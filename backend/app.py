@@ -7,14 +7,28 @@ from datetime import datetime, timedelta
 import requests
 import urllib3
 from functools import wraps
+from dotenv import load_dotenv
 
 # Désactiver les avertissements SSL
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
+# Charger les variables d'environnement
+load_dotenv()
+
+# Récupérer les variables d'environnement
+DT_ENV_URL = os.environ.get('DT_ENV_URL')
+API_TOKEN = os.environ.get('API_TOKEN')
+CACHE_DURATION = 300  # 5 minutes en secondes
+
 app = Flask(__name__)
 CORS(app)  # Activer CORS pour toutes les routes
 
-load_dotenv()
+# Fonction pour construire les sélecteurs d'entités avec filtrage par MZ
+def build_entity_selector(entity_type, mz_name):
+    """
+    Construit un sélecteur d'entité avec filtrage par type et management zone
+    """
+    return f"type({entity_type}),mzName(\"{mz_name}\")"
 
 # ...autres importations et code existant...
 
@@ -278,14 +292,14 @@ def get_summary():
         if not current_mz:
             return {'error': 'Aucune Management Zone définie'}
         
-        # Récupérer les données de base
+        # Récupérer les données de base en utilisant les sélecteurs d'entités
         services_data = query_api("entities", {
-            "entitySelector": f"type(SERVICE),mzName(\"{current_mz}\")",
+            "entitySelector": build_entity_selector("SERVICE", current_mz),
             "fields": "+properties,+fromRelationships"
         })
         
         hosts_data = query_api("entities", {
-            "entitySelector": f"type(HOST),mzName(\"{current_mz}\")",
+            "entitySelector": build_entity_selector("HOST", current_mz),
             "fields": "+properties,+fromRelationships"
         })
         
@@ -415,8 +429,11 @@ def get_hosts():
         if not current_mz:
             return {'error': 'Aucune Management Zone définie'}
         
+        # Utiliser la fonction build_entity_selector
+        entity_selector = build_entity_selector("HOST", current_mz)
+        
         hosts_data = query_api("entities", {
-            "entitySelector": f"type(HOST),mzName(\"{current_mz}\")",
+            "entitySelector": entity_selector,
             "fields": "+properties,+fromRelationships"
         })
         
@@ -501,8 +518,11 @@ def get_services():
         if not current_mz:
             return {'error': 'Aucune Management Zone définie'}
         
+        # Utiliser la fonction build_entity_selector
+        entity_selector = build_entity_selector("SERVICE", current_mz)
+        
         services_data = query_api("entities", {
-            "entitySelector": f"type(SERVICE),mzName(\"{current_mz}\")",
+            "entitySelector": entity_selector,
             "fields": "+properties,+fromRelationships"
         })
         
@@ -630,8 +650,11 @@ def get_processes():
         if not current_mz:
             return {'error': 'Aucune Management Zone définie'}
         
+        # Utiliser la fonction build_entity_selector
+        entity_selector = build_entity_selector("PROCESS_GROUP", current_mz)
+        
         process_groups_data = query_api("entities", {
-            "entitySelector": f"type(PROCESS_GROUP),mzName(\"{current_mz}\")",
+            "entitySelector": entity_selector,
             "fields": "+properties,+fromRelationships"
         })
         
@@ -686,7 +709,8 @@ def get_problems():
                     'status': problem.get('status', 'OPEN'),
                     'affected_entities': len(problem.get('affectedEntities', [])),
                     'start_time': datetime.fromtimestamp(problem.get('startTime', 0)/1000).strftime('%Y-%m-%d %H:%M'),
-                    'dt_url': f"{DT_ENV_URL}/#problems/problemdetails;pid={problem.get('problemId', 'Unknown')}"
+                    'dt_url': f"{DT_ENV_URL}/#problems/problemdetails;pid={problem.get('problemId', 'Unknown')}",
+                    'zone': current_mz
                 })
         
         return active_problems
