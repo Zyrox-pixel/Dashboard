@@ -36,3 +36,4 @@ export const CACHE_TYPES = {
   SUMMARY: 'summary',
   MANAGEMENT_ZONES: 'management_zones'
 };
+

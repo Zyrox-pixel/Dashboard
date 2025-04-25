@@ -34,6 +34,7 @@ export interface ManagementZone {
   availability: string;
   status: 'healthy' | 'warning';
   color: 'red' | 'amber' | 'orange' | 'blue' | 'emerald' | 'purple' | 'green';
+  dt_url: string; // Ajout de cette propriété manquante
 }
 
 // Types pour les process groups

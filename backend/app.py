@@ -14,10 +14,37 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 app = Flask(__name__)
 CORS(app)  # Activer CORS pour toutes les routes
 
-# Configuration (à déplacer dans un fichier .env pour la production)
-DT_ENV_URL = os.environ.get('DT_ENV_URL')
-API_TOKEN = os.environ.get('API_TOKEN')  
-CACHE_DURATION = 300  # 5 minutes en secondes
+load_dotenv()
+
+# ...autres importations et code existant...
+
+# Fonction pour obtenir la liste des MZs Vital for Group
+def get_vital_for_group_mzs():
+    # Récupérer la liste depuis la variable d'environnement
+    vfg_mz_string = os.environ.get('VFG_MZ_LIST', '')
+    
+    # Si la variable n'est pas définie, retourner une liste vide
+    if not vfg_mz_string:
+        return []
+    
+    # Diviser la chaîne en liste de MZs
+    return [mz.strip() for mz in vfg_mz_string.split(',')]
+
+# ... code existant ...
+
+# Nouvel endpoint pour obtenir les Management Zones de Vital for Group
+@app.route('/api/vital-for-group-mzs', methods=['GET'])
+def get_vital_for_group_mzs_endpoint():
+    try:
+        vfg_mzs = get_vital_for_group_mzs()
+        
+        # Format de réponse simple
+        return jsonify({
+            'mzs': vfg_mzs
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 
 # Structure de cache simple
 cache = {
