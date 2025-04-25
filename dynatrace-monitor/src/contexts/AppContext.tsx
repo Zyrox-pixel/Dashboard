@@ -6,29 +6,33 @@ import {
   ProcessGroup, 
   VitalForGroupMZsResponse,
   ProblemResponse,
-  ProcessResponse 
+  ProcessResponse,
+  Host,
+  Service
 } from '../api/types';
-import { DollarSign, Building, CreditCard, Users, ShoppingCart, Truck, Database, LineChart, Shield, Key, Globe, Server, Grid } from 'lucide-react';
+import { Database, Shield, Key, Globe, Server, Grid, Building, CreditCard } from 'lucide-react';
 
 // Définition du type pour le contexte de l'application
 interface AppContextType {
   activeProblems: Problem[];
   managementZones: ManagementZone[];
-  vitalForGroupMZs: ManagementZone[]; // Nouvelle propriété pour Vital for Group
+  vitalForGroupMZs: ManagementZone[];
   selectedZone: string | null;
   sidebarCollapsed: boolean;
   currentPage: number;
   activeTab: string;
-  processGroups: ProcessGroup[]; // Renommé de financeProcessGroups
+  processGroups: ProcessGroup[];
+  hosts: Host[];
+  services: Service[];
   isLoading: {
     problems: boolean;
     managementZones: boolean;
     zoneDetails: boolean;
-    vitalForGroupMZs: boolean; // Nouvel état de chargement
-    initialLoadComplete: boolean; // Nouvel état pour indiquer le chargement initial
+    vitalForGroupMZs: boolean;
+    initialLoadComplete: boolean;
   };
-  error: string | null; // Pour gérer les erreurs
-  backendConnected: boolean; // Nouvel état pour indiquer si le backend est connecté
+  error: string | null;
+  backendConnected: boolean;
   
   // Fonctions pour modifier l'état
   setSelectedZone: (zoneId: string | null) => void;
@@ -45,7 +49,6 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 const getZoneIcon = (zoneName: string) => {
   const lowerName = zoneName.toLowerCase();
   
-  // Icônes spécifiques pour les MZs de Vital for Group
   if (lowerName.includes('acesid')) {
     return <Key />;
   } else if (lowerName.includes('ocsp')) {
@@ -72,7 +75,6 @@ const getZoneIcon = (zoneName: string) => {
 const getZoneColor = (zoneName: string) => {
   const lowerName = zoneName.toLowerCase();
   
-  // Couleurs spécifiques pour les MZs de Vital for Group
   if (lowerName.includes('acesid')) {
     return 'blue';
   } else if (lowerName.includes('ocsp')) {
@@ -95,56 +97,13 @@ const getZoneColor = (zoneName: string) => {
   return colors[hash % colors.length] as 'red' | 'amber' | 'orange' | 'blue' | 'emerald' | 'purple' | 'green';
 };
 
-// Données mockées pour les problèmes - ne pas définir par défaut
-const mockActiveProblems: Problem[] = [
-  {
-    id: "PROB-1",
-    title: "Latence élevée sur API Clients",
-    code: "AP03566",
-    subtitle: "ACESID - Management Zone: Vital for Group",
-    time: "Il y a 37 minutes",
-    type: "Dégradation de performance",
-    responseTime: "2.7s (seuil: 1.5s)",
-    servicesImpacted: "2",
-    usersAffected: "~450",
-    impact: "MOYEN",
-    status: "warning",
-    zone: "PRODSEC - AP03566 - ACESID"
-  },
-  {
-    id: "PROB-2",
-    title: "CPU élevé sur serveur de base de données",
-    code: "AP11564",
-    subtitle: "OCSP - Management Zone: Vital for Group",
-    time: "Il y a 1 heure",
-    type: "Utilisation ressources",
-    cpuUsage: "92% (seuil: 80%)",
-    host: "s02vl8822471.fr.net.intra",
-    duration: "58 minutes",
-    impact: "ÉLEVÉ",
-    status: "critical",
-    zone: "PRODSEC - AP11564 - OCSP"
-  }
-];
-
-// Données statiques pour les MZs de Vital for Group (utilisées si l'API échoue)
-const staticVitalForGroupMZs = [
-  "PRODSEC - AP03566 - ACESID",
-  "PRODSEC - AP11564 - OCSP",
-  "PRODSEC - AP11038 - WebSSO ITG",
-  "PRODSEC - AP07352 - REFSG",
-  "PRODSEC - AP24220 - Micro-segmentation",
-  "PRODSEC - AP11667 - EPV-MUT",
-  "PRODSEC - AP24260 - EPV-FORTIS"
-];
-
 // Fournisseur du contexte
 interface AppProviderProps {
   children: ReactNode;
 }
 
 export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
-  // Au lieu d'initialiser avec des données mockées, on initialise avec des tableaux vides
+  // Initialisation avec des tableaux vides
   const [activeProblems, setActiveProblems] = useState<Problem[]>([]);
   const [managementZones, setManagementZones] = useState<ManagementZone[]>([]);
   const [vitalForGroupMZs, setVitalForGroupMZs] = useState<ManagementZone[]>([]);
@@ -153,13 +112,15 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [activeTab, setActiveTab] = useState<string>('process-groups');
   const [processGroups, setProcessGroups] = useState<ProcessGroup[]>([]);
-  const [backendConnected, setBackendConnected] = useState<boolean>(false); // État de connexion au backend
+  const [hosts, setHosts] = useState<Host[]>([]);
+  const [services, setServices] = useState<Service[]>([]);
+  const [backendConnected, setBackendConnected] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState({
     problems: true,
     managementZones: true,
     zoneDetails: false,
     vitalForGroupMZs: true,
-    initialLoadComplete: false // Indique si le chargement initial est terminé
+    initialLoadComplete: false
   });
   const [error, setError] = useState<string | null>(null);
 
@@ -186,13 +147,13 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         code: id,
         icon: getZoneIcon(mzName),
         problemCount: 0,
-        apps: Math.floor(Math.random() * 5) + 1,
-        services: Math.floor(Math.random() * 10) + 5,
-        hosts: Math.floor(Math.random() * 8) + 2,
-        availability: (97 + Math.random() * 3).toFixed(1) + "%",
+        apps: Math.floor(Math.random() * 5) + 1, // Valeur temporaire, à remplacer avec les vraies données
+        services: Math.floor(Math.random() * 10) + 5, // Valeur temporaire, à remplacer avec les vraies données
+        hosts: Math.floor(Math.random() * 8) + 2, // Valeur temporaire, à remplacer avec les vraies données
+        availability: (97 + Math.random() * 3).toFixed(1) + "%", // Valeur temporaire, à remplacer avec les vraies données
         status: "healthy" as "healthy" | "warning",
         color: getZoneColor(mzName),
-        dt_url: "#"
+        dt_url: "#" // Valeur temporaire, à remplacer avec les vraies données
       };
     });
   };
@@ -208,108 +169,23 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     }
   };
 
-  // Fonction pour charger les données de l'API
-  const fetchData = async () => {
+  // Fonction pour charger les données spécifiques à une zone
+  const loadZoneData = async (zoneId: string) => {
+    setIsLoading(prev => ({ ...prev, zoneDetails: true }));
     try {
-      setIsLoading(prev => ({ 
-        ...prev, 
-        problems: true, 
-        managementZones: true, 
-        vitalForGroupMZs: true,
-        initialLoadComplete: false
-      }));
-      
-      // Vérifier si le backend est en ligne
-      const isBackendConnected = await checkBackendStatus();
-      setBackendConnected(isBackendConnected);
-      
-      if (!isBackendConnected) {
-        setError("Le serveur backend n'est pas accessible. Veuillez vérifier votre connexion.");
-        setIsLoading(prev => ({ 
-          ...prev,
-
-          problems: false, 
-          managementZones: false,
-          vitalForGroupMZs: false,
-          initialLoadComplete: true
-        }));
-        return;
-      }
-      
-      // Charger les MZs de Vital for Group
-      let vfgMZs: ManagementZone[] = [];
-      
-      try {
-        const vfgResponse = await api.getVitalForGroupMZs();
+      // Trouver la MZ complète à partir de l'ID
+      const selectedZoneObj = vitalForGroupMZs.find(zone => zone.id === zoneId);
+      if (selectedZoneObj) {
+        // Définir la MZ actuelle sur le backend
+        const setMzResponse = await api.setManagementZone(selectedZoneObj.name);
         
-        if (!vfgResponse.error && vfgResponse.data) {
-          const vfgData = vfgResponse.data as VitalForGroupMZsResponse;
-          if (vfgData.mzs && Array.isArray(vfgData.mzs) && vfgData.mzs.length > 0) {
-            vfgMZs = createMZsFromNames(vfgData.mzs);
-          } else {
-            // Utiliser les noms statiques si l'API renvoie un tableau vide
-            vfgMZs = createMZsFromNames(staticVitalForGroupMZs);
-          }
-        } else {
-          // Utiliser les noms statiques si l'API échoue
-          vfgMZs = createMZsFromNames(staticVitalForGroupMZs);
+        if (setMzResponse.error) {
+          console.error('Erreur lors de la définition de la MZ:', setMzResponse.error);
+          setError(`Erreur lors de la définition de la MZ: ${setMzResponse.error}`);
+          return;
         }
-      } catch (error) {
-        console.error('Error fetching Vital for Group MZs:', error);
-        vfgMZs = createMZsFromNames(staticVitalForGroupMZs);
-      }
-      
-      setVitalForGroupMZs(vfgMZs);
-      
-      // Sélectionner automatiquement la première MZ
-      if (!selectedZone && vfgMZs.length > 0) {
-        setSelectedZone(vfgMZs[0].id);
-      }
-      
-      // Charger les problèmes
-      try {
-        const problemsResponse = await api.getProblems();
         
-        if (!problemsResponse.error && problemsResponse.data) {
-          const problemsData = problemsResponse.data as ProblemResponse[];
-          
-          if (Array.isArray(problemsData) && problemsData.length > 0) {
-            // Transformer les données en format attendu par le frontend
-            const problems: Problem[] = problemsData.map((problem: ProblemResponse) => ({
-              id: problem.id || `PROB-${Math.random().toString(36).substr(2, 9)}`,
-              title: problem.title || "Problème inconnu",
-              code: problem.id ? problem.id.substring(0, 7) : "UNKNOWN",
-              subtitle: `${problem.zone || "Non spécifié"} - Impact: ${problem.impact || "INCONNU"}`,
-              time: problem.start_time ? `Depuis ${problem.start_time}` : "Récent",
-              type: "Problème Dynatrace",
-              status: problem.status === "OPEN" ? "critical" : "warning",
-              impact: problem.impact === "INFRASTRUCTURE" ? "ÉLEVÉ" : problem.impact === "SERVICE" ? "MOYEN" : "FAIBLE",
-              zone: problem.zone || "Non spécifié",
-              servicesImpacted: problem.affected_entities ? problem.affected_entities.toString() : "0",
-              dt_url: problem.dt_url || "#"
-            }));
-            
-            setActiveProblems(problems);
-            
-            // Mettre à jour les compteurs de problèmes pour les MZs
-            const updatedVfgMZs: ManagementZone[] = vfgMZs.map(zone => {
-              const zoneProblems = problems.filter((p: Problem) => p.zone.includes(zone.name));
-              return {
-                ...zone,
-                problemCount: zoneProblems.length,
-                status: zoneProblems.length > 0 ? "warning" : "healthy"
-              };
-            });
-            
-            setVitalForGroupMZs(updatedVfgMZs);
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching problems:', error);
-      }
-      
-      // Charger les process groups si une zone est sélectionnée
-      if (selectedZone) {
+        // Récupérer les process groups pour cette MZ
         try {
           const processResponse = await api.getProcesses();
           
@@ -343,15 +219,166 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
               });
               
               setProcessGroups(processes);
+            } else {
+              // Aucun processus trouvé
+              setProcessGroups([]);
             }
+          } else if (processResponse.error) {
+            console.error('Erreur lors de la récupération des processus:', processResponse.error);
+            setProcessGroups([]);
           }
         } catch (error) {
-          console.error('Error fetching process groups:', error);
+          console.error('Erreur lors de la récupération des processus:', error);
+          setProcessGroups([]);
         }
+        
+        // Récupérer les hosts pour cette MZ
+        try {
+          const hostsResponse = await api.getHosts();
+          
+          if (!hostsResponse.error && hostsResponse.data) {
+            setHosts(hostsResponse.data as Host[]);
+          } else if (hostsResponse.error) {
+            console.error('Erreur lors de la récupération des hosts:', hostsResponse.error);
+            setHosts([]);
+          }
+        } catch (error) {
+          console.error('Erreur lors de la récupération des hosts:', error);
+          setHosts([]);
+        }
+        
+        // Récupérer les services pour cette MZ
+        try {
+          const servicesResponse = await api.getServices();
+          
+          if (!servicesResponse.error && servicesResponse.data) {
+            setServices(servicesResponse.data as Service[]);
+          } else if (servicesResponse.error) {
+            console.error('Erreur lors de la récupération des services:', servicesResponse.error);
+            setServices([]);
+          }
+        } catch (error) {
+          console.error('Erreur lors de la récupération des services:', error);
+          setServices([]);
+        }
+      }
+    } catch (error) {
+      console.error('Erreur lors du chargement des données de la zone:', error);
+      setError('Erreur lors du chargement des données pour la zone sélectionnée.');
+    } finally {
+      setIsLoading(prev => ({ ...prev, zoneDetails: false }));
+    }
+  };
+
+  // Fonction pour charger les données de l'API
+  const fetchData = async () => {
+    try {
+      setIsLoading(prev => ({ 
+        ...prev, 
+        problems: true, 
+        managementZones: true, 
+        vitalForGroupMZs: true,
+        initialLoadComplete: false
+      }));
+      
+      // Vérifier si le backend est en ligne
+      const isBackendConnected = await checkBackendStatus();
+      setBackendConnected(isBackendConnected);
+      
+      if (!isBackendConnected) {
+        setError("Le serveur backend n'est pas accessible. Veuillez vérifier votre connexion.");
+        setIsLoading(prev => ({ 
+          ...prev,
+          problems: false, 
+          managementZones: false,
+          vitalForGroupMZs: false,
+          initialLoadComplete: true
+        }));
+        return;
+      }
+      
+      // Charger les MZs de Vital for Group depuis l'API
+      try {
+        const vfgResponse = await api.getVitalForGroupMZs();
+        
+        if (!vfgResponse.error && vfgResponse.data) {
+          const vfgData = vfgResponse.data as VitalForGroupMZsResponse;
+          if (vfgData.mzs && Array.isArray(vfgData.mzs) && vfgData.mzs.length > 0) {
+            const vfgMZs = createMZsFromNames(vfgData.mzs);
+            setVitalForGroupMZs(vfgMZs);
+            
+            // Sélectionner automatiquement la première MZ si aucune n'est sélectionnée
+            if (!selectedZone && vfgMZs.length > 0) {
+              setSelectedZone(vfgMZs[0].id);
+            }
+          } else {
+            console.warn('Aucune MZ Vital for Group trouvée dans la réponse API.');
+            setVitalForGroupMZs([]);
+          }
+        } else {
+          console.error('Erreur lors de la récupération des MZs Vital for Group:', vfgResponse.error);
+          setVitalForGroupMZs([]);
+        }
+      } catch (error) {
+        console.error('Erreur lors de la récupération des MZs Vital for Group:', error);
+        setVitalForGroupMZs([]);
+      }
+      
+      // Charger les problèmes
+      try {
+        const problemsResponse = await api.getProblems();
+        
+        if (!problemsResponse.error && problemsResponse.data) {
+          const problemsData = problemsResponse.data as ProblemResponse[];
+          
+          if (Array.isArray(problemsData)) {
+            // Transformer les données en format attendu par le frontend
+            const problems: Problem[] = problemsData.map((problem: ProblemResponse) => ({
+              id: problem.id || `PROB-${Math.random().toString(36).substr(2, 9)}`,
+              title: problem.title || "Problème inconnu",
+              code: problem.id ? problem.id.substring(0, 7) : "UNKNOWN",
+              subtitle: `${problem.zone || "Non spécifié"} - Impact: ${problem.impact || "INCONNU"}`,
+              time: problem.start_time ? `Depuis ${problem.start_time}` : "Récent",
+              type: "Problème Dynatrace",
+              status: problem.status === "OPEN" ? "critical" : "warning",
+              impact: problem.impact === "INFRASTRUCTURE" ? "ÉLEVÉ" : problem.impact === "SERVICE" ? "MOYEN" : "FAIBLE",
+              zone: problem.zone || "Non spécifié",
+              servicesImpacted: problem.affected_entities ? problem.affected_entities.toString() : "0",
+              dt_url: problem.dt_url || "#"
+            }));
+            
+            setActiveProblems(problems);
+            
+            // Mettre à jour les compteurs de problèmes pour les MZs
+            if (vitalForGroupMZs.length > 0) {
+              const updatedVfgMZs: ManagementZone[] = vitalForGroupMZs.map(zone => {
+                const zoneProblems = problems.filter((p: Problem) => p.zone.includes(zone.name));
+                return {
+                  ...zone,
+                  problemCount: zoneProblems.length,
+                  status: zoneProblems.length > 0 ? "warning" : "healthy"
+                };
+              });
+              
+              setVitalForGroupMZs(updatedVfgMZs);
+            }
+          }
+        } else if (problemsResponse.error) {
+          console.error('Erreur lors de la récupération des problèmes:', problemsResponse.error);
+          setActiveProblems([]);
+        }
+      } catch (error) {
+        console.error('Erreur lors de la récupération des problèmes:', error);
+        setActiveProblems([]);
+      }
+      
+      // Charger les données pour la zone sélectionnée
+      if (selectedZone) {
+        await loadZoneData(selectedZone);
       }
       
     } catch (error) {
-      console.error('Error fetching data:', error);
+      console.error('Erreur lors du chargement des données:', error);
       setError('Erreur lors du chargement des données. Veuillez réessayer.');
     } finally {
       setIsLoading(prev => ({ 
@@ -359,8 +386,16 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         problems: false, 
         managementZones: false,
         vitalForGroupMZs: false,
-        initialLoadComplete: true // Le chargement initial est terminé
+        initialLoadComplete: true
       }));
+    }
+  };
+
+  // Fonction pour définir la zone sélectionnée et charger ses données
+  const setSelectedZoneAndLoadData = (zoneId: string | null) => {
+    setSelectedZone(zoneId);
+    if (zoneId) {
+      loadZoneData(zoneId);
     }
   };
 
@@ -380,11 +415,13 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     currentPage,
     activeTab,
     processGroups,
+    hosts,
+    services,
     isLoading,
     error,
     backendConnected,
     
-    setSelectedZone,
+    setSelectedZone: setSelectedZoneAndLoadData,
     setSidebarCollapsed,
     setCurrentPage,
     setActiveTab,
