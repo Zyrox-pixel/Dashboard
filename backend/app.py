@@ -681,6 +681,7 @@ def get_processes():
     except Exception as e:
         return {'error': str(e)}
 
+        
 @app.route('/api/problems', methods=['GET'])
 @cached('problems')
 def get_problems():
@@ -690,32 +691,68 @@ def get_problems():
         if not current_mz:
             return {'error': 'Aucune Management Zone définie'}
         
+        # Récupérer tous les problèmes ouverts sans filtrer par MZ via l'API
         problems_data = query_api(
             endpoint="problems",
             params={
                 "from": "-24h",
-                "status": "OPEN",
-                "managementZone": current_mz
+                "status": "OPEN"
+                # Nous retirons le filtre managementZone pour éviter les problèmes de filtrage incorrect
             }
         )
         
         active_problems = []
         if 'problems' in problems_data:
+            total_problems = len(problems_data['problems'])
+            print(f"Nombre total de problèmes récupérés: {total_problems}")
+            
+            # On va filtrer manuellement les problèmes liés à notre Management Zone
+            mz_problems = 0
             for problem in problems_data['problems']:
-                active_problems.append({
-                    'id': problem.get('problemId', 'Unknown'),
-                    'title': problem.get('title', 'Problème inconnu'),
-                    'impact': problem.get('impactLevel', 'UNKNOWN'),
-                    'status': problem.get('status', 'OPEN'),
-                    'affected_entities': len(problem.get('affectedEntities', [])),
-                    'start_time': datetime.fromtimestamp(problem.get('startTime', 0)/1000).strftime('%Y-%m-%d %H:%M'),
-                    'dt_url': f"{DT_ENV_URL}/#problems/problemdetails;pid={problem.get('problemId', 'Unknown')}",
-                    'zone': current_mz
-                })
+                # Vérifier si le problème est lié à notre Management Zone
+                is_in_mz = False
+                
+                # Rechercher dans les management zones directement attachées au problème
+                if 'managementZones' in problem:
+                    for mz in problem.get('managementZones', []):
+                        if mz.get('name') == current_mz:
+                            is_in_mz = True
+                            break
+                
+                # Rechercher aussi dans les entités affectées
+                if not is_in_mz:
+                    for entity in problem.get('affectedEntities', []):
+                        # Vérifier les management zones de chaque entité affectée
+                        for mz in entity.get('managementZones', []):
+                            if mz.get('name') == current_mz:
+                                is_in_mz = True
+                                break
+                        if is_in_mz:
+                            break
+                
+                # Si le problème est dans notre MZ, l'ajouter à notre liste
+                if is_in_mz:
+                    mz_problems += 1
+                    active_problems.append({
+                        'id': problem.get('problemId', 'Unknown'),
+                        'title': problem.get('title', 'Problème inconnu'),
+                        'impact': problem.get('impactLevel', 'UNKNOWN'),
+                        'status': problem.get('status', 'OPEN'),
+                        'affected_entities': len(problem.get('affectedEntities', [])),
+                        'start_time': datetime.fromtimestamp(problem.get('startTime', 0)/1000).strftime('%Y-%m-%d %H:%M'),
+                        'dt_url': f"{DT_ENV_URL}/#problems/problemdetails;pid={problem.get('problemId', 'Unknown')}",
+                        'zone': current_mz
+                    })
+            
+            print(f"Problèmes filtrés appartenant à {current_mz}: {mz_problems}/{total_problems}")
         
         return active_problems
     except Exception as e:
+        print(f"Erreur lors de la récupération des problèmes: {e}")
+        import traceback
+        traceback.print_exc()
         return {'error': str(e)}
+
 
 @app.route('/api/management-zones', methods=['GET'])
 @cached('management_zones')
