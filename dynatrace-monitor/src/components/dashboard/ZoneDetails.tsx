@@ -1,9 +1,10 @@
 import React from 'react';
-import { ChevronLeft, Clock, AlertTriangle, ExternalLink, RefreshCw, Cpu, Activity, Server, Filter } from 'lucide-react';
+import { ChevronLeft, Clock, AlertTriangle, ExternalLink, RefreshCw, Cpu, Activity, Server, Filter, Loader } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { ManagementZone, Problem, ProcessGroup } from '../../api/types';
 import ProblemsList from './ProblemsList';
 import ProcessGroupRow from '../common/ProcessGroupRow';
+import { useApp } from '../../contexts/AppContext';
 
 interface ZoneDetailsProps {
   zone: ManagementZone;
@@ -12,6 +13,7 @@ interface ZoneDetailsProps {
   activeTab: string;
   onBackClick: () => void;
   onTabChange: (tab: string) => void;
+  isLoading?: boolean; // Ajout de la propriété isLoading comme optionnelle
 }
 
 const ZoneDetails: React.FC<ZoneDetailsProps> = ({
@@ -20,9 +22,11 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
   processGroups,
   activeTab,
   onBackClick,
-  onTabChange
+  onTabChange,
+  isLoading = false // Valeur par défaut
 }) => {
   const { isDarkTheme } = useTheme();
+  const { refreshData } = useApp();
   const zoneProblems = problems.filter(problem => problem.zone === zone.name);
 
   // Déterminer les couleurs en fonction de la zone et du thème
@@ -77,6 +81,28 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
 
   const zoneColors = getZoneColors();
 
+  // État de chargement pour les détails de la zone
+  if (isLoading) {
+    return (
+      <div>
+        <button 
+          onClick={onBackClick}
+          className={`mb-5 flex items-center gap-2 px-4 py-1.5 rounded-lg border ${
+            isDarkTheme ? 'border-slate-600 text-slate-300 hover:bg-slate-700' : 'border-slate-300 text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          <ChevronLeft size={14} />
+          <span>Retour aux Management Zones</span>
+        </button>
+        
+        <div className="flex flex-col items-center justify-center h-64">
+          <Loader className="w-10 h-10 text-indigo-500 animate-spin mb-4" />
+          <p className="text-slate-400">Chargement des détails de la zone...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div>
       <button 
@@ -103,7 +129,7 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
             <div className="flex items-center gap-4 mt-1">
               <div className="flex items-center gap-1.5">
                 <Clock size={12} className="text-slate-400" />
-                <span className="text-xs text-slate-400">Dernière mise à jour: 10:53</span>
+                <span className="text-xs text-slate-400">Dernière mise à jour: {new Date().toLocaleTimeString()}</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <AlertTriangle size={12} className={zoneProblems.length > 0 ? "text-red-500" : "text-green-500"} />
@@ -119,12 +145,20 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
         </div>
         
         <div className="flex gap-3">
-          <a href="#" className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm ${zoneColors.bg} ${zoneColors.text}`}>
+          <a 
+            href={zone.dt_url} 
+            target="_blank"
+            rel="noopener noreferrer"
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm ${zoneColors.bg} ${zoneColors.text}`}
+          >
             <ExternalLink size={14} />
             <span>Ouvrir dans Dynatrace</span>
           </a>
           
-          <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 text-sm">
+          <button 
+            onClick={refreshData}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 text-sm"
+          >
             <RefreshCw size={14} />
             <span>Rafraîchir</span>
           </button>
@@ -247,9 +281,17 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-700">
-              {processGroups.map((process, index) => (
-                <ProcessGroupRow key={index} process={process} index={index} />
-              ))}
+              {processGroups.length > 0 ? (
+                processGroups.map((process, index) => (
+                  <ProcessGroupRow key={index} process={process} index={index} />
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={3} className="p-8 text-center text-slate-500">
+                    Aucun process group trouvé pour cette management zone.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </section>

@@ -1,6 +1,11 @@
 import axios, { AxiosError, AxiosRequestConfig, AxiosResponse } from 'axios';
 import { API_BASE_URL, ENDPOINTS, CACHE_TYPES } from './endpoints';
-import { ApiResponse } from './types';
+import { 
+  ApiResponse, 
+  VitalForGroupMZsResponse,
+  ProblemResponse,
+  ProcessResponse
+} from './types';
 
 // Création d'une instance axios avec des configurations de base
 const apiClient = axios.create({
@@ -83,7 +88,7 @@ const api = {
 
   // Récupérer les problèmes
   getProblems() {
-    return this.get(ENDPOINTS.PROBLEMS);
+    return this.get<ProblemResponse[]>(ENDPOINTS.PROBLEMS);
   },
 
   // Récupérer les management zones
@@ -94,6 +99,11 @@ const api = {
   // Récupérer la management zone actuelle
   getCurrentManagementZone() {
     return this.get(ENDPOINTS.CURRENT_MANAGEMENT_ZONE);
+  },
+
+  // Récupérer les management zones de Vital for Group
+  getVitalForGroupMZs() {
+    return this.get<VitalForGroupMZsResponse>(ENDPOINTS.VITAL_FOR_GROUP_MZS);
   },
 
   // Définir la management zone actuelle
@@ -113,7 +123,7 @@ const api = {
 
   // Récupérer les process groups
   getProcesses() {
-    return this.get(ENDPOINTS.PROCESSES);
+    return this.get<ProcessResponse[]>(ENDPOINTS.PROCESSES);
   },
 
   // Rafraîchir un type de cache
