@@ -103,7 +103,7 @@ const Sidebar: React.FC = () => {
               }`}
             >
               <Award size={20} className="flex-shrink-0" />
-              {!sidebarCollapsed && <span className="whitespace-nowrap">Vital for Anthropic</span>}
+              {!sidebarCollapsed && <span className="whitespace-nowrap">Vital for Entreprise</span>}
             </Link>
           </li>
           <li>

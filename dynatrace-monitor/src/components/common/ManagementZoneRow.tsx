@@ -1,118 +1,90 @@
 import React from 'react';
-import { AlertTriangle, ExternalLink } from 'lucide-react';
-import { Problem } from '../../api/types';
+import { ManagementZone } from '../../api/types';
 
-interface ProblemCardProps {
-  problem: Problem;
+interface ManagementZoneRowProps {
+  zone: ManagementZone;
+  onZoneClick: (zoneId: string) => void;
 }
 
-const ProblemCard: React.FC<ProblemCardProps> = ({ problem }) => {
+const ManagementZoneRow: React.FC<ManagementZoneRowProps> = ({ zone, onZoneClick }) => {
   return (
-    <div className="relative mb-3 rounded-md overflow-hidden border border-slate-700 bg-slate-800 dark:bg-slate-800 dark:border-slate-700">
-      <div className="absolute top-0 left-0 w-1 h-full bg-red-500"></div>
-      
-      <div className="flex justify-between items-center py-3 px-4 border-b border-slate-700 dark:border-slate-700">
-        <div className="flex items-center gap-3">
-          <AlertTriangle className="text-red-500" size={18} />
-          <div>
-            <div className="font-medium text-white flex items-center gap-2 dark:text-white">
-              {problem.title}
-              <span className="text-xs px-2 py-0.5 rounded bg-red-900/50 text-red-400 border border-red-500/30 dark:bg-red-900/50 dark:text-red-400 dark:border-red-500/30">{problem.code}</span>
-            </div>
-            <div className="text-xs text-slate-400 dark:text-slate-400">{problem.subtitle}</div>
-          </div>
+    <div 
+      onClick={() => onZoneClick(zone.id)}
+      className="border-t first:border-t-0 border-slate-700 py-3 px-2 grid grid-cols-12 gap-2 items-center hover:bg-slate-700/20 cursor-pointer dark:border-slate-700 dark:hover:bg-slate-700/20"
+    >
+      {/* Icône et nom */}
+      <div className="col-span-3 flex items-center gap-3">
+        <div className={`w-8 h-8 rounded-md flex items-center justify-center ${
+          zone.status === 'healthy' 
+            ? 'bg-green-500/10 text-green-400 dark:bg-green-500/10 dark:text-green-400' 
+            : 'bg-red-500/10 text-red-400 dark:bg-red-500/10 dark:text-red-400'
+        }`}>
+          {zone.icon}
         </div>
-        <div className="text-xs text-slate-400 dark:text-slate-400">
-          {problem.time}
-        </div>
-      </div>
-      
-      <div className="grid grid-cols-4 py-2 px-4 text-sm">
         <div>
-          <div className="text-xs uppercase text-slate-500 mb-0.5 dark:text-slate-500">TYPE</div>
-          <div className="text-slate-300 dark:text-slate-300">{problem.type}</div>
+          <div className="font-semibold flex items-center gap-1.5 text-white dark:text-white">
+            {zone.name}
+            {zone.problemCount > 0 && (
+              <div className="w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center text-xs font-bold dark:bg-red-500 dark:text-white">
+                {zone.problemCount}
+              </div>
+            )}
+          </div>
+          <div className="text-xs text-slate-400 dark:text-slate-400">{zone.code}</div>
         </div>
-        
-        {problem.responseTime && (
-          <div>
-            <div className="text-xs uppercase text-slate-500 mb-0.5 dark:text-slate-500">TEMPS DE RÉPONSE</div>
-            <div className="text-red-500 dark:text-red-500">{problem.responseTime}</div>
-          </div>
-        )}
-        
-        {problem.cpuUsage && (
-          <div>
-            <div className="text-xs uppercase text-slate-500 mb-0.5 dark:text-slate-500">CPU</div>
-            <div className="text-red-500 dark:text-red-500">{problem.cpuUsage}</div>
-          </div>
-        )}
-        
-        {problem.errorRate && (
-          <div>
-            <div className="text-xs uppercase text-slate-500 mb-0.5 dark:text-slate-500">TAUX D'ERREUR</div>
-            <div className="text-red-500 dark:text-red-500">{problem.errorRate}</div>
-          </div>
-        )}
-        
-        {problem.host && (
-          <div>
-            <div className="text-xs uppercase text-slate-500 mb-0.5 dark:text-slate-500">HÔTE</div>
-            <div className="text-slate-300 dark:text-slate-300">{problem.host}</div>
-          </div>
-        )}
-        
-        {problem.servicesImpacted && (
-          <div>
-            <div className="text-xs uppercase text-slate-500 mb-0.5 dark:text-slate-500">SERVICES IMPACTÉS</div>
-            <div className="text-slate-300 dark:text-slate-300">{problem.servicesImpacted}</div>
-          </div>
-        )}
-        
-        {problem.usersAffected && (
-          <div>
-            <div className="text-xs uppercase text-slate-500 mb-0.5 dark:text-slate-500">UTILISATEURS AFFECTÉS</div>
-            <div className="text-slate-300 dark:text-slate-300">{problem.usersAffected}</div>
-          </div>
-        )}
-        
-        {problem.failedTransactions && (
-          <div>
-            <div className="text-xs uppercase text-slate-500 mb-0.5 dark:text-slate-500">TRANSACTIONS ÉCHOUÉES</div>
-            <div className="text-slate-300 dark:text-slate-300">{problem.failedTransactions}</div>
-          </div>
-        )}
-        
-        {problem.duration && (
-          <div>
-            <div className="text-xs uppercase text-slate-500 mb-0.5 dark:text-slate-500">DURÉE</div>
-            <div className="text-slate-300 dark:text-slate-300">{problem.duration}</div>
-          </div>
-        )}
       </div>
       
-      <div className="flex justify-between items-center py-2 px-4 border-t border-slate-700 dark:border-slate-700">
-        <div className="flex items-center gap-2 text-xs text-slate-400 dark:text-slate-400">
-          <span>Impact:</span>
-          <span className={`uppercase px-2 py-0.5 rounded text-xs font-medium ${
-            problem.impact === 'MOYEN' 
-              ? 'bg-yellow-600 text-white dark:bg-yellow-600 dark:text-white' 
-              : problem.impact === 'ÉLEVÉ' 
-                ? 'bg-red-600 text-white dark:bg-red-600 dark:text-white' 
-                : 'bg-green-700 text-white dark:bg-green-700 dark:text-white'
-          }`}>
-            {problem.impact}
-          </span>
+      {/* Applications */}
+      <div className="col-span-2 text-right">
+        <div className="text-xs text-slate-500 mb-1 dark:text-slate-500">Applications:</div>
+        <div className="font-medium text-white dark:text-white">{zone.apps}</div>
+      </div>
+      
+      {/* Services */}
+      <div className="col-span-2 text-right">
+        <div className="text-xs text-slate-500 mb-1 dark:text-slate-500">Services:</div>
+        <div className="font-medium text-white dark:text-white">{zone.services}</div>
+      </div>
+      
+      {/* Hôtes */}
+      <div className="col-span-2 text-right">
+        <div className="text-xs text-slate-500 mb-1 dark:text-slate-500">Hôtes:</div>
+        <div className="font-medium text-white dark:text-white">{zone.hosts}</div>
+      </div>
+      
+      {/* Disponibilité */}
+      <div className="col-span-2 text-right">
+        <div className="text-xs text-slate-500 mb-1 dark:text-slate-500">Disponibilité:</div>
+        <div className={`font-medium ${
+          parseFloat(zone.availability) < 99 
+            ? 'text-yellow-500 dark:text-yellow-500' 
+            : 'text-green-500 dark:text-green-500'
+        }`}>{zone.availability}</div>
+      </div>
+      
+      {/* Statut et bouton */}
+      <div className="col-span-1 flex items-center">
+        <div className="flex items-center gap-1.5">
+          <span className={`inline-block w-2.5 h-2.5 rounded-full ${
+            zone.status === 'healthy' 
+              ? 'bg-green-500 shadow-sm shadow-green-500/50 dark:bg-green-500 dark:shadow-green-500/50' 
+              : 'bg-yellow-500 shadow-sm shadow-yellow-500/50 dark:bg-yellow-500 dark:shadow-yellow-500/50'
+          }`}></span>
+          <span className="text-xs text-slate-400 dark:text-slate-400">{zone.status === 'healthy' ? 'Sain' : 'Dégradé'}</span>
         </div>
+      </div>
+      
+      <div className="col-span-1">
         <a 
           href="#" 
-          className="flex items-center gap-1 text-xs text-red-400 hover:text-red-300 dark:text-red-400 dark:hover:text-red-300"
+          className="flex items-center justify-center gap-1 px-2 py-1 rounded bg-red-900/20 text-red-400 text-xs hover:bg-red-900/30 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/30"
+          onClick={(e) => { e.stopPropagation(); }}
         >
-          <ExternalLink size={12} />
-          Détails du problème
+          <span>Détails</span>
         </a>
       </div>
     </div>
   );
 };
 
-export default ProblemCard;
+export default ManagementZoneRow;
