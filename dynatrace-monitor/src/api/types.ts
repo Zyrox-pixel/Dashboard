@@ -19,6 +19,7 @@ export interface Problem {
   impact: 'FAIBLE' | 'MOYEN' | 'ÉLEVÉ';
   status: 'low' | 'warning' | 'critical';
   zone: string;
+  dt_url?: string;
 }
 
 // Types pour les management zones
@@ -34,7 +35,7 @@ export interface ManagementZone {
   availability: string;
   status: 'healthy' | 'warning';
   color: 'red' | 'amber' | 'orange' | 'blue' | 'emerald' | 'purple' | 'green';
-  dt_url: string; // Ajout de cette propriété manquante
+  dt_url: string;
 }
 
 // Types pour les process groups
@@ -43,6 +44,7 @@ export interface ProcessGroup {
   technology: string;
   icon: React.ReactNode;
   type: 'technology' | 'database' | 'server';
+  dt_url?: string;
 }
 
 // Type pour les hôtes
@@ -131,6 +133,7 @@ export interface ProblemResponse {
 
 // Type pour la réponse d'un processus de l'API
 export interface ProcessResponse {
+  id: string;
   name: string;
   technology?: string;
   tech_icon?: string;

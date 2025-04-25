@@ -15,6 +15,9 @@ const Dashboard: React.FC = () => {
     activeTab,
     setActiveTab,
     processGroups,
+    hosts,
+    services,
+    summaryData,
     isLoading,
     error,
     backendConnected,
@@ -113,7 +116,7 @@ const Dashboard: React.FC = () => {
     );
   }
   
-  // L'affichage normal commence ici - c'est ce que vous avez déjà
+  // L'affichage normal commence ici
   return (
     <Layout
       title="Vital for Group"
@@ -128,7 +131,9 @@ const Dashboard: React.FC = () => {
         <ZoneDetails
           zone={currentZone}
           problems={activeProblems.filter(p => p.zone.includes(currentZone.name))}
-          processGroups={processGroups}
+          processGroups={processGroups || []}
+          hosts={hosts || []}
+          services={services || []}
           activeTab={activeTab}
           onBackClick={handleBackClick}
           onTabChange={handleTabChange}
@@ -143,11 +148,62 @@ const Dashboard: React.FC = () => {
               <div>
                 <h2 className="text-lg font-semibold text-blue-600 dark:text-blue-400 mb-1">Vital for Group</h2>
                 <p className="text-slate-600 dark:text-slate-300">
-                  Supervision des applications critiques du groupe incluant ACESID, OCSP, WebSSO, et autres services sécurisés.
+                  Supervision des applications critiques du groupe.
                 </p>
               </div>
             </div>
           </div>
+        
+          {/* Afficher les données de résumé si disponibles */}
+          {summaryData && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+              <div className="bg-slate-800 dark:bg-slate-800 p-4 rounded-lg border border-slate-700 dark:border-slate-700">
+                <div className="text-xs text-slate-400 dark:text-slate-400 mb-1">Hôtes</div>
+                <div className="text-xl font-bold text-white dark:text-white">{summaryData.hosts?.count || 0}</div>
+                <div className="text-sm text-slate-400 dark:text-slate-400">
+                  CPU Moyen: <span className={
+                    (summaryData.hosts?.avg_cpu || 0) > 80 ? 'text-red-500' : 
+                    (summaryData.hosts?.avg_cpu || 0) > 60 ? 'text-yellow-500' : 
+                    'text-green-500'
+                  }>
+                    {summaryData.hosts?.avg_cpu || 0}%
+                  </span>
+                </div>
+              </div>
+              
+              <div className="bg-slate-800 dark:bg-slate-800 p-4 rounded-lg border border-slate-700 dark:border-slate-700">
+                <div className="text-xs text-slate-400 dark:text-slate-400 mb-1">Services</div>
+                <div className="text-xl font-bold text-white dark:text-white">{summaryData.services?.count || 0}</div>
+                <div className="text-sm text-slate-400 dark:text-slate-400">
+                  Taux d'erreur: <span className={
+                    (summaryData.services?.avg_error_rate || 0) > 5 ? 'text-red-500' : 
+                    (summaryData.services?.avg_error_rate || 0) > 1 ? 'text-yellow-500' : 
+                    'text-green-500'
+                  }>
+                    {summaryData.services?.avg_error_rate || 0}%
+                  </span>
+                </div>
+              </div>
+              
+              <div className="bg-slate-800 dark:bg-slate-800 p-4 rounded-lg border border-slate-700 dark:border-slate-700">
+                <div className="text-xs text-slate-400 dark:text-slate-400 mb-1">Requêtes</div>
+                <div className="text-xl font-bold text-white dark:text-white">{summaryData.requests?.total || 0}</div>
+                <div className="text-sm text-slate-400 dark:text-slate-400">
+                  Moyenne horaire: {summaryData.requests?.hourly_avg || 0}
+                </div>
+              </div>
+              
+              <div className="bg-slate-800 dark:bg-slate-800 p-4 rounded-lg border border-slate-700 dark:border-slate-700">
+                <div className="text-xs text-slate-400 dark:text-slate-400 mb-1">Problèmes</div>
+                <div className="text-xl font-bold text-white dark:text-white">{summaryData.problems?.count || 0}</div>
+                <div className="text-sm text-slate-400 dark:text-slate-400">
+                  <span className={(summaryData.problems?.count || 0) > 0 ? 'text-red-500' : 'text-green-500'}>
+                    {(summaryData.problems?.count || 0) > 0 ? 'Problèmes actifs' : 'Aucun problème'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
         
           <ProblemsList problems={activeProblems} title="Problèmes actifs sur Vital for Group" />
           <ManagementZoneList zones={vitalForGroupMZs} onZoneClick={handleZoneClick} />

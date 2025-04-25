@@ -1,7 +1,7 @@
 import React from 'react';
 import { ChevronLeft, Clock, AlertTriangle, ExternalLink, RefreshCw, Cpu, Activity, Server, Filter, Loader } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
-import { ManagementZone, Problem, ProcessGroup } from '../../api/types';
+import { ManagementZone, Problem, ProcessGroup, Host, Service } from '../../api/types';
 import ProblemsList from './ProblemsList';
 import ProcessGroupRow from '../common/ProcessGroupRow';
 import { useApp } from '../../contexts/AppContext';
@@ -10,20 +10,24 @@ interface ZoneDetailsProps {
   zone: ManagementZone;
   problems: Problem[];
   processGroups: ProcessGroup[];
+  hosts: Host[];
+  services: Service[];
   activeTab: string;
   onBackClick: () => void;
   onTabChange: (tab: string) => void;
-  isLoading?: boolean; // Ajout de la propriété isLoading comme optionnelle
+  isLoading?: boolean;
 }
 
 const ZoneDetails: React.FC<ZoneDetailsProps> = ({
   zone,
   problems,
   processGroups,
+  hosts,
+  services,
   activeTab,
   onBackClick,
   onTabChange,
-  isLoading = false // Valeur par défaut
+  isLoading = false
 }) => {
   const { isDarkTheme } = useTheme();
   const { refreshData } = useApp();
@@ -297,29 +301,168 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
         </section>
       )}
       
-      {/* Onglet Services (à implémenter avec les vraies données) */}
+      {/* Onglet Services */}
       {activeTab === 'services' && (
         <section className={`rounded-lg overflow-hidden ${
           isDarkTheme ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
-        } border p-6 flex justify-center items-center`}>
-          <div className="text-center text-slate-500">
-            <Activity size={40} className="mx-auto mb-3 opacity-50" />
-            <h3 className="text-lg font-medium mb-1">Données des services</h3>
-            <p>Les informations sur les services seront disponibles prochainement.</p>
+        } border`}>
+          <div className="flex justify-between items-center p-3 border-b border-slate-700">
+            <h2 className="font-semibold flex items-center gap-2">
+              <Activity className={zoneColors.text} size={16} />
+              <span>Services</span>
+            </h2>
+            <button className={`flex items-center gap-1 px-3 py-1 rounded-md border text-sm ${
+              isDarkTheme ? 'border-slate-600 text-slate-300 hover:bg-slate-700' : 'border-slate-300 text-slate-600 hover:bg-slate-100'
+            }`}>
+              <Filter size={12} />
+              <span>Filtrer</span>
+            </button>
           </div>
+
+          <table className="w-full">
+            <thead>
+              <tr className={`${isDarkTheme ? 'bg-slate-700/30' : 'bg-slate-50'}`}>
+                <th className="text-left p-3 font-medium text-xs text-slate-400">Nom</th>
+                <th className="text-left p-3 font-medium text-xs text-slate-400">Technologie</th>
+                <th className="text-left p-3 font-medium text-xs text-slate-400">Temps de réponse</th>
+                <th className="text-left p-3 font-medium text-xs text-slate-400">Taux d'erreur</th>
+                <th className="text-left p-3 font-medium text-xs text-slate-400">Requêtes</th>
+                <th className="text-right p-3 font-medium text-xs text-slate-400">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-700">
+              {services.length > 0 ? (
+                services.map((service, index) => (
+                  <tr key={index} className={`${isDarkTheme ? 'hover:bg-slate-700/30' : 'hover:bg-slate-50'}`}>
+                    <td className="p-3 font-medium text-sm">
+                      <div className="flex items-center gap-2">
+                        <span className={`w-2.5 h-2.5 rounded-full ${service.status === 'Actif' ? 'bg-green-500' : 'bg-gray-400'}`}></span>
+                        {service.name}
+                      </div>
+                    </td>
+                    <td className="p-3 text-sm">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm">{service.technology}</span>
+                      </div>
+                    </td>
+                    <td className="p-3 text-sm">
+                      {service.response_time ? `${service.response_time} ms` : 'N/A'}
+                    </td>
+                    <td className="p-3 text-sm">
+                      <span className={`${
+                        service.error_rate ? 
+                          (service.error_rate > 5 ? 'text-red-500' : 
+                          service.error_rate > 1 ? 'text-yellow-500' : 
+                          'text-green-500') : 
+                          'text-green-500'
+                      }`}>
+                        {service.error_rate ? `${service.error_rate}%` : '0%'}
+                      </span>
+                    </td>
+                    <td className="p-3 text-sm">
+                      {service.requests || 'N/A'}
+                    </td>
+                    <td className="p-3 text-right">
+                      <a 
+                        href={service.dt_url} 
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-xs font-medium text-red-400 hover:underline dark:text-red-400"
+                      >
+                        <ExternalLink size={12} />
+                        Dynatrace
+                      </a>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={6} className="p-8 text-center text-slate-500">
+                    Aucun service trouvé pour cette management zone.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </section>
       )}
       
-      {/* Onglet Hôtes (à implémenter avec les vraies données) */}
+      {/* Onglet Hôtes */}
       {activeTab === 'hosts' && (
         <section className={`rounded-lg overflow-hidden ${
           isDarkTheme ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
-        } border p-6 flex justify-center items-center`}>
-          <div className="text-center text-slate-500">
-            <Server size={40} className="mx-auto mb-3 opacity-50" />
-            <h3 className="text-lg font-medium mb-1">Données des hôtes</h3>
-            <p>Les informations sur les hôtes seront disponibles prochainement.</p>
+        } border`}>
+          <div className="flex justify-between items-center p-3 border-b border-slate-700">
+            <h2 className="font-semibold flex items-center gap-2">
+              <Server className={zoneColors.text} size={16} />
+              <span>Hôtes</span>
+            </h2>
+            <button className={`flex items-center gap-1 px-3 py-1 rounded-md border text-sm ${
+              isDarkTheme ? 'border-slate-600 text-slate-300 hover:bg-slate-700' : 'border-slate-300 text-slate-600 hover:bg-slate-100'
+            }`}>
+              <Filter size={12} />
+              <span>Filtrer</span>
+            </button>
           </div>
+
+          <table className="w-full">
+            <thead>
+              <tr className={`${isDarkTheme ? 'bg-slate-700/30' : 'bg-slate-50'}`}>
+                <th className="text-left p-3 font-medium text-xs text-slate-400">Nom</th>
+                <th className="text-left p-3 font-medium text-xs text-slate-400">CPU</th>
+                <th className="text-left p-3 font-medium text-xs text-slate-400">RAM</th>
+                <th className="text-right p-3 font-medium text-xs text-slate-400">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-700">
+              {hosts.length > 0 ? (
+                hosts.map((host, index) => (
+                  <tr key={index} className={`${isDarkTheme ? 'hover:bg-slate-700/30' : 'hover:bg-slate-50'}`}>
+                    <td className="p-3 font-medium text-sm">{host.name}</td>
+                    <td className="p-3 text-sm">
+                      <span className={`${
+                        host.cpu ? 
+                          (host.cpu > 80 ? 'text-red-500' : 
+                          host.cpu > 60 ? 'text-yellow-500' : 
+                          'text-green-500') : 
+                          'text-slate-400'
+                      }`}>
+                        {host.cpu ? `${host.cpu}%` : 'N/A'}
+                      </span>
+                    </td>
+                    <td className="p-3 text-sm">
+                      <span className={`${
+                        host.ram ? 
+                          (host.ram > 80 ? 'text-red-500' : 
+                          host.ram > 60 ? 'text-yellow-500' : 
+                          'text-green-500') : 
+                          'text-slate-400'
+                      }`}>
+                        {host.ram ? `${host.ram}%` : 'N/A'}
+                      </span>
+                    </td>
+                    <td className="p-3 text-right">
+                      <a 
+                        href={host.dt_url} 
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-xs font-medium text-red-400 hover:underline dark:text-red-400"
+                      >
+                        <ExternalLink size={12} />
+                        Dynatrace
+                      </a>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={4} className="p-8 text-center text-slate-500">
+                    Aucun hôte trouvé pour cette management zone.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </section>
       )}
     </div>

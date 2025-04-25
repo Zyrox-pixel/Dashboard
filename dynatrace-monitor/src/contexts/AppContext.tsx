@@ -8,7 +8,8 @@ import {
   ProblemResponse,
   ProcessResponse,
   Host,
-  Service
+  Service,
+  SummaryData
 } from '../api/types';
 import { Database, Shield, Key, Globe, Server, Grid, Building, CreditCard } from 'lucide-react';
 
@@ -24,6 +25,7 @@ interface AppContextType {
   processGroups: ProcessGroup[];
   hosts: Host[];
   services: Service[];
+  summaryData: SummaryData | null;
   isLoading: {
     problems: boolean;
     managementZones: boolean;
@@ -114,6 +116,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   const [processGroups, setProcessGroups] = useState<ProcessGroup[]>([]);
   const [hosts, setHosts] = useState<Host[]>([]);
   const [services, setServices] = useState<Service[]>([]);
+  const [summaryData, setSummaryData] = useState<SummaryData | null>(null);
   const [backendConnected, setBackendConnected] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState({
     problems: true,
@@ -128,35 +131,6 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   useEffect(() => {
     fetchData();
   }, []);
-
-  // Fonction pour créer des objets ManagementZone à partir des noms
-  const createMZsFromNames = (mzNames: string[]): ManagementZone[] => {
-    return mzNames.map((mzName: string) => {
-      // Extraire l'ID (par exemple AP03566) du nom complet
-      let id = "unknown";
-      if (mzName.includes("AP")) {
-        const match = mzName.match(/AP\d+/);
-        if (match) {
-          id = match[0];
-        }
-      }
-      
-      return {
-        id: id,
-        name: mzName,
-        code: id,
-        icon: getZoneIcon(mzName),
-        problemCount: 0,
-        apps: Math.floor(Math.random() * 5) + 1, // Valeur temporaire, à remplacer avec les vraies données
-        services: Math.floor(Math.random() * 10) + 5, // Valeur temporaire, à remplacer avec les vraies données
-        hosts: Math.floor(Math.random() * 8) + 2, // Valeur temporaire, à remplacer avec les vraies données
-        availability: (97 + Math.random() * 3).toFixed(1) + "%", // Valeur temporaire, à remplacer avec les vraies données
-        status: "healthy" as "healthy" | "warning",
-        color: getZoneColor(mzName),
-        dt_url: "#" // Valeur temporaire, à remplacer avec les vraies données
-      };
-    });
-  };
 
   // Vérifier d'abord si le backend est en ligne
   const checkBackendStatus = async (): Promise<boolean> => {
@@ -297,6 +271,50 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         return;
       }
       
+      // Récupérer le résumé des données
+      try {
+        const summaryResponse = await api.getSummary();
+        if (!summaryResponse.error && summaryResponse.data) {
+          setSummaryData(summaryResponse.data as SummaryData);
+        } else if (summaryResponse.error) {
+          console.error('Erreur lors de la récupération du résumé:', summaryResponse.error);
+        }
+      } catch (error) {
+        console.error('Erreur lors de la récupération du résumé:', error);
+      }
+      
+      // Charger toutes les Management Zones disponibles
+      try {
+        const mzResponse = await api.getManagementZones();
+        if (!mzResponse.error && mzResponse.data) {
+          const mzData = mzResponse.data as any[];
+          
+          // Transformer les données pour le frontend
+          const formattedMZs: ManagementZone[] = mzData.map(mz => ({
+            id: mz.id,
+            name: mz.name,
+            code: mz.id,
+            icon: getZoneIcon(mz.name),
+            problemCount: 0, // Sera mis à jour après avoir récupéré les problèmes
+            apps: 0, // Ces valeurs seront fournies par l'API résumé
+            services: 0,
+            hosts: 0,
+            availability: "100%", // Valeur par défaut, sera mise à jour si disponible
+            status: "healthy" as "healthy" | "warning",
+            color: getZoneColor(mz.name),
+            dt_url: mz.dt_url || "#"
+          }));
+          
+          setManagementZones(formattedMZs);
+        } else if (mzResponse.error) {
+          console.error('Erreur lors de la récupération des Management Zones:', mzResponse.error);
+          setManagementZones([]);
+        }
+      } catch (error) {
+        console.error('Erreur lors de la récupération des Management Zones:', error);
+        setManagementZones([]);
+      }
+      
       // Charger les MZs de Vital for Group depuis l'API
       try {
         const vfgResponse = await api.getVitalForGroupMZs();
@@ -304,13 +322,38 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         if (!vfgResponse.error && vfgResponse.data) {
           const vfgData = vfgResponse.data as VitalForGroupMZsResponse;
           if (vfgData.mzs && Array.isArray(vfgData.mzs) && vfgData.mzs.length > 0) {
-            const vfgMZs = createMZsFromNames(vfgData.mzs);
+            // Filtrer les MZs pour ne garder que celles de Vital for Group
+            const vfgMZs: ManagementZone[] = [];
+            
+            // Obtenir toutes les MZs et filtrer celles qui sont dans VFG
+            for (const mzName of vfgData.mzs) {
+              // Chercher la MZ dans les MZs déjà récupérées
+              const existingMZ = managementZones.find(mz => mz.name === mzName);
+              
+              if (existingMZ) {
+                vfgMZs.push(existingMZ);
+              } else {
+                // Si la MZ n'existe pas encore, créer une entrée temporaire
+                vfgMZs.push({
+                  id: `tmp-${mzName.replace(/\s+/g, '-')}`,
+                  name: mzName,
+                  code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1'),
+                  icon: getZoneIcon(mzName),
+                  problemCount: 0,
+                  apps: 0,
+                  services: 0,
+                  hosts: 0,
+                  availability: "100%",
+                  status: "healthy" as "healthy" | "warning",
+                  color: getZoneColor(mzName),
+                  dt_url: "#"
+                });
+              }
+            }
+            
             setVitalForGroupMZs(vfgMZs);
             
-            // Sélectionner automatiquement la première MZ si aucune n'est sélectionnée
-            if (!selectedZone && vfgMZs.length > 0) {
-              setSelectedZone(vfgMZs[0].id);
-            }
+         
           } else {
             console.warn('Aucune MZ Vital for Group trouvée dans la réponse API.');
             setVitalForGroupMZs([]);
@@ -377,6 +420,19 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         await loadZoneData(selectedZone);
       }
       
+      // Mettre à jour les stats des MZ avec les données du résumé si disponibles
+      if (summaryData && vitalForGroupMZs.length > 0) {
+        const updatedVfgMZs = vitalForGroupMZs.map(mz => {
+          return {
+            ...mz,
+            services: summaryData.services?.count || 0,
+            hosts: summaryData.hosts?.count || 0,
+            // Si nous avons des données spécifiques à cette MZ, les utiliser ici
+          };
+        });
+        setVitalForGroupMZs(updatedVfgMZs);
+      }
+      
     } catch (error) {
       console.error('Erreur lors du chargement des données:', error);
       setError('Erreur lors du chargement des données. Veuillez réessayer.');
@@ -417,6 +473,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     processGroups,
     hosts,
     services,
+    summaryData,
     isLoading,
     error,
     backendConnected,
