@@ -1,9 +1,10 @@
-import React from 'react';
-import { ChevronLeft, Clock, AlertTriangle, ExternalLink, RefreshCw, Cpu, Activity, Server, Filter, Loader } from 'lucide-react';
+import React, { useMemo, useCallback } from 'react';
+import { ChevronLeft, Clock, AlertTriangle, ExternalLink, RefreshCw, Cpu, Activity, Server, Filter, Loader, Database } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { ManagementZone, Problem, ProcessGroup, Host, Service } from '../../api/types';
 import ProblemsList from './ProblemsList';
-import ProcessGroupRow from '../common/ProcessGroupRow';
+import PaginatedTable from '../common/PaginatedTable';
+import MetricChart from '../common/MetricChart';
 import { useApp } from '../../contexts/AppContext';
 
 interface ZoneDetailsProps {
@@ -31,10 +32,15 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
 }) => {
   const { isDarkTheme } = useTheme();
   const { refreshData } = useApp();
-  const zoneProblems = problems.filter(problem => problem.zone === zone.name);
+  
+  // Filtrer les problèmes pour la zone courante (mémorisé)
+  const zoneProblems = useMemo(() => 
+    problems.filter(problem => problem.zone === zone.name),
+    [problems, zone.name]
+  );
 
-  // Déterminer les couleurs en fonction de la zone et du thème
-  const getZoneColors = () => {
+  // Déterminer les couleurs en fonction de la zone et du thème (mémorisé)
+  const zoneColors = useMemo(() => {
     const colors = {
       red: {
         bg: isDarkTheme ? 'bg-red-500/10' : 'bg-red-100',
@@ -81,9 +87,220 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
     };
     
     return colors[zone.color] || colors.blue;
-  };
+  }, [zone.color, isDarkTheme]);
+  
+  // Définition des colonnes pour les tableaux (mémorisée)
+  const processColumns = useMemo(() => [
+    {
+      key: 'name',
+      label: 'Nom',
+      cellClassName: 'font-medium text-sm',
+    },
+    {
+      key: 'technology',
+      label: 'Technologie',
+      cellClassName: 'text-sm',
+      render: (process: ProcessGroup) => (
+        <div className="flex items-center">
+          {process.icon}
+          <span className="ml-2">{process.technology}</span>
+        </div>
+      ),
+    },
+    {
+      key: 'actions',
+      label: 'Actions',
+      cellClassName: 'text-right',
+      render: (process: ProcessGroup) => (
+        <a 
+          href={process.dt_url} 
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 text-xs font-medium text-red-400 hover:underline dark:text-red-400"
+        >
+          <ExternalLink size={12} />
+          Dynatrace
+        </a>
+      ),
+    },
+  ], []);
 
-  const zoneColors = getZoneColors();
+  const serviceColumns = useMemo(() => [
+    {
+      key: 'name',
+      label: 'Nom',
+      cellClassName: 'font-medium text-sm',
+      render: (service: Service) => (
+        <div className="flex items-center gap-2">
+          <span className={`w-2.5 h-2.5 rounded-full ${service.status === 'Actif' ? 'bg-green-500' : 'bg-gray-400'}`}></span>
+          {service.name}
+        </div>
+      ),
+    },
+    {
+      key: 'technology',
+      label: 'Technologie',
+      cellClassName: 'text-sm',
+      render: (service: Service) => (
+        <div className="flex items-center gap-2">
+          <span className="text-sm">{service.technology}</span>
+        </div>
+      ),
+    },
+    {
+      key: 'response_time',
+      label: 'Temps de réponse',
+      cellClassName: 'text-sm',
+      render: (service: Service) => (
+        service.response_time ? `${service.response_time} ms` : 'N/A'
+      ),
+    },
+    {
+      key: 'error_rate',
+      label: 'Taux d\'erreur',
+      cellClassName: 'text-sm',
+      render: (service: Service) => (
+        <span className={`${
+          service.error_rate ? 
+            (service.error_rate > 5 ? 'text-red-500' : 
+            service.error_rate > 1 ? 'text-yellow-500' : 
+            'text-green-500') : 
+            'text-green-500'
+        }`}>
+          {service.error_rate ? `${service.error_rate}%` : '0%'}
+        </span>
+      ),
+    },
+    {
+      key: 'requests',
+      label: 'Requêtes',
+      cellClassName: 'text-sm',
+      render: (service: Service) => (
+        service.requests ? service.requests.toLocaleString() : 'N/A'
+      ),
+    },
+    {
+      key: 'actions',
+      label: 'Actions',
+      cellClassName: 'text-right',
+      render: (service: Service) => (
+        <a 
+          href={service.dt_url} 
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 text-xs font-medium text-red-400 hover:underline dark:text-red-400"
+        >
+          <ExternalLink size={12} />
+          Dynatrace
+        </a>
+      ),
+    },
+  ], []);
+
+  const hostColumns = useMemo(() => [
+    {
+      key: 'name',
+      label: 'Nom',
+      cellClassName: 'font-medium text-sm',
+    },
+    {
+      key: 'cpu',
+      label: 'CPU',
+      cellClassName: 'text-sm',
+      render: (host: Host) => (
+        <span className={`${
+          host.cpu ? 
+            (host.cpu > 80 ? 'text-red-500' : 
+            host.cpu > 60 ? 'text-yellow-500' : 
+            'text-green-500') : 
+            'text-slate-400'
+        }`}>
+          {host.cpu ? `${host.cpu}%` : 'N/A'}
+        </span>
+      ),
+    },
+    {
+      key: 'cpu_chart',
+      label: 'Historique CPU',
+      cellClassName: 'text-sm',
+      render: (host: Host) => (
+        <div className="w-48 h-12">
+          {host.cpu_history && host.cpu_history.length > 0 ? (
+            <MetricChart 
+              history={host.cpu_history} 
+              color="red"
+              height={50}
+              unit="%"
+              label="CPU"
+            />
+          ) : (
+            <div className="text-xs text-slate-400 h-full flex items-center justify-center">
+              Aucune donnée
+            </div>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: 'ram',
+      label: 'RAM',
+      cellClassName: 'text-sm',
+      render: (host: Host) => (
+        <span className={`${
+          host.ram ? 
+            (host.ram > 80 ? 'text-red-500' : 
+            host.ram > 60 ? 'text-yellow-500' : 
+            'text-green-500') : 
+            'text-slate-400'
+        }`}>
+          {host.ram ? `${host.ram}%` : 'N/A'}
+        </span>
+      ),
+    },
+    {
+      key: 'ram_chart',
+      label: 'Historique RAM',
+      cellClassName: 'text-sm',
+      render: (host: Host) => (
+        <div className="w-48 h-12">
+          {host.ram_history && host.ram_history.length > 0 ? (
+            <MetricChart 
+              history={host.ram_history} 
+              color="blue"
+              height={50}
+              unit="%"
+              label="RAM"
+            />
+          ) : (
+            <div className="text-xs text-slate-400 h-full flex items-center justify-center">
+              Aucune donnée
+            </div>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: 'actions',
+      label: 'Actions',
+      cellClassName: 'text-right',
+      render: (host: Host) => (
+        <a 
+          href={host.dt_url} 
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 text-xs font-medium text-red-400 hover:underline dark:text-red-400"
+        >
+          <ExternalLink size={12} />
+          Dynatrace
+        </a>
+      ),
+    },
+  ], []);
+
+  // Optimiser le gestionnaire d'événements avec useCallback
+  const handleTabClick = useCallback((tab: string) => {
+    onTabChange(tab);
+  }, [onTabChange]);
 
   // État de chargement pour les détails de la zone
   if (isLoading) {
@@ -212,7 +429,7 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
       {/* Navigation par onglets */}
       <div className="flex border-b mb-5 overflow-x-auto no-scrollbar">
         <button 
-          onClick={() => onTabChange('process-groups')}
+          onClick={() => handleTabClick('process-groups')}
           className={`px-4 py-2 font-medium text-sm whitespace-nowrap border-b-2 -mb-px transition-colors ${
             activeTab === 'process-groups' 
               ? `border-${zone.color}-500 ${zoneColors.text}` 
@@ -227,7 +444,7 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
           </div>
         </button>
         <button 
-          onClick={() => onTabChange('services')}
+          onClick={() => handleTabClick('services')}
           className={`px-4 py-2 font-medium text-sm whitespace-nowrap border-b-2 -mb-px transition-colors ${
             activeTab === 'services' 
               ? `border-${zone.color}-500 ${zoneColors.text}` 
@@ -242,7 +459,7 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
           </div>
         </button>
         <button 
-          onClick={() => onTabChange('hosts')}
+          onClick={() => handleTabClick('hosts')}
           className={`px-4 py-2 font-medium text-sm whitespace-nowrap border-b-2 -mb-px transition-colors ${
             activeTab === 'hosts' 
               ? `border-${zone.color}-500 ${zoneColors.text}` 
@@ -258,7 +475,7 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
         </button>
       </div>
       
-      {/* Contenu des onglets */}
+      {/* Contenu des onglets - Utilisation du composant PaginatedTable */}
       {activeTab === 'process-groups' && (
         <section className={`rounded-lg overflow-hidden ${
           isDarkTheme ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
@@ -267,6 +484,7 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
             <h2 className="font-semibold flex items-center gap-2">
               <Cpu className={zoneColors.text} size={16} />
               <span>Process Groups</span>
+              <span className="text-xs text-slate-400 ml-2">({processGroups.length})</span>
             </h2>
             <button className={`flex items-center gap-1 px-3 py-1 rounded-md border text-sm ${
               isDarkTheme ? 'border-slate-600 text-slate-300 hover:bg-slate-700' : 'border-slate-300 text-slate-600 hover:bg-slate-100'
@@ -276,28 +494,12 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
             </button>
           </div>
 
-          <table className="w-full">
-            <thead>
-              <tr className={`${isDarkTheme ? 'bg-slate-700/30' : 'bg-slate-50'}`}>
-                <th className="text-left p-3 font-medium text-xs text-slate-400">Nom</th>
-                <th className="text-left p-3 font-medium text-xs text-slate-400">Technologie</th>
-                <th className="text-right p-3 font-medium text-xs text-slate-400">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-700">
-              {processGroups.length > 0 ? (
-                processGroups.map((process, index) => (
-                  <ProcessGroupRow key={index} process={process} index={index} />
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={3} className="p-8 text-center text-slate-500">
-                    Aucun process group trouvé pour cette management zone.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+          <PaginatedTable 
+            data={processGroups}
+            columns={processColumns}
+            pageSize={10}
+            emptyMessage="Aucun process group trouvé pour cette management zone."
+          />
         </section>
       )}
       
@@ -310,6 +512,7 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
             <h2 className="font-semibold flex items-center gap-2">
               <Activity className={zoneColors.text} size={16} />
               <span>Services</span>
+              <span className="text-xs text-slate-400 ml-2">({services.length})</span>
             </h2>
             <button className={`flex items-center gap-1 px-3 py-1 rounded-md border text-sm ${
               isDarkTheme ? 'border-slate-600 text-slate-300 hover:bg-slate-700' : 'border-slate-300 text-slate-600 hover:bg-slate-100'
@@ -319,71 +522,12 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
             </button>
           </div>
 
-          <table className="w-full">
-            <thead>
-              <tr className={`${isDarkTheme ? 'bg-slate-700/30' : 'bg-slate-50'}`}>
-                <th className="text-left p-3 font-medium text-xs text-slate-400">Nom</th>
-                <th className="text-left p-3 font-medium text-xs text-slate-400">Technologie</th>
-                <th className="text-left p-3 font-medium text-xs text-slate-400">Temps de réponse</th>
-                <th className="text-left p-3 font-medium text-xs text-slate-400">Taux d'erreur</th>
-                <th className="text-left p-3 font-medium text-xs text-slate-400">Requêtes</th>
-                <th className="text-right p-3 font-medium text-xs text-slate-400">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-700">
-              {services.length > 0 ? (
-                services.map((service, index) => (
-                  <tr key={index} className={`${isDarkTheme ? 'hover:bg-slate-700/30' : 'hover:bg-slate-50'}`}>
-                    <td className="p-3 font-medium text-sm">
-                      <div className="flex items-center gap-2">
-                        <span className={`w-2.5 h-2.5 rounded-full ${service.status === 'Actif' ? 'bg-green-500' : 'bg-gray-400'}`}></span>
-                        {service.name}
-                      </div>
-                    </td>
-                    <td className="p-3 text-sm">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm">{service.technology}</span>
-                      </div>
-                    </td>
-                    <td className="p-3 text-sm">
-                      {service.response_time ? `${service.response_time} ms` : 'N/A'}
-                    </td>
-                    <td className="p-3 text-sm">
-                      <span className={`${
-                        service.error_rate ? 
-                          (service.error_rate > 5 ? 'text-red-500' : 
-                          service.error_rate > 1 ? 'text-yellow-500' : 
-                          'text-green-500') : 
-                          'text-green-500'
-                      }`}>
-                        {service.error_rate ? `${service.error_rate}%` : '0%'}
-                      </span>
-                    </td>
-                    <td className="p-3 text-sm">
-                      {service.requests || 'N/A'}
-                    </td>
-                    <td className="p-3 text-right">
-                      <a 
-                        href={service.dt_url} 
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-xs font-medium text-red-400 hover:underline dark:text-red-400"
-                      >
-                        <ExternalLink size={12} />
-                        Dynatrace
-                      </a>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={6} className="p-8 text-center text-slate-500">
-                    Aucun service trouvé pour cette management zone.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+          <PaginatedTable 
+            data={services}
+            columns={serviceColumns}
+            pageSize={8}
+            emptyMessage="Aucun service trouvé pour cette management zone."
+          />
         </section>
       )}
       
@@ -396,6 +540,7 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
             <h2 className="font-semibold flex items-center gap-2">
               <Server className={zoneColors.text} size={16} />
               <span>Hôtes</span>
+              <span className="text-xs text-slate-400 ml-2">({hosts.length})</span>
             </h2>
             <button className={`flex items-center gap-1 px-3 py-1 rounded-md border text-sm ${
               isDarkTheme ? 'border-slate-600 text-slate-300 hover:bg-slate-700' : 'border-slate-300 text-slate-600 hover:bg-slate-100'
@@ -405,64 +550,12 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
             </button>
           </div>
 
-          <table className="w-full">
-            <thead>
-              <tr className={`${isDarkTheme ? 'bg-slate-700/30' : 'bg-slate-50'}`}>
-                <th className="text-left p-3 font-medium text-xs text-slate-400">Nom</th>
-                <th className="text-left p-3 font-medium text-xs text-slate-400">CPU</th>
-                <th className="text-left p-3 font-medium text-xs text-slate-400">RAM</th>
-                <th className="text-right p-3 font-medium text-xs text-slate-400">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-700">
-              {hosts.length > 0 ? (
-                hosts.map((host, index) => (
-                  <tr key={index} className={`${isDarkTheme ? 'hover:bg-slate-700/30' : 'hover:bg-slate-50'}`}>
-                    <td className="p-3 font-medium text-sm">{host.name}</td>
-                    <td className="p-3 text-sm">
-                      <span className={`${
-                        host.cpu ? 
-                          (host.cpu > 80 ? 'text-red-500' : 
-                          host.cpu > 60 ? 'text-yellow-500' : 
-                          'text-green-500') : 
-                          'text-slate-400'
-                      }`}>
-                        {host.cpu ? `${host.cpu}%` : 'N/A'}
-                      </span>
-                    </td>
-                    <td className="p-3 text-sm">
-                      <span className={`${
-                        host.ram ? 
-                          (host.ram > 80 ? 'text-red-500' : 
-                          host.ram > 60 ? 'text-yellow-500' : 
-                          'text-green-500') : 
-                          'text-slate-400'
-                      }`}>
-                        {host.ram ? `${host.ram}%` : 'N/A'}
-                      </span>
-                    </td>
-                    <td className="p-3 text-right">
-                      <a 
-                        href={host.dt_url} 
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-xs font-medium text-red-400 hover:underline dark:text-red-400"
-                      >
-                        <ExternalLink size={12} />
-                        Dynatrace
-                      </a>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={4} className="p-8 text-center text-slate-500">
-                    Aucun hôte trouvé pour cette management zone.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+          <PaginatedTable 
+            data={hosts}
+            columns={hostColumns}
+            pageSize={8}
+            emptyMessage="Aucun hôte trouvé pour cette management zone."
+          />
         </section>
       )}
     </div>

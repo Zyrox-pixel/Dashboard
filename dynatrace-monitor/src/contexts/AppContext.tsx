@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo } from 'react';
 import { api, CACHE_TYPES } from '../api';
 import { 
   Problem, 
@@ -143,8 +143,8 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     }
   };
 
-  // Fonction pour charger les données spécifiques à une zone
-  const loadZoneData = async (zoneId: string) => {
+  // Fonction optimisée pour charger les données d'une zone
+  const loadZoneData = useCallback(async (zoneId: string) => {
     setIsLoading(prev => ({ ...prev, zoneDetails: true }));
     try {
       // Trouver la MZ complète à partir de l'ID
@@ -159,80 +159,66 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
           return;
         }
         
-        // Récupérer les process groups pour cette MZ
-        try {
-          const processResponse = await api.getProcesses();
+        // Récupérer les données en parallèle pour améliorer la performance
+        const [processResponse, hostsResponse, servicesResponse] = await Promise.all([
+          api.getProcesses(),
+          api.getHosts(),
+          api.getServices()
+        ]);
+        
+        // Traiter les données des process groups
+        if (!processResponse.error && processResponse.data) {
+          const processData = processResponse.data as ProcessResponse[];
           
-          if (!processResponse.error && processResponse.data) {
-            const processData = processResponse.data as ProcessResponse[];
-            
-            if (Array.isArray(processData) && processData.length > 0) {
-              // Transformer les données pour le frontend
-              const processes: ProcessGroup[] = processData.map((process: ProcessResponse) => {
-                // Créer l'icône en fonction du type de technologie
-                let icon = <></>;
-                const techLower = process.tech_icon ? process.tech_icon.toLowerCase() : '';
-                
-                if (techLower === 'database') {
-                  icon = <Database size={14} />;
-                } else if (techLower === 'coffee') {
-                  icon = <span className="text-amber-500">☕</span>;
-                } else if (techLower === 'snake') {
-                  icon = <span className="text-green-500">🐍</span>;
-                } else {
-                  icon = <span className="text-blue-500">⚙️</span>;
-                }
-                
-                return {
-                  name: process.name || "Processus inconnu",
-                  technology: process.technology || "Non spécifié",
-                  icon: icon,
-                  dt_url: process.dt_url || "#",
-                  type: techLower.includes('database') ? 'database' : 'technology'
-                };
-              });
+          if (Array.isArray(processData) && processData.length > 0) {
+            // Transformer les données pour le frontend
+            const processes: ProcessGroup[] = processData.map((process: ProcessResponse) => {
+              // Créer l'icône en fonction du type de technologie
+              let icon = <></>;
+              const techLower = process.tech_icon ? process.tech_icon.toLowerCase() : '';
               
-              setProcessGroups(processes);
-            } else {
-              // Aucun processus trouvé
-              setProcessGroups([]);
-            }
-          } else if (processResponse.error) {
-            console.error('Erreur lors de la récupération des processus:', processResponse.error);
+              if (techLower === 'database') {
+                icon = <Database size={14} />;
+              } else if (techLower === 'coffee') {
+                icon = <span className="text-amber-500">☕</span>;
+              } else if (techLower === 'snake') {
+                icon = <span className="text-green-500">🐍</span>;
+              } else {
+                icon = <span className="text-blue-500">⚙️</span>;
+              }
+              
+              return {
+                name: process.name || "Processus inconnu",
+                technology: process.technology || "Non spécifié",
+                icon: icon,
+                dt_url: process.dt_url || "#",
+                type: techLower.includes('database') ? 'database' : 'technology'
+              };
+            });
+            
+            setProcessGroups(processes);
+          } else {
+            // Aucun processus trouvé
             setProcessGroups([]);
           }
-        } catch (error) {
-          console.error('Erreur lors de la récupération des processus:', error);
+        } else if (processResponse.error) {
+          console.error('Erreur lors de la récupération des processus:', processResponse.error);
           setProcessGroups([]);
         }
         
-        // Récupérer les hosts pour cette MZ
-        try {
-          const hostsResponse = await api.getHosts();
-          
-          if (!hostsResponse.error && hostsResponse.data) {
-            setHosts(hostsResponse.data as Host[]);
-          } else if (hostsResponse.error) {
-            console.error('Erreur lors de la récupération des hosts:', hostsResponse.error);
-            setHosts([]);
-          }
-        } catch (error) {
-          console.error('Erreur lors de la récupération des hosts:', error);
+        // Traiter les données des hôtes
+        if (!hostsResponse.error && hostsResponse.data) {
+          setHosts(hostsResponse.data as Host[]);
+        } else if (hostsResponse.error) {
+          console.error('Erreur lors de la récupération des hosts:', hostsResponse.error);
           setHosts([]);
         }
         
-        // Récupérer les services pour cette MZ
-        try {
-          const servicesResponse = await api.getServices();
-          
-          if (!servicesResponse.error && servicesResponse.data) {
-            setServices(servicesResponse.data as Service[]);
-          } else if (servicesResponse.error) {
-            console.error('Erreur lors de la récupération des services:', servicesResponse.error);
-            setServices([]);
-          }
-        } catch (error) {
-          console.error('Erreur lors de la récupération des services:', error);
+        // Traiter les données des services
+        if (!servicesResponse.error && servicesResponse.data) {
+          setServices(servicesResponse.data as Service[]);
+        } else if (servicesResponse.error) {
+          console.error('Erreur lors de la récupération des services:', servicesResponse.error);
           setServices([]);
         }
       }
@@ -242,10 +228,10 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     } finally {
       setIsLoading(prev => ({ ...prev, zoneDetails: false }));
     }
-  };
+  }, [vitalForGroupMZs]);
 
-  // Fonction pour charger les données de l'API
-  const fetchData = async () => {
+  // Fonction optimisée pour charger les données de l'API
+  const fetchData = useCallback(async () => {
     try {
       setIsLoading(prev => ({ 
         ...prev, 
@@ -271,163 +257,145 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         return;
       }
       
-      // Récupérer le résumé des données
-      try {
-        const summaryResponse = await api.getSummary();
-        if (!summaryResponse.error && summaryResponse.data) {
-          setSummaryData(summaryResponse.data as SummaryData);
-        } else if (summaryResponse.error) {
-          console.error('Erreur lors de la récupération du résumé:', summaryResponse.error);
-        }
-      } catch (error) {
-        console.error('Erreur lors de la récupération du résumé:', error);
+      // Exécuter plusieurs requêtes en parallèle pour améliorer les performances
+      const [summaryResponse, mzResponse, vfgResponse, problemsResponse] = await Promise.all([
+        api.getSummary(),
+        api.getManagementZones(),
+        api.getVitalForGroupMZs(),
+        api.getProblems()
+      ]);
+      
+      // Traiter les données du résumé
+      if (!summaryResponse.error && summaryResponse.data) {
+        setSummaryData(summaryResponse.data as SummaryData);
+      } else if (summaryResponse.error) {
+        console.error('Erreur lors de la récupération du résumé:', summaryResponse.error);
       }
       
-      // Charger toutes les Management Zones disponibles
-      try {
-        const mzResponse = await api.getManagementZones();
-        if (!mzResponse.error && mzResponse.data) {
-          const mzData = mzResponse.data as any[];
-          
-          // Transformer les données pour le frontend
-          const formattedMZs: ManagementZone[] = mzData.map(mz => ({
-            id: mz.id,
-            name: mz.name,
-            code: mz.id,
-            icon: getZoneIcon(mz.name),
-            problemCount: 0, // Sera mis à jour après avoir récupéré les problèmes
-            apps: 0, // Ces valeurs seront fournies par l'API résumé
-            services: 0,
-            hosts: 0,
-            availability: "100%", // Valeur par défaut, sera mise à jour si disponible
-            status: "healthy" as "healthy" | "warning",
-            color: getZoneColor(mz.name),
-            dt_url: mz.dt_url || "#"
-          }));
-          
-          setManagementZones(formattedMZs);
-        } else if (mzResponse.error) {
-          console.error('Erreur lors de la récupération des Management Zones:', mzResponse.error);
-          setManagementZones([]);
-        }
-      } catch (error) {
-        console.error('Erreur lors de la récupération des Management Zones:', error);
+      // Traiter les données des Management Zones
+      let formattedMZs: ManagementZone[] = [];
+      if (!mzResponse.error && mzResponse.data) {
+        const mzData = mzResponse.data as any[];
+        
+        // Transformer les données pour le frontend
+        formattedMZs = mzData.map(mz => ({
+          id: mz.id,
+          name: mz.name,
+          code: mz.id,
+          icon: getZoneIcon(mz.name),
+          problemCount: 0, // Sera mis à jour après avoir récupéré les problèmes
+          apps: 0, // Ces valeurs seront fournies par l'API résumé
+          services: 0,
+          hosts: 0,
+          availability: "100%", // Valeur par défaut, sera mise à jour si disponible
+          status: "healthy" as "healthy" | "warning",
+          color: getZoneColor(mz.name),
+          dt_url: mz.dt_url || "#"
+        }));
+        
+        setManagementZones(formattedMZs);
+      } else if (mzResponse.error) {
+        console.error('Erreur lors de la récupération des Management Zones:', mzResponse.error);
         setManagementZones([]);
       }
       
-      // Charger les MZs de Vital for Group depuis l'API
-      try {
-        const vfgResponse = await api.getVitalForGroupMZs();
-        
-        if (!vfgResponse.error && vfgResponse.data) {
-          const vfgData = vfgResponse.data as VitalForGroupMZsResponse;
-          if (vfgData.mzs && Array.isArray(vfgData.mzs) && vfgData.mzs.length > 0) {
-            // Filtrer les MZs pour ne garder que celles de Vital for Group
-            const vfgMZs: ManagementZone[] = [];
+      // Traiter les données des MZs de Vital for Group
+      if (!vfgResponse.error && vfgResponse.data) {
+        const vfgData = vfgResponse.data as VitalForGroupMZsResponse;
+        if (vfgData.mzs && Array.isArray(vfgData.mzs) && vfgData.mzs.length > 0) {
+          // Filtrer les MZs pour ne garder que celles de Vital for Group
+          const vfgMZs: ManagementZone[] = [];
+          
+          // Obtenir toutes les MZs et filtrer celles qui sont dans VFG
+          for (const mzName of vfgData.mzs) {
+            // Chercher la MZ dans les MZs déjà récupérées
+            const existingMZ = formattedMZs.find(mz => mz.name === mzName);
             
-            // Obtenir toutes les MZs et filtrer celles qui sont dans VFG
-            for (const mzName of vfgData.mzs) {
-              // Chercher la MZ dans les MZs déjà récupérées
-              const existingMZ = managementZones.find(mz => mz.name === mzName);
-              
-              if (existingMZ) {
-                vfgMZs.push(existingMZ);
-              } else {
-                // Si la MZ n'existe pas encore, créer une entrée temporaire
-                vfgMZs.push({
-                  id: `tmp-${mzName.replace(/\s+/g, '-')}`,
-                  name: mzName,
-                  code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1'),
-                  icon: getZoneIcon(mzName),
-                  problemCount: 0,
-                  apps: 0,
-                  services: 0,
-                  hosts: 0,
-                  availability: "100%",
-                  status: "healthy" as "healthy" | "warning",
-                  color: getZoneColor(mzName),
-                  dt_url: "#"
-                });
-              }
+            if (existingMZ) {
+              vfgMZs.push(existingMZ);
+            } else {
+              // Si la MZ n'existe pas encore, créer une entrée temporaire
+              vfgMZs.push({
+                id: `tmp-${mzName.replace(/\s+/g, '-')}`,
+                name: mzName,
+                code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1'),
+                icon: getZoneIcon(mzName),
+                problemCount: 0,
+                apps: 0,
+                services: 0,
+                hosts: 0,
+                availability: "100%",
+                status: "healthy" as "healthy" | "warning",
+                color: getZoneColor(mzName),
+                dt_url: "#"
+              });
             }
-            
-            setVitalForGroupMZs(vfgMZs);
-            
-         
-          } else {
-            console.warn('Aucune MZ Vital for Group trouvée dans la réponse API.');
-            setVitalForGroupMZs([]);
           }
+          
+          setVitalForGroupMZs(vfgMZs);
         } else {
-          console.error('Erreur lors de la récupération des MZs Vital for Group:', vfgResponse.error);
+          console.warn('Aucune MZ Vital for Group trouvée dans la réponse API.');
           setVitalForGroupMZs([]);
         }
-      } catch (error) {
-        console.error('Erreur lors de la récupération des MZs Vital for Group:', error);
+      } else {
+        console.error('Erreur lors de la récupération des MZs Vital for Group:', vfgResponse.error);
         setVitalForGroupMZs([]);
       }
       
-      // Charger les problèmes
-      try {
-        const problemsResponse = await api.getProblems();
+      // Traiter les données des problèmes
+      if (!problemsResponse.error && problemsResponse.data) {
+        const problemsData = problemsResponse.data as ProblemResponse[];
         
-        if (!problemsResponse.error && problemsResponse.data) {
-          const problemsData = problemsResponse.data as ProblemResponse[];
+        if (Array.isArray(problemsData)) {
+          // Transformer les données en format attendu par le frontend
+          const problems: Problem[] = problemsData.map((problem: ProblemResponse) => ({
+            id: problem.id || `PROB-${Math.random().toString(36).substr(2, 9)}`,
+            title: problem.title || "Problème inconnu",
+            code: problem.id ? problem.id.substring(0, 7) : "UNKNOWN",
+            subtitle: `${problem.zone || "Non spécifié"} - Impact: ${problem.impact || "INCONNU"}`,
+            time: problem.start_time ? `Depuis ${problem.start_time}` : "Récent",
+            type: "Problème Dynatrace",
+            status: problem.status === "OPEN" ? "critical" : "warning",
+            impact: problem.impact === "INFRASTRUCTURE" ? "ÉLEVÉ" : problem.impact === "SERVICE" ? "MOYEN" : "FAIBLE",
+            zone: problem.zone || "Non spécifié",
+            servicesImpacted: problem.affected_entities ? problem.affected_entities.toString() : "0",
+            dt_url: problem.dt_url || "#"
+          }));
           
-          if (Array.isArray(problemsData)) {
-            // Transformer les données en format attendu par le frontend
-            const problems: Problem[] = problemsData.map((problem: ProblemResponse) => ({
-              id: problem.id || `PROB-${Math.random().toString(36).substr(2, 9)}`,
-              title: problem.title || "Problème inconnu",
-              code: problem.id ? problem.id.substring(0, 7) : "UNKNOWN",
-              subtitle: `${problem.zone || "Non spécifié"} - Impact: ${problem.impact || "INCONNU"}`,
-              time: problem.start_time ? `Depuis ${problem.start_time}` : "Récent",
-              type: "Problème Dynatrace",
-              status: problem.status === "OPEN" ? "critical" : "warning",
-              impact: problem.impact === "INFRASTRUCTURE" ? "ÉLEVÉ" : problem.impact === "SERVICE" ? "MOYEN" : "FAIBLE",
-              zone: problem.zone || "Non spécifié",
-              servicesImpacted: problem.affected_entities ? problem.affected_entities.toString() : "0",
-              dt_url: problem.dt_url || "#"
-            }));
+          setActiveProblems(problems);
+          
+          // Mettre à jour les compteurs de problèmes pour les MZs
+          if (vfgMZs && vfgMZs.length > 0) {
+            const updatedVfgMZs: ManagementZone[] = vfgMZs.map(zone => {
+              const zoneProblems = problems.filter((p: Problem) => p.zone.includes(zone.name));
+              return {
+                ...zone,
+                problemCount: zoneProblems.length,
+                status: zoneProblems.length > 0 ? "warning" : "healthy"
+              };
+            });
             
-            setActiveProblems(problems);
-            
-            // Mettre à jour les compteurs de problèmes pour les MZs
-            if (vitalForGroupMZs.length > 0) {
-              const updatedVfgMZs: ManagementZone[] = vitalForGroupMZs.map(zone => {
-                const zoneProblems = problems.filter((p: Problem) => p.zone.includes(zone.name));
-                return {
-                  ...zone,
-                  problemCount: zoneProblems.length,
-                  status: zoneProblems.length > 0 ? "warning" : "healthy"
-                };
-              });
-              
-              setVitalForGroupMZs(updatedVfgMZs);
-            }
+            setVitalForGroupMZs(updatedVfgMZs);
           }
-        } else if (problemsResponse.error) {
-          console.error('Erreur lors de la récupération des problèmes:', problemsResponse.error);
-          setActiveProblems([]);
         }
-      } catch (error) {
-        console.error('Erreur lors de la récupération des problèmes:', error);
+      } else if (problemsResponse.error) {
+        console.error('Erreur lors de la récupération des problèmes:', problemsResponse.error);
         setActiveProblems([]);
       }
       
-      // Charger les données pour la zone sélectionnée
+      // Si une zone est déjà sélectionnée, charger ses données
       if (selectedZone) {
         await loadZoneData(selectedZone);
       }
       
       // Mettre à jour les stats des MZ avec les données du résumé si disponibles
-      if (summaryData && vitalForGroupMZs.length > 0) {
+      if (summaryResponse.data && vitalForGroupMZs.length > 0) {
+        const summaryData = summaryResponse.data as SummaryData;
         const updatedVfgMZs = vitalForGroupMZs.map(mz => {
           return {
             ...mz,
             services: summaryData.services?.count || 0,
             hosts: summaryData.hosts?.count || 0,
-            // Si nous avons des données spécifiques à cette MZ, les utiliser ici
           };
         });
         setVitalForGroupMZs(updatedVfgMZs);
@@ -445,24 +413,24 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         initialLoadComplete: true
       }));
     }
-  };
+  }, [loadZoneData, selectedZone]);
 
   // Fonction pour définir la zone sélectionnée et charger ses données
-  const setSelectedZoneAndLoadData = (zoneId: string | null) => {
+  const setSelectedZoneAndLoadData = useCallback((zoneId: string | null) => {
     setSelectedZone(zoneId);
     if (zoneId) {
       loadZoneData(zoneId);
     }
-  };
+  }, [loadZoneData]);
 
   // Fonction pour rafraîchir les données
-  const refreshData = () => {
+  const refreshData = useCallback(() => {
     setError(null);
     fetchData();
-  };
+  }, [fetchData]);
 
-  // Valeur du contexte
-  const value: AppContextType = {
+  // Valeur du contexte mémorisée
+  const value = useMemo<AppContextType>(() => ({
     activeProblems,
     managementZones,
     vitalForGroupMZs,
@@ -483,7 +451,24 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     setCurrentPage,
     setActiveTab,
     refreshData
-  };
+  }), [
+    activeProblems,
+    managementZones,
+    vitalForGroupMZs,
+    selectedZone,
+    sidebarCollapsed,
+    currentPage,
+    activeTab,
+    processGroups,
+    hosts,
+    services,
+    summaryData,
+    isLoading,
+    error,
+    backendConnected,
+    setSelectedZoneAndLoadData,
+    refreshData
+  ]);
 
   return (
     <AppContext.Provider value={value}>
