@@ -31,7 +31,7 @@ def build_entity_selector(entity_type, mz_name):
     """
     return f"type({entity_type}),mzName(\"{mz_name}\")"
 
-# Fonction pour obtenir la liste des MZs Vital for Group
+# Fonction pour obtenir la liste des MZs Vital for Group (depuis .env)
 def get_vital_for_group_mzs():
     # Récupérer la liste depuis la variable d'environnement
     vfg_mz_string = os.environ.get('VFG_MZ_LIST', '')
@@ -43,7 +43,7 @@ def get_vital_for_group_mzs():
     # Diviser la chaîne en liste de MZs
     return [mz.strip() for mz in vfg_mz_string.split(',')]
 
-# Nouvel endpoint pour obtenir les Management Zones de Vital for Group
+# Endpoint pour obtenir les Management Zones de Vital for Group
 @app.route('/api/vital-for-group-mzs', methods=['GET'])
 def get_vital_for_group_mzs_endpoint():
     try:
@@ -55,7 +55,6 @@ def get_vital_for_group_mzs_endpoint():
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-
 
 # Structure de cache simple
 cache = {
@@ -852,41 +851,57 @@ def get_problems():
         traceback.print_exc()
         return {'error': str(e)}
 
+# Route séparée pour obtenir TOUTES les Management Zones (fonctionnalité future)
 @app.route('/api/management-zones', methods=['GET'])
 @cached('management_zones')
 def get_management_zones():
     try:
-        print("Fetching management zones...")
+        print("Tentative de récupération de toutes les Management Zones...")
         
-        # Version de l'API v2 actuelle
-        # mz_data = query_api("managementZones")
-        
-        # Essayons l'ancienne API v1
-        url = f"{DT_ENV_URL}/api/config/v1/managementZones"
-        headers = {
-            'Authorization': f'Api-Token {API_TOKEN}',
-            'Accept': 'application/json'
-        }
-        response = requests.get(url, headers=headers, verify=VERIFY_SSL)
-        response.raise_for_status()
-        mz_data = response.json()
-        
-        print("API Response:", json.dumps(mz_data, indent=2))
-        
-        management_zones = []
-        
-        # Pour l'API v1 config
-        for mz in mz_data.get('values', []):
-            management_zones.append({
-                'id': mz.get('id'),
-                'name': mz.get('name'),
-                'dt_url': f"{DT_ENV_URL}/#settings/managementzones;id={mz.get('id')}"
-            })
-        
-        print(f"Found {len(management_zones)} management zones")
-        return management_zones
+        # En cas d'erreur avec l'API, renvoyer un message clair plutôt que de bloquer
+        try:
+            url = f"{DT_ENV_URL}/api/config/v1/managementZones"
+            headers = {
+                'Authorization': f'Api-Token {API_TOKEN}',
+                'Accept': 'application/json'
+            }
+            response = requests.get(url, headers=headers, verify=VERIFY_SSL, timeout=5)
+            
+            # Si réussite
+            if response.status_code == 200:
+                mz_data = response.json()
+                
+                management_zones = []
+                
+                # Pour l'API v1 config
+                for mz in mz_data.get('values', []):
+                    management_zones.append({
+                        'id': mz.get('id'),
+                        'name': mz.get('name'),
+                        'dt_url': f"{DT_ENV_URL}/#settings/managementzones;id={mz.get('id')}"
+                    })
+                
+                print(f"Trouvé {len(management_zones)} Management Zones")
+                return management_zones
+            else:
+                # En cas d'erreur d'accès, retourner un message explicite
+                print(f"Impossible d'accéder à l'API des Management Zones: Code {response.status_code}")
+                return {
+                    'error': 'Accès API restreint',
+                    'message': 'Le token API actuel ne permet pas d\'accéder à la liste complète des Management Zones',
+                    'status_code': response.status_code
+                }
+                
+        except requests.exceptions.RequestException as e:
+            print(f"Erreur lors de l'accès à l'API des Management Zones: {str(e)}")
+            return {
+                'error': 'Erreur de connexion',
+                'message': f'Impossible de se connecter à l\'API Dynatrace: {str(e)}',
+                'note': 'Cette fonctionnalité nécessite des droits API supplémentaires.'
+            }
+            
     except Exception as e:
-        print(f"Error fetching management zones: {str(e)}")
+        print(f"Erreur générale dans get_management_zones: {str(e)}")
         import traceback
         traceback.print_exc()
         return {'error': str(e)}
