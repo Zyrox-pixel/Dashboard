@@ -852,59 +852,64 @@ def get_problems():
         return {'error': str(e)}
 
 # Route séparée pour obtenir TOUTES les Management Zones (fonctionnalité future)
+# Route séparée pour obtenir TOUTES les Management Zones (fonctionnalité future)
+# Route séparée pour obtenir TOUTES les Management Zones (fonctionnalité future)
 @app.route('/api/management-zones', methods=['GET'])
 @cached('management_zones')
 def get_management_zones():
+    # Vérifier d'abord si l'API est accessible sans générer d'erreur
     try:
-        print("Tentative de récupération de toutes les Management Zones...")
+        # Tentative simplifiée avec HEAD pour vérifier l'accès sans télécharger les données
+        url = f"{DT_ENV_URL}/api/config/v1/managementZones"
+        headers = {
+            'Authorization': f'Api-Token {API_TOKEN}',
+            'Accept': 'application/json'
+        }
         
-        # En cas d'erreur avec l'API, renvoyer un message clair plutôt que de bloquer
-        try:
-            url = f"{DT_ENV_URL}/api/config/v1/managementZones"
-            headers = {
-                'Authorization': f'Api-Token {API_TOKEN}',
-                'Accept': 'application/json'
-            }
-            response = requests.get(url, headers=headers, verify=VERIFY_SSL, timeout=5)
-            
-            # Si réussite
-            if response.status_code == 200:
-                mz_data = response.json()
-                
-                management_zones = []
-                
-                # Pour l'API v1 config
-                for mz in mz_data.get('values', []):
-                    management_zones.append({
-                        'id': mz.get('id'),
-                        'name': mz.get('name'),
-                        'dt_url': f"{DT_ENV_URL}/#settings/managementzones;id={mz.get('id')}"
-                    })
-                
-                print(f"Trouvé {len(management_zones)} Management Zones")
-                return management_zones
-            else:
-                # En cas d'erreur d'accès, retourner un message explicite
-                print(f"Impossible d'accéder à l'API des Management Zones: Code {response.status_code}")
-                return {
-                    'error': 'Accès API restreint',
-                    'message': 'Le token API actuel ne permet pas d\'accéder à la liste complète des Management Zones',
-                    'status_code': response.status_code
-                }
-                
-        except requests.exceptions.RequestException as e:
-            print(f"Erreur lors de l'accès à l'API des Management Zones: {str(e)}")
+        # Utiliser la méthode HEAD avec un timeout court
+        response = requests.head(url, headers=headers, verify=VERIFY_SSL, timeout=2)
+        
+        # Si l'API n'est pas accessible (403), retourner un message sans erreur
+        if response.status_code == 403:
             return {
-                'error': 'Erreur de connexion',
-                'message': f'Impossible de se connecter à l\'API Dynatrace: {str(e)}',
-                'note': 'Cette fonctionnalité nécessite des droits API supplémentaires.'
+                'message': 'Liste des Management Zones non disponible',
+                'note': 'Accès limité par les permissions API'
+            }
+        
+        # Si l'API est accessible, procéder à la requête complète
+        if response.status_code == 200:
+            response = requests.get(url, headers=headers, verify=VERIFY_SSL, timeout=5)
+            mz_data = response.json()
+            
+            management_zones = []
+            
+            # Pour l'API v1 config
+            for mz in mz_data.get('values', []):
+                management_zones.append({
+                    'id': mz.get('id'),
+                    'name': mz.get('name'),
+                    'dt_url': f"{DT_ENV_URL}/#settings/managementzones;id={mz.get('id')}"
+                })
+            
+            return management_zones
+        else:
+            return {
+                'message': f'API non disponible (code: {response.status_code})',
+                'note': 'Vérifiez la configuration de votre environnement Dynatrace'
             }
             
-    except Exception as e:
-        print(f"Erreur générale dans get_management_zones: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return {'error': str(e)}
+    except requests.exceptions.RequestException:
+        # Gérer silencieusement les erreurs de connexion ou de timeout
+        return {
+            'message': 'Liste des Management Zones non disponible',
+            'note': 'Service temporairement indisponible'
+        }
+    except Exception:
+        # Gérer toute autre erreur silencieusement
+        return {
+            'message': 'Liste des Management Zones non disponible',
+            'note': 'Erreur interne'
+        }
 
 @app.route('/api/status', methods=['GET'])
 def get_status():
