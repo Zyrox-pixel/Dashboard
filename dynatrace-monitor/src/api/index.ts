@@ -69,7 +69,7 @@ apiClient.interceptors.response.use(
 );
 
 // Helper pour batched requests
-export const batchRequests = async <T>(requests: Promise<ApiResponse<T>>[]) => {
+const batchRequests = async <T>(requests: Promise<ApiResponse<T>>[]) => {
   try {
     const responses = await Promise.all(requests);
     return responses.map(response => response.data);
@@ -142,7 +142,14 @@ const api = {
       if (endpoint.includes(ENDPOINTS.REFRESH_CACHE(''))) {
         // Si c'est une requête de rafraîchissement, invalider le cache correspondant
         const cacheType = endpoint.split('/').pop();
-        sessionStorage.removeItem(`dynatrace_monitor:${ENDPOINTS[cacheType?.toUpperCase() || '']}`);
+        if (cacheType && ENDPOINTS[cacheType.toUpperCase() as keyof typeof ENDPOINTS]) {
+          const endpointPath = 
+            typeof ENDPOINTS[cacheType.toUpperCase() as keyof typeof ENDPOINTS] === 'function' 
+              ? ENDPOINTS.REFRESH_CACHE(cacheType) 
+              : ENDPOINTS[cacheType.toUpperCase() as keyof typeof ENDPOINTS];
+          
+          sessionStorage.removeItem(`dynatrace_monitor:${endpointPath}`);
+        }
       }
       
       return { data: response.data };

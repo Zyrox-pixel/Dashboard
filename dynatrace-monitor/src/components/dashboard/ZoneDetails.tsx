@@ -3,7 +3,7 @@ import { ChevronLeft, Clock, AlertTriangle, ExternalLink, RefreshCw, Cpu, Activi
 import { useTheme } from '../../contexts/ThemeContext';
 import { ManagementZone, Problem, ProcessGroup, Host, Service } from '../../api/types';
 import ProblemsList from './ProblemsList';
-import PaginatedTable from '../common/PaginatedTable';
+import PaginatedTable, { Column } from '../common/PaginatedTable';
 import MetricChart from '../common/MetricChart';
 import { useApp } from '../../contexts/AppContext';
 
@@ -90,7 +90,7 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
   }, [zone.color, isDarkTheme]);
   
   // Définition des colonnes pour les tableaux (mémorisée)
-  const processColumns = useMemo(() => [
+  const processColumns = useMemo<Column<ProcessGroup>[]>(() => [
     {
       key: 'name',
       label: 'Nom',
@@ -494,7 +494,7 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
             </button>
           </div>
 
-          <PaginatedTable 
+          <PaginatedTable<ProcessGroup> 
             data={processGroups}
             columns={processColumns}
             pageSize={10}

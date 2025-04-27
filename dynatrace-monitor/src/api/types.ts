@@ -40,6 +40,7 @@ export interface ManagementZone {
 
 // Types pour les process groups
 export interface ProcessGroup {
+  id: string;  // Ajouté cette propriété
   name: string;
   technology: string;
   icon: React.ReactNode;

@@ -188,6 +188,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
               }
               
               return {
+                id: process.id,
                 name: process.name || "Processus inconnu",
                 technology: process.technology || "Non spécifié",
                 icon: icon,
@@ -365,8 +366,8 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
           setActiveProblems(problems);
           
           // Mettre à jour les compteurs de problèmes pour les MZs
-          if (vfgMZs && vfgMZs.length > 0) {
-            const updatedVfgMZs: ManagementZone[] = vfgMZs.map(zone => {
+          if (vitalForGroupMZs.length > 0) {
+            const updatedVfgMZs: ManagementZone[] = vitalForGroupMZs.map(zone => {
               const zoneProblems = problems.filter((p: Problem) => p.zone.includes(zone.name));
               return {
                 ...zone,

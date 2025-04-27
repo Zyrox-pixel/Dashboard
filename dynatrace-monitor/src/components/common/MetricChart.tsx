@@ -68,7 +68,7 @@ const MetricChart: React.FC<MetricChartProps> = ({
   }
 
   // Couleurs pour le graphique selon le thème
-  const colorPalette = {
+  const colorPalette: Record<string, { main: string; gradient: [string, string] }> = {
     red: {
       main: 'rgb(239, 68, 68)',
       gradient: ['rgba(239, 68, 68, 0.8)', 'rgba(239, 68, 68, 0.2)']
@@ -92,7 +92,7 @@ const MetricChart: React.FC<MetricChartProps> = ({
   };
 
   // Utiliser la couleur spécifiée ou la couleur par défaut
-  const chartColor = colorPalette[color as keyof typeof colorPalette] || colorPalette.red;
+  const chartColor = colorPalette[color] || colorPalette.red;
 
   return (
     <div>
@@ -113,18 +113,18 @@ const MetricChart: React.FC<MetricChartProps> = ({
             <XAxis 
               dataKey="time" 
               tick={{ fontSize: 10 }} 
-              tickFormatter={(value) => value.split(':')[0] + 'h'} 
+              tickFormatter={(value: string) => value.split(':')[0] + 'h'} 
               interval="preserveStartEnd"
             />
             <YAxis 
               tick={{ fontSize: 10 }} 
               domain={domain} 
               allowDecimals={false}
-              tickFormatter={(value) => `${value}${unit}`}
+              tickFormatter={(value: number) => `${value}${unit}`}
             />
             <Tooltip 
               formatter={(value: number) => [`${value}${unit}`, label]}
-              labelFormatter={(time) => {
+              labelFormatter={(time: string) => {
                 const dataPoint = sampledData.find(d => d.time === time);
                 return dataPoint ? `${dataPoint.date} à ${time}` : time;
               }}
