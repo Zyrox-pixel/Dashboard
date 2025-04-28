@@ -7,6 +7,10 @@ import PaginatedTable, { Column } from '../common/PaginatedTable';
 import { useApp } from '../../contexts/AppContext';
 import AdvancedOsFilter from '../common/AdvancedOsFilter';
 import FilterBadges from '../common/FilterBadges';
+import AdvancedServiceFilter from '../common/AdvancedServiceFilter';
+import AdvancedProcessGroupFilter from '../common/AdvancedProcessGroupFilter';
+import ServiceFilterBadges from '../common/ServiceFilterBadges';
+import ProcessFilterBadges from '../common/ProcessFilterBadges';
 
 interface OsFilter {
   type: string;
@@ -49,9 +53,23 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
   const [hostSearchTerm, setHostSearchTerm] = useState<string>('');
   const [serviceSearchTerm, setServiceSearchTerm] = useState<string>('');
   
-  // États pour les filtres avancés
+  // États pour les filtres avancés d'OS
   const [showAdvancedOsFilter, setShowAdvancedOsFilter] = useState<boolean>(false);
   const [osFilters, setOsFilters] = useState<OsFilter[]>([]);
+  
+  // États pour les filtres avancés de services
+  const [showAdvancedServiceFilter, setShowAdvancedServiceFilter] = useState<boolean>(false);
+  const [serviceFilters, setServiceFilters] = useState<{
+    type: 'technology' | 'response_time' | 'error_rate' | 'status';
+    values: string[];
+  }[]>([]);
+
+  // États pour les filtres avancés de process groups
+  const [showAdvancedProcessFilter, setShowAdvancedProcessFilter] = useState<boolean>(false);
+  const [processFilters, setProcessFilters] = useState<{
+    type: 'technology' | 'process_type';
+    values: string[];
+  }[]>([]);
   
   // Filtrer les problèmes pour la zone courante (mémorisé)
   const zoneProblems = useMemo(() => 
@@ -148,88 +166,86 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
   }, [hosts]);
   
   // Fonction pour obtenir les données triées et filtrées
-  // Fonction modifiée dans ZoneDetails.tsx pour corriger la logique de filtrage
-
-const getSortedData = <T extends {}>( data: T[], searchTerm: string = '', filters: any = {}): T[] => {
-  if (!data || !Array.isArray(data) || data.length === 0) {
-    return [];
-  }
-  
-  let sortableData = [...data];
-  
-  // Filtrer les données si un terme de recherche est fourni
-  if (searchTerm && sortableData.length > 0 && 'name' in sortableData[0]) {
-    sortableData = sortableData.filter(item => 
-      ((item as any).name || '').toString().toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  }
-  
-  // Appliquer des filtres avancés d'OS
-  if (filters.osFilters && filters.osFilters.length > 0 && sortableData.length > 0 && 'os_version' in sortableData[0]) {
-    sortableData = sortableData.filter(item => {
-      const osVersion = (item as any).os_version;
-      if (!osVersion) return false;
-      
-      // Déterminer le type d'OS de l'élément
-      let itemOsType = "Autre";
-      if (osVersion.toLowerCase().includes('linux')) {
-        itemOsType = "Linux";
-      } else if (osVersion.toLowerCase().includes('windows')) {
-        itemOsType = "Windows";
-      } else if (osVersion.toLowerCase().includes('unix')) {
-        itemOsType = "Unix";
-      } else if (osVersion.toLowerCase().includes('aix')) {
-        itemOsType = "AIX";
-      } else if (osVersion.toLowerCase().includes('mac') || osVersion.toLowerCase().includes('darwin')) {
-        itemOsType = "MacOS";
-      }
-      
-      // Vérifier si cet OS est dans nos filtres
-      for (const filter of filters.osFilters) {
-        if (filter.type === itemOsType) {
-          // Si versions est vide, toutes les versions sont incluses
-          if (filter.versions.length === 0) {
-            return true;
-          }
-          
-          // Sinon, vérifier si cette version spécifique est dans la liste
-          return filter.versions.includes(osVersion);
+  const getSortedData = <T extends {}>( data: T[], searchTerm: string = '', filters: any = {}): T[] => {
+    if (!data || !Array.isArray(data) || data.length === 0) {
+      return [];
+    }
+    
+    let sortableData = [...data];
+    
+    // Filtrer les données si un terme de recherche est fourni
+    if (searchTerm && sortableData.length > 0 && 'name' in sortableData[0]) {
+      sortableData = sortableData.filter(item => 
+        ((item as any).name || '').toString().toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+    
+    // Appliquer des filtres avancés d'OS
+    if (filters.osFilters && filters.osFilters.length > 0 && sortableData.length > 0 && 'os_version' in sortableData[0]) {
+      sortableData = sortableData.filter(item => {
+        const osVersion = (item as any).os_version;
+        if (!osVersion) return false;
+        
+        // Déterminer le type d'OS de l'élément
+        let itemOsType = "Autre";
+        if (osVersion.toLowerCase().includes('linux')) {
+          itemOsType = "Linux";
+        } else if (osVersion.toLowerCase().includes('windows')) {
+          itemOsType = "Windows";
+        } else if (osVersion.toLowerCase().includes('unix')) {
+          itemOsType = "Unix";
+        } else if (osVersion.toLowerCase().includes('aix')) {
+          itemOsType = "AIX";
+        } else if (osVersion.toLowerCase().includes('mac') || osVersion.toLowerCase().includes('darwin')) {
+          itemOsType = "MacOS";
         }
+        
+        // Vérifier si cet OS est dans nos filtres
+        for (const filter of filters.osFilters) {
+          if (filter.type === itemOsType) {
+            // Si versions est vide, toutes les versions sont incluses
+            if (filter.versions.length === 0) {
+              return true;
+            }
+            
+            // Sinon, vérifier si cette version spécifique est dans la liste
+            return filter.versions.includes(osVersion);
+          }
+        }
+        
+        // Si aucun filtre ne correspond au type d'OS, exclure cet élément
+        return false;
+      });
+    }
+    
+    // Si aucun tri n'est configuré, retourner les données filtrées
+    if (!sortConfig.key || !sortConfig.direction) {
+      return sortableData;
+    }
+    
+    // Trier les données
+    return sortableData.sort((a, b) => {
+      if (!(sortConfig.key in a) || !(sortConfig.key in b)) {
+        return 0;
       }
       
-      // Si aucun filtre ne correspond au type d'OS, exclure cet élément
-      return false;
-    });
-  }
-  
-  // Si aucun tri n'est configuré, retourner les données filtrées
-  if (!sortConfig.key || !sortConfig.direction) {
-    return sortableData;
-  }
-  
-  // Trier les données
-  return sortableData.sort((a, b) => {
-    if (!(sortConfig.key in a) || !(sortConfig.key in b)) {
+      const aValue = (a as any)[sortConfig.key];
+      const bValue = (b as any)[sortConfig.key];
+      
+      // Gestion des valeurs null ou undefined
+      if (aValue == null && bValue == null) return 0;
+      if (aValue == null) return 1;
+      if (bValue == null) return -1;
+      
+      if (aValue < bValue) {
+        return sortConfig.direction === 'ascending' ? -1 : 1;
+      }
+      if (aValue > bValue) {
+        return sortConfig.direction === 'ascending' ? 1 : -1;
+      }
       return 0;
-    }
-    
-    const aValue = (a as any)[sortConfig.key];
-    const bValue = (b as any)[sortConfig.key];
-    
-    // Gestion des valeurs null ou undefined
-    if (aValue == null && bValue == null) return 0;
-    if (aValue == null) return 1;
-    if (bValue == null) return -1;
-    
-    if (aValue < bValue) {
-      return sortConfig.direction === 'ascending' ? -1 : 1;
-    }
-    if (aValue > bValue) {
-      return sortConfig.direction === 'ascending' ? 1 : -1;
-    }
-    return 0;
-  });
-};
+    });
+  };
   
   // Extraire la liste des OS uniques des hôtes
   const uniqueOperatingSystems = useMemo(() => {
@@ -261,7 +277,7 @@ const getSortedData = <T extends {}>( data: T[], searchTerm: string = '', filter
     return Array.from(osSet);
   }, [normalizedHosts]);
 
-  // Fonction pour supprimer un filtre
+  // Fonction pour supprimer un filtre OS
   const handleRemoveFilter = (type: string, version?: string) => {
     if (version) {
       // Supprimer une version spécifique du filtre
@@ -323,6 +339,62 @@ const getSortedData = <T extends {}>( data: T[], searchTerm: string = '', filter
     }
   };
   
+  // Fonction pour supprimer un filtre service
+  const handleRemoveServiceFilter = (type: string, value?: string) => {
+    if (!value) {
+      // Supprimer tout le type de filtre
+      setServiceFilters(serviceFilters.filter(f => f.type !== type));
+      return;
+    }
+    
+    // Supprimer une valeur spécifique
+    const newFilters = [...serviceFilters];
+    const filterIndex = newFilters.findIndex(f => f.type === type);
+    
+    if (filterIndex !== -1) {
+      const filter = {...newFilters[filterIndex]};
+      filter.values = filter.values.filter(v => v !== value);
+      
+      if (filter.values.length === 0) {
+        // Si plus aucune valeur, supprimer le filtre
+        newFilters.splice(filterIndex, 1);
+      } else {
+        // Sinon mettre à jour le filtre
+        newFilters[filterIndex] = filter;
+      }
+      
+      setServiceFilters(newFilters);
+    }
+  };
+
+  // Fonction pour supprimer un filtre process
+  const handleRemoveProcessFilter = (type: string, value?: string) => {
+    if (!value) {
+      // Supprimer tout le type de filtre
+      setProcessFilters(processFilters.filter(f => f.type !== type));
+      return;
+    }
+    
+    // Supprimer une valeur spécifique
+    const newFilters = [...processFilters];
+    const filterIndex = newFilters.findIndex(f => f.type === type);
+    
+    if (filterIndex !== -1) {
+      const filter = {...newFilters[filterIndex]};
+      filter.values = filter.values.filter(v => v !== value);
+      
+      if (filter.values.length === 0) {
+        // Si plus aucune valeur, supprimer le filtre
+        newFilters.splice(filterIndex, 1);
+      } else {
+        // Sinon mettre à jour le filtre
+        newFilters[filterIndex] = filter;
+      }
+      
+      setProcessFilters(newFilters);
+    }
+  };
+  
   // Fonction pour obtenir le nombre total de filtres appliqués
   const getSelectedFiltersCount = (): number => {
     let count = 0;
@@ -337,6 +409,15 @@ const getSortedData = <T extends {}>( data: T[], searchTerm: string = '', filter
     
     return count;
   };
+
+  // Obtenir le compte des filtres actifs pour services et process
+  const getServiceFiltersCount = () => {
+    return serviceFilters.reduce((count, filter) => count + filter.values.length, 0);
+  };
+
+  const getProcessFiltersCount = () => {
+    return processFilters.reduce((count, filter) => count + filter.values.length, 0);
+  };
   
   // Obtenir les données triées et filtrées pour les hôtes
   const sortedHosts = useMemo(() => {
@@ -347,6 +428,82 @@ const getSortedData = <T extends {}>( data: T[], searchTerm: string = '', filter
   const sortedServices = useMemo(() => {
     return getSortedData(services, serviceSearchTerm);
   }, [services, sortConfig, serviceSearchTerm]);
+
+  // Filtrer les services selon les critères avancés
+  const getFilteredServices = () => {
+    if (serviceFilters.length === 0) return sortedServices;
+    
+    return sortedServices.filter(service => {
+      // Pour chaque groupe de filtres (technology, response_time, etc.)
+      return serviceFilters.every(filterGroup => {
+        // Si aucune valeur n'est sélectionnée dans ce groupe, considérer comme "match"
+        if (filterGroup.values.length === 0) return true;
+        
+        switch (filterGroup.type) {
+          case 'technology':
+            return filterGroup.values.includes(service.technology);
+            
+          case 'response_time':
+            if (service.response_time === null) return false;
+            
+            if (filterGroup.values.includes('fast'))
+              if (service.response_time < 100) return true;
+              
+            if (filterGroup.values.includes('medium'))
+              if (service.response_time >= 100 && service.response_time < 500) return true;
+              
+            if (filterGroup.values.includes('slow'))
+              if (service.response_time >= 500) return true;
+              
+            return false;
+            
+          case 'error_rate':
+            if (service.error_rate === null) return false;
+            
+            if (filterGroup.values.includes('normal'))
+              if (service.error_rate < 1) return true;
+              
+            if (filterGroup.values.includes('elevated'))
+              if (service.error_rate >= 1 && service.error_rate < 5) return true;
+              
+            if (filterGroup.values.includes('critical'))
+              if (service.error_rate >= 5) return true;
+              
+            return false;
+            
+          case 'status':
+            return filterGroup.values.includes(service.status.toLowerCase());
+            
+          default:
+            return true;
+        }
+      });
+    });
+  };
+
+  // Filtrer les process groups selon les critères avancés
+  const getFilteredProcessGroups = () => {
+    if (processFilters.length === 0) return processGroups;
+    
+    return processGroups.filter(process => {
+      // Pour chaque groupe de filtres (technology, process_type)
+      return processFilters.every(filterGroup => {
+        // Si aucune valeur n'est sélectionnée dans ce groupe, considérer comme "match"
+        if (filterGroup.values.length === 0) return true;
+        
+        switch (filterGroup.type) {
+          case 'technology':
+            return filterGroup.values.includes(process.technology);
+            
+          case 'process_type':
+            return filterGroup.values.includes(process.type);
+            
+          default:
+            return true;
+        }
+      });
+    });
+  };
   
   // Définition des colonnes pour les tableaux (mémorisée)
   const processColumns = useMemo<Column<ProcessGroup>[]>(() => [
@@ -946,7 +1103,7 @@ const getSortedData = <T extends {}>( data: T[], searchTerm: string = '', filter
             <h2 className="font-semibold flex items-center gap-2">
               <Activity className={zoneColors.text} size={16} />
               <span>Services</span>
-              <span className="text-xs text-slate-400 ml-2">({sortedServices.length})</span>
+              <span className="text-xs text-slate-400 ml-2">({getFilteredServices().length})</span>
             </h2>
             
             {/* Barre de recherche pour les services */}
@@ -974,20 +1131,54 @@ const getSortedData = <T extends {}>( data: T[], searchTerm: string = '', filter
                 )}
               </div>
               
-              <button className={`flex items-center gap-1 px-3 py-1 rounded-md border text-sm ${
-                isDarkTheme ? 'border-slate-600 text-slate-300 hover:bg-slate-700' : 'border-slate-300 text-slate-600 hover:bg-slate-100'
-              }`}>
-                <Filter size={12} />
-                <span>Filtrer</span>
+              <button 
+                onClick={() => setShowAdvancedServiceFilter(!showAdvancedServiceFilter)}
+                className={`flex items-center gap-1 px-3 py-1 rounded-md border text-sm ${
+                  isDarkTheme 
+                    ? serviceFilters.length > 0 
+                      ? 'border-indigo-600 bg-indigo-700/30 text-indigo-400' 
+                      : 'border-slate-600 text-slate-300 hover:bg-slate-700' 
+                    : serviceFilters.length > 0 
+                      ? 'border-indigo-600 bg-indigo-100 text-indigo-600' 
+                      : 'border-slate-300 text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                <Filter size={14} />
+                <span>Filtres avancés {getServiceFiltersCount() > 0 && `(${getServiceFiltersCount()})`}</span>
               </button>
             </div>
           </div>
 
+          {/* Afficher les badges de filtres actifs */}
+          {serviceFilters.length > 0 && (
+            <ServiceFilterBadges
+              filters={serviceFilters}
+              onRemoveFilter={handleRemoveServiceFilter}
+              onClearAllFilters={() => setServiceFilters([])}
+            />
+          )}
+          
+          {/* Popup du filtre avancé pour les services */}
+          {showAdvancedServiceFilter && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+              <AdvancedServiceFilter
+                services={services}
+                selectedFilters={serviceFilters}
+                onFilterChange={setServiceFilters}
+                onClose={() => setShowAdvancedServiceFilter(false)}
+              />
+            </div>
+          )}
+
           <PaginatedTable 
-            data={sortedServices}
+            data={getFilteredServices()}
             columns={serviceColumns}
             pageSize={20}
-            emptyMessage="Aucun service trouvé pour cette management zone."
+            emptyMessage={
+              serviceFilters.length > 0
+                ? "Aucun service ne correspond aux filtres sélectionnés."
+                : "Aucun service trouvé pour cette management zone."
+            }
           />
         </section>
       )}
@@ -1001,21 +1192,55 @@ const getSortedData = <T extends {}>( data: T[], searchTerm: string = '', filter
             <h2 className="font-semibold flex items-center gap-2">
               <Cpu className={zoneColors.text} size={16} />
               <span>Process Groups</span>
-              <span className="text-xs text-slate-400 ml-2">({processGroups.length})</span>
+              <span className="text-xs text-slate-400 ml-2">({getFilteredProcessGroups().length})</span>
             </h2>
-            <button className={`flex items-center gap-1 px-3 py-1 rounded-md border text-sm ${
-              isDarkTheme ? 'border-slate-600 text-slate-300 hover:bg-slate-700' : 'border-slate-300 text-slate-600 hover:bg-slate-100'
-            }`}>
-              <Filter size={12} />
-              <span>Filtrer</span>
+            <button 
+              onClick={() => setShowAdvancedProcessFilter(!showAdvancedProcessFilter)}
+              className={`flex items-center gap-1 px-3 py-1 rounded-md border text-sm ${
+                isDarkTheme 
+                  ? processFilters.length > 0 
+                    ? 'border-indigo-600 bg-indigo-700/30 text-indigo-400' 
+                    : 'border-slate-600 text-slate-300 hover:bg-slate-700' 
+                  : processFilters.length > 0 
+                    ? 'border-indigo-600 bg-indigo-100 text-indigo-600' 
+                    : 'border-slate-300 text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              <Filter size={14} />
+              <span>Filtres avancés {getProcessFiltersCount() > 0 && `(${getProcessFiltersCount()})`}</span>
             </button>
           </div>
 
+          {/* Afficher les badges de filtres actifs */}
+          {processFilters.length > 0 && (
+            <ProcessFilterBadges
+              filters={processFilters}
+              onRemoveFilter={handleRemoveProcessFilter}
+              onClearAllFilters={() => setProcessFilters([])}
+            />
+          )}
+          
+          {/* Popup du filtre avancé pour les process groups */}
+          {showAdvancedProcessFilter && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+              <AdvancedProcessGroupFilter
+                processGroups={processGroups}
+                selectedFilters={processFilters}
+                onFilterChange={setProcessFilters}
+                onClose={() => setShowAdvancedProcessFilter(false)}
+              />
+            </div>
+          )}
+
           <PaginatedTable 
-            data={processGroups}
+            data={getFilteredProcessGroups()}
             columns={processColumns}
             pageSize={20}
-            emptyMessage="Aucun process group trouvé pour cette management zone."
+            emptyMessage={
+              processFilters.length > 0
+                ? "Aucun process group ne correspond aux filtres sélectionnés."
+                : "Aucun process group trouvé pour cette management zone."
+            }
           />
         </section>
       )}
