@@ -48,37 +48,29 @@ const FilterBadges: React.FC<FilterBadgesProps> = ({
         Filtres actifs:
       </span>
       
-      {filters.map(filter => {
-        if (filter.versions.length === 0) {
-          // Toutes les versions de ce type d'OS sont sélectionnées
-          return (
-            <span 
-              key={filter.type}
-              className={`inline-flex items-center gap-1.5 px-2 py-1 text-xs font-medium rounded-full ${
-                isDarkTheme
-                  ? 'bg-indigo-900/30 text-indigo-300 border border-indigo-700/50'
-                  : 'bg-indigo-50 text-indigo-700 border border-indigo-200'
-              }`}
-            >
-              {getOsTypeIcon(filter.type)}
-              <span>{filter.type}</span>
-              <button
-                onClick={() => onRemoveFilter(filter.type)}
-                className={`ml-1 p-0.5 rounded-full ${
-                  isDarkTheme
-                    ? 'hover:bg-indigo-800 text-indigo-300'
-                    : 'hover:bg-indigo-100 text-indigo-600'
-                }`}
-              >
-                <X size={10} />
-              </button>
-            </span>
-          );
-        } else {
-          // Afficher chaque version exclue séparément
-          return null; // Nous ne montrons pas les versions exclues pour simplifier l'UI
-        }
-      })}
+      {filters.map(filter => (
+        <span 
+          key={filter.type}
+          className={`inline-flex items-center gap-1.5 px-2 py-1 text-xs font-medium rounded-full ${
+            isDarkTheme
+              ? 'bg-indigo-900/30 text-indigo-300 border border-indigo-700/50'
+              : 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+          }`}
+        >
+          {getOsTypeIcon(filter.type)}
+          <span>{filter.type}</span>
+          <button
+            onClick={() => onRemoveFilter(filter.type)}
+            className={`ml-1 p-0.5 rounded-full ${
+              isDarkTheme
+                ? 'hover:bg-indigo-800 text-indigo-300'
+                : 'hover:bg-indigo-100 text-indigo-600'
+            }`}
+          >
+            <X size={10} />
+          </button>
+        </span>
+      ))}
       
       {filters.length > 0 && (
         <button
