@@ -5,6 +5,13 @@ import { ManagementZone, Problem, ProcessGroup, Host, Service } from '../../api/
 import ProblemsList from './ProblemsList';
 import PaginatedTable, { Column } from '../common/PaginatedTable';
 import { useApp } from '../../contexts/AppContext';
+import AdvancedOsFilter from '../common/AdvancedOsFilter';
+import FilterBadges from '../common/FilterBadges';
+
+interface OsFilter {
+  type: string;
+  versions: string[];
+}
 
 interface ZoneDetailsProps {
   zone: ManagementZone;
@@ -42,9 +49,9 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
   const [hostSearchTerm, setHostSearchTerm] = useState<string>('');
   const [serviceSearchTerm, setServiceSearchTerm] = useState<string>('');
   
-  // États pour les filtres OS
-  const [selectedOsFilters, setSelectedOsFilters] = useState<string[]>([]);
-  const [showOsFilter, setShowOsFilter] = useState<boolean>(false);
+  // États pour les filtres avancés
+  const [showAdvancedOsFilter, setShowAdvancedOsFilter] = useState<boolean>(false);
+  const [osFilters, setOsFilters] = useState<OsFilter[]>([]);
   
   // Filtrer les problèmes pour la zone courante (mémorisé)
   const zoneProblems = useMemo(() => 
@@ -155,13 +162,47 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
       );
     }
     
-    // Appliquer des filtres spécifiques (comme le filtre OS)
+    // Appliquer des filtres avancés d'OS
     if (filters.osFilters && filters.osFilters.length > 0 && sortableData.length > 0 && 'os_version' in sortableData[0]) {
-      sortableData = sortableData.filter(item => 
-        filters.osFilters.some((filter: string) => 
-          (item as any).os_version.toLowerCase().includes(filter.toLowerCase())
-        )
-      );
+      sortableData = sortableData.filter(item => {
+        const osVersion = (item as any).os_version;
+        if (!osVersion) return false;
+        
+        // Vérifie si l'OS est filtré
+        for (const filter of filters.osFilters) {
+          // Déterminer le type d'OS de l'élément
+          let itemOsType = "Autre";
+          if (osVersion.toLowerCase().includes('linux')) {
+            itemOsType = "Linux";
+          } else if (osVersion.toLowerCase().includes('windows')) {
+            itemOsType = "Windows";
+          } else if (osVersion.toLowerCase().includes('unix')) {
+            itemOsType = "Unix";
+          } else if (osVersion.toLowerCase().includes('aix')) {
+            itemOsType = "AIX";
+          } else if (osVersion.toLowerCase().includes('mac') || osVersion.toLowerCase().includes('darwin')) {
+            itemOsType = "MacOS";
+          }
+          
+          // Si ce type d'OS est filtré
+          if (filter.type === itemOsType) {
+            // Si la liste des versions est vide, toutes les versions sont incluses
+            if (filter.versions.length === 0) {
+              return true;
+            }
+            
+            // Si la version spécifique n'est pas dans la liste d'exclusion
+            if (!filter.versions.includes(osVersion)) {
+              return true;
+            }
+            
+            return false;
+          }
+        }
+        
+        // Si aucun filtre ne correspond au type d'OS, n'incluez pas cet élément
+        return filters.osFilters.length === 0;
+      });
     }
     
     // Si aucun tri n'est configuré, retourner les données filtrées
@@ -222,25 +263,88 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
     
     return Array.from(osSet);
   }, [normalizedHosts]);
-  
-  // Fonction pour basculer un filtre OS
-  const toggleOsFilter = (os: string) => {
-    if (selectedOsFilters.includes(os)) {
-      setSelectedOsFilters(selectedOsFilters.filter(filter => filter !== os));
+
+  // Fonction pour supprimer un filtre
+  const handleRemoveFilter = (type: string, version?: string) => {
+    if (version) {
+      // Supprimer une version spécifique du filtre
+      const filterIndex = osFilters.findIndex(f => f.type === type);
+      if (filterIndex >= 0) {
+        const newFilters = [...osFilters];
+        const filter = {...newFilters[filterIndex]};
+        
+        if (filter.versions.includes(version)) {
+          // Retirer cette version de la liste d'exclusion
+          filter.versions = filter.versions.filter(v => v !== version);
+          
+          // Si plus aucune exclusion, simplifier à "toutes les versions"
+          if (filter.versions.length === 0) {
+            newFilters[filterIndex] = { type, versions: [] };
+          } else {
+            newFilters[filterIndex] = filter;
+          }
+        } else {
+          // Si cette version n'est pas exclue, l'ajouter aux exclusions
+          const allVersions = normalizedHosts
+            .filter(host => {
+              const osVersion = host.os_version || "";
+              let itemOsType = "Autre";
+              
+              if (osVersion.toLowerCase().includes('linux')) {
+                itemOsType = "Linux";
+              } else if (osVersion.toLowerCase().includes('windows')) {
+                itemOsType = "Windows";
+              } else if (osVersion.toLowerCase().includes('unix')) {
+                itemOsType = "Unix";
+              } else if (osVersion.toLowerCase().includes('aix')) {
+                itemOsType = "AIX";
+              } else if (osVersion.toLowerCase().includes('mac') || osVersion.toLowerCase().includes('darwin')) {
+                itemOsType = "MacOS";
+              }
+              
+              return itemOsType === type;
+            })
+            .map(host => host.os_version || "");
+            
+            if (!filter.versions.includes(version)) {
+              filter.versions.push(version);
+            }
+          
+          // Si toutes les versions sont exclues, supprimer le filtre
+          if (filter.versions.length >= allVersions.length) {
+            newFilters.splice(filterIndex, 1);
+          } else {
+            newFilters[filterIndex] = filter;
+          }
+        }
+        
+        setOsFilters(newFilters);
+      }
     } else {
-      setSelectedOsFilters([...selectedOsFilters, os]);
+      // Supprimer un filtre complet
+      setOsFilters(osFilters.filter(f => f.type !== type));
     }
   };
   
-  // Fonction pour effacer tous les filtres OS
-  const clearOsFilters = () => {
-    setSelectedOsFilters([]);
+  // Fonction pour obtenir le nombre total de filtres appliqués
+  const getSelectedFiltersCount = (): number => {
+    let count = 0;
+    
+    osFilters.forEach(filter => {
+      if (filter.versions.length === 0) {
+        count += 1; // Compte l'OS entier comme un filtre
+      } else {
+        count += 1; // Compte chaque filtre de version
+      }
+    });
+    
+    return count;
   };
   
   // Obtenir les données triées et filtrées pour les hôtes
   const sortedHosts = useMemo(() => {
-    return getSortedData(normalizedHosts, hostSearchTerm, { osFilters: selectedOsFilters });
-  }, [normalizedHosts, sortConfig, hostSearchTerm, selectedOsFilters]);
+    return getSortedData(normalizedHosts, hostSearchTerm, { osFilters: osFilters });
+  }, [normalizedHosts, sortConfig, hostSearchTerm, osFilters]);
   
   // Obtenir les données triées et filtrées pour les services
   const sortedServices = useMemo(() => {
@@ -783,64 +887,41 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
                 </div>
                 
                 <button 
-                  onClick={() => setShowOsFilter(!showOsFilter)}
+                  onClick={() => setShowAdvancedOsFilter(!showAdvancedOsFilter)}
                   className={`flex items-center gap-1 px-3 py-1 rounded-md border text-sm ${
                     isDarkTheme 
-                      ? selectedOsFilters.length > 0 
+                      ? osFilters.length > 0 
                         ? 'border-indigo-600 bg-indigo-700/30 text-indigo-400' 
                         : 'border-slate-600 text-slate-300 hover:bg-slate-700' 
-                      : selectedOsFilters.length > 0 
+                      : osFilters.length > 0 
                         ? 'border-indigo-600 bg-indigo-100 text-indigo-600' 
                         : 'border-slate-300 text-slate-600 hover:bg-slate-100'
                   }`}
                 >
-                  <Sliders size={12} />
-                  <span>Filtrer par OS {selectedOsFilters.length > 0 && `(${selectedOsFilters.length})`}</span>
+                  <Filter size={14} />
+                  <span>Filtres avancés {osFilters.length > 0 && `(${getSelectedFiltersCount()})`}</span>
                 </button>
               </div>
             </div>
             
-            {/* Filtres OS */}
-            {showOsFilter && (
-              <div className={`px-4 py-3 border-b ${
-                isDarkTheme ? 'bg-slate-800/70 border-slate-700' : 'bg-slate-50 border-slate-200'
-              }`}>
-                <div className="flex justify-between items-center mb-2">
-                  <h3 className="text-sm font-medium">Filtrer par système d'exploitation</h3>
-                  {selectedOsFilters.length > 0 && (
-                    <button 
-                      onClick={clearOsFilters}
-                      className={`text-xs ${isDarkTheme ? 'text-indigo-400' : 'text-indigo-600'} hover:underline`}
-                    >
-                      Effacer les filtres
-                    </button>
-                  )}
-                </div>
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {uniqueOperatingSystems.map(os => (
-                    <button
-                      key={os}
-                      onClick={() => toggleOsFilter(os)}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                        selectedOsFilters.includes(os)
-                          ? isDarkTheme 
-                            ? 'bg-indigo-700/40 text-indigo-300 border-indigo-600' 
-                            : 'bg-indigo-100 text-indigo-700 border-indigo-200'
-                          : isDarkTheme 
-                            ? 'bg-slate-700/50 text-slate-300 border-slate-600 hover:bg-slate-700' 
-                            : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
-                      } border`}
-                    >
-                      <span className="flex items-center justify-center w-4 h-4">
-                        {getOsIcon(os)}
-                      </span>
-                      <span>{os}</span>
-                      {selectedOsFilters.includes(os) && (
-                        <Check size={12} className={isDarkTheme ? 'text-indigo-400' : 'text-indigo-600'} />
-                      )}
-                    </button>
-                  ))}
-                </div>
+            {/* Afficher les badges de filtres actifs */}
+            {osFilters.length > 0 && (
+              <FilterBadges
+                filters={osFilters}
+                onRemoveFilter={handleRemoveFilter}
+                onClearAllFilters={() => setOsFilters([])}
+              />
+            )}
+            
+            {/* Popup du filtre avancé des OS */}
+            {showAdvancedOsFilter && (
+              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                <AdvancedOsFilter
+                  hosts={normalizedHosts}
+                  selectedFilters={osFilters}
+                  onFilterChange={setOsFilters}
+                  onClose={() => setShowAdvancedOsFilter(false)}
+                />
               </div>
             )}
             
@@ -850,7 +931,7 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
               columns={hostColumns}
               pageSize={20}
               emptyMessage={
-                selectedOsFilters.length > 0
+                osFilters.length > 0
                   ? "Aucun hôte ne correspond aux filtres sélectionnés."
                   : "Aucun hôte trouvé pour cette management zone."
               }
