@@ -112,7 +112,12 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
   };
   
   // Fonction pour obtenir les données triées et filtrées
-  const getSortedData = <T extends {}>(data: T[], searchTerm: string = ''): T[] => {
+  const getSortedData = <T extends {}>(data: T[] | null | undefined, searchTerm: string = ''): T[] => {
+    // S'assurer que les données sont un tableau
+    if (!data || !Array.isArray(data) || data.length === 0) {
+      return [];
+    }
+    
     let sortableData = [...data];
     
     // Filtrer les données si un terme de recherche est fourni
@@ -153,7 +158,7 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
   
   // Obtenir les données triées et filtrées pour les hôtes
   const sortedHosts = useMemo(() => 
-    getSortedData(hosts, hostSearchTerm),
+    Array.isArray(hosts) ? getSortedData(hosts, hostSearchTerm) : [],
     [hosts, sortConfig, hostSearchTerm]
   );
   
