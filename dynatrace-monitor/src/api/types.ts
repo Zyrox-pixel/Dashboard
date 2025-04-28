@@ -55,6 +55,8 @@ export interface Host {
   name: string;
   cpu: number | null;
   ram: number | null;
+  cpu_history?: MetricHistory[]; // Rendus optionnels avec "?"
+  ram_history?: MetricHistory[]; // Rendus optionnels avec "?"
   dt_url: string;
 }
 

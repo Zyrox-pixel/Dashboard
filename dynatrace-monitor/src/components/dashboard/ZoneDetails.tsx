@@ -1,10 +1,9 @@
-import React, { useMemo, useCallback, useState } from 'react';
+import React, { useMemo, useCallback, useState, useEffect } from 'react';
 import { ChevronLeft, Clock, AlertTriangle, ExternalLink, RefreshCw, Cpu, Activity, Server, Filter, Loader, Database, Search, ArrowUp, ArrowDown } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { ManagementZone, Problem, ProcessGroup, Host, Service } from '../../api/types';
 import ProblemsList from './ProblemsList';
 import PaginatedTable, { Column } from '../common/PaginatedTable';
-import MetricChart from '../common/MetricChart';
 import { useApp } from '../../contexts/AppContext';
 
 interface ZoneDetailsProps {
@@ -32,6 +31,18 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
 }) => {
   const { isDarkTheme } = useTheme();
   const { refreshData } = useApp();
+  
+  // Ajouter du debug pour voir ce qui se passe avec les données hosts
+  useEffect(() => {
+    console.log("Hosts reçus dans ZoneDetails:", hosts);
+    console.log("Hosts est un tableau?", Array.isArray(hosts));
+    if (Array.isArray(hosts)) {
+      console.log("Nombre d'hôtes:", hosts.length);
+      if (hosts.length > 0) {
+        console.log("Premier hôte:", hosts[0]);
+      }
+    }
+  }, [hosts]);
   
   // États pour le tri et la recherche
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'ascending' | 'descending' | null }>({
@@ -111,9 +122,31 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
     setSortConfig({ key, direction });
   };
   
+  // Fonction pour normaliser les données d'hôte au format attendu
+  const normalizeHostData = (hostData: any): Host[] => {
+    if (!hostData || !Array.isArray(hostData)) {
+      console.log("normalizeHostData: Les données ne sont pas un tableau", hostData);
+      return [];
+    }
+    
+    // Transformer les données d'hôte au format attendu
+    return hostData.map(host => ({
+      id: host.id,
+      name: host.name,
+      cpu: host.cpu,
+      ram: host.ram,
+      dt_url: host.dt_url
+    }));
+  };
+  
+  // Normaliser les données d'hôte
+  const normalizedHosts = useMemo(() => {
+    console.log("Normalisation des hôtes...");
+    return normalizeHostData(hosts);
+  }, [hosts]);
+  
   // Fonction pour obtenir les données triées et filtrées
-  const getSortedData = <T extends {}>(data: T[] | null | undefined, searchTerm: string = ''): T[] => {
-    // S'assurer que les données sont un tableau
+  const getSortedData = <T extends {}>( data: T[], searchTerm: string = ''): T[] => {
     if (!data || !Array.isArray(data) || data.length === 0) {
       return [];
     }
@@ -121,9 +154,9 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
     let sortableData = [...data];
     
     // Filtrer les données si un terme de recherche est fourni
-    if (searchTerm && 'name' in sortableData[0]) {
+    if (searchTerm && sortableData.length > 0 && 'name' in sortableData[0]) {
       sortableData = sortableData.filter(item => 
-        (item as any).name.toLowerCase().includes(searchTerm.toLowerCase())
+        ((item as any).name || '').toString().toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
     
@@ -157,10 +190,10 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
   };
   
   // Obtenir les données triées et filtrées pour les hôtes
-  const sortedHosts = useMemo(() => 
-    Array.isArray(hosts) ? getSortedData(hosts, hostSearchTerm) : [],
-    [hosts, sortConfig, hostSearchTerm]
-  );
+  const sortedHosts = useMemo(() => {
+    console.log("Calcul des hôtes triés, avec", normalizedHosts.length, "hôtes");
+    return getSortedData(normalizedHosts, hostSearchTerm);
+  }, [normalizedHosts, sortConfig, hostSearchTerm]);
   
   // Définition des colonnes pour les tableaux (mémorisée)
   const processColumns = useMemo<Column<ProcessGroup>[]>(() => [
@@ -379,6 +412,11 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
     );
   }
 
+  // Message de débogage si pas d'hôtes
+  if (Array.isArray(hosts) && hosts.length === 0) {
+    console.log("Aucun hôte trouvé!");
+  }
+
   return (
     <div>
       <button 
@@ -569,6 +607,13 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
               </button>
             </div>
           </div>
+
+          {/* Ajouter un message de debug si nécessaire */}
+          {sortedHosts.length === 0 && (
+            <div className="p-4 bg-yellow-100 border border-yellow-300 text-yellow-800 rounded m-4">
+              <strong>Débogage:</strong> Aucun hôte trouvé. Vérifiez la console pour plus de détails.
+            </div>
+          )}
 
           <PaginatedTable 
             data={sortedHosts}
