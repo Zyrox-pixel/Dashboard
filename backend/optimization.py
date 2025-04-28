@@ -367,289 +367,307 @@ class OptimizedAPIClient:
             return []
 
     def get_service_metrics_parallel(self, service_ids, from_time, to_time):
-        """
-        Récupère les métriques pour plusieurs services en parallèle - CORRIGÉ
+    """
+    Récupère les métriques pour plusieurs services en parallèle - CORRIGÉ
+    
+    Args:
+        service_ids (list): Liste des IDs de services
+        from_time (int): Timestamp de début
+        to_time (int): Timestamp de fin
         
-        Args:
-            service_ids (list): Liste des IDs de services
-            from_time (int): Timestamp de début
-            to_time (int): Timestamp de fin
-            
-        Returns:
-            list: Métriques pour tous les services
-        """
-        # Préparer les requêtes pour la récupération des détails des services avec ID explicite
-        service_details_queries = []
-        for service_id in service_ids:
-            service_details_queries.append((
-                f"entities/{service_id}", 
-                None, 
-                True,
-                f"service_details:{service_id}"  # Clé de cache explicite avec ID
-            ))
+    Returns:
+        list: Métriques pour tous les services
+    """
+    # Préparer les requêtes pour la récupération des détails des services avec ID explicite
+    service_details_queries = []
+    for service_id in service_ids:
+        service_details_queries.append((
+            f"entities/{service_id}", 
+            None, 
+            True,
+            f"service_details:{service_id}"  # Clé de cache explicite avec ID
+        ))
+    
+    # Récupérer les détails des services en parallèle
+    service_details_results = self.batch_query(service_details_queries)
+    
+    # Créer un dictionnaire pour associer les résultats aux services
+    service_details_dict = {}
+    for i, service_id in enumerate(service_ids):
+        service_details_dict[service_id] = service_details_results[i]
+    
+    # Préparer les requêtes de métriques pour tous les services avec clés explicites
+    metric_queries = []
+    for service_id in service_ids:
+        # Requête pour le temps de réponse avec ID explicite
+        metric_queries.append((
+            "metrics/query",
+            {
+                "metricSelector": "builtin:service.response.time",
+                "from": from_time,
+                "to": to_time,
+                "entitySelector": f"entityId({service_id})"
+            },
+            True,
+            f"response_time:{service_id}:{from_time}:{to_time}"  # Clé explicite avec ID
+        ))
         
-        # Récupérer les détails des services en parallèle
-        service_details_results = self.batch_query(service_details_queries)
+        # Requête pour le taux d'erreur avec ID explicite
+        metric_queries.append((
+            "metrics/query",
+            {
+                "metricSelector": "builtin:service.errors.total.rate",
+                "from": from_time,
+                "to": to_time,
+                "entitySelector": f"entityId({service_id})"
+            },
+            True,
+            f"error_rate:{service_id}:{from_time}:{to_time}"  # Clé explicite avec ID
+        ))
         
-        # Créer un dictionnaire pour associer les résultats aux services
-        service_details_dict = {}
-        for i, service_id in enumerate(service_ids):
-            service_details_dict[service_id] = service_details_results[i]
+        # Requête pour le nombre de requêtes avec ID explicite
+        metric_queries.append((
+            "metrics/query",
+            {
+                "metricSelector": "builtin:service.requestCount.total",
+                "from": from_time,
+                "to": to_time,
+                "entitySelector": f"entityId({service_id})"
+            },
+            True,
+            f"requests:{service_id}:{from_time}:{to_time}"  # Clé explicite avec ID
+        ))
+    
+    # Exécuter toutes les requêtes de métriques en parallèle
+    all_metric_results = self.batch_query(metric_queries)
+    
+    # Créer des dictionnaires pour associer les résultats de métriques aux services
+    response_time_metrics = {}
+    error_rate_metrics = {}
+    request_metrics = {}
+    
+    # Distribuer les résultats dans des dictionnaires par ID de service
+    result_index = 0
+    for service_id in service_ids:
+        response_time_metrics[service_id] = all_metric_results[result_index]
+        result_index += 1
+        error_rate_metrics[service_id] = all_metric_results[result_index]
+        result_index += 1
+        request_metrics[service_id] = all_metric_results[result_index]
+        result_index += 1
+    
+    # Récupérer les technologies en parallèle
+    tech_queries = []
+    for service_id in service_ids:
+        tech_queries.append((
+            f"entities/{service_id}", 
+            None, 
+            True,
+            f"tech:{service_id}"  # Clé explicite avec ID
+        ))
+    
+    tech_results = self.batch_query(tech_queries)
+    tech_dict = {}
+    for i, service_id in enumerate(service_ids):
+        tech_info = self.extract_technology(service_id)
+        tech_dict[service_id] = tech_info
+    
+    # Préparer les requêtes d'historique avec clés explicites
+    history_queries = []
+    for service_id in service_ids:
+        # Historique du temps de réponse
+        history_queries.append((
+            "metrics/query",
+            {
+                "metricSelector": "builtin:service.response.time",
+                "from": from_time,
+                "to": to_time,
+                "resolution": "1h",
+                "entitySelector": f"entityId({service_id})"
+            },
+            True,
+            f"rt_history:{service_id}:{from_time}:{to_time}"  # Clé explicite avec ID
+        ))
         
-        # Préparer les requêtes de métriques pour tous les services avec clés explicites
-        metric_queries = []
-        for service_id in service_ids:
-            # Requête pour le temps de réponse avec ID explicite
-            metric_queries.append((
-                "metrics/query",
-                {
-                    "metricSelector": "builtin:service.response.time",
-                    "from": from_time,
-                    "to": to_time,
-                    "entitySelector": f"entityId({service_id})"
-                },
-                True,
-                f"response_time:{service_id}:{from_time}:{to_time}"  # Clé explicite avec ID
-            ))
-            
-            # Requête pour le taux d'erreur avec ID explicite
-            metric_queries.append((
-                "metrics/query",
-                {
-                    "metricSelector": "builtin:service.errors.total.rate",
-                    "from": from_time,
-                    "to": to_time,
-                    "entitySelector": f"entityId({service_id})"
-                },
-                True,
-                f"error_rate:{service_id}:{from_time}:{to_time}"  # Clé explicite avec ID
-            ))
-            
-            # Requête pour le nombre de requêtes avec ID explicite
-            metric_queries.append((
-                "metrics/query",
-                {
-                    "metricSelector": "builtin:service.requestCount.total",
-                    "from": from_time,
-                    "to": to_time,
-                    "entitySelector": f"entityId({service_id})"
-                },
-                True,
-                f"requests:{service_id}:{from_time}:{to_time}"  # Clé explicite avec ID
-            ))
+        # Historique du taux d'erreur
+        history_queries.append((
+            "metrics/query",
+            {
+                "metricSelector": "builtin:service.errors.total.rate",
+                "from": from_time,
+                "to": to_time,
+                "resolution": "1h",
+                "entitySelector": f"entityId({service_id})"
+            },
+            True,
+            f"er_history:{service_id}:{from_time}:{to_time}"  # Clé explicite avec ID
+        ))
         
-        # Exécuter toutes les requêtes de métriques en parallèle
-        all_metric_results = self.batch_query(metric_queries)
+        # Historique du nombre de requêtes
+        history_queries.append((
+            "metrics/query",
+            {
+                "metricSelector": "builtin:service.requestCount.total",
+                "from": from_time,
+                "to": to_time,
+                "resolution": "1h",
+                "entitySelector": f"entityId({service_id})"
+            },
+            True,
+            f"req_history:{service_id}:{from_time}:{to_time}"  # Clé explicite avec ID
+        ))
+    
+    # Exécuter les requêtes d'historique en parallèle
+    history_results = self.batch_query(history_queries)
+    
+    # Créer des dictionnaires pour associer les résultats d'historique aux services
+    rt_history_dict = {}
+    er_history_dict = {}
+    req_history_dict = {}
+    
+    # Distribuer les résultats d'historique dans des dictionnaires par ID de service
+    result_index = 0
+    for service_id in service_ids:
+        rt_history_dict[service_id] = history_results[result_index]
+        result_index += 1
+        er_history_dict[service_id] = history_results[result_index]
+        result_index += 1
+        req_history_dict[service_id] = history_results[result_index]
+        result_index += 1
+    
+    # Maintenant, assembler les métriques pour chaque service
+    service_metrics = []
+    for service_id in service_ids:
+        service_details = service_details_dict[service_id]
         
-        # Créer des dictionnaires pour associer les résultats de métriques aux services
-        response_time_metrics = {}
-        error_rate_metrics = {}
-        request_metrics = {}
+        # Vérification du type de service et activité
+        service_status = "Actif"
+        if service_details and 'properties' in service_details and 'monitoring' in service_details['properties']:
+            if service_details['properties']['monitoring'].get('monitoringState') != "ACTIVE":
+                service_status = "Inactif"
         
-        # Distribuer les résultats dans des dictionnaires par ID de service
-        result_index = 0
-        for service_id in service_ids:
-            response_time_metrics[service_id] = all_metric_results[result_index]
-            result_index += 1
-            error_rate_metrics[service_id] = all_metric_results[result_index]
-            result_index += 1
-            request_metrics[service_id] = all_metric_results[result_index]
-            result_index += 1
+        # Extraire les métriques pour ce service
+        response_time_data = response_time_metrics[service_id]
+        error_rate_data = error_rate_metrics[service_id]
+        requests_data = request_metrics[service_id]
         
-        # Récupérer les technologies en parallèle
-        tech_queries = []
-        for service_id in service_ids:
-            tech_queries.append((
-                f"entities/{service_id}", 
-                None, 
-                True,
-                f"tech:{service_id}"  # Clé explicite avec ID
-            ))
+        # Traiter les résultats des métriques
+        response_time = None
+        error_rate = None
+        requests_count = None
         
-        tech_results = self.batch_query(tech_queries)
-        tech_dict = {}
-        for i, service_id in enumerate(service_ids):
-            tech_info = self.extract_technology(service_id)
-            tech_dict[service_id] = tech_info
+        # Extraire le temps de réponse - SECTION MODIFIÉE
+        if response_time_data and 'result' in response_time_data and response_time_data['result']:
+            result = response_time_data['result'][0]
+            if 'data' in result and result['data']:
+                values = result['data'][0].get('values', [])
+                if values and values[0] is not None:
+                    raw_value = values[0]
+                    
+                    # CORRECTION: Vérifier si la valeur est anormalement élevée (probablement en µs)
+                    if raw_value > 10000:  # Si > 10 secondes
+                        response_time = int(raw_value / 1000)  # Convertir en ms
+                    else:
+                        response_time = int(raw_value)
+                    
+                    # Limiter les valeurs extrêmes à un maximum raisonnable
+                    if response_time > 30000:  # Max 30 secondes
+                        response_time = 30000
         
-        # Préparer les requêtes d'historique avec clés explicites
-        history_queries = []
-        for service_id in service_ids:
-            # Historique du temps de réponse
-            history_queries.append((
-                "metrics/query",
-                {
-                    "metricSelector": "builtin:service.response.time",
-                    "from": from_time,
-                    "to": to_time,
-                    "resolution": "1h",
-                    "entitySelector": f"entityId({service_id})"
-                },
-                True,
-                f"rt_history:{service_id}:{from_time}:{to_time}"  # Clé explicite avec ID
-            ))
-            
-            # Historique du taux d'erreur
-            history_queries.append((
-                "metrics/query",
-                {
-                    "metricSelector": "builtin:service.errors.total.rate",
-                    "from": from_time,
-                    "to": to_time,
-                    "resolution": "1h",
-                    "entitySelector": f"entityId({service_id})"
-                },
-                True,
-                f"er_history:{service_id}:{from_time}:{to_time}"  # Clé explicite avec ID
-            ))
-            
-            # Historique du nombre de requêtes
-            history_queries.append((
-                "metrics/query",
-                {
-                    "metricSelector": "builtin:service.requestCount.total",
-                    "from": from_time,
-                    "to": to_time,
-                    "resolution": "1h",
-                    "entitySelector": f"entityId({service_id})"
-                },
-                True,
-                f"req_history:{service_id}:{from_time}:{to_time}"  # Clé explicite avec ID
-            ))
+        # Extraire le taux d'erreur
+        if error_rate_data and 'result' in error_rate_data and error_rate_data['result']:
+            result = error_rate_data['result'][0]
+            if 'data' in result and result['data']:
+                values = result['data'][0].get('values', [])
+                if values and values[0] is not None:
+                    error_rate = round(values[0], 1)
         
-        # Exécuter les requêtes d'historique en parallèle
-        history_results = self.batch_query(history_queries)
+        # Extraire le nombre de requêtes
+        if requests_data and 'result' in requests_data and requests_data['result']:
+            result = requests_data['result'][0]
+            if 'data' in result and result['data']:
+                values = result['data'][0].get('values', [])
+                if values and values[0] is not None:
+                    requests_count = int(values[0])
         
-        # Créer des dictionnaires pour associer les résultats d'historique aux services
-        rt_history_dict = {}
-        er_history_dict = {}
-        req_history_dict = {}
+        # Extraire la technologie du dictionnaire
+        tech_info = tech_dict[service_id]
         
-        # Distribuer les résultats d'historique dans des dictionnaires par ID de service
-        result_index = 0
-        for service_id in service_ids:
-            rt_history_dict[service_id] = history_results[result_index]
-            result_index += 1
-            er_history_dict[service_id] = history_results[result_index]
-            result_index += 1
-            req_history_dict[service_id] = history_results[result_index]
-            result_index += 1
+        # Traiter les historiques
+        response_time_history = []
+        error_rate_history = []
+        request_count_history = []
         
-        # Maintenant, assembler les métriques pour chaque service
-        service_metrics = []
-        for service_id in service_ids:
-            service_details = service_details_dict[service_id]
-            
-            # Vérification du type de service et activité
-            service_status = "Actif"
-            if service_details and 'properties' in service_details and 'monitoring' in service_details['properties']:
-                if service_details['properties']['monitoring'].get('monitoringState') != "ACTIVE":
-                    service_status = "Inactif"
-            
-            # Extraire les métriques pour ce service
-            response_time_data = response_time_metrics[service_id]
-            error_rate_data = error_rate_metrics[service_id]
-            requests_data = request_metrics[service_id]
-            
-            # Traiter les résultats des métriques
-            response_time = None
-            error_rate = None
-            requests_count = None
-            
-            # Extraire le temps de réponse
-            if response_time_data and 'result' in response_time_data and response_time_data['result']:
-                result = response_time_data['result'][0]
-                if 'data' in result and result['data']:
-                    values = result['data'][0].get('values', [])
-                    if values and values[0] is not None:
-                        response_time = int(values[0])
-            
-            # Extraire le taux d'erreur
-            if error_rate_data and 'result' in error_rate_data and error_rate_data['result']:
-                result = error_rate_data['result'][0]
-                if 'data' in result and result['data']:
-                    values = result['data'][0].get('values', [])
-                    if values and values[0] is not None:
-                        error_rate = round(values[0], 1)
-            
-            # Extraire le nombre de requêtes
-            if requests_data and 'result' in requests_data and requests_data['result']:
-                result = requests_data['result'][0]
-                if 'data' in result and result['data']:
-                    values = result['data'][0].get('values', [])
-                    if values and values[0] is not None:
-                        requests_count = int(values[0])
-            
-            # Extraire la technologie du dictionnaire
-            tech_info = tech_dict[service_id]
-            
-            # Traiter les historiques
-            response_time_history = []
-            error_rate_history = []
-            request_count_history = []
-            
-            # Historique du temps de réponse
-            rt_history_data = rt_history_dict[service_id]
-            if rt_history_data and 'result' in rt_history_data and rt_history_data['result']:
-                result = rt_history_data['result'][0]
-                if 'data' in result and result['data']:
-                    values = result['data'][0].get('values', [])
-                    timestamps = result['data'][0].get('timestamps', [])
-                    if values and timestamps:
-                        for i in range(len(values)):
-                            if values[i] is not None:
-                                response_time_history.append({
-                                    'timestamp': timestamps[i],
-                                    'value': values[i]
-                                })
-            
-            # Historique du taux d'erreur
-            er_history_data = er_history_dict[service_id]
-            if er_history_data and 'result' in er_history_data and er_history_data['result']:
-                result = er_history_data['result'][0]
-                if 'data' in result and result['data']:
-                    values = result['data'][0].get('values', [])
-                    timestamps = result['data'][0].get('timestamps', [])
-                    if values and timestamps:
-                        for i in range(len(values)):
-                            if values[i] is not None:
-                                error_rate_history.append({
-                                    'timestamp': timestamps[i],
-                                    'value': values[i]
-                                })
-            
-            # Historique du nombre de requêtes
-            req_history_data = req_history_dict[service_id]
-            if req_history_data and 'result' in req_history_data and req_history_data['result']:
-                result = req_history_data['result'][0]
-                if 'data' in result and result['data']:
-                    values = result['data'][0].get('values', [])
-                    timestamps = result['data'][0].get('timestamps', [])
-                    if values and timestamps:
-                        for i in range(len(values)):
-                            if values[i] is not None:
-                                request_count_history.append({
-                                    'timestamp': timestamps[i],
-                                    'value': values[i]
-                                })
-            
-            # Créer l'objet de métriques pour ce service
-            service_metrics.append({
-                'id': service_id,
-                'name': service_details.get('displayName', 'Unknown') if service_details else 'Unknown',
-                'response_time': response_time,
-                'error_rate': error_rate,
-                'requests': requests_count,
-                'status': service_status,
-                'technology': tech_info['name'],
-                'tech_icon': tech_info['icon'],
-                'dt_url': f"{self.env_url}/#entity/{service_id}",
-                'response_time_history': response_time_history,
-                'error_rate_history': error_rate_history,
-                'request_count_history': request_count_history
-            })
+        # Historique du temps de réponse - SECTION MODIFIÉE
+        rt_history_data = rt_history_dict[service_id]
+        if rt_history_data and 'result' in rt_history_data and rt_history_data['result']:
+            result = rt_history_data['result'][0]
+            if 'data' in result and result['data']:
+                values = result['data'][0].get('values', [])
+                timestamps = result['data'][0].get('timestamps', [])
+                if values and timestamps:
+                    for i in range(len(values)):
+                        if values[i] is not None:
+                            # CORRECTION: Appliquer la même logique aux valeurs historiques
+                            rt_value = values[i]
+                            if rt_value > 10000:  # Si > 10 secondes
+                                rt_value = rt_value / 1000  # Convertir en ms
+                            
+                            # Limiter les valeurs extrêmes
+                            rt_value = min(rt_value, 30000)
+                            
+                            response_time_history.append({
+                                'timestamp': timestamps[i],
+                                'value': rt_value
+                            })
         
-        return service_metrics
+        # Historique du taux d'erreur
+        er_history_data = er_history_dict[service_id]
+        if er_history_data and 'result' in er_history_data and er_history_data['result']:
+            result = er_history_data['result'][0]
+            if 'data' in result and result['data']:
+                values = result['data'][0].get('values', [])
+                timestamps = result['data'][0].get('timestamps', [])
+                if values and timestamps:
+                    for i in range(len(values)):
+                        if values[i] is not None:
+                            error_rate_history.append({
+                                'timestamp': timestamps[i],
+                                'value': values[i]
+                            })
+        
+        # Historique du nombre de requêtes
+        req_history_data = req_history_dict[service_id]
+        if req_history_data and 'result' in req_history_data and req_history_data['result']:
+            result = req_history_data['result'][0]
+            if 'data' in result and result['data']:
+                values = result['data'][0].get('values', [])
+                timestamps = result['data'][0].get('timestamps', [])
+                if values and timestamps:
+                    for i in range(len(values)):
+                        if values[i] is not None:
+                            request_count_history.append({
+                                'timestamp': timestamps[i],
+                                'value': values[i]
+                            })
+        
+        # Créer l'objet de métriques pour ce service
+        service_metrics.append({
+            'id': service_id,
+            'name': service_details.get('displayName', 'Unknown') if service_details else 'Unknown',
+            'response_time': response_time,
+            'error_rate': error_rate,
+            'requests': requests_count,
+            'status': service_status,
+            'technology': tech_info['name'],
+            'tech_icon': tech_info['icon'],
+            'dt_url': f"{self.env_url}/#entity/{service_id}",
+            'response_time_history': response_time_history,
+            'error_rate_history': error_rate_history,
+            'request_count_history': request_count_history
+        })
+    
+    return service_metrics
 
     def get_service_metrics_parallel(self, service_ids, from_time, to_time):
     # Préparer les requêtes pour la récupération des détails des services avec ID explicite
