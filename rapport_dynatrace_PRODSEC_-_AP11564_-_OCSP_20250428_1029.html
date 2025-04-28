@@ -1,0 +1,2958 @@
+
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Rapport Dynatrace - PRODSEC - AP11564 - OCSP</title>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
+        <style>
+            :root {
+                --primary-color: #0077cc;
+                --secondary-color: #0da5b3;
+                --background-dark: #1a1a1a;
+                --background-medium: #222;
+                --background-light: #2a2a2a;
+                --text-color: #fff;
+                --border-color: #444;
+                --success-color: #66ff66;
+                --warning-color: #ffcc00;
+                --danger-color: #ff4d4d;
+                --info-color: #3498db;
+                --header-height: 60px;
+            }
+           
+            /* Éléments de base */
+            body {
+                font-family: 'Segoe UI', Arial, sans-serif;
+                margin: 0;
+                padding: 0;
+                background-color: var(--background-dark);
+                color: var(--text-color);
+                padding-top: var(--header-height);
+            }
+           
+            .container {
+                max-width: 1400px;
+                margin: 0 auto;
+                padding: 20px;
+            }
+           
+            /* Entête fixe */
+            header {
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                height: var(--header-height);
+                background-color: var(--background-medium);
+                box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+                z-index: 1000;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 0 20px;
+            }
+           
+            .header-title {
+                font-size: 1.2rem;
+                font-weight: 600;
+                display: flex;
+                align-items: center;
+            }
+           
+            .header-title i {
+                margin-right: 10px;
+                color: var(--primary-color);
+            }
+           
+            .nav-menu {
+                display: flex;
+                gap: 15px;
+            }
+           
+            .nav-link {
+                color: var(--text-color);
+                text-decoration: none;
+                padding: 8px 12px;
+                border-radius: 4px;
+                transition: background-color 0.2s;
+            }
+           
+            .nav-link:hover {
+                background-color: var(--background-light);
+            }
+           
+            .nav-link.active {
+                background-color: var(--primary-color);
+            }
+           
+            /* Contrôles */
+            .controls {
+                margin: 15px 0;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                flex-wrap: wrap;
+                gap: 10px;
+            }
+           
+            .search-box {
+                padding: 8px 12px;
+                border-radius: 4px;
+                border: 1px solid var(--border-color);
+                background-color: var(--background-medium);
+                color: var(--text-color);
+                width: 250px;
+            }
+           
+            .filter-options {
+                display: flex;
+                gap: 10px;
+            }
+           
+            .filter-button {
+                padding: 8px 12px;
+                border-radius: 4px;
+                border: 1px solid var(--border-color);
+                background-color: var(--background-medium);
+                color: var(--text-color);
+                cursor: pointer;
+                transition: background-color 0.2s;
+            }
+           
+            .filter-button:hover {
+                background-color: var(--background-light);
+            }
+           
+            .filter-button.active {
+                background-color: var(--primary-color);
+            }
+           
+            .theme-toggle {
+                background: none;
+                border: none;
+                color: var(--text-color);
+                cursor: pointer;
+                font-size: 1.2rem;
+            }
+           
+            /* Cartes de résumé */
+            .summary-section {
+                margin: 30px 0;
+            }
+           
+            .cards-container {
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+                gap: 20px;
+                margin: 20px 0;
+            }
+           
+            .card {
+                background-color: var(--background-medium);
+                border-radius: 8px;
+                padding: 20px;
+                box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+                display: flex;
+                flex-direction: column;
+            }
+           
+            .card-header {
+                display: flex;
+                align-items: center;
+                margin-bottom: 15px;
+            }
+           
+            .card-icon {
+                background-color: rgba(255, 255, 255, 0.1);
+                border-radius: 50%;
+                width: 40px;
+                height: 40px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                margin-right: 12px;
+            }
+           
+            .card-title {
+                font-size: 1rem;
+                font-weight: 500;
+                margin: 0;
+            }
+           
+            .card-value {
+                font-size: 2rem;
+                font-weight: 700;
+                margin: 10px 0;
+            }
+           
+            .card-trend {
+                display: flex;
+                align-items: center;
+                font-size: 0.9rem;
+                margin-top: auto;
+            }
+           
+            .trend-up {
+                color: var(--danger-color);
+            }
+           
+            .trend-down {
+                color: var(--success-color);
+            }
+           
+            .trend-neutral {
+                color: var(--warning-color);
+            }
+           
+            /* Problèmes actifs */
+            .problems-section {
+                background-color: var(--background-medium);
+                border-radius: 8px;
+                padding: 20px;
+                margin: 30px 0;
+                box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            }
+           
+            .problem-item {
+                padding: 15px;
+                margin: 10px 0;
+                border-radius: 6px;
+                background-color: var(--background-light);
+                display: flex;
+                align-items: center;
+                gap: 15px;
+            }
+           
+            .problem-icon {
+                font-size: 1.5rem;
+            }
+           
+            .impact-INFRASTRUCTURE {
+                color: var(--danger-color);
+            }
+           
+            .impact-SERVICE {
+                color: var(--warning-color);
+            }
+           
+            .impact-APPLICATION {
+                color: var(--info-color);
+            }
+           
+            .problem-details {
+                flex: 1;
+            }
+           
+            .problem-title {
+                font-weight: 500;
+                margin-bottom: 5px;
+            }
+           
+            .problem-meta {
+                display: flex;
+                font-size: 0.85rem;
+                color: rgba(255, 255, 255, 0.7);
+            }
+           
+            .problem-meta > div {
+                margin-right: 15px;
+            }
+           
+            .problem-entities {
+                background-color: rgba(255, 255, 255, 0.1);
+                padding: 2px 6px;
+                border-radius: 10px;
+                font-size: 0.8rem;
+            }
+           
+            /* Tableaux de données */
+            .section {
+                background-color: var(--background-medium);
+                border-radius: 8px;
+                padding: 20px;
+                margin: 30px 0;
+                box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            }
+           
+            .section-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 20px;
+            }
+           
+            .section-title {
+                font-size: 1.5rem;
+                font-weight: 600;
+                margin: 0;
+                display: flex;
+                align-items: center;
+            }
+           
+            .section-title i {
+                margin-right: 10px;
+                color: var(--primary-color);
+            }
+           
+            .view-toggle {
+                display: flex;
+                background-color: var(--background-light);
+                border-radius: 4px;
+                overflow: hidden;
+            }
+           
+            .view-option {
+                padding: 8px 12px;
+                cursor: pointer;
+                transition: background-color 0.2s;
+            }
+           
+            .view-option:hover {
+                background-color: rgba(255, 255, 255, 0.1);
+            }
+           
+            .view-option.active {
+                background-color: var(--primary-color);
+            }
+           
+            table {
+                border-collapse: collapse;
+                width: 100%;
+                margin-bottom: 0;
+                background-color: var(--background-medium);
+            }
+           
+            th, td {
+                border: none;
+                padding: 12px 15px;
+                text-align: left;
+            }
+           
+            th {
+                background-color: var(--background-light);
+                color: var(--text-color);
+                position: sticky;
+                top: var(--header-height);
+                z-index: 10;
+            }
+           
+            tr {
+                transition: background-color 0.2s;
+            }
+           
+            tr:nth-child(even) {
+                background-color: rgba(255, 255, 255, 0.03);
+            }
+           
+            tr:hover {
+                background-color: rgba(255, 255, 255, 0.05);
+            }
+           
+            /* Classes utilitaires */
+            .error-high {
+                color: var(--danger-color);
+                font-weight: bold;
+            }
+           
+            .error-medium {
+                color: var(--warning-color);
+                font-weight: bold;
+            }
+           
+            .error-low {
+                color: var(--success-color);
+            }
+           
+            .high-usage {
+                color: var(--danger-color);
+                font-weight: bold;
+            }
+           
+            .medium-usage {
+                color: var(--warning-color);
+                font-weight: bold;
+            }
+           
+            .normal-usage {
+                color: var(--success-color);
+            }
+           
+            .inactive {
+                color: #888;
+                font-style: italic;
+            }
+           
+            .tech-badge {
+                display: inline-flex;
+                align-items: center;
+                padding: 4px 8px;
+                border-radius: 4px;
+                background-color: rgba(255, 255, 255, 0.1);
+                font-size: 0.9em;
+            }
+           
+            .tech-badge i {
+                margin-right: 5px;
+            }
+           
+            .note {
+                background-color: var(--background-light);
+                padding: 15px;
+                border-radius: 6px;
+                margin: 20px 0;
+                border-left: 4px solid var(--secondary-color);
+            }
+           
+            .pagination {
+                display: flex;
+                justify-content: center;
+                margin-top: 20px;
+                gap: 5px;
+            }
+           
+            .pagination-btn {
+                padding: 8px 12px;
+                border-radius: 4px;
+                background-color: var(--background-light);
+                border: none;
+                color: var(--text-color);
+                cursor: pointer;
+                transition: background-color 0.2s;
+            }
+           
+            .pagination-btn:hover {
+                background-color: rgba(255, 255, 255, 0.1);
+            }
+           
+            .pagination-btn.active {
+                background-color: var(--primary-color);
+            }
+           
+            /* Graphiques et visualisations */
+            .chart-container {
+                margin: 15px 0;
+                background-color: var(--background-light);
+                border-radius: 6px;
+                padding: 15px;
+                height: 150px;
+            }
+           
+            .mini-chart {
+                height: 30px;
+                width: 120px;
+                display: inline-block;
+                vertical-align: middle;
+            }
+           
+            .gauge-container {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+            }
+           
+            .gauge {
+                width: 40px;
+                height: 40px;
+                position: relative;
+            }
+           
+            .gauge-value {
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                font-size: 0.8rem;
+                font-weight: bold;
+            }
+           
+            /* Tooltips */
+            .tooltip {
+                position: relative;
+                display: inline-block;
+            }
+           
+            .tooltip .tooltip-content {
+                visibility: hidden;
+                background-color: var(--background-dark);
+                color: var(--text-color);
+                text-align: center;
+                border-radius: 6px;
+                padding: 10px;
+                position: absolute;
+                z-index: 1000;
+                bottom: 125%;
+                left: 50%;
+                transform: translateX(-50%);
+                width: 250px;
+                box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
+                opacity: 0;
+                transition: opacity 0.3s;
+            }
+           
+            .tooltip:hover .tooltip-content {
+                visibility: visible;
+                opacity: 1;
+            }
+           
+            /* Status indicators */
+            .status-indicator {
+                width: 10px;
+                height: 10px;
+                border-radius: 50%;
+                display: inline-block;
+                margin-right: 5px;
+            }
+           
+            .status-active {
+                background-color: var(--success-color);
+            }
+           
+            .status-inactive {
+                background-color: #888;
+            }
+           
+            .status-warning {
+                background-color: var(--warning-color);
+            }
+           
+            .status-error {
+                background-color: var(--danger-color);
+            }
+           
+            /* Liens externes */
+            .external-link {
+                color: var(--primary-color);
+                text-decoration: none;
+                display: inline-flex;
+                align-items: center;
+                gap: 5px;
+                transition: color 0.2s;
+            }
+           
+            .external-link:hover {
+                color: var(--secondary-color);
+                text-decoration: underline;
+            }
+           
+            /* Switchs de thème */
+            .theme-switcher {
+                margin-left: auto;
+            }
+           
+            /* Footers et infos de pagination */
+            .table-footer {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-top: 15px;
+                font-size: 0.9rem;
+            }
+           
+            .export-buttons {
+                display: flex;
+                gap: 10px;
+            }
+           
+            .export-btn {
+                display: inline-flex;
+                align-items: center;
+                gap: 5px;
+                padding: 5px 10px;
+                border-radius: 4px;
+                background-color: var(--background-light);
+                color: var(--text-color);
+                border: none;
+                cursor: pointer;
+                font-size: 0.9rem;
+                transition: background-color 0.2s;
+            }
+           
+            .export-btn:hover {
+                background-color: rgba(255, 255, 255, 0.1);
+            }
+           
+            /* Loading spinner */
+            .loader {
+                width: 30px;
+                height: 30px;
+                border: 3px solid rgba(255, 255, 255, 0.2);
+                border-radius: 50%;
+                border-top-color: var(--primary-color);
+                animation: spin 1s ease-in-out infinite;
+                margin: 20px auto;
+            }
+           
+            @keyframes spin {
+                to { transform: rotate(360deg); }
+            }
+           
+            /* Responsive design */
+            @media (max-width: 1200px) {
+                .cards-container {
+                    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+                }
+            }
+           
+            @media (max-width: 992px) {
+                th, td {
+                    padding: 10px;
+                }
+               
+                .chart-container {
+                    height: 120px;
+                }
+            }
+           
+            @media (max-width: 768px) {
+                .cards-container {
+                    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+                }
+               
+                .nav-menu {
+                    display: none;
+                }
+               
+                .header-title {
+                    font-size: 1rem;
+                }
+               
+                .mobile-menu-toggle {
+                    display: block;
+                }
+               
+                .card-value {
+                    font-size: 1.5rem;
+                }
+               
+                .problem-meta {
+                    flex-direction: column;
+                    gap: 5px;
+                }
+               
+                .problem-meta > div {
+                    margin-right: 0;
+                }
+            }
+           
+            @media (max-width: 576px) {
+                .cards-container {
+                    grid-template-columns: 1fr;
+                }
+               
+                .controls {
+                    flex-direction: column;
+                    align-items: stretch;
+                }
+               
+                .search-box {
+                    width: 100%;
+                }
+               
+                .filter-options {
+                    justify-content: space-between;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <header>
+            <div class="header-title">
+                <i class="fas fa-chart-line"></i>
+                <span>Dynatrace - PRODSEC - AP11564 - OCSP</span>
+            </div>
+            <nav class="nav-menu">
+                <a href="#summary" class="nav-link active">Résumé</a>
+                <a href="#problems" class="nav-link">Problèmes</a>
+                <a href="#hosts" class="nav-link">Hôtes</a>
+                <a href="#services" class="nav-link">Services</a>
+                <a href="#processes" class="nav-link">Process</a>
+            </nav>
+            <button class="theme-toggle" id="themeToggle">
+                <i class="fas fa-moon"></i>
+            </button>
+        </header>
+       
+        <div class="container">
+            <div class="controls">
+                <input type="text" class="search-box" id="searchBox" placeholder="Rechercher...">
+                <div class="filter-options">
+                    <button class="filter-button active" data-filter="all">Tous</button>
+                    <button class="filter-button" data-filter="critical">Critiques</button>
+                    <button class="filter-button" data-filter="warning">Avertissements</button>
+                    <button class="filter-button" data-filter="healthy">En bonne santé</button>
+                </div>
+            </div>
+           
+            <!-- Section Résumé -->
+            <div id="summary" class="summary-section">
+                <h2>Résumé de l'environnement</h2>
+                <p>État de l'environnement au 2025-04-28 10:29:46. Période d'analyse: dernières 24 heures.</p>
+               
+                <div class="cards-container">
+                    <!-- Carte de résumé des hôtes -->
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-icon">
+                                <i class="fas fa-server"></i>
+                            </div>
+                            <h3 class="card-title">Hôtes</h3>
+                        </div>
+                        <div class="card-value">14</div>
+                        <div class="card-info">
+                            CPU Moyen: <span class="normal-usage">3%</span>
+                        </div>
+                        <div class="card-trend">
+                            <i class="fas fa-exclamation-triangle trend-neutral"></i>
+                            <span>0 hôte(s) critique(s)</span>
+                        </div>
+                    </div>
+                   
+                    <!-- Carte de résumé des services -->
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-icon">
+                                <i class="fas fa-code"></i>
+                            </div>
+                            <h3 class="card-title">Services</h3>
+                        </div>
+                        <div class="card-value">5</div>
+                        <div class="card-info">
+                            <span>1 service(s) avec erreurs</span>
+                        </div>
+                        <div class="card-trend">
+                            <i class="fas fa-chart-line trend-up"></i>
+                            <span>Taux d'erreur moyen: 3.2%</span>
+                        </div>
+                    </div>
+                   
+                    <!-- Carte de résumé des requêtes -->
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-icon">
+                                <i class="fas fa-exchange-alt"></i>
+                            </div>
+                            <h3 class="card-title">Requêtes</h3>
+                        </div>
+                        <div class="card-value">94718</div>
+                        <div class="card-info">
+                            <span>Dernières 24 heures</span>
+                        </div>
+                        <div class="card-trend">
+                            <i class="fas fa-chart-bar trend-neutral"></i>
+                            <span>Moyenne horaire: 3946</span>
+                        </div>
+                    </div>
+                   
+                    <!-- Carte de résumé des problèmes -->
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-icon">
+                                <i class="fas fa-exclamation-circle"></i>
+                            </div>
+                            <h3 class="card-title">Problèmes</h3>
+                        </div>
+                        <div class="card-value">1</div>
+                        <div class="card-info">
+                            <span>Problèmes actifs</span>
+                        </div>
+                        <div class="card-trend">
+                            <i class="fas fa-exclamation-triangle trend-up"></i>
+                            <span>1 à examiner</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+           
+            <!-- Section Problèmes -->
+            <div id="problems" class="problems-section">
+                <div class="section-header">
+                    <h2 class="section-title">
+                        <i class="fas fa-exclamation-circle"></i>
+                        Problèmes Actifs
+                    </h2>
+                </div>
+               
+                
+                    
+                    <div class="problem-item">
+                        <div class="problem-icon impact-INFRASTRUCTURE">
+                            <i class="fas fa-exclamation-triangle"></i>
+                        </div>
+                        <div class="problem-details">
+                            <div class="problem-title">[SHA]ITGPNOI.CustomHost OneAgent_detection</div>
+                            <div class="problem-meta">
+                                <div>
+                                    <i class="fas fa-clock"></i>
+                                    Depuis 2025-04-28 09:23
+                                </div>
+                                <div>
+                                    <i class="fas fa-exclamation-circle"></i>
+                                    Impact: INFRASTRUCTURE
+                                </div>
+                                <div class="problem-entities">
+                                    <i class="fas fa-cubes"></i>
+                                    1 entités affectées
+                                </div>
+                            </div>
+                        </div>
+                        <a href="https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038/#problems/problemdetails;pid=-2726827229727856167_1745823900000V2" target="_blank" class="external-link">
+                            <i class="fas fa-external-link-alt"></i>
+                            Détails
+                        </a>
+                    </div>
+                    
+                
+            </div>
+           
+            <!-- Section Hôtes -->
+            <div id="hosts" class="section">
+                <div class="section-header">
+                    <h2 class="section-title">
+                        <i class="fas fa-server"></i>
+                        Hôtes
+                    </h2>
+                    <div class="view-toggle">
+                        <div class="view-option active" data-view="table">
+                            <i class="fas fa-table"></i>
+                        </div>
+                        <div class="view-option" data-view="cards">
+                            <i class="fas fa-th-large"></i>
+                        </div>
+                    </div>
+                </div>
+               
+                <div class="note">
+                    Les valeurs CPU et RAM représentent l'utilisation moyenne sur les dernières 24h.
+                    Cliquez sur un hôte pour voir plus de détails.
+                </div>
+               
+                <table id="hostsTable">
+                    <tr>
+                        <th>Nom</th>
+                        <th>CPU (%)</th>
+                        <th>Tendance CPU</th>
+                        <th>RAM (%)</th>
+                        <th>Tendance RAM</th>
+                        <th>Actions</th>
+                    </tr>
+                    
+                    <tr data-status="healthy">
+                        <td>s02vl9920434.fr.net.intra</td>
+                        <td class="normal-usage">
+                            
+                            <div class="gauge-container">
+                                <canvas class="gauge" data-value="4" data-type="cpu"></canvas>
+                                <span>4</span>
+                            </div>
+                            
+                        </td>
+                        <td>
+                            
+                            <canvas class="mini-chart" data-history="[{"timestamp": 1745744400000, "value": 4.708995225694444}, {"timestamp": 1745748000000, "value": 4.641243489583333}, {"timestamp": 1745751600000, "value": 4.363009982638889}, {"timestamp": 1745755200000, "value": 4.44921875}, {"timestamp": 1745758800000, "value": 4.329210069444445}, {"timestamp": 1745762400000, "value": 4.490755208333334}, {"timestamp": 1745766000000, "value": 4.472482638888889}, {"timestamp": 1745769600000, "value": 4.32890625}, {"timestamp": 1745773200000, "value": 4.389192708333334}, {"timestamp": 1745776800000, "value": 4.631857638888889}, {"timestamp": 1745780400000, "value": 4.349728732638889}, {"timestamp": 1745784000000, "value": 4.728960503472222}, {"timestamp": 1745787600000, "value": 6.087348090277778}, {"timestamp": 1745791200000, "value": 4.671940104166667}, {"timestamp": 1745794800000, "value": 4.987586805555556}, {"timestamp": 1745798400000, "value": 5.665451388888889}, {"timestamp": 1745802000000, "value": 5.0973524305555555}, {"timestamp": 1745805600000, "value": 4.948318142361111}, {"timestamp": 1745809200000, "value": 4.822374131944445}, {"timestamp": 1745812800000, "value": 4.9771484375}, {"timestamp": 1745816400000, "value": 5.500846354166667}, {"timestamp": 1745820000000, "value": 6.043229166666666}, {"timestamp": 1745823600000, "value": 6.468218315972222}, {"timestamp": 1745827200000, "value": 6.66742672390408}, {"timestamp": 1745830800000, "value": 6.384453546433222}]"></canvas>
+                            
+                        </td>
+                        <td class="normal-usage">
+                            
+                            <div class="gauge-container">
+                                <canvas class="gauge" data-value="47" data-type="ram"></canvas>
+                                <span>47</span>
+                            </div>
+                            
+                        </td>
+                        <td>
+                            
+                            <canvas class="mini-chart" data-history="[{"timestamp": 1745744400000, "value": 46.960698784722226}, {"timestamp": 1745748000000, "value": 46.88250868055555}, {"timestamp": 1745751600000, "value": 46.97463107638889}, {"timestamp": 1745755200000, "value": 47.158962673611114}, {"timestamp": 1745758800000, "value": 47.33646375868056}, {"timestamp": 1745762400000, "value": 47.58319227430555}, {"timestamp": 1745766000000, "value": 47.49639756944445}, {"timestamp": 1745769600000, "value": 47.641216362847224}, {"timestamp": 1745773200000, "value": 48.31471896701389}, {"timestamp": 1745776800000, "value": 48.42100694444444}, {"timestamp": 1745780400000, "value": 48.45583224826389}, {"timestamp": 1745784000000, "value": 48.525244140625}, {"timestamp": 1745787600000, "value": 48.51423611111111}, {"timestamp": 1745791200000, "value": 47.917578125}, {"timestamp": 1745794800000, "value": 48.39712456597222}, {"timestamp": 1745798400000, "value": 47.99580620659722}, {"timestamp": 1745802000000, "value": 48.19934353298611}, {"timestamp": 1745805600000, "value": 48.27703993055555}, {"timestamp": 1745809200000, "value": 48.46701931423611}, {"timestamp": 1745812800000, "value": 48.54747178819444}, {"timestamp": 1745816400000, "value": 48.518212890625}, {"timestamp": 1745820000000, "value": 48.58888888888889}, {"timestamp": 1745823600000, "value": 49.099049207899306}, {"timestamp": 1745827200000, "value": 49.34426506890191}, {"timestamp": 1745830800000, "value": 48.98784383138021}]"></canvas>
+                            
+                        </td>
+                        <td>
+                            <a href="https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038/#entity/HOST-05523368AA159808" target="_blank" class="external-link">
+                                <i class="fas fa-external-link-alt"></i>
+                                Dynatrace
+                            </a>
+                        </td>
+                    </tr>
+                    
+                    <tr data-status="healthy">
+                        <td>s02vl9920427.fr.net.intra</td>
+                        <td class="normal-usage">
+                            
+                            <div class="gauge-container">
+                                <canvas class="gauge" data-value="3" data-type="cpu"></canvas>
+                                <span>3</span>
+                            </div>
+                            
+                        </td>
+                        <td>
+                            
+                            <canvas class="mini-chart" data-history="[{"timestamp": 1745744400000, "value": 3.2026475694444443}, {"timestamp": 1745748000000, "value": 3.16181640625}, {"timestamp": 1745751600000, "value": 3.1145941840277778}, {"timestamp": 1745755200000, "value": 3.3025607638888888}, {"timestamp": 1745758800000, "value": 3.216579861111111}, {"timestamp": 1745762400000, "value": 3.179275173611111}, {"timestamp": 1745766000000, "value": 3.199967447916667}, {"timestamp": 1745769600000, "value": 3.225705295138889}, {"timestamp": 1745773200000, "value": 3.2733832465277777}, {"timestamp": 1745776800000, "value": 3.2903211805555554}, {"timestamp": 1745780400000, "value": 3.2189127604166665}, {"timestamp": 1745784000000, "value": 3.3027018229166667}, {"timestamp": 1745787600000, "value": 4.628645833333334}, {"timestamp": 1745791200000, "value": 3.2621961805555557}, {"timestamp": 1745794800000, "value": 3.668381076388889}, {"timestamp": 1745798400000, "value": 3.265885416666667}, {"timestamp": 1745802000000, "value": 3.331673177083333}, {"timestamp": 1745805600000, "value": 3.3760199652777776}, {"timestamp": 1745809200000, "value": 3.2685872395833333}, {"timestamp": 1745812800000, "value": 3.3206380208333335}, {"timestamp": 1745816400000, "value": 3.2060546875}, {"timestamp": 1745820000000, "value": 3.17744140625}, {"timestamp": 1745823600000, "value": 3.1869188096788195}, {"timestamp": 1745827200000, "value": 3.223895772298177}, {"timestamp": 1745830800000, "value": 3.220016842796689}]"></canvas>
+                            
+                        </td>
+                        <td class="normal-usage">
+                            
+                            <div class="gauge-container">
+                                <canvas class="gauge" data-value="32" data-type="ram"></canvas>
+                                <span>32</span>
+                            </div>
+                            
+                        </td>
+                        <td>
+                            
+                            <canvas class="mini-chart" data-history="[{"timestamp": 1745744400000, "value": 32.5177734375}, {"timestamp": 1745748000000, "value": 32.557286241319446}, {"timestamp": 1745751600000, "value": 32.675043402777774}, {"timestamp": 1745755200000, "value": 32.72736545138889}, {"timestamp": 1745758800000, "value": 32.68297526041667}, {"timestamp": 1745762400000, "value": 32.86115451388889}, {"timestamp": 1745766000000, "value": 32.91344401041667}, {"timestamp": 1745769600000, "value": 32.98619249131944}, {"timestamp": 1745773200000, "value": 33.08400607638889}, {"timestamp": 1745776800000, "value": 33.04084201388889}, {"timestamp": 1745780400000, "value": 32.82450086805556}, {"timestamp": 1745784000000, "value": 32.902804904513886}, {"timestamp": 1745787600000, "value": 32.93232421875}, {"timestamp": 1745791200000, "value": 33.09591471354167}, {"timestamp": 1745794800000, "value": 34.22828776041667}, {"timestamp": 1745798400000, "value": 33.35764973958333}, {"timestamp": 1745802000000, "value": 34.94404839409722}, {"timestamp": 1745805600000, "value": 34.859944661458336}, {"timestamp": 1745809200000, "value": 34.30774197048611}, {"timestamp": 1745812800000, "value": 34.405056423611114}, {"timestamp": 1745816400000, "value": 34.51669921875}, {"timestamp": 1745820000000, "value": 34.520654296875}, {"timestamp": 1745823600000, "value": 34.67257520887587}, {"timestamp": 1745827200000, "value": 34.766490427653}, {"timestamp": 1745830800000, "value": 34.93099957420712}]"></canvas>
+                            
+                        </td>
+                        <td>
+                            <a href="https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038/#entity/HOST-2ED8CDAA9A554AFA" target="_blank" class="external-link">
+                                <i class="fas fa-external-link-alt"></i>
+                                Dynatrace
+                            </a>
+                        </td>
+                    </tr>
+                    
+                    <tr data-status="healthy">
+                        <td>s02vl9920432.fr.net.intra</td>
+                        <td class="normal-usage">
+                            
+                            <div class="gauge-container">
+                                <canvas class="gauge" data-value="4" data-type="cpu"></canvas>
+                                <span>4</span>
+                            </div>
+                            
+                        </td>
+                        <td>
+                            
+                            <canvas class="mini-chart" data-history="[{"timestamp": 1745744400000, "value": 4.694401041666667}, {"timestamp": 1745748000000, "value": 4.705544704861111}, {"timestamp": 1745751600000, "value": 4.653743489583333}, {"timestamp": 1745755200000, "value": 4.761458333333334}, {"timestamp": 1745758800000, "value": 4.5848198784722225}, {"timestamp": 1745762400000, "value": 4.4918836805555555}, {"timestamp": 1745766000000, "value": 4.6037109375}, {"timestamp": 1745769600000, "value": 4.7037977430555555}, {"timestamp": 1745773200000, "value": 4.645008680555556}, {"timestamp": 1745776800000, "value": 4.786848958333334}, {"timestamp": 1745780400000, "value": 4.669390190972222}, {"timestamp": 1745784000000, "value": 4.878190104166666}, {"timestamp": 1745787600000, "value": 5.754231770833333}, {"timestamp": 1745791200000, "value": 4.807660590277778}, {"timestamp": 1745794800000, "value": 4.812608506944445}, {"timestamp": 1745798400000, "value": 5.86953125}, {"timestamp": 1745802000000, "value": 5.300629340277778}, {"timestamp": 1745805600000, "value": 4.909027777777778}, {"timestamp": 1745809200000, "value": 4.827387152777778}, {"timestamp": 1745812800000, "value": 4.992664930555556}, {"timestamp": 1745816400000, "value": 5.293142361111111}, {"timestamp": 1745820000000, "value": 5.785264756944445}, {"timestamp": 1745823600000, "value": 6.290288628472222}, {"timestamp": 1745827200000, "value": 6.541158718532986}, {"timestamp": 1745830800000, "value": 6.300308590843564}]"></canvas>
+                            
+                        </td>
+                        <td class="normal-usage">
+                            
+                            <div class="gauge-container">
+                                <canvas class="gauge" data-value="48" data-type="ram"></canvas>
+                                <span>48</span>
+                            </div>
+                            
+                        </td>
+                        <td>
+                            
+                            <canvas class="mini-chart" data-history="[{"timestamp": 1745744400000, "value": 48.78318684895833}, {"timestamp": 1745748000000, "value": 48.85432400173611}, {"timestamp": 1745751600000, "value": 48.49375}, {"timestamp": 1745755200000, "value": 48.22335069444444}, {"timestamp": 1745758800000, "value": 48.398654513888886}, {"timestamp": 1745762400000, "value": 48.46559787326389}, {"timestamp": 1745766000000, "value": 48.62702365451389}, {"timestamp": 1745769600000, "value": 48.61908637152778}, {"timestamp": 1745773200000, "value": 48.67848849826389}, {"timestamp": 1745776800000, "value": 48.71911349826389}, {"timestamp": 1745780400000, "value": 48.78390299479167}, {"timestamp": 1745784000000, "value": 48.785991753472224}, {"timestamp": 1745787600000, "value": 48.651850043402774}, {"timestamp": 1745791200000, "value": 47.29140625}, {"timestamp": 1745794800000, "value": 49.013671875}, {"timestamp": 1745798400000, "value": 48.197726779513886}, {"timestamp": 1745802000000, "value": 47.512212456597226}, {"timestamp": 1745805600000, "value": 47.245372178819444}, {"timestamp": 1745809200000, "value": 47.294764539930554}, {"timestamp": 1745812800000, "value": 47.38738064236111}, {"timestamp": 1745816400000, "value": 47.431401909722226}, {"timestamp": 1745820000000, "value": 47.356640625}, {"timestamp": 1745823600000, "value": 47.71148173014323}, {"timestamp": 1745827200000, "value": 48.23733630710178}, {"timestamp": 1745830800000, "value": 48.33776546659924}]"></canvas>
+                            
+                        </td>
+                        <td>
+                            <a href="https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038/#entity/HOST-351D389F21A7235D" target="_blank" class="external-link">
+                                <i class="fas fa-external-link-alt"></i>
+                                Dynatrace
+                            </a>
+                        </td>
+                    </tr>
+                    
+                    <tr data-status="healthy">
+                        <td>s02vl9920428.fr.net.intra</td>
+                        <td class="normal-usage">
+                            
+                            <div class="gauge-container">
+                                <canvas class="gauge" data-value="3" data-type="cpu"></canvas>
+                                <span>3</span>
+                            </div>
+                            
+                        </td>
+                        <td>
+                            
+                            <canvas class="mini-chart" data-history="[{"timestamp": 1745744400000, "value": 3.671657986111111}, {"timestamp": 1745748000000, "value": 3.584114583333333}, {"timestamp": 1745751600000, "value": 3.5141059027777777}, {"timestamp": 1745755200000, "value": 3.5727647569444443}, {"timestamp": 1745758800000, "value": 3.577170138888889}, {"timestamp": 1745762400000, "value": 3.543576388888889}, {"timestamp": 1745766000000, "value": 3.786349826388889}, {"timestamp": 1745769600000, "value": 3.559592013888889}, {"timestamp": 1745773200000, "value": 3.590451388888889}, {"timestamp": 1745776800000, "value": 3.583268229166667}, {"timestamp": 1745780400000, "value": 3.558355034722222}, {"timestamp": 1745784000000, "value": 3.440700954861111}, {"timestamp": 1745787600000, "value": 4.482313368055555}, {"timestamp": 1745791200000, "value": 3.1671657986111112}, {"timestamp": 1745794800000, "value": 3.257085503472222}, {"timestamp": 1745798400000, "value": 3.30478515625}, {"timestamp": 1745802000000, "value": 3.216547309027778}, {"timestamp": 1745805600000, "value": 4.3277777777777775}, {"timestamp": 1745809200000, "value": 3.3564887152777776}, {"timestamp": 1745812800000, "value": 3.171017795138889}, {"timestamp": 1745816400000, "value": 3.168044704861111}, {"timestamp": 1745820000000, "value": 3.171614583333333}, {"timestamp": 1745823600000, "value": 3.1526496039496528}, {"timestamp": 1745827200000, "value": 3.2313464694552954}, {"timestamp": 1745830800000, "value": 3.2503840128580728}]"></canvas>
+                            
+                        </td>
+                        <td class="normal-usage">
+                            
+                            <div class="gauge-container">
+                                <canvas class="gauge" data-value="33" data-type="ram"></canvas>
+                                <span>33</span>
+                            </div>
+                            
+                        </td>
+                        <td>
+                            
+                            <canvas class="mini-chart" data-history="[{"timestamp": 1745744400000, "value": 33.22218967013889}, {"timestamp": 1745748000000, "value": 33.05367838541667}, {"timestamp": 1745751600000, "value": 32.47535807291667}, {"timestamp": 1745755200000, "value": 32.58277994791667}, {"timestamp": 1745758800000, "value": 32.599148220486114}, {"timestamp": 1745762400000, "value": 32.603678385416664}, {"timestamp": 1745766000000, "value": 32.61727973090278}, {"timestamp": 1745769600000, "value": 32.68241102430556}, {"timestamp": 1745773200000, "value": 32.73595377604167}, {"timestamp": 1745776800000, "value": 32.76158854166667}, {"timestamp": 1745780400000, "value": 32.689404296875}, {"timestamp": 1745784000000, "value": 32.697254774305556}, {"timestamp": 1745787600000, "value": 32.737391493055554}, {"timestamp": 1745791200000, "value": 32.156336805555554}, {"timestamp": 1745794800000, "value": 33.40691189236111}, {"timestamp": 1745798400000, "value": 34.081852213541666}, {"timestamp": 1745802000000, "value": 34.133051215277774}, {"timestamp": 1745805600000, "value": 33.510319010416666}, {"timestamp": 1745809200000, "value": 33.24875759548611}, {"timestamp": 1745812800000, "value": 33.36061197916667}, {"timestamp": 1745816400000, "value": 33.38308919270833}, {"timestamp": 1745820000000, "value": 33.39460720486111}, {"timestamp": 1745823600000, "value": 33.611446126302084}, {"timestamp": 1745827200000, "value": 33.769737837049696}, {"timestamp": 1745830800000, "value": 33.249485197521395}]"></canvas>
+                            
+                        </td>
+                        <td>
+                            <a href="https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038/#entity/HOST-430C70DA88E1A02C" target="_blank" class="external-link">
+                                <i class="fas fa-external-link-alt"></i>
+                                Dynatrace
+                            </a>
+                        </td>
+                    </tr>
+                    
+                    <tr data-status="healthy">
+                        <td>s02vl9920430.fr.net.intra</td>
+                        <td class="normal-usage">
+                            
+                            <div class="gauge-container">
+                                <canvas class="gauge" data-value="5" data-type="cpu"></canvas>
+                                <span>5</span>
+                            </div>
+                            
+                        </td>
+                        <td>
+                            
+                            <canvas class="mini-chart" data-history="[{"timestamp": 1745744400000, "value": 5.032747395833334}, {"timestamp": 1745748000000, "value": 5.098133680555556}, {"timestamp": 1745751600000, "value": 5.1126085069444445}, {"timestamp": 1745755200000, "value": 5.168370225694445}, {"timestamp": 1745758800000, "value": 5.0978515625}, {"timestamp": 1745762400000, "value": 5.067719184027778}, {"timestamp": 1745766000000, "value": 5.179177517361111}, {"timestamp": 1745769600000, "value": 5.156901041666667}, {"timestamp": 1745773200000, "value": 5.023014322916667}, {"timestamp": 1745776800000, "value": 5.094672309027778}, {"timestamp": 1745780400000, "value": 4.892241753472222}, {"timestamp": 1745784000000, "value": 5.199175347222222}, {"timestamp": 1745787600000, "value": 6.001833767361111}, {"timestamp": 1745791200000, "value": 5.284830729166667}, {"timestamp": 1745794800000, "value": 5.537608506944444}, {"timestamp": 1745798400000, "value": 5.394986979166666}, {"timestamp": 1745802000000, "value": 5.131814236111111}, {"timestamp": 1745805600000, "value": 5.7605577256944445}, {"timestamp": 1745809200000, "value": 5.214344618055556}, {"timestamp": 1745812800000, "value": 5.308333333333334}, {"timestamp": 1745816400000, "value": 5.761013454861111}, {"timestamp": 1745820000000, "value": 6.444390190972222}, {"timestamp": 1745823600000, "value": 7.079701063368056}, {"timestamp": 1745827200000, "value": 7.509818013509115}, {"timestamp": 1745830800000, "value": 7.127584911528087}]"></canvas>
+                            
+                        </td>
+                        <td class="normal-usage">
+                            
+                            <div class="gauge-container">
+                                <canvas class="gauge" data-value="47" data-type="ram"></canvas>
+                                <span>47</span>
+                            </div>
+                            
+                        </td>
+                        <td>
+                            
+                            <canvas class="mini-chart" data-history="[{"timestamp": 1745744400000, "value": 47.300640190972224}, {"timestamp": 1745748000000, "value": 47.314181857638886}, {"timestamp": 1745751600000, "value": 47.27876519097222}, {"timestamp": 1745755200000, "value": 47.12205403645833}, {"timestamp": 1745758800000, "value": 47.13163519965278}, {"timestamp": 1745762400000, "value": 47.097737630208336}, {"timestamp": 1745766000000, "value": 47.22367621527778}, {"timestamp": 1745769600000, "value": 47.19144965277778}, {"timestamp": 1745773200000, "value": 47.05581597222222}, {"timestamp": 1745776800000, "value": 47.08581814236111}, {"timestamp": 1745780400000, "value": 47.078846571180556}, {"timestamp": 1745784000000, "value": 47.09690755208333}, {"timestamp": 1745787600000, "value": 47.08342556423611}, {"timestamp": 1745791200000, "value": 45.812320963541666}, {"timestamp": 1745794800000, "value": 47.03240017361111}, {"timestamp": 1745798400000, "value": 47.380132378472226}, {"timestamp": 1745802000000, "value": 47.43205295138889}, {"timestamp": 1745805600000, "value": 45.77738172743056}, {"timestamp": 1745809200000, "value": 45.736507161458334}, {"timestamp": 1745812800000, "value": 45.94244249131945}, {"timestamp": 1745816400000, "value": 46.08084852430556}, {"timestamp": 1745820000000, "value": 46.385226779513886}, {"timestamp": 1745823600000, "value": 46.62289038764106}, {"timestamp": 1745827200000, "value": 46.95854958428277}, {"timestamp": 1745830800000, "value": 47.293418884277344}]"></canvas>
+                            
+                        </td>
+                        <td>
+                            <a href="https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038/#entity/HOST-5E97B96A1A2959D4" target="_blank" class="external-link">
+                                <i class="fas fa-external-link-alt"></i>
+                                Dynatrace
+                            </a>
+                        </td>
+                    </tr>
+                    
+                    <tr data-status="healthy">
+                        <td>s02vl9920429.fr.net.intra</td>
+                        <td class="normal-usage">
+                            
+                            <div class="gauge-container">
+                                <canvas class="gauge" data-value="4" data-type="cpu"></canvas>
+                                <span>4</span>
+                            </div>
+                            
+                        </td>
+                        <td>
+                            
+                            <canvas class="mini-chart" data-history="[{"timestamp": 1745744400000, "value": 4.16640625}, {"timestamp": 1745748000000, "value": 4.141037326388889}, {"timestamp": 1745751600000, "value": 4.060709635416667}, {"timestamp": 1745755200000, "value": 4.193413628472222}, {"timestamp": 1745758800000, "value": 3.8391710069444445}, {"timestamp": 1745762400000, "value": 3.9793402777777778}, {"timestamp": 1745766000000, "value": 4.141145833333334}, {"timestamp": 1745769600000, "value": 4.08447265625}, {"timestamp": 1745773200000, "value": 4.058908420138889}, {"timestamp": 1745776800000, "value": 4.103645833333333}, {"timestamp": 1745780400000, "value": 4.145746527777778}, {"timestamp": 1745784000000, "value": 4.393967013888889}, {"timestamp": 1745787600000, "value": 5.238834635416667}, {"timestamp": 1745791200000, "value": 4.432953559027778}, {"timestamp": 1745794800000, "value": 4.369639756944444}, {"timestamp": 1745798400000, "value": 4.635611979166667}, {"timestamp": 1745802000000, "value": 4.1618055555555555}, {"timestamp": 1745805600000, "value": 4.620377604166666}, {"timestamp": 1745809200000, "value": 4.220334201388889}, {"timestamp": 1745812800000, "value": 4.329210069444445}, {"timestamp": 1745816400000, "value": 4.714822048611111}, {"timestamp": 1745820000000, "value": 6.062934027777778}, {"timestamp": 1745823600000, "value": 5.413723415798611}, {"timestamp": 1745827200000, "value": 5.6130352444118925}, {"timestamp": 1745830800000, "value": 5.526606968470982}]"></canvas>
+                            
+                        </td>
+                        <td class="normal-usage">
+                            
+                            <div class="gauge-container">
+                                <canvas class="gauge" data-value="46" data-type="ram"></canvas>
+                                <span>46</span>
+                            </div>
+                            
+                        </td>
+                        <td>
+                            
+                            <canvas class="mini-chart" data-history="[{"timestamp": 1745744400000, "value": 46.811794704861114}, {"timestamp": 1745748000000, "value": 46.81341688368055}, {"timestamp": 1745751600000, "value": 46.809711371527776}, {"timestamp": 1745755200000, "value": 46.862467447916664}, {"timestamp": 1745758800000, "value": 46.94888237847222}, {"timestamp": 1745762400000, "value": 46.99054904513889}, {"timestamp": 1745766000000, "value": 47.0466796875}, {"timestamp": 1745769600000, "value": 47.0287109375}, {"timestamp": 1745773200000, "value": 47.04713541666667}, {"timestamp": 1745776800000, "value": 47.51258138020833}, {"timestamp": 1745780400000, "value": 47.57016059027778}, {"timestamp": 1745784000000, "value": 47.21369900173611}, {"timestamp": 1745787600000, "value": 47.30008680555556}, {"timestamp": 1745791200000, "value": 45.849430338541666}, {"timestamp": 1745794800000, "value": 47.07830946180555}, {"timestamp": 1745798400000, "value": 47.00629340277778}, {"timestamp": 1745802000000, "value": 46.125965711805556}, {"timestamp": 1745805600000, "value": 46.302256944444444}, {"timestamp": 1745809200000, "value": 46.5162109375}, {"timestamp": 1745812800000, "value": 46.583995225694444}, {"timestamp": 1745816400000, "value": 46.68967556423611}, {"timestamp": 1745820000000, "value": 45.937679036458334}, {"timestamp": 1745823600000, "value": 45.017981635199654}, {"timestamp": 1745827200000, "value": 45.35275853474935}, {"timestamp": 1745830800000, "value": 45.55228569394066}]"></canvas>
+                            
+                        </td>
+                        <td>
+                            <a href="https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038/#entity/HOST-616A895213DF845E" target="_blank" class="external-link">
+                                <i class="fas fa-external-link-alt"></i>
+                                Dynatrace
+                            </a>
+                        </td>
+                    </tr>
+                    
+                    <tr data-status="healthy">
+                        <td>s02vl9920431.fr.net.intra</td>
+                        <td class="normal-usage">
+                            
+                            <div class="gauge-container">
+                                <canvas class="gauge" data-value="5" data-type="cpu"></canvas>
+                                <span>5</span>
+                            </div>
+                            
+                        </td>
+                        <td>
+                            
+                            <canvas class="mini-chart" data-history="[{"timestamp": 1745744400000, "value": 5.209516059027778}, {"timestamp": 1745748000000, "value": 5.11484375}, {"timestamp": 1745751600000, "value": 5.34013671875}, {"timestamp": 1745755200000, "value": 5.959375}, {"timestamp": 1745758800000, "value": 5.219292534722222}, {"timestamp": 1745762400000, "value": 5.150065104166667}, {"timestamp": 1745766000000, "value": 5.334939236111111}, {"timestamp": 1745769600000, "value": 5.042599826388889}, {"timestamp": 1745773200000, "value": 5.217350260416667}, {"timestamp": 1745776800000, "value": 5.408919270833334}, {"timestamp": 1745780400000, "value": 5.393033854166666}, {"timestamp": 1745784000000, "value": 5.637586805555555}, {"timestamp": 1745787600000, "value": 6.24541015625}, {"timestamp": 1745791200000, "value": 5.426388888888889}, {"timestamp": 1745794800000, "value": 5.639149305555556}, {"timestamp": 1745798400000, "value": 5.9060655381944445}, {"timestamp": 1745802000000, "value": 5.856575520833333}, {"timestamp": 1745805600000, "value": 6.106032986111111}, {"timestamp": 1745809200000, "value": 5.755316840277778}, {"timestamp": 1745812800000, "value": 5.6065863715277775}, {"timestamp": 1745816400000, "value": 6.2833875868055555}, {"timestamp": 1745820000000, "value": 6.4738172743055555}, {"timestamp": 1745823600000, "value": 6.704404025607639}, {"timestamp": 1745827200000, "value": 7.714841545952691}, {"timestamp": 1745830800000, "value": 7.4247996012369795}]"></canvas>
+                            
+                        </td>
+                        <td class="normal-usage">
+                            
+                            <div class="gauge-container">
+                                <canvas class="gauge" data-value="50" data-type="ram"></canvas>
+                                <span>50</span>
+                            </div>
+                            
+                        </td>
+                        <td>
+                            
+                            <canvas class="mini-chart" data-history="[{"timestamp": 1745744400000, "value": 50.499674479166664}, {"timestamp": 1745748000000, "value": 50.445941840277776}, {"timestamp": 1745751600000, "value": 50.433284505208334}, {"timestamp": 1745755200000, "value": 50.221912977430556}, {"timestamp": 1745758800000, "value": 48.59329969618056}, {"timestamp": 1745762400000, "value": 48.609874131944444}, {"timestamp": 1745766000000, "value": 48.67297092013889}, {"timestamp": 1745769600000, "value": 48.766048177083334}, {"timestamp": 1745773200000, "value": 48.80009765625}, {"timestamp": 1745776800000, "value": 48.700374348958334}, {"timestamp": 1745780400000, "value": 48.743435329861114}, {"timestamp": 1745784000000, "value": 48.89401041666667}, {"timestamp": 1745787600000, "value": 49.56478949652778}, {"timestamp": 1745791200000, "value": 49.18916015625}, {"timestamp": 1745794800000, "value": 49.830327690972226}, {"timestamp": 1745798400000, "value": 50.579112413194444}, {"timestamp": 1745802000000, "value": 50.76197916666667}, {"timestamp": 1745805600000, "value": 50.82025282118055}, {"timestamp": 1745809200000, "value": 50.85861002604167}, {"timestamp": 1745812800000, "value": 50.03697374131944}, {"timestamp": 1745816400000, "value": 49.90693901909722}, {"timestamp": 1745820000000, "value": 49.95097113715278}, {"timestamp": 1745823600000, "value": 50.231867133246524}, {"timestamp": 1745827200000, "value": 50.3445423550076}, {"timestamp": 1745830800000, "value": 49.98632085890997}]"></canvas>
+                            
+                        </td>
+                        <td>
+                            <a href="https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038/#entity/HOST-6DF9C1B5A344492C" target="_blank" class="external-link">
+                                <i class="fas fa-external-link-alt"></i>
+                                Dynatrace
+                            </a>
+                        </td>
+                    </tr>
+                    
+                    <tr data-status="healthy">
+                        <td>s02vl9919396.fr.net.intra</td>
+                        <td class="normal-usage">
+                            
+                            <div class="gauge-container">
+                                <canvas class="gauge" data-value="1" data-type="cpu"></canvas>
+                                <span>1</span>
+                            </div>
+                            
+                        </td>
+                        <td>
+                            
+                            <canvas class="mini-chart" data-history="[{"timestamp": 1745744400000, "value": 1.2827690972222223}, {"timestamp": 1745748000000, "value": 1.4744032118055554}, {"timestamp": 1745751600000, "value": 1.3795355902777777}, {"timestamp": 1745755200000, "value": 1.2801974826388889}, {"timestamp": 1745758800000, "value": 1.2829644097222221}, {"timestamp": 1745762400000, "value": 1.2793185763888888}, {"timestamp": 1745766000000, "value": 1.46279296875}, {"timestamp": 1745769600000, "value": 1.4354383680555556}, {"timestamp": 1745773200000, "value": 1.262033420138889}, {"timestamp": 1745776800000, "value": 1.3220269097222221}, {"timestamp": 1745780400000, "value": 1.292578125}, {"timestamp": 1745784000000, "value": 1.4936957465277778}, {"timestamp": 1745787600000, "value": 1.4211805555555554}, {"timestamp": 1745791200000, "value": 1.2870442708333334}, {"timestamp": 1745794800000, "value": 1.4154730902777777}, {"timestamp": 1745798400000, "value": 1.3408420138888888}, {"timestamp": 1745802000000, "value": 1.7117730034722223}, {"timestamp": 1745805600000, "value": 1.4832573784722223}, {"timestamp": 1745809200000, "value": 1.2246202256944445}, {"timestamp": 1745812800000, "value": 1.231640625}, {"timestamp": 1745816400000, "value": 1.31962890625}, {"timestamp": 1745820000000, "value": 1.4635199652777777}, {"timestamp": 1745823600000, "value": 1.4192498101128472}, {"timestamp": 1745827200000, "value": 1.3077580769856771}, {"timestamp": 1745830800000, "value": 1.3137969970703125}]"></canvas>
+                            
+                        </td>
+                        <td class="normal-usage">
+                            
+                            <div class="gauge-container">
+                                <canvas class="gauge" data-value="15" data-type="ram"></canvas>
+                                <span>15</span>
+                            </div>
+                            
+                        </td>
+                        <td>
+                            
+                            <canvas class="mini-chart" data-history="[{"timestamp": 1745744400000, "value": 15.66982421875}, {"timestamp": 1745748000000, "value": 15.685177951388889}, {"timestamp": 1745751600000, "value": 15.705365668402777}, {"timestamp": 1745755200000, "value": 15.848372395833334}, {"timestamp": 1745758800000, "value": 15.867344835069444}, {"timestamp": 1745762400000, "value": 15.897650824652779}, {"timestamp": 1745766000000, "value": 15.969949001736111}, {"timestamp": 1745769600000, "value": 15.971685112847222}, {"timestamp": 1745773200000, "value": 15.983555772569444}, {"timestamp": 1745776800000, "value": 16.19826388888889}, {"timestamp": 1745780400000, "value": 17.048079427083334}, {"timestamp": 1745784000000, "value": 17.054725477430555}, {"timestamp": 1745787600000, "value": 17.06220703125}, {"timestamp": 1745791200000, "value": 17.147081163194443}, {"timestamp": 1745794800000, "value": 16.534928385416666}, {"timestamp": 1745798400000, "value": 16.041010199652778}, {"timestamp": 1745802000000, "value": 16.253553602430557}, {"timestamp": 1745805600000, "value": 16.473459201388888}, {"timestamp": 1745809200000, "value": 16.494883897569444}, {"timestamp": 1745812800000, "value": 16.51467013888889}, {"timestamp": 1745816400000, "value": 16.530609809027776}, {"timestamp": 1745820000000, "value": 16.52287326388889}, {"timestamp": 1745823600000, "value": 16.749312167697482}, {"timestamp": 1745827200000, "value": 16.822503153483073}, {"timestamp": 1745830800000, "value": 16.167876833961124}]"></canvas>
+                            
+                        </td>
+                        <td>
+                            <a href="https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038/#entity/HOST-93EDB9CB416FE020" target="_blank" class="external-link">
+                                <i class="fas fa-external-link-alt"></i>
+                                Dynatrace
+                            </a>
+                        </td>
+                    </tr>
+                    
+                    <tr data-status="healthy">
+                        <td>s02vl9920433.fr.net.intra</td>
+                        <td class="normal-usage">
+                            
+                            <div class="gauge-container">
+                                <canvas class="gauge" data-value="4" data-type="cpu"></canvas>
+                                <span>4</span>
+                            </div>
+                            
+                        </td>
+                        <td>
+                            
+                            <canvas class="mini-chart" data-history="[{"timestamp": 1745744400000, "value": 4.438802083333333}, {"timestamp": 1745748000000, "value": 4.314236111111111}, {"timestamp": 1745751600000, "value": 4.264246961805555}, {"timestamp": 1745755200000, "value": 4.5431098090277775}, {"timestamp": 1745758800000, "value": 4.244683159722222}, {"timestamp": 1745762400000, "value": 4.235861545138889}, {"timestamp": 1745766000000, "value": 4.424077690972222}, {"timestamp": 1745769600000, "value": 4.3908203125}, {"timestamp": 1745773200000, "value": 4.342404513888889}, {"timestamp": 1745776800000, "value": 4.457747395833334}, {"timestamp": 1745780400000, "value": 4.394357638888889}, {"timestamp": 1745784000000, "value": 4.7046875}, {"timestamp": 1745787600000, "value": 5.468381076388889}, {"timestamp": 1745791200000, "value": 4.651746961805555}, {"timestamp": 1745794800000, "value": 4.776725260416667}, {"timestamp": 1745798400000, "value": 4.488226996527778}, {"timestamp": 1745802000000, "value": 4.454850260416666}, {"timestamp": 1745805600000, "value": 4.586642795138889}, {"timestamp": 1745809200000, "value": 4.4808159722222225}, {"timestamp": 1745812800000, "value": 4.349565972222222}, {"timestamp": 1745816400000, "value": 5.062272135416666}, {"timestamp": 1745820000000, "value": 5.674186197916667}, {"timestamp": 1745823600000, "value": 5.833562554253472}, {"timestamp": 1745827200000, "value": 5.919910515679254}, {"timestamp": 1745830800000, "value": 5.652473449707031}]"></canvas>
+                            
+                        </td>
+                        <td class="normal-usage">
+                            
+                            <div class="gauge-container">
+                                <canvas class="gauge" data-value="48" data-type="ram"></canvas>
+                                <span>48</span>
+                            </div>
+                            
+                        </td>
+                        <td>
+                            
+                            <canvas class="mini-chart" data-history="[{"timestamp": 1745744400000, "value": 48.826144748263886}, {"timestamp": 1745748000000, "value": 48.95207790798611}, {"timestamp": 1745751600000, "value": 48.97494574652778}, {"timestamp": 1745755200000, "value": 48.5765625}, {"timestamp": 1745758800000, "value": 48.68250868055556}, {"timestamp": 1745762400000, "value": 48.705463324652776}, {"timestamp": 1745766000000, "value": 48.73009982638889}, {"timestamp": 1745769600000, "value": 48.73251953125}, {"timestamp": 1745773200000, "value": 48.77647569444444}, {"timestamp": 1745776800000, "value": 48.68420138888889}, {"timestamp": 1745780400000, "value": 48.737548828125}, {"timestamp": 1745784000000, "value": 48.78311089409722}, {"timestamp": 1745787600000, "value": 48.797374131944444}, {"timestamp": 1745791200000, "value": 47.42861328125}, {"timestamp": 1745794800000, "value": 47.82041015625}, {"timestamp": 1745798400000, "value": 48.23304036458333}, {"timestamp": 1745802000000, "value": 48.65630967881945}, {"timestamp": 1745805600000, "value": 48.74996744791667}, {"timestamp": 1745809200000, "value": 48.78310546875}, {"timestamp": 1745812800000, "value": 48.85011393229167}, {"timestamp": 1745816400000, "value": 48.37740342881944}, {"timestamp": 1745820000000, "value": 48.41809353298611}, {"timestamp": 1745823600000, "value": 48.73471340603299}, {"timestamp": 1745827200000, "value": 49.18688015407986}, {"timestamp": 1745830800000, "value": 49.249783470517116}]"></canvas>
+                            
+                        </td>
+                        <td>
+                            <a href="https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038/#entity/HOST-9BA4606E0D5FCEE0" target="_blank" class="external-link">
+                                <i class="fas fa-external-link-alt"></i>
+                                Dynatrace
+                            </a>
+                        </td>
+                    </tr>
+                    
+                    <tr data-status="healthy">
+                        <td>s02vl9919394.fr.net.intra</td>
+                        <td class="normal-usage">
+                            
+                            <div class="gauge-container">
+                                <canvas class="gauge" data-value="2" data-type="cpu"></canvas>
+                                <span>2</span>
+                            </div>
+                            
+                        </td>
+                        <td>
+                            
+                            <canvas class="mini-chart" data-history="[{"timestamp": 1745744400000, "value": 1.9578993055555556}, {"timestamp": 1745748000000, "value": 1.9401475694444446}, {"timestamp": 1745751600000, "value": 1.9406684027777779}, {"timestamp": 1745755200000, "value": 1.8971354166666667}, {"timestamp": 1745758800000, "value": 1.9225694444444446}, {"timestamp": 1745762400000, "value": 1.8734483506944444}, {"timestamp": 1745766000000, "value": 1.9294704861111112}, {"timestamp": 1745769600000, "value": 1.8862847222222223}, {"timestamp": 1745773200000, "value": 1.8578342013888889}, {"timestamp": 1745776800000, "value": 1.9420247395833334}, {"timestamp": 1745780400000, "value": 2.0093641493055556}, {"timestamp": 1745784000000, "value": 1.9149739583333334}, {"timestamp": 1745787600000, "value": 1.9032118055555556}, {"timestamp": 1745791200000, "value": 1.9170572916666666}, {"timestamp": 1745794800000, "value": 2.251095920138889}, {"timestamp": 1745798400000, "value": 1.9069010416666667}, {"timestamp": 1745802000000, "value": 1.9250542534722221}, {"timestamp": 1745805600000, "value": 8.190364583333333}, {"timestamp": 1745809200000, "value": 1.942751736111111}, {"timestamp": 1745812800000, "value": 1.8691189236111112}, {"timestamp": 1745816400000, "value": 2.0777994791666665}, {"timestamp": 1745820000000, "value": 1.903689236111111}, {"timestamp": 1745823600000, "value": 2.1133734809027778}, {"timestamp": 1745827200000, "value": 1.9753216213650173}, {"timestamp": 1745830800000, "value": 1.9039662679036458}]"></canvas>
+                            
+                        </td>
+                        <td class="normal-usage">
+                            
+                            <div class="gauge-container">
+                                <canvas class="gauge" data-value="17" data-type="ram"></canvas>
+                                <span>17</span>
+                            </div>
+                            
+                        </td>
+                        <td>
+                            
+                            <canvas class="mini-chart" data-history="[{"timestamp": 1745744400000, "value": 17.908045789930554}, {"timestamp": 1745748000000, "value": 17.934440104166665}, {"timestamp": 1745751600000, "value": 17.958317057291666}, {"timestamp": 1745755200000, "value": 17.966634114583332}, {"timestamp": 1745758800000, "value": 17.989561631944444}, {"timestamp": 1745762400000, "value": 17.968988715277778}, {"timestamp": 1745766000000, "value": 17.850819227430556}, {"timestamp": 1745769600000, "value": 17.73366970486111}, {"timestamp": 1745773200000, "value": 17.764860026041667}, {"timestamp": 1745776800000, "value": 17.788666449652776}, {"timestamp": 1745780400000, "value": 17.790511067708334}, {"timestamp": 1745784000000, "value": 17.82841796875}, {"timestamp": 1745787600000, "value": 17.803314887152776}, {"timestamp": 1745791200000, "value": 17.903873697916666}, {"timestamp": 1745794800000, "value": 17.97837456597222}, {"timestamp": 1745798400000, "value": 18.44619140625}, {"timestamp": 1745802000000, "value": 18.46491970486111}, {"timestamp": 1745805600000, "value": 17.394379340277776}, {"timestamp": 1745809200000, "value": 16.99900173611111}, {"timestamp": 1745812800000, "value": 17.03904079861111}, {"timestamp": 1745816400000, "value": 17.095296223958332}, {"timestamp": 1745820000000, "value": 16.67599826388889}, {"timestamp": 1745823600000, "value": 16.82390365600586}, {"timestamp": 1745827200000, "value": 16.90754631890191}, {"timestamp": 1745830800000, "value": 16.963069370814733}]"></canvas>
+                            
+                        </td>
+                        <td>
+                            <a href="https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038/#entity/HOST-9E17277EE69E6135" target="_blank" class="external-link">
+                                <i class="fas fa-external-link-alt"></i>
+                                Dynatrace
+                            </a>
+                        </td>
+                    </tr>
+                    
+                    <tr data-status="healthy">
+                        <td>s02vl9942346.fr.net.intra</td>
+                        <td class="normal-usage">
+                            
+                            <div class="gauge-container">
+                                <canvas class="gauge" data-value="3" data-type="cpu"></canvas>
+                                <span>3</span>
+                            </div>
+                            
+                        </td>
+                        <td>
+                            
+                            <canvas class="mini-chart" data-history="[{"timestamp": 1745744400000, "value": 3.5786024305555557}, {"timestamp": 1745748000000, "value": 3.569140625}, {"timestamp": 1745751600000, "value": 3.4839409722222223}, {"timestamp": 1745755200000, "value": 3.546310763888889}, {"timestamp": 1745758800000, "value": 3.8360243055555556}, {"timestamp": 1745762400000, "value": 3.5391167534722223}, {"timestamp": 1745766000000, "value": 3.5961480034722224}, {"timestamp": 1745769600000, "value": 3.510546875}, {"timestamp": 1745773200000, "value": 3.552810329861111}, {"timestamp": 1745776800000, "value": 3.540386284722222}, {"timestamp": 1745780400000, "value": 3.4483072916666666}, {"timestamp": 1745784000000, "value": 3.819314236111111}, {"timestamp": 1745787600000, "value": 3.567013888888889}, {"timestamp": 1745791200000, "value": 3.648806423611111}, {"timestamp": 1745794800000, "value": 3.646723090277778}, {"timestamp": 1745798400000, "value": 3.7075846354166666}, {"timestamp": 1745802000000, "value": 3.612868923611111}, {"timestamp": 1745805600000, "value": 3.6012586805555555}, {"timestamp": 1745809200000, "value": 3.570334201388889}, {"timestamp": 1745812800000, "value": 3.543587239583333}, {"timestamp": 1745816400000, "value": 4.01220703125}, {"timestamp": 1745820000000, "value": 3.6309678819444446}, {"timestamp": 1745823600000, "value": 3.609176296657986}, {"timestamp": 1745827200000, "value": 3.5911268446180555}, {"timestamp": 1745830800000, "value": 3.7380725378277657}]"></canvas>
+                            
+                        </td>
+                        <td class="normal-usage">
+                            
+                            <div class="gauge-container">
+                                <canvas class="gauge" data-value="37" data-type="ram"></canvas>
+                                <span>37</span>
+                            </div>
+                            
+                        </td>
+                        <td>
+                            
+                            <canvas class="mini-chart" data-history="[{"timestamp": 1745744400000, "value": 37.42462022569445}, {"timestamp": 1745748000000, "value": 37.68601345486111}, {"timestamp": 1745751600000, "value": 37.67243381076389}, {"timestamp": 1745755200000, "value": 37.880208333333336}, {"timestamp": 1745758800000, "value": 37.67809244791667}, {"timestamp": 1745762400000, "value": 37.701274956597224}, {"timestamp": 1745766000000, "value": 37.39357638888889}, {"timestamp": 1745769600000, "value": 37.24650607638889}, {"timestamp": 1745773200000, "value": 37.312261284722226}, {"timestamp": 1745776800000, "value": 37.31984592013889}, {"timestamp": 1745780400000, "value": 37.24480251736111}, {"timestamp": 1745784000000, "value": 37.55633680555555}, {"timestamp": 1745787600000, "value": 37.91670464409722}, {"timestamp": 1745791200000, "value": 37.95915256076389}, {"timestamp": 1745794800000, "value": 38.64384223090278}, {"timestamp": 1745798400000, "value": 38.64150933159722}, {"timestamp": 1745802000000, "value": 37.26966145833333}, {"timestamp": 1745805600000, "value": 37.43216145833333}, {"timestamp": 1745809200000, "value": 37.46733940972222}, {"timestamp": 1745812800000, "value": 37.26828884548611}, {"timestamp": 1745816400000, "value": 38.103542751736114}, {"timestamp": 1745820000000, "value": 38.71496853298611}, {"timestamp": 1745823600000, "value": 39.385581800672746}, {"timestamp": 1745827200000, "value": 39.548424275716144}, {"timestamp": 1745830800000, "value": 39.129683045135145}]"></canvas>
+                            
+                        </td>
+                        <td>
+                            <a href="https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038/#entity/HOST-B083C67B28CE97B8" target="_blank" class="external-link">
+                                <i class="fas fa-external-link-alt"></i>
+                                Dynatrace
+                            </a>
+                        </td>
+                    </tr>
+                    
+                    <tr data-status="healthy">
+                        <td>s02vl9942345.fr.net.intra</td>
+                        <td class="normal-usage">
+                            
+                            <div class="gauge-container">
+                                <canvas class="gauge" data-value="3" data-type="cpu"></canvas>
+                                <span>3</span>
+                            </div>
+                            
+                        </td>
+                        <td>
+                            
+                            <canvas class="mini-chart" data-history="[{"timestamp": 1745744400000, "value": 3.5873914930555557}, {"timestamp": 1745748000000, "value": 3.719216579861111}, {"timestamp": 1745751600000, "value": 3.5890190972222222}, {"timestamp": 1745755200000, "value": 3.5738172743055556}, {"timestamp": 1745758800000, "value": 3.6111219618055554}, {"timestamp": 1745762400000, "value": 3.552115885416667}, {"timestamp": 1745766000000, "value": 3.563693576388889}, {"timestamp": 1745769600000, "value": 3.586328125}, {"timestamp": 1745773200000, "value": 3.639236111111111}, {"timestamp": 1745776800000, "value": 3.941156684027778}, {"timestamp": 1745780400000, "value": 3.558246527777778}, {"timestamp": 1745784000000, "value": 3.6319010416666666}, {"timestamp": 1745787600000, "value": 3.688259548611111}, {"timestamp": 1745791200000, "value": 3.7978515625}, {"timestamp": 1745794800000, "value": 3.9220811631944446}, {"timestamp": 1745798400000, "value": 3.7065538194444443}, {"timestamp": 1745802000000, "value": 3.753287760416667}, {"timestamp": 1745805600000, "value": 3.844921875}, {"timestamp": 1745809200000, "value": 3.7594401041666665}, {"timestamp": 1745812800000, "value": 4.1365234375}, {"timestamp": 1745816400000, "value": 3.6494791666666666}, {"timestamp": 1745820000000, "value": 3.8834743923611112}, {"timestamp": 1745823600000, "value": 4.043520779079861}, {"timestamp": 1745827200000, "value": 4.0151658799913195}, {"timestamp": 1745830800000, "value": 3.9509996686662947}]"></canvas>
+                            
+                        </td>
+                        <td class="normal-usage">
+                            
+                            <div class="gauge-container">
+                                <canvas class="gauge" data-value="39" data-type="ram"></canvas>
+                                <span>39</span>
+                            </div>
+                            
+                        </td>
+                        <td>
+                            
+                            <canvas class="mini-chart" data-history="[{"timestamp": 1745744400000, "value": 39.65712890625}, {"timestamp": 1745748000000, "value": 39.17629123263889}, {"timestamp": 1745751600000, "value": 38.995279947916664}, {"timestamp": 1745755200000, "value": 38.9322265625}, {"timestamp": 1745758800000, "value": 38.960460069444444}, {"timestamp": 1745762400000, "value": 39.193180338541666}, {"timestamp": 1745766000000, "value": 39.058506944444446}, {"timestamp": 1745769600000, "value": 39.055674913194444}, {"timestamp": 1745773200000, "value": 39.103108723958336}, {"timestamp": 1745776800000, "value": 38.72545572916667}, {"timestamp": 1745780400000, "value": 38.44348415798611}, {"timestamp": 1745784000000, "value": 38.44764539930556}, {"timestamp": 1745787600000, "value": 38.725260416666664}, {"timestamp": 1745791200000, "value": 38.867919921875}, {"timestamp": 1745794800000, "value": 40.18180881076389}, {"timestamp": 1745798400000, "value": 40.11432834201389}, {"timestamp": 1745802000000, "value": 39.260579427083336}, {"timestamp": 1745805600000, "value": 38.108561197916664}, {"timestamp": 1745809200000, "value": 39.16357421875}, {"timestamp": 1745812800000, "value": 39.081217447916664}, {"timestamp": 1745816400000, "value": 39.6625}, {"timestamp": 1745820000000, "value": 39.49324001736111}, {"timestamp": 1745823600000, "value": 39.52846544053819}, {"timestamp": 1745827200000, "value": 39.79263661702474}, {"timestamp": 1745830800000, "value": 40.20095225742885}]"></canvas>
+                            
+                        </td>
+                        <td>
+                            <a href="https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038/#entity/HOST-B908FE27F579550F" target="_blank" class="external-link">
+                                <i class="fas fa-external-link-alt"></i>
+                                Dynatrace
+                            </a>
+                        </td>
+                    </tr>
+                    
+                    <tr data-status="healthy">
+                        <td>s02vl9919393.fr.net.intra</td>
+                        <td class="normal-usage">
+                            
+                            <div class="gauge-container">
+                                <canvas class="gauge" data-value="2" data-type="cpu"></canvas>
+                                <span>2</span>
+                            </div>
+                            
+                        </td>
+                        <td>
+                            
+                            <canvas class="mini-chart" data-history="[{"timestamp": 1745744400000, "value": 1.8548828125}, {"timestamp": 1745748000000, "value": 1.8854166666666667}, {"timestamp": 1745751600000, "value": 1.8761067708333334}, {"timestamp": 1745755200000, "value": 1.8899088541666667}, {"timestamp": 1745758800000, "value": 1.9178059895833333}, {"timestamp": 1745762400000, "value": 1.869943576388889}, {"timestamp": 1745766000000, "value": 1.885373263888889}, {"timestamp": 1745769600000, "value": 1.87705078125}, {"timestamp": 1745773200000, "value": 1.84609375}, {"timestamp": 1745776800000, "value": 1.8873697916666667}, {"timestamp": 1745780400000, "value": 1.8316948784722222}, {"timestamp": 1745784000000, "value": 1.8672526041666666}, {"timestamp": 1745787600000, "value": 1.85673828125}, {"timestamp": 1745791200000, "value": 1.8677842881944444}, {"timestamp": 1745794800000, "value": 1.9584526909722222}, {"timestamp": 1745798400000, "value": 1.8937065972222222}, {"timestamp": 1745802000000, "value": 1.8641276041666666}, {"timestamp": 1745805600000, "value": 1.9776258680555556}, {"timestamp": 1745809200000, "value": 1.8108723958333333}, {"timestamp": 1745812800000, "value": 1.8585394965277777}, {"timestamp": 1745816400000, "value": 2.1736762152777778}, {"timestamp": 1745820000000, "value": 1.8700846354166667}, {"timestamp": 1745823600000, "value": 2.1199971516927083}, {"timestamp": 1745827200000, "value": 2.0362314860026043}, {"timestamp": 1745830800000, "value": 1.9759272432875359}]"></canvas>
+                            
+                        </td>
+                        <td class="normal-usage">
+                            
+                            <div class="gauge-container">
+                                <canvas class="gauge" data-value="19" data-type="ram"></canvas>
+                                <span>19</span>
+                            </div>
+                            
+                        </td>
+                        <td>
+                            
+                            <canvas class="mini-chart" data-history="[{"timestamp": 1745744400000, "value": 19.407356770833335}, {"timestamp": 1745748000000, "value": 19.396234809027778}, {"timestamp": 1745751600000, "value": 19.331070963541666}, {"timestamp": 1745755200000, "value": 19.074397786458334}, {"timestamp": 1745758800000, "value": 19.123524305555556}, {"timestamp": 1745762400000, "value": 19.144053819444444}, {"timestamp": 1745766000000, "value": 19.19040256076389}, {"timestamp": 1745769600000, "value": 19.21820746527778}, {"timestamp": 1745773200000, "value": 19.200423177083334}, {"timestamp": 1745776800000, "value": 19.255729166666665}, {"timestamp": 1745780400000, "value": 19.254481336805554}, {"timestamp": 1745784000000, "value": 19.241682942708334}, {"timestamp": 1745787600000, "value": 19.251453993055556}, {"timestamp": 1745791200000, "value": 19.33689236111111}, {"timestamp": 1745794800000, "value": 19.443939887152776}, {"timestamp": 1745798400000, "value": 19.161707899305554}, {"timestamp": 1745802000000, "value": 19.23394097222222}, {"timestamp": 1745805600000, "value": 19.289420572916665}, {"timestamp": 1745809200000, "value": 19.3134765625}, {"timestamp": 1745812800000, "value": 19.327506510416665}, {"timestamp": 1745816400000, "value": 19.447661675347224}, {"timestamp": 1745820000000, "value": 19.682530381944446}, {"timestamp": 1745823600000, "value": 19.865949842664932}, {"timestamp": 1745827200000, "value": 19.954589335123696}, {"timestamp": 1745830800000, "value": 19.986478257453303}]"></canvas>
+                            
+                        </td>
+                        <td>
+                            <a href="https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038/#entity/HOST-BE429AD8F8938BE7" target="_blank" class="external-link">
+                                <i class="fas fa-external-link-alt"></i>
+                                Dynatrace
+                            </a>
+                        </td>
+                    </tr>
+                    
+                    <tr data-status="healthy">
+                        <td>s02vl9919392.fr.net.intra</td>
+                        <td class="normal-usage">
+                            
+                            <div class="gauge-container">
+                                <canvas class="gauge" data-value="2" data-type="cpu"></canvas>
+                                <span>2</span>
+                            </div>
+                            
+                        </td>
+                        <td>
+                            
+                            <canvas class="mini-chart" data-history="[{"timestamp": 1745744400000, "value": 1.835080295138889}, {"timestamp": 1745748000000, "value": 1.8402994791666667}, {"timestamp": 1745751600000, "value": 1.8520399305555555}, {"timestamp": 1745755200000, "value": 2.0019097222222224}, {"timestamp": 1745758800000, "value": 1.8948784722222223}, {"timestamp": 1745762400000, "value": 1.8465277777777778}, {"timestamp": 1745766000000, "value": 1.9017144097222223}, {"timestamp": 1745769600000, "value": 1.8327473958333333}, {"timestamp": 1745773200000, "value": 1.8526692708333334}, {"timestamp": 1745776800000, "value": 1.9111328125}, {"timestamp": 1745780400000, "value": 1.8655381944444445}, {"timestamp": 1745784000000, "value": 1.8894205729166667}, {"timestamp": 1745787600000, "value": 1.8519205729166666}, {"timestamp": 1745791200000, "value": 1.8713107638888888}, {"timestamp": 1745794800000, "value": 2.2069878472222224}, {"timestamp": 1745798400000, "value": 2.471929253472222}, {"timestamp": 1745802000000, "value": 1.9643229166666667}, {"timestamp": 1745805600000, "value": 1.9886827256944444}, {"timestamp": 1745809200000, "value": 1.9311631944444445}, {"timestamp": 1745812800000, "value": 1.9055989583333333}, {"timestamp": 1745816400000, "value": 1.927126736111111}, {"timestamp": 1745820000000, "value": 1.8842664930555555}, {"timestamp": 1745823600000, "value": 1.9774515787760416}, {"timestamp": 1745827200000, "value": 2.0107772827148436}, {"timestamp": 1745830800000, "value": 1.9358222347566452}]"></canvas>
+                            
+                        </td>
+                        <td class="normal-usage">
+                            
+                            <div class="gauge-container">
+                                <canvas class="gauge" data-value="17" data-type="ram"></canvas>
+                                <span>17</span>
+                            </div>
+                            
+                        </td>
+                        <td>
+                            
+                            <canvas class="mini-chart" data-history="[{"timestamp": 1745744400000, "value": 17.531754557291666}, {"timestamp": 1745748000000, "value": 17.521820746527776}, {"timestamp": 1745751600000, "value": 17.54833984375}, {"timestamp": 1745755200000, "value": 17.5810546875}, {"timestamp": 1745758800000, "value": 17.454090711805556}, {"timestamp": 1745762400000, "value": 17.551470269097223}, {"timestamp": 1745766000000, "value": 17.602875434027776}, {"timestamp": 1745769600000, "value": 17.636241319444444}, {"timestamp": 1745773200000, "value": 17.618538411458335}, {"timestamp": 1745776800000, "value": 17.627962239583333}, {"timestamp": 1745780400000, "value": 17.644102647569444}, {"timestamp": 1745784000000, "value": 17.66001519097222}, {"timestamp": 1745787600000, "value": 17.68877495659722}, {"timestamp": 1745791200000, "value": 17.758219401041668}, {"timestamp": 1745794800000, "value": 18.050081380208333}, {"timestamp": 1745798400000, "value": 17.33490668402778}, {"timestamp": 1745802000000, "value": 17.379210069444444}, {"timestamp": 1745805600000, "value": 17.455826822916666}, {"timestamp": 1745809200000, "value": 17.46809353298611}, {"timestamp": 1745812800000, "value": 17.42721896701389}, {"timestamp": 1745816400000, "value": 17.466395399305554}, {"timestamp": 1745820000000, "value": 17.54609375}, {"timestamp": 1745823600000, "value": 17.775070020887586}, {"timestamp": 1745827200000, "value": 17.916722530788846}, {"timestamp": 1745830800000, "value": 17.923968435704023}]"></canvas>
+                            
+                        </td>
+                        <td>
+                            <a href="https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038/#entity/HOST-C99506E3F03B5A49" target="_blank" class="external-link">
+                                <i class="fas fa-external-link-alt"></i>
+                                Dynatrace
+                            </a>
+                        </td>
+                    </tr>
+                    
+                </table>
+               
+                <div class="table-footer">
+                    <div class="pagination">
+                        <button class="pagination-btn" data-page="prev">
+                            <i class="fas fa-chevron-left"></i>
+                        </button>
+                        <button class="pagination-btn active" data-page="1">1</button>
+                        <button class="pagination-btn" data-page="2">2</button>
+                        <button class="pagination-btn" data-page="next">
+                            <i class="fas fa-chevron-right"></i>
+                        </button>
+                    </div>
+                    <div class="export-buttons">
+                        <button class="export-btn" id="exportCSV">
+                            <i class="fas fa-file-csv"></i>
+                            CSV
+                        </button>
+                        <button class="export-btn" id="exportPDF">
+                            <i class="fas fa-file-pdf"></i>
+                            PDF
+                        </button>
+                    </div>
+                </div>
+            </div>
+           
+            <!-- Section Services -->
+            <div id="services" class="section">
+                <div class="section-header">
+                    <h2 class="section-title">
+                        <i class="fas fa-code"></i>
+                        Services
+                    </h2>
+                    <div class="view-toggle">
+                        <div class="view-option active" data-view="table">
+                            <i class="fas fa-table"></i>
+                        </div>
+                        <div class="view-option" data-view="cards">
+                            <i class="fas fa-th-large"></i>
+                        </div>
+                    </div>
+                </div>
+               
+                <div class="note">
+                    Note: Les services sans données de métriques (N/A) sont probablement inactifs ou n'ont pas reçu de trafic durant la période analysée (dernières 24h).
+                </div>
+               
+                <table id="servicesTable">
+                    <tr>
+                        <th>Nom</th>
+                        <th>Technologie</th>
+                        <th>Temps de réponse (ms)</th>
+                        <th>Tendance</th>
+                        <th>Erreurs (%)</th>
+                        <th>Requêtes</th>
+                        <th>Actions</th>
+                    </tr>
+                    
+                    <tr class=""
+                        data-status="warning">
+                        <td>
+                            <div class="tooltip">
+                                <span class="status-indicator status-active"></span>
+                                default web request
+                                <div class="tooltip-content">
+                                    <strong>default web request</strong><br>
+                                    Status: Actif<br>
+                                    
+                                    Requêtes totales: 45905
+                                    
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="tech-badge">
+                                <i class="fas fa-code"></i>
+                                AKKA, JAVA, APACHE_HTTP_CLIENT_SYNC, SCALA, SCALA, PLAY, JAVA, AKKA
+                            </span>
+                        </td>
+                        <td>8214</td>
+                        <td>
+                            
+                            <canvas class="mini-chart" data-history="[{"timestamp": 1745744400000, "value": 8441.268020425963}, {"timestamp": 1745748000000, "value": 8715.283891933495}, {"timestamp": 1745751600000, "value": 8219.915703169649}, {"timestamp": 1745755200000, "value": 8205.878002766478}, {"timestamp": 1745758800000, "value": 8200.19093590373}, {"timestamp": 1745762400000, "value": 8190.097585524288}, {"timestamp": 1745766000000, "value": 8194.982715186201}, {"timestamp": 1745769600000, "value": 8186.591833714417}, {"timestamp": 1745773200000, "value": 8185.10358503944}, {"timestamp": 1745776800000, "value": 8223.57934540002}, {"timestamp": 1745780400000, "value": 8243.217661220611}, {"timestamp": 1745784000000, "value": 8247.697343826141}, {"timestamp": 1745787600000, "value": 8218.90171615018}, {"timestamp": 1745791200000, "value": 8237.801030023698}, {"timestamp": 1745794800000, "value": 8327.360459223102}, {"timestamp": 1745798400000, "value": 8430.59955207568}, {"timestamp": 1745802000000, "value": 8323.36637469864}, {"timestamp": 1745805600000, "value": 8302.054968561171}, {"timestamp": 1745809200000, "value": 8362.045031467036}, {"timestamp": 1745812800000, "value": 8268.650736869238}, {"timestamp": 1745816400000, "value": 8348.734294039446}, {"timestamp": 1745820000000, "value": 8530.106836714425}, {"timestamp": 1745823600000, "value": 8262.558613805777}, {"timestamp": 1745827200000, "value": 8250.788689994279}, {"timestamp": 1745830800000, "value": 8264.433104823796}]"></canvas>
+                            
+                        </td>
+                        <td class="error-medium">
+                            3.2
+                        </td>
+                        <td>45905</td>
+                        <td>
+                            <a href="https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038/#entity/SERVICE-2D01317F566DF562" target="_blank" class="external-link">
+                                <i class="fas fa-external-link-alt"></i>
+                                Dynatrace
+                            </a>
+                        </td>
+                    </tr>
+                    
+                    <tr class=""
+                        data-status="healthy">
+                        <td>
+                            <div class="tooltip">
+                                <span class="status-indicator status-active"></span>
+                                Requests executed in background threads of play.core.server.ProdServerStart
+                                <div class="tooltip-content">
+                                    <strong>Requests executed in background threads of play.core.server.ProdServerStart</strong><br>
+                                    Status: Actif<br>
+                                    
+                                    Requêtes totales: 92
+                                    
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="tech-badge">
+                                <i class="fas fa-coffee"></i>
+                                JAVA, AKKA, APACHE_HTTP_CLIENT_SYNC, SCALA, JAVA, PLAY, SCALA, AKKA
+                            </span>
+                        </td>
+                        <td>6095</td>
+                        <td>
+                            
+                            <canvas class="mini-chart" data-history="[{"timestamp": 1745744400000, "value": 5943.043557168784}, {"timestamp": 1745748000000, "value": 5854.117753623188}, {"timestamp": 1745751600000, "value": 6005.460144927536}, {"timestamp": 1745755200000, "value": 5941.348457350272}, {"timestamp": 1745758800000, "value": 6158.715579710145}, {"timestamp": 1745762400000, "value": 5815.422586520947}, {"timestamp": 1745766000000, "value": 6319.227272727273}, {"timestamp": 1745769600000, "value": 6064.766304347826}, {"timestamp": 1745773200000, "value": 5988.726449275362}, {"timestamp": 1745776800000, "value": 5992.474452554745}, {"timestamp": 1745780400000, "value": 6172.159709618874}, {"timestamp": 1745784000000, "value": 6778.918181818181}, {"timestamp": 1745787600000, "value": 7889.724637681159}, {"timestamp": 1745791200000, "value": 6204.217391304348}, {"timestamp": 1745794800000, "value": 6149.471014492754}, {"timestamp": 1745798400000, "value": 6088.326086956522}, {"timestamp": 1745802000000, "value": 6343.2450090744105}, {"timestamp": 1745805600000, "value": 6315.563405797101}, {"timestamp": 1745809200000, "value": 6222.550724637681}, {"timestamp": 1745812800000, "value": 6967.401088929219}, {"timestamp": 1745816400000, "value": 6460.576363636364}, {"timestamp": 1745820000000, "value": 6037.500910746812}, {"timestamp": 1745823600000, "value": 6224.355072463768}, {"timestamp": 1745827200000, "value": 6167.099637681159}, {"timestamp": 1745830800000, "value": 6265.789883268482}]"></canvas>
+                            
+                        </td>
+                        <td class="error-low">
+                            0
+                        </td>
+                        <td>92</td>
+                        <td>
+                            <a href="https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038/#entity/SERVICE-2F58DEF73FA7CCF4" target="_blank" class="external-link">
+                                <i class="fas fa-external-link-alt"></i>
+                                Dynatrace
+                            </a>
+                        </td>
+                    </tr>
+                    
+                    <tr class=""
+                        data-status="healthy">
+                        <td>
+                            <div class="tooltip">
+                                <span class="status-indicator status-active"></span>
+                                play.core.server.ProdServerStart on port 9000
+                                <div class="tooltip-content">
+                                    <strong>play.core.server.ProdServerStart on port 9000</strong><br>
+                                    Status: Actif<br>
+                                    
+                                    Aucune requête détectée
+                                    
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="tech-badge">
+                                <i class="fas fa-code"></i>
+                                SCALA, JAVA, APACHE_HTTP_CLIENT_SYNC, PLAY, JAVA, AKKA, AKKA, SCALA
+                            </span>
+                        </td>
+                        <td>N/A</td>
+                        <td>
+                            
+                            Pas de données
+                            
+                        </td>
+                        <td class="error-low">
+                            0
+                        </td>
+                        <td>N/A</td>
+                        <td>
+                            <a href="https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038/#entity/SERVICE-496776B729A5B7B0" target="_blank" class="external-link">
+                                <i class="fas fa-external-link-alt"></i>
+                                Dynatrace
+                            </a>
+                        </td>
+                    </tr>
+                    
+                    <tr class=""
+                        data-status="healthy">
+                        <td>
+                            <div class="tooltip">
+                                <span class="status-indicator status-active"></span>
+                                _:443
+                                <div class="tooltip-content">
+                                    <strong>_:443</strong><br>
+                                    Status: Actif<br>
+                                    
+                                    Requêtes totales: 1461
+                                    
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="tech-badge">
+                                <i class="fas fa-code"></i>
+                                NGINX, NGINX
+                            </span>
+                        </td>
+                        <td>1968</td>
+                        <td>
+                            
+                            <canvas class="mini-chart" data-history="[{"timestamp": 1745744400000, "value": 1927.8742643730195}, {"timestamp": 1745748000000, "value": 1977.609764347728}, {"timestamp": 1745751600000, "value": 1938.736343115124}, {"timestamp": 1745755200000, "value": 1968.9677163570457}, {"timestamp": 1745758800000, "value": 1915.8530174844896}, {"timestamp": 1745762400000, "value": 1904.3024307518372}, {"timestamp": 1745766000000, "value": 1930.6562747091382}, {"timestamp": 1745769600000, "value": 1919.6260604004071}, {"timestamp": 1745773200000, "value": 1916.019428442336}, {"timestamp": 1745776800000, "value": 1948.255052500847}, {"timestamp": 1745780400000, "value": 1991.6525864016264}, {"timestamp": 1745784000000, "value": 1984.5250820971578}, {"timestamp": 1745787600000, "value": 2036.310080144486}, {"timestamp": 1745791200000, "value": 2010.893609789259}, {"timestamp": 1745794800000, "value": 2052.6375664367297}, {"timestamp": 1745798400000, "value": 2024.4867975626269}, {"timestamp": 1745802000000, "value": 1954.3667953667953}, {"timestamp": 1745805600000, "value": 1985.0055286020536}, {"timestamp": 1745809200000, "value": 1981.4560234842497}, {"timestamp": 1745812800000, "value": 1929.766831794641}, {"timestamp": 1745816400000, "value": 2018.754691538375}, {"timestamp": 1745820000000, "value": 1928.6210645526614}, {"timestamp": 1745823600000, "value": 1849.7126634549209}, {"timestamp": 1745827200000, "value": 1791.7020911895784}, {"timestamp": 1745830800000, "value": 1850.0562440419446}]"></canvas>
+                            
+                        </td>
+                        <td class="error-low">
+                            0
+                        </td>
+                        <td>1461</td>
+                        <td>
+                            <a href="https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038/#entity/SERVICE-6780EE0BE3357605" target="_blank" class="external-link">
+                                <i class="fas fa-external-link-alt"></i>
+                                Dynatrace
+                            </a>
+                        </td>
+                    </tr>
+                    
+                    <tr class=""
+                        data-status="healthy">
+                        <td>
+                            <div class="tooltip">
+                                <span class="status-indicator status-active"></span>
+                                _:80
+                                <div class="tooltip-content">
+                                    <strong>_:80</strong><br>
+                                    Status: Actif<br>
+                                    
+                                    Requêtes totales: 47260
+                                    
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="tech-badge">
+                                <i class="fas fa-code"></i>
+                                NGINX, NGINX
+                            </span>
+                        </td>
+                        <td>12515</td>
+                        <td>
+                            
+                            <canvas class="mini-chart" data-history="[{"timestamp": 1745744400000, "value": 12910.065142482088}, {"timestamp": 1745748000000, "value": 18055.165035671882}, {"timestamp": 1745751600000, "value": 12509.324075523798}, {"timestamp": 1745755200000, "value": 12533.793261679875}, {"timestamp": 1745758800000, "value": 12740.031833182125}, {"timestamp": 1745762400000, "value": 12555.474565761297}, {"timestamp": 1745766000000, "value": 12558.708999898417}, {"timestamp": 1745769600000, "value": 12519.37368296224}, {"timestamp": 1745773200000, "value": 12508.646134533652}, {"timestamp": 1745776800000, "value": 12399.243629827004}, {"timestamp": 1745780400000, "value": 12542.175282147446}, {"timestamp": 1745784000000, "value": 12559.225715840354}, {"timestamp": 1745787600000, "value": 12603.788870080867}, {"timestamp": 1745791200000, "value": 12617.719946379726}, {"timestamp": 1745794800000, "value": 12698.570487290208}, {"timestamp": 1745798400000, "value": 12820.321373213557}, {"timestamp": 1745802000000, "value": 12592.858211594063}, {"timestamp": 1745805600000, "value": 12457.724693134569}, {"timestamp": 1745809200000, "value": 12513.866103699593}, {"timestamp": 1745812800000, "value": 12450.73693039712}, {"timestamp": 1745816400000, "value": 11929.864247934967}, {"timestamp": 1745820000000, "value": 12304.6936032969}, {"timestamp": 1745823600000, "value": 11765.198865349137}, {"timestamp": 1745827200000, "value": 11458.862819135806}, {"timestamp": 1745830800000, "value": 11406.604144873632}]"></canvas>
+                            
+                        </td>
+                        <td class="error-low">
+                            0
+                        </td>
+                        <td>47260</td>
+                        <td>
+                            <a href="https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038/#entity/SERVICE-F00F4E30AB27E39C" target="_blank" class="external-link">
+                                <i class="fas fa-external-link-alt"></i>
+                                Dynatrace
+                            </a>
+                        </td>
+                    </tr>
+                    
+                </table>
+               
+                <div class="table-footer">
+                    <div class="pagination">
+                        <button class="pagination-btn" data-page="prev">
+                            <i class="fas fa-chevron-left"></i>
+                        </button>
+                        <button class="pagination-btn active" data-page="1">1</button>
+                        <button class="pagination-btn" data-page="2">2</button>
+                        <button class="pagination-btn" data-page="next">
+                            <i class="fas fa-chevron-right"></i>
+                        </button>
+                    </div>
+                    <div class="export-buttons">
+                        <button class="export-btn" id="exportCSV">
+                            <i class="fas fa-file-csv"></i>
+                            CSV
+                        </button>
+                        <button class="export-btn" id="exportPDF">
+                            <i class="fas fa-file-pdf"></i>
+                            PDF
+                        </button>
+                    </div>
+                </div>
+            </div>
+           
+            <!-- Section Process Groups -->
+            <div id="processes" class="section">
+                <div class="section-header">
+                    <h2 class="section-title">
+                        <i class="fas fa-cubes"></i>
+                        Process Groups
+                    </h2>
+                </div>
+               
+                <table id="processesTable">
+                    <tr>
+                        <th>Nom</th>
+                        <th>Technologie</th>
+                        <th>Actions</th>
+                    </tr>
+                    
+                    <tr>
+                        <td>cybAgent</td>
+                        <td>
+                            <span class="tech-badge">
+                                <i class="fas fa-code"></i>
+                                CA Workload Agent
+                            </span>
+                        </td>
+                        <td>
+                            <a href="https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038/#entity/PROCESS_GROUP-00B1B2EC5A611D54" target="_blank" class="external-link">
+                                <i class="fas fa-external-link-alt"></i>
+                                Dynatrace
+                            </a>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>Linux System</td>
+                        <td>
+                            <span class="tech-badge">
+                                <i class="fas fa-code"></i>
+                                LINUX_SYSTEM
+                            </span>
+                        </td>
+                        <td>
+                            <a href="https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038/#entity/PROCESS_GROUP-02CF53EE0F1B323D" target="_blank" class="external-link">
+                                <i class="fas fa-external-link-alt"></i>
+                                Dynatrace
+                            </a>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>PRODSEC AP11564 Python Dynatrace OneAgent Extensions Controller </td>
+                        <td>
+                            <span class="tech-badge">
+                                <i class="fas fa-snake"></i>
+                                PYTHON, DYNATRACE
+                            </span>
+                        </td>
+                        <td>
+                            <a href="https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038/#entity/PROCESS_GROUP-046DD1C58E5D2484" target="_blank" class="external-link">
+                                <i class="fas fa-external-link-alt"></i>
+                                Dynatrace
+                            </a>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>gzip</td>
+                        <td>
+                            <span class="tech-badge">
+                                <i class="fas fa-code"></i>
+                                Non spécifié
+                            </span>
+                        </td>
+                        <td>
+                            <a href="https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038/#entity/PROCESS_GROUP-0686B3FCF5B4DAC5" target="_blank" class="external-link">
+                                <i class="fas fa-external-link-alt"></i>
+                                Dynatrace
+                            </a>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>seagent</td>
+                        <td>
+                            <span class="tech-badge">
+                                <i class="fas fa-code"></i>
+                                Non spécifié
+                            </span>
+                        </td>
+                        <td>
+                            <a href="https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038/#entity/PROCESS_GROUP-07D176C7F15041CC" target="_blank" class="external-link">
+                                <i class="fas fa-external-link-alt"></i>
+                                Dynatrace
+                            </a>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>[ILLUMIO] venAgentMonitor</td>
+                        <td>
+                            <span class="tech-badge">
+                                <i class="fas fa-code"></i>
+                                ILLUMIO, SQLITE
+                            </span>
+                        </td>
+                        <td>
+                            <a href="https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038/#entity/PROCESS_GROUP-0D4D611A039F98A0" target="_blank" class="external-link">
+                                <i class="fas fa-external-link-alt"></i>
+                                Dynatrace
+                            </a>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>mfetpd</td>
+                        <td>
+                            <span class="tech-badge">
+                                <i class="fas fa-code"></i>
+                                Non spécifié
+                            </span>
+                        </td>
+                        <td>
+                            <a href="https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038/#entity/PROCESS_GROUP-12591B6B4BA862E1" target="_blank" class="external-link">
+                                <i class="fas fa-external-link-alt"></i>
+                                Dynatrace
+                            </a>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>OneAgent Python</td>
+                        <td>
+                            <span class="tech-badge">
+                                <i class="fas fa-code"></i>
+                                DYNATRACE
+                            </span>
+                        </td>
+                        <td>
+                            <a href="https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038/#entity/PROCESS_GROUP-1D8A20A41E961BEC" target="_blank" class="external-link">
+                                <i class="fas fa-external-link-alt"></i>
+                                Dynatrace
+                            </a>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>gzip</td>
+                        <td>
+                            <span class="tech-badge">
+                                <i class="fas fa-code"></i>
+                                Non spécifié
+                            </span>
+                        </td>
+                        <td>
+                            <a href="https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038/#entity/PROCESS_GROUP-259EAA416CB9D3A9" target="_blank" class="external-link">
+                                <i class="fas fa-external-link-alt"></i>
+                                Dynatrace
+                            </a>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>OneAgent eBPF service discovery</td>
+                        <td>
+                            <span class="tech-badge">
+                                <i class="fas fa-code"></i>
+                                DYNATRACE
+                            </span>
+                        </td>
+                        <td>
+                            <a href="https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038/#entity/PROCESS_GROUP-27E0338ABE57591B" target="_blank" class="external-link">
+                                <i class="fas fa-external-link-alt"></i>
+                                Dynatrace
+                            </a>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>hardserver</td>
+                        <td>
+                            <span class="tech-badge">
+                                <i class="fas fa-code"></i>
+                                Non spécifié
+                            </span>
+                        </td>
+                        <td>
+                            <a href="https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038/#entity/PROCESS_GROUP-2911A75992D9D172" target="_blank" class="external-link">
+                                <i class="fas fa-external-link-alt"></i>
+                                Dynatrace
+                            </a>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>master</td>
+                        <td>
+                            <span class="tech-badge">
+                                <i class="fas fa-code"></i>
+                                Non spécifié
+                            </span>
+                        </td>
+                        <td>
+                            <a href="https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038/#entity/PROCESS_GROUP-2ADDFCF02D9F707A" target="_blank" class="external-link">
+                                <i class="fas fa-external-link-alt"></i>
+                                Dynatrace
+                            </a>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>masvc</td>
+                        <td>
+                            <span class="tech-badge">
+                                <i class="fas fa-code"></i>
+                                MCAFEE
+                            </span>
+                        </td>
+                        <td>
+                            <a href="https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038/#entity/PROCESS_GROUP-2E7266C6170945AB" target="_blank" class="external-link">
+                                <i class="fas fa-external-link-alt"></i>
+                                Dynatrace
+                            </a>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>selogrd</td>
+                        <td>
+                            <span class="tech-badge">
+                                <i class="fas fa-code"></i>
+                                eTAC
+                            </span>
+                        </td>
+                        <td>
+                            <a href="https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038/#entity/PROCESS_GROUP-3182CDFA646CD066" target="_blank" class="external-link">
+                                <i class="fas fa-external-link-alt"></i>
+                                Dynatrace
+                            </a>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>[ILLUMIO] venPlatformHandler</td>
+                        <td>
+                            <span class="tech-badge">
+                                <i class="fas fa-code"></i>
+                                ILLUMIO, SQLITE
+                            </span>
+                        </td>
+                        <td>
+                            <a href="https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038/#entity/PROCESS_GROUP-34B2902B6FE4F363" target="_blank" class="external-link">
+                                <i class="fas fa-external-link-alt"></i>
+                                Dynatrace
+                            </a>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>splunk_daemon</td>
+                        <td>
+                            <span class="tech-badge">
+                                <i class="fas fa-database"></i>
+                                SQLITE, SPLUNK
+                            </span>
+                        </td>
+                        <td>
+                            <a href="https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038/#entity/PROCESS_GROUP-34D1463563C291AD" target="_blank" class="external-link">
+                                <i class="fas fa-external-link-alt"></i>
+                                Dynatrace
+                            </a>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>OneAgent log analytics</td>
+                        <td>
+                            <span class="tech-badge">
+                                <i class="fas fa-code"></i>
+                                DYNATRACE
+                            </span>
+                        </td>
+                        <td>
+                            <a href="https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038/#entity/PROCESS_GROUP-55FC73CEDC4A4E85" target="_blank" class="external-link">
+                                <i class="fas fa-external-link-alt"></i>
+                                Dynatrace
+                            </a>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>TaniumClient</td>
+                        <td>
+                            <span class="tech-badge">
+                                <i class="fas fa-database"></i>
+                                SQLITE, Tanium
+                            </span>
+                        </td>
+                        <td>
+                            <a href="https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038/#entity/PROCESS_GROUP-5E4B47BF157D68AA" target="_blank" class="external-link">
+                                <i class="fas fa-external-link-alt"></i>
+                                Dynatrace
+                            </a>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>smtpd</td>
+                        <td>
+                            <span class="tech-badge">
+                                <i class="fas fa-code"></i>
+                                Non spécifié
+                            </span>
+                        </td>
+                        <td>
+                            <a href="https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038/#entity/PROCESS_GROUP-61127D9F02EA61B3" target="_blank" class="external-link">
+                                <i class="fas fa-external-link-alt"></i>
+                                Dynatrace
+                            </a>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>dsmcad</td>
+                        <td>
+                            <span class="tech-badge">
+                                <i class="fas fa-code"></i>
+                                Non spécifié
+                            </span>
+                        </td>
+                        <td>
+                            <a href="https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038/#entity/PROCESS_GROUP-61F918519FEBC5E2" target="_blank" class="external-link">
+                                <i class="fas fa-external-link-alt"></i>
+                                Dynatrace
+                            </a>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>OneAgent monitoring extensions</td>
+                        <td>
+                            <span class="tech-badge">
+                                <i class="fas fa-code"></i>
+                                DYNATRACE
+                            </span>
+                        </td>
+                        <td>
+                            <a href="https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038/#entity/PROCESS_GROUP-6D30D10E32C8FDF1" target="_blank" class="external-link">
+                                <i class="fas fa-external-link-alt"></i>
+                                Dynatrace
+                            </a>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>OneAgent system monitoring</td>
+                        <td>
+                            <span class="tech-badge">
+                                <i class="fas fa-code"></i>
+                                DYNATRACE
+                            </span>
+                        </td>
+                        <td>
+                            <a href="https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038/#entity/PROCESS_GROUP-7948953891626D91" target="_blank" class="external-link">
+                                <i class="fas fa-external-link-alt"></i>
+                                Dynatrace
+                            </a>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>nginx</td>
+                        <td>
+                            <span class="tech-badge">
+                                <i class="fas fa-code"></i>
+                                NGINX, NGINX
+                            </span>
+                        </td>
+                        <td>
+                            <a href="https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038/#entity/PROCESS_GROUP-856B8096444DBA49" target="_blank" class="external-link">
+                                <i class="fas fa-external-link-alt"></i>
+                                Dynatrace
+                            </a>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>PRODSEC AP11564 JAVA play.core.server.ProdServerStart</td>
+                        <td>
+                            <span class="tech-badge">
+                                <i class="fas fa-code"></i>
+                                APACHE_HTTP_CLIENT_SYNC, AKKA, SCALA, AKKA, SCALA, PLAY, JAVA, JAVA
+                            </span>
+                        </td>
+                        <td>
+                            <a href="https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038/#entity/PROCESS_GROUP-94B687D01E385CB4" target="_blank" class="external-link">
+                                <i class="fas fa-external-link-alt"></i>
+                                Dynatrace
+                            </a>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>systemd</td>
+                        <td>
+                            <span class="tech-badge">
+                                <i class="fas fa-code"></i>
+                                Non spécifié
+                            </span>
+                        </td>
+                        <td>
+                            <a href="https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038/#entity/PROCESS_GROUP-9B5067F34852FAA6" target="_blank" class="external-link">
+                                <i class="fas fa-external-link-alt"></i>
+                                Dynatrace
+                            </a>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>raserv</td>
+                        <td>
+                            <span class="tech-badge">
+                                <i class="fas fa-code"></i>
+                                Non spécifié
+                            </span>
+                        </td>
+                        <td>
+                            <a href="https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038/#entity/PROCESS_GROUP-9BC18AF1C93159C4" target="_blank" class="external-link">
+                                <i class="fas fa-external-link-alt"></i>
+                                Dynatrace
+                            </a>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>Short-lived processes</td>
+                        <td>
+                            <span class="tech-badge">
+                                <i class="fas fa-code"></i>
+                                Non spécifié
+                            </span>
+                        </td>
+                        <td>
+                            <a href="https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038/#entity/PROCESS_GROUP-9D0A2A04DAB09556" target="_blank" class="external-link">
+                                <i class="fas fa-external-link-alt"></i>
+                                Dynatrace
+                            </a>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>PRODSEC AP11564 JAVA cybermation.agent.CybAgentDriver</td>
+                        <td>
+                            <span class="tech-badge">
+                                <i class="fas fa-coffee"></i>
+                                JAVA, JAVA
+                            </span>
+                        </td>
+                        <td>
+                            <a href="https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038/#entity/PROCESS_GROUP-A2CFEB0FB4D08287" target="_blank" class="external-link">
+                                <i class="fas fa-external-link-alt"></i>
+                                Dynatrace
+                            </a>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>PRODSEC AP11564 JAVA org.joval.enterprise.utilities.Bootstrap</td>
+                        <td>
+                            <span class="tech-badge">
+                                <i class="fas fa-coffee"></i>
+                                JAVA, JAVA
+                            </span>
+                        </td>
+                        <td>
+                            <a href="https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038/#entity/PROCESS_GROUP-A8A9CC6E8CC85F17" target="_blank" class="external-link">
+                                <i class="fas fa-external-link-alt"></i>
+                                Dynatrace
+                            </a>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>OneAgent network monitoring</td>
+                        <td>
+                            <span class="tech-badge">
+                                <i class="fas fa-code"></i>
+                                DYNATRACE
+                            </span>
+                        </td>
+                        <td>
+                            <a href="https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038/#entity/PROCESS_GROUP-ADD2ADD5CC7CD49A" target="_blank" class="external-link">
+                                <i class="fas fa-external-link-alt"></i>
+                                Dynatrace
+                            </a>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>crond</td>
+                        <td>
+                            <span class="tech-badge">
+                                <i class="fas fa-code"></i>
+                                UNIX_BP2I
+                            </span>
+                        </td>
+                        <td>
+                            <a href="https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038/#entity/PROCESS_GROUP-B4F2CBC2E10221DA" target="_blank" class="external-link">
+                                <i class="fas fa-external-link-alt"></i>
+                                Dynatrace
+                            </a>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>macmnsvc</td>
+                        <td>
+                            <span class="tech-badge">
+                                <i class="fas fa-code"></i>
+                                MCAFEE
+                            </span>
+                        </td>
+                        <td>
+                            <a href="https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038/#entity/PROCESS_GROUP-B6325A56C7A8F2B9" target="_blank" class="external-link">
+                                <i class="fas fa-external-link-alt"></i>
+                                Dynatrace
+                            </a>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>PRODSEC AP11564 Go Dynatrace OneAgent Source StatsD</td>
+                        <td>
+                            <span class="tech-badge">
+                                <i class="fas fa-gopher"></i>
+                                GO, DYNATRACE
+                            </span>
+                        </td>
+                        <td>
+                            <a href="https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038/#entity/PROCESS_GROUP-B725775A7BA83B65" target="_blank" class="external-link">
+                                <i class="fas fa-external-link-alt"></i>
+                                Dynatrace
+                            </a>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>sssd</td>
+                        <td>
+                            <span class="tech-badge">
+                                <i class="fas fa-code"></i>
+                                LDAP
+                            </span>
+                        </td>
+                        <td>
+                            <a href="https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038/#entity/PROCESS_GROUP-BAC1E63D4426A012" target="_blank" class="external-link">
+                                <i class="fas fa-external-link-alt"></i>
+                                Dynatrace
+                            </a>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>rsyslogd</td>
+                        <td>
+                            <span class="tech-badge">
+                                <i class="fas fa-code"></i>
+                                UNIX_BP2I
+                            </span>
+                        </td>
+                        <td>
+                            <a href="https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038/#entity/PROCESS_GROUP-BE7DF26F94AB0D0C" target="_blank" class="external-link">
+                                <i class="fas fa-external-link-alt"></i>
+                                Dynatrace
+                            </a>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>bzip2</td>
+                        <td>
+                            <span class="tech-badge">
+                                <i class="fas fa-code"></i>
+                                Non spécifié
+                            </span>
+                        </td>
+                        <td>
+                            <a href="https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038/#entity/PROCESS_GROUP-C12BF6F5B713DD48" target="_blank" class="external-link">
+                                <i class="fas fa-external-link-alt"></i>
+                                Dynatrace
+                            </a>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>sshd</td>
+                        <td>
+                            <span class="tech-badge">
+                                <i class="fas fa-code"></i>
+                                UNIX_BP2I
+                            </span>
+                        </td>
+                        <td>
+                            <a href="https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038/#entity/PROCESS_GROUP-C46CF87AB10D457F" target="_blank" class="external-link">
+                                <i class="fas fa-external-link-alt"></i>
+                                Dynatrace
+                            </a>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>BESClient</td>
+                        <td>
+                            <span class="tech-badge">
+                                <i class="fas fa-database"></i>
+                                SQLITE, BIGFIX
+                            </span>
+                        </td>
+                        <td>
+                            <a href="https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038/#entity/PROCESS_GROUP-C53432CF96C5E272" target="_blank" class="external-link">
+                                <i class="fas fa-external-link-alt"></i>
+                                Dynatrace
+                            </a>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>seosd</td>
+                        <td>
+                            <span class="tech-badge">
+                                <i class="fas fa-code"></i>
+                                eTAC
+                            </span>
+                        </td>
+                        <td>
+                            <a href="https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038/#entity/PROCESS_GROUP-C955929C259FE7EF" target="_blank" class="external-link">
+                                <i class="fas fa-external-link-alt"></i>
+                                Dynatrace
+                            </a>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>vmtoolsd</td>
+                        <td>
+                            <span class="tech-badge">
+                                <i class="fas fa-code"></i>
+                                VMWARE_TOOL
+                            </span>
+                        </td>
+                        <td>
+                            <a href="https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038/#entity/PROCESS_GROUP-CD3DFB3ADDDE7937" target="_blank" class="external-link">
+                                <i class="fas fa-external-link-alt"></i>
+                                Dynatrace
+                            </a>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>chronyd</td>
+                        <td>
+                            <span class="tech-badge">
+                                <i class="fas fa-code"></i>
+                                UNIX_BP2I
+                            </span>
+                        </td>
+                        <td>
+                            <a href="https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038/#entity/PROCESS_GROUP-CEBD59C659BA68E3" target="_blank" class="external-link">
+                                <i class="fas fa-external-link-alt"></i>
+                                Dynatrace
+                            </a>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>sssd_be</td>
+                        <td>
+                            <span class="tech-badge">
+                                <i class="fas fa-code"></i>
+                                Non spécifié
+                            </span>
+                        </td>
+                        <td>
+                            <a href="https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038/#entity/PROCESS_GROUP-CFE9F7480E47C787" target="_blank" class="external-link">
+                                <i class="fas fa-external-link-alt"></i>
+                                Dynatrace
+                            </a>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>Mue_InUse</td>
+                        <td>
+                            <span class="tech-badge">
+                                <i class="fas fa-code"></i>
+                                Non spécifié
+                            </span>
+                        </td>
+                        <td>
+                            <a href="https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038/#entity/PROCESS_GROUP-D50DDCFD0ECB3410" target="_blank" class="external-link">
+                                <i class="fas fa-external-link-alt"></i>
+                                Dynatrace
+                            </a>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>[ILLUMIO] venAgentMgr</td>
+                        <td>
+                            <span class="tech-badge">
+                                <i class="fas fa-database"></i>
+                                SQLITE, ILLUMIO
+                            </span>
+                        </td>
+                        <td>
+                            <a href="https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038/#entity/PROCESS_GROUP-E4D1669DD9ABF3BF" target="_blank" class="external-link">
+                                <i class="fas fa-external-link-alt"></i>
+                                Dynatrace
+                            </a>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>PRODSEC AP11564 Go elastic-agent</td>
+                        <td>
+                            <span class="tech-badge">
+                                <i class="fas fa-gopher"></i>
+                                GO
+                            </span>
+                        </td>
+                        <td>
+                            <a href="https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038/#entity/PROCESS_GROUP-E78E4519BC619DA6" target="_blank" class="external-link">
+                                <i class="fas fa-external-link-alt"></i>
+                                Dynatrace
+                            </a>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>tuned</td>
+                        <td>
+                            <span class="tech-badge">
+                                <i class="fas fa-database"></i>
+                                SQLITE
+                            </span>
+                        </td>
+                        <td>
+                            <a href="https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038/#entity/PROCESS_GROUP-E8CD920E24787978" target="_blank" class="external-link">
+                                <i class="fas fa-external-link-alt"></i>
+                                Dynatrace
+                            </a>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>[ILLUMIO] venVtapServer</td>
+                        <td>
+                            <span class="tech-badge">
+                                <i class="fas fa-code"></i>
+                                ILLUMIO, SQLITE
+                            </span>
+                        </td>
+                        <td>
+                            <a href="https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038/#entity/PROCESS_GROUP-ED3E4F08C53E8F55" target="_blank" class="external-link">
+                                <i class="fas fa-external-link-alt"></i>
+                                Dynatrace
+                            </a>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>PRODSEC AP11564 Go filebeat</td>
+                        <td>
+                            <span class="tech-badge">
+                                <i class="fas fa-gopher"></i>
+                                GO
+                            </span>
+                        </td>
+                        <td>
+                            <a href="https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038/#entity/PROCESS_GROUP-FB98422698114695" target="_blank" class="external-link">
+                                <i class="fas fa-external-link-alt"></i>
+                                Dynatrace
+                            </a>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>snmpd</td>
+                        <td>
+                            <span class="tech-badge">
+                                <i class="fas fa-database"></i>
+                                SQLITE, UNIX_BP2I
+                            </span>
+                        </td>
+                        <td>
+                            <a href="https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038/#entity/PROCESS_GROUP-FCB86CA77E7EE1F6" target="_blank" class="external-link">
+                                <i class="fas fa-external-link-alt"></i>
+                                Dynatrace
+                            </a>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>dsmc</td>
+                        <td>
+                            <span class="tech-badge">
+                                <i class="fas fa-code"></i>
+                                Non spécifié
+                            </span>
+                        </td>
+                        <td>
+                            <a href="https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038/#entity/PROCESS_GROUP-FE81BCA345B65299" target="_blank" class="external-link">
+                                <i class="fas fa-external-link-alt"></i>
+                                Dynatrace
+                            </a>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>TaniumCX</td>
+                        <td>
+                            <span class="tech-badge">
+                                <i class="fas fa-database"></i>
+                                SQLITE
+                            </span>
+                        </td>
+                        <td>
+                            <a href="https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038/#entity/PROCESS_GROUP-FFB2FCB6D2DF315C" target="_blank" class="external-link">
+                                <i class="fas fa-external-link-alt"></i>
+                                Dynatrace
+                            </a>
+                        </td>
+                    </tr>
+                    
+                </table>
+               
+                <div class="table-footer">
+                    <div class="pagination">
+                        <button class="pagination-btn" data-page="prev">
+                            <i class="fas fa-chevron-left"></i>
+                        </button>
+                        <button class="pagination-btn active" data-page="1">1</button>
+                        <button class="pagination-btn" data-page="next">
+                            <i class="fas fa-chevron-right"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+       
+        <script>
+            // Initialisation des graphiques et visualisations
+            document.addEventListener('DOMContentLoaded', function() {
+                // Initialiser les mini-charts (sparklines)
+                initSparklines();
+               
+                // Initialiser les jauges
+                initGauges();
+               
+                // Initialiser les filtres et la recherche
+                initFilters();
+               
+                // Initialiser le thème
+                initTheme();
+               
+                // Initialiser la navigation
+                initNavigation();
+               
+                // Initialiser la pagination
+                initPagination();
+               
+                // Initialiser les boutons d'exportation
+                initExportButtons();
+            });
+           
+            // Fonction pour initialiser les mini-graphiques (sparklines)
+            function initSparklines() {
+                const miniCharts = document.querySelectorAll('.mini-chart');
+               
+                miniCharts.forEach(function(canvas) {
+                    const historyData = JSON.parse(canvas.getAttribute('data-history'));
+                    if (!historyData || historyData.length === 0) return;
+                   
+                    const ctx = canvas.getContext('2d');
+                    const values = historyData.map(item => item.value);
+                   
+                    // Créer un mini graphique linéaire
+                    new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: Array(values.length).fill(''),
+                            datasets: [{
+                                data: values,
+                                borderColor: '#0077cc',
+                                borderWidth: 1.5,
+                                fill: true,
+                                backgroundColor: 'rgba(0, 119, 204, 0.1)',
+                                pointRadius: 0,
+                                tension: 0.4
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    display: false
+                                },
+                                tooltip: {
+                                    enabled: false
+                                }
+                            },
+                            scales: {
+                                x: {
+                                    display: false
+                                },
+                                y: {
+                                    display: false,
+                                    min: 0,
+                                    suggestedMax: Math.max(...values) * 1.1
+                                }
+                            },
+                            animation: false
+                        }
+                    });
+                });
+            }
+           
+            // Fonction pour initialiser les jauges
+            function initGauges() {
+                const gauges = document.querySelectorAll('.gauge');
+               
+                gauges.forEach(function(canvas) {
+                    const value = parseInt(canvas.getAttribute('data-value'));
+                    const type = canvas.getAttribute('data-type');
+                    const ctx = canvas.getContext('2d');
+                   
+                    // Déterminer la couleur en fonction de la valeur
+                    let color;
+                    if (value > 80) {
+                        color = '#ff4d4d'; // rouge
+                    } else if (value > 60) {
+                        color = '#ffcc00'; // jaune
+                    } else {
+                        color = '#66ff66'; // vert
+                    }
+                   
+                    // Dessiner la jauge
+                    new Chart(ctx, {
+                        type: 'doughnut',
+                        data: {
+                            datasets: [{
+                                data: [value, 100 - value],
+                                backgroundColor: [color, 'rgba(255, 255, 255, 0.1)'],
+                                borderWidth: 0
+                            }]
+                        },
+                        options: {
+                            cutout: '70%',
+                            responsive: true,
+                            maintainAspectRatio: true,
+                            circumference: 270,
+                            rotation: -135,
+                            plugins: {
+                                legend: {
+                                    display: false
+                                },
+                                tooltip: {
+                                    enabled: false
+                                }
+                            },
+                            animation: false
+                        }
+                    });
+                   
+                    // Ajouter le texte au centre
+                    const gaugeValue = canvas.nextElementSibling;
+                    if (gaugeValue) {
+                        gaugeValue.textContent = value + '%';
+                        gaugeValue.style.color = color;
+                    }
+                });
+            }
+           
+            // Fonction pour initialiser les filtres et la recherche
+            function initFilters() {
+                const searchBox = document.getElementById('searchBox');
+                const filterButtons = document.querySelectorAll('.filter-button');
+               
+                // Gestionnaire pour la recherche
+                searchBox.addEventListener('input', function() {
+                    const searchText = this.value.toLowerCase();
+                    filterTables(searchText);
+                });
+               
+                // Gestionnaire pour les boutons de filtre
+                filterButtons.forEach(function(button) {
+                    button.addEventListener('click', function() {
+                        // Mettre à jour l'état actif
+                        filterButtons.forEach(btn => btn.classList.remove('active'));
+                        this.classList.add('active');
+                       
+                        // Appliquer le filtre
+                        const filterType = this.getAttribute('data-filter');
+                        filterTablesByStatus(filterType);
+                    });
+                });
+               
+                // Fonction pour filtrer les tableaux par texte
+                function filterTables(searchText) {
+                    const tables = [
+                        document.getElementById('hostsTable'),
+                        document.getElementById('servicesTable'),
+                        document.getElementById('processesTable')
+                    ];
+                   
+                    tables.forEach(function(table) {
+                        if (!table) return;
+                       
+                        const rows = table.querySelectorAll('tr');
+                       
+                        // Commencer à 1 pour ignorer l'en-tête
+                        for (let i = 1; i < rows.length; i++) {
+                            const row = rows[i];
+                            const text = row.textContent.toLowerCase();
+                           
+                            if (text.includes(searchText)) {
+                                row.style.display = '';
+                            } else {
+                                row.style.display = 'none';
+                            }
+                        }
+                    });
+                }
+               
+                // Fonction pour filtrer les tableaux par statut
+                function filterTablesByStatus(statusFilter) {
+                    const tables = [
+                        document.getElementById('hostsTable'),
+                        document.getElementById('servicesTable'),
+                        document.getElementById('processesTable')
+                    ];
+                   
+                    tables.forEach(function(table) {
+                        if (!table) return;
+                       
+                        const rows = table.querySelectorAll('tr');
+                       
+                        // Commencer à 1 pour ignorer l'en-tête
+                        for (let i = 1; i < rows.length; i++) {
+                            const row = rows[i];
+                            const rowStatus = row.getAttribute('data-status');
+                           
+                            if (statusFilter === 'all' || !rowStatus || rowStatus === statusFilter) {
+                                row.style.display = '';
+                            } else {
+                                row.style.display = 'none';
+                            }
+                        }
+                    });
+                }
+            }
+           
+            // Fonction pour initialiser le thème
+            function initTheme() {
+                const themeToggle = document.getElementById('themeToggle');
+                const root = document.documentElement;
+               
+                // Vérifier s'il y a un thème sauvegardé
+                const savedTheme = localStorage.getItem('dynatraceReportTheme');
+                if (savedTheme === 'light') {
+                    applyLightTheme();
+                }
+               
+                themeToggle.addEventListener('click', function() {
+                    const currentBg = getComputedStyle(root).getPropertyValue('--background-dark').trim();
+                   
+                    if (currentBg === '#1a1a1a') {
+                        applyLightTheme();
+                        localStorage.setItem('dynatraceReportTheme', 'light');
+                    } else {
+                        applyDarkTheme();
+                        localStorage.setItem('dynatraceReportTheme', 'dark');
+                    }
+                });
+               
+                function applyLightTheme() {
+                    root.style.setProperty('--background-dark', '#f8f9fa');
+                    root.style.setProperty('--background-medium', '#ffffff');
+                    root.style.setProperty('--background-light', '#f1f3f5');
+                    root.style.setProperty('--text-color', '#212529');
+                    root.style.setProperty('--border-color', '#dee2e6');
+                    themeToggle.innerHTML = '<i class="fas fa-sun"></i>';
+                }
+               
+                function applyDarkTheme() {
+                    root.style.setProperty('--background-dark', '#1a1a1a');
+                    root.style.setProperty('--background-medium', '#222');
+                    root.style.setProperty('--background-light', '#2a2a2a');
+                    root.style.setProperty('--text-color', '#fff');
+                    root.style.setProperty('--border-color', '#444');
+                    themeToggle.innerHTML = '<i class="fas fa-moon"></i>';
+                }
+            }
+           
+            // Fonction pour initialiser la navigation
+            function initNavigation() {
+                const navLinks = document.querySelectorAll('.nav-link');
+               
+                navLinks.forEach(function(link) {
+                    link.addEventListener('click', function(e) {
+                        e.preventDefault();
+                       
+                        // Mettre à jour l'état actif
+                        navLinks.forEach(l => l.classList.remove('active'));
+                        this.classList.add('active');
+                       
+                        // Faire défiler jusqu'à la section
+                        const targetId = this.getAttribute('href').substring(1);
+                        const targetElement = document.getElementById(targetId);
+                       
+                        if (targetElement) {
+                            // Offset pour tenir compte de l'en-tête fixe
+                            const headerHeight = document.querySelector('header').offsetHeight;
+                            const targetPosition = targetElement.getBoundingClientRect().top + window.pageYOffset - headerHeight;
+                           
+                            window.scrollTo({
+                                top: targetPosition,
+                                behavior: 'smooth'
+                            });
+                        }
+                    });
+                });
+               
+                // Mettre à jour la navigation active pendant le défilement
+                window.addEventListener('scroll', function() {
+                    const sections = [
+                        document.getElementById('summary'),
+                        document.getElementById('problems'),
+                        document.getElementById('hosts'),
+                        document.getElementById('services'),
+                        document.getElementById('processes')
+                    ];
+                   
+                    const headerHeight = document.querySelector('header').offsetHeight;
+                    const scrollPosition = window.scrollY + headerHeight + 10;
+                   
+                    let currentSection = null;
+                   
+                    sections.forEach(function(section) {
+                        if (!section) return;
+                       
+                        if (section.offsetTop <= scrollPosition &&
+                            section.offsetTop + section.offsetHeight > scrollPosition) {
+                            currentSection = section.id;
+                        }
+                    });
+                   
+                    if (currentSection) {
+                        navLinks.forEach(function(link) {
+                            link.classList.remove('active');
+                            if (link.getAttribute('href') === '#' + currentSection) {
+                                link.classList.add('active');
+                            }
+                        });
+                    }
+                });
+            }
+           
+            // Fonction pour initialiser la pagination
+            function initPagination() {
+                const tableIds = ['hostsTable', 'servicesTable', 'processesTable'];
+                const rowsPerPage = 10;
+               
+                tableIds.forEach(function(tableId) {
+                    const table = document.getElementById(tableId);
+                    if (!table) return;
+                   
+                    const rows = table.querySelectorAll('tr');
+                    if (rows.length <= rowsPerPage + 1) return; // +1 pour l'en-tête
+                   
+                    const totalPages = Math.ceil((rows.length - 1) / rowsPerPage);
+                    let currentPage = 1;
+                   
+                    // Obtenir les boutons de pagination pour cette table
+                    const paginationContainer = table.parentNode.querySelector('.pagination');
+                    if (!paginationContainer) return;
+                   
+                    const pageButtons = paginationContainer.querySelectorAll('[data-page]');
+                   
+                    // Mettre à jour la pagination
+                    updatePageButtons();
+                    showPage(1);
+                   
+                    // Ajouter des événements aux boutons
+                    pageButtons.forEach(function(button) {
+                        button.addEventListener('click', function() {
+                            const pageAction = this.getAttribute('data-page');
+                           
+                            if (pageAction === 'prev') {
+                                if (currentPage > 1) showPage(currentPage - 1);
+                            } else if (pageAction === 'next') {
+                                if (currentPage < totalPages) showPage(currentPage + 1);
+                            } else {
+                                const pageNum = parseInt(pageAction);
+                                if (!isNaN(pageNum)) showPage(pageNum);
+                            }
+                        });
+                    });
+                   
+                    // Fonction pour afficher une page spécifique
+                    function showPage(pageNum) {
+                        currentPage = pageNum;
+                       
+                        // Calculer les indices des lignes à afficher
+                        const start = (pageNum - 1) * rowsPerPage + 1; // +1 pour ignorer l'en-tête
+                        const end = Math.min(start + rowsPerPage - 1, rows.length - 1);
+                       
+                        // Masquer toutes les lignes de données
+                        for (let i = 1; i < rows.length; i++) {
+                            rows[i].style.display = 'none';
+                        }
+                       
+                        // Afficher les lignes de la page actuelle
+                        for (let i = start; i <= end; i++) {
+                            rows[i].style.display = '';
+                        }
+                       
+                        // Mettre à jour l'état des boutons
+                        updatePageButtons();
+                    }
+                   
+                    // Mise à jour des boutons de pagination
+                    function updatePageButtons() {
+                        pageButtons.forEach(function(button) {
+                            const pageAction = button.getAttribute('data-page');
+                           
+                            if (pageAction === 'prev') {
+                                button.disabled = currentPage <= 1;
+                            } else if (pageAction === 'next') {
+                                button.disabled = currentPage >= totalPages;
+                            } else {
+                                const pageNum = parseInt(pageAction);
+                                if (!isNaN(pageNum)) {
+                                    button.classList.toggle('active', pageNum === currentPage);
+                                   
+                                    // Mise à jour de la visibilité des boutons de page
+                                    if (totalPages <= 5) {
+                                        // Afficher tous les boutons si <= 5 pages
+                                        button.style.display = pageNum <= totalPages ? '' : 'none';
+                                    } else {
+                                        // Logique pour afficher un sous-ensemble de boutons
+                                        if (pageNum === 1 || pageNum === totalPages) {
+                                            button.style.display = '';
+                                        } else if (pageNum >= currentPage - 1 && pageNum <= currentPage + 1) {
+                                            button.style.display = '';
+                                        } else {
+                                            button.style.display = 'none';
+                                        }
+                                    }
+                                }
+                            }
+                        });
+                    }
+                });
+            }
+           
+            // Fonction pour initialiser les boutons d'exportation
+            function initExportButtons() {
+                const exportCSVButtons = document.querySelectorAll('#exportCSV');
+                const exportPDFButtons = document.querySelectorAll('#exportPDF');
+               
+                exportCSVButtons.forEach(function(button) {
+                    button.addEventListener('click', function() {
+                        // Trouver la table associée à ce bouton
+                        const tableContainer = this.closest('.section');
+                        if (!tableContainer) return;
+                       
+                        const table = tableContainer.querySelector('table');
+                        if (!table) return;
+                       
+                        exportTableToCSV(table, tableContainer.querySelector('.section-title').textContent.trim() + '.csv');
+                    });
+                });
+               
+                exportPDFButtons.forEach(function(button) {
+                    button.addEventListener('click', function() {
+                        alert('La fonctionnalité d'exportation PDF sera disponible dans une future mise à jour.');
+                    });
+                });
+               
+                // Fonction pour exporter une table au format CSV
+                function exportTableToCSV(table, filename) {
+                    const rows = table.querySelectorAll('tr');
+                    let csv = [];
+                   
+                    for (let i = 0; i < rows.length; i++) {
+                        const row = rows[i];
+                        const cols = row.querySelectorAll('td, th');
+                        let rowData = [];
+                       
+                        for (let j = 0; j < cols.length; j++) {
+                            // Récupérer le texte brut sans les éléments HTML internes
+                            let cellText = cols[j].innerText.trim();
+                           
+                            // Échapper les guillemets doubles
+                            cellText = cellText.replace(/"/g, '""');
+                           
+                            // Entourer de guillemets si nécessaire
+                            rowData.push('"' + cellText + '"');
+                        }
+                       
+                        csv.push(rowData.join(','));
+                    }
+                   
+                    // Créer un élément de lien pour télécharger
+                    const csvContent = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv.join('
+'));
+                    const link = document.createElement('a');
+                    link.setAttribute('href', csvContent);
+                    link.setAttribute('download', filename);
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                }
+            }
+           
+            // Fonctions utilitaires
+            function formatNumber(num) {
+                return num.toString().replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1 ');
+            }
+        </script>
+    </body>
+    </html>
+    
