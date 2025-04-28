@@ -21,6 +21,7 @@ export const ENDPOINTS = {
   MANAGEMENT_ZONES: '/management-zones',
   CURRENT_MANAGEMENT_ZONE: '/current-management-zone',
   SET_MANAGEMENT_ZONE: '/set-management-zone',
+  VITAL_FOR_GROUP_MZS: '/vital-for-group-mzs', // Nouvel endpoint
   
   // Endpoint de rafraîchissement du cache
   REFRESH_CACHE: (cacheType: string) => `/refresh/${cacheType}`
@@ -35,3 +36,4 @@ export const CACHE_TYPES = {
   SUMMARY: 'summary',
   MANAGEMENT_ZONES: 'management_zones'
 };
+

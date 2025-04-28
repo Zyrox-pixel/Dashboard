@@ -1,12 +1,12 @@
-import React from 'react';
-import { Shield, Loader, AlertOctagon, RefreshCw } from 'lucide-react';
+import React, { useEffect } from 'react';
+import { Shield, Loader, AlertOctagon, RefreshCw, Clock, BarChart } from 'lucide-react';
 import Layout from '../components/layout/Layout';
 import ProblemsList from '../components/dashboard/ProblemsList';
 import ManagementZoneList from '../components/dashboard/ManagementZoneList';
 import ZoneDetails from '../components/dashboard/ZoneDetails';
-import { useApp } from '../contexts/AppContext';
+import { useOptimizedApp } from '../contexts/OptimizedAppContext';
 
-const Dashboard: React.FC = () => {
+const OptimizedDashboard: React.FC = () => {
   const { 
     activeProblems,
     vitalForGroupMZs, 
@@ -21,8 +21,17 @@ const Dashboard: React.FC = () => {
     isLoading,
     error,
     backendConnected,
-    refreshData
-  } = useApp();
+    performanceMetrics,
+    refreshData,
+    loadAllData
+  } = useOptimizedApp();
+  
+  // Charger les données au montage du composant
+  useEffect(() => {
+    if (!isLoading.initialLoadComplete) {
+      loadAllData();
+    }
+  }, []);
   
   const handleZoneClick = (zoneId: string) => {
     setSelectedZone(zoneId);
@@ -40,10 +49,18 @@ const Dashboard: React.FC = () => {
   // Trouver la zone sélectionnée
   const currentZone = vitalForGroupMZs.find(zone => zone.id === selectedZone);
   
+  // Formatter le temps de chargement pour l'affichage
+  const formatLoadTime = (timeMs: number): string => {
+    if (timeMs < 1000) {
+      return `${timeMs.toFixed(0)} ms`;
+    }
+    return `${(timeMs / 1000).toFixed(2)} s`;
+  };
+  
   // Afficher un écran de chargement si le chargement initial n'est pas terminé
-  if (!isLoading.initialLoadComplete) {
+  if (!isLoading.initialLoadComplete || isLoading.dashboardData) {
     return (
-      <Layout title="Vital for Group">
+      <Layout title="Vital for Group (Optimisé)">
         <div className="flex flex-col items-center justify-center h-64">
           <div className="w-16 h-16 border-t-4 border-b-4 border-indigo-500 rounded-full animate-spin mb-4"></div>
           <p className="text-xl text-slate-400">Chargement des données...</p>
@@ -55,7 +72,7 @@ const Dashboard: React.FC = () => {
   // Afficher un message d'erreur si le backend n'est pas connecté
   if (!backendConnected) {
     return (
-      <Layout title="Vital for Group">
+      <Layout title="Vital for Group (Optimisé)">
         <div className="flex flex-col items-center justify-center h-64 p-10 mt-20 bg-red-50 border border-red-200 rounded-lg dark:bg-red-900/20 dark:border-red-800">
           <AlertOctagon className="w-16 h-16 text-red-500 mb-4" />
           <p className="text-xl text-red-600 dark:text-red-400 mb-4">Le serveur backend n'est pas accessible</p>
@@ -63,7 +80,7 @@ const Dashboard: React.FC = () => {
             Impossible de se connecter au serveur. Vérifiez que le backend est démarré et que votre connexion est active.
           </p>
           <button 
-            onClick={refreshData}
+            onClick={() => refreshData()}
             className="px-6 py-3 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 flex items-center gap-2"
           >
             <RefreshCw size={18} />
@@ -77,13 +94,13 @@ const Dashboard: React.FC = () => {
   // Afficher un message d'erreur générale si nécessaire
   if (error) {
     return (
-      <Layout title="Vital for Group">
+      <Layout title="Vital for Group (Optimisé)">
         <div className="flex flex-col items-center justify-center h-64 p-10 mt-20 bg-red-50 border border-red-200 rounded-lg dark:bg-red-900/20 dark:border-red-800">
           <AlertOctagon className="w-16 h-16 text-red-500 mb-4" />
           <p className="text-xl text-red-600 dark:text-red-400 mb-4">Une erreur est survenue</p>
           <p className="text-slate-600 dark:text-slate-300 mb-8 text-center max-w-lg">{error}</p>
           <button 
-            onClick={refreshData}
+            onClick={() => refreshData()}
             className="px-6 py-3 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 flex items-center gap-2"
           >
             <RefreshCw size={18} />
@@ -97,7 +114,7 @@ const Dashboard: React.FC = () => {
   // Si aucune MZ n'est trouvée après le chargement
   if (vitalForGroupMZs.length === 0 && !isLoading.vitalForGroupMZs) {
     return (
-      <Layout title="Vital for Group">
+      <Layout title="Vital for Group (Optimisé)">
         <div className="flex flex-col items-center justify-center h-64 p-10 mt-20 bg-blue-50 border border-blue-200 rounded-lg dark:bg-blue-900/20 dark:border-blue-800">
           <Shield className="w-16 h-16 text-blue-500 mb-4" />
           <p className="text-xl text-blue-600 dark:text-blue-400 mb-4">Aucune Management Zone trouvée</p>
@@ -105,7 +122,7 @@ const Dashboard: React.FC = () => {
             Aucune Management Zone pour Vital for Group n'a été trouvée. Vérifiez votre configuration.
           </p>
           <button 
-            onClick={refreshData}
+            onClick={() => refreshData()}
             className="px-6 py-3 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 flex items-center gap-2"
           >
             <RefreshCw size={18} />
@@ -119,9 +136,44 @@ const Dashboard: React.FC = () => {
   // L'affichage normal commence ici
   return (
     <Layout
-      title="Vital for Group"
+      title="Vital for Group (Optimisé)"
       subtitle={currentZone?.name}
     >
+      {/* Section des métriques de performance */}
+      <div className="mb-6 p-4 bg-green-500/10 border border-green-200 rounded-lg dark:bg-green-900/20 dark:border-green-800">
+        <div className="flex items-start gap-4">
+          <BarChart className="text-green-500 mt-1" size={24} />
+          <div className="flex-1">
+            <h2 className="text-lg font-semibold text-green-600 dark:text-green-400 mb-1">Optimisation des performances</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
+              <div>
+                <p className="text-slate-600 dark:text-slate-300 flex items-center">
+                  <Clock className="mr-2 text-green-500" size={16} />
+                  Temps de chargement: <span className="ml-2 font-semibold text-green-600 dark:text-green-400">{formatLoadTime(performanceMetrics.loadTime)}</span>
+                </p>
+              </div>
+              <div>
+                <p className="text-slate-600 dark:text-slate-300">
+                  Dernier rafraîchissement: <span className="ml-2 font-semibold">{performanceMetrics.lastRefresh.toLocaleTimeString()}</span>
+                </p>
+              </div>
+              <div>
+                <p className="text-slate-600 dark:text-slate-300">
+                  Entities: <span className="ml-2 font-semibold">{performanceMetrics.dataSizes.services + performanceMetrics.dataSizes.hosts} total</span>
+                </p>
+              </div>
+            </div>
+          </div>
+          <button 
+            onClick={() => refreshData()}
+            className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 flex items-center gap-2 ml-auto"
+          >
+            <RefreshCw size={16} />
+            <span>Rafraîchir</span>
+          </button>
+        </div>
+      </div>
+    
       {isLoading.vitalForGroupMZs || isLoading.problems ? (
         <div className="flex justify-center items-center h-64">
           <Loader className="w-10 h-10 text-indigo-500 animate-spin" />
@@ -148,7 +200,7 @@ const Dashboard: React.FC = () => {
               <div>
                 <h2 className="text-lg font-semibold text-blue-600 dark:text-blue-400 mb-1">Vital for Group</h2>
                 <p className="text-slate-600 dark:text-slate-300">
-                  Supervision des applications critiques du groupe.
+                  Supervision des applications critiques du groupe avec performance optimisée.
                 </p>
               </div>
             </div>
@@ -213,4 +265,4 @@ const Dashboard: React.FC = () => {
   );
 };
 
-export default Dashboard;
+export default OptimizedDashboard;

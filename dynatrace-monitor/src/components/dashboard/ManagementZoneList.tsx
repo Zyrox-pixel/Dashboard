@@ -84,17 +84,17 @@ const ManagementZoneList: React.FC<ManagementZoneListProps> = ({ zones, onZoneCl
               <ChevronLeft size={14} />
             </button>
             
-            {[...Array(totalPages)].map((_, idx) => (
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
               <button
-                key={idx}
-                onClick={() => handlePageChange(idx + 1)}
+                key={pageNum}
+                onClick={() => handlePageChange(pageNum)}
                 className={`w-8 h-8 flex items-center justify-center rounded text-sm ${
-                  currentPage === idx + 1
+                  currentPage === pageNum
                     ? 'bg-indigo-600 text-white'
                     : 'text-slate-400 hover:bg-slate-700'
                 }`}
               >
-                {idx + 1}
+                {pageNum}
               </button>
             ))}
             
