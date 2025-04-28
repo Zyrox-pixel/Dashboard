@@ -66,12 +66,17 @@ def get_vital_for_group_mzs_endpoint():
         # Récupérer directement la liste depuis la variable d'environnement
         vfg_mz_string = os.environ.get('VFG_MZ_LIST', '')
         
+        # Logging pour debug
+        logger.info(f"VFG_MZ_LIST from .env: {vfg_mz_string}")
+        
         # Si la variable n'est pas définie, retourner une liste vide
         if not vfg_mz_string:
+            logger.warning("VFG_MZ_LIST is empty or not defined in .env file")
             return jsonify({'mzs': [], 'source': 'env_file'})
         
         # Diviser la chaîne en liste de MZs
         vfg_mzs = [mz.strip() for mz in vfg_mz_string.split(',')]
+        logger.info(f"Parsed MZs: {vfg_mzs}")
         
         # Format de réponse simple
         return jsonify({
@@ -80,8 +85,13 @@ def get_vital_for_group_mzs_endpoint():
         })
     except Exception as e:
         logger.error(f"Erreur lors de la récupération des MZs Vital for Group: {e}")
-        return jsonify({'error': str(e)}), 500
-
+        # Retourner une réponse même en cas d'erreur
+        return jsonify({
+            'mzs': [],
+            'source': 'env_file',
+            'error': str(e)
+        }), 500
+        
 # Fonction pour récupérer la Management Zone actuelle
 def get_current_mz():
     # Récupérer la MZ depuis le fichier
