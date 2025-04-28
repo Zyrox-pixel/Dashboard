@@ -35,7 +35,7 @@ const OptimizedDashboard: React.FC = () => {
   
   const handleZoneClick = (zoneId: string) => {
     setSelectedZone(zoneId);
-    setActiveTab('process-groups');
+    setActiveTab('hosts'); // Changé de 'process-groups' à 'hosts'
   };
   
   const handleBackClick = () => {

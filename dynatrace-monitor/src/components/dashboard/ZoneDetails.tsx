@@ -135,6 +135,7 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
       name: host.name,
       cpu: host.cpu,
       ram: host.ram,
+      os_version: host.os_version || "Non spécifié",
       dt_url: host.dt_url
     }));
   };
@@ -308,6 +309,29 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
       key: 'name',
       label: 'Nom',
       cellClassName: 'font-medium text-sm',
+    },
+    {
+      key: 'os_version',
+      label: (
+        <div className="flex items-center cursor-pointer" onClick={() => requestSort('os_version')}>
+          Système d'exploitation
+          {sortConfig.key === 'os_version' && (
+            <span className="ml-1">
+              {sortConfig.direction === 'ascending' ? (
+                <ArrowUp size={14} />
+              ) : sortConfig.direction === 'descending' ? (
+                <ArrowDown size={14} />
+              ) : null}
+            </span>
+          )}
+        </div>
+      ),
+      cellClassName: 'text-sm',
+      render: (host: Host) => (
+        <span>
+          {host.os_version || 'Non spécifié'}
+        </span>
+      ),
     },
     {
       key: 'cpu',

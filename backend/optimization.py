@@ -652,10 +652,10 @@ class OptimizedAPIClient:
         return service_metrics
 
     def get_hosts_metrics_parallel(self, host_ids, from_time, to_time):
-        """
-        Récupère les métriques pour plusieurs hôtes en parallèle - CORRIGÉ
-        
-        Args:
+    """
+    Récupère les métriques pour plusieurs hôtes en parallèle - CORRIGÉ
+    
+    Args:
             host_ids (list): Liste des IDs d'hôtes
             from_time (int): Timestamp de début
             to_time (int): Timestamp de fin
@@ -832,12 +832,41 @@ class OptimizedAPIClient:
                                     'value': values[i]
                                 })
             
+            # Extraire la version de l'OS des propriétés de l'hôte
+            os_version = "Non spécifié"
+            if host_details and 'properties' in host_details:
+                properties = host_details.get('properties', {})
+                
+                # Vérifier différentes propriétés possibles pour l'OS
+                if 'osType' in properties:
+                    os_type = properties.get('osType', "")
+                    os_version = os_type
+                    
+                    # Ajouter la version si disponible
+                    if 'osVersion' in properties:
+                        os_version = f"{os_type} {properties.get('osVersion', '')}"
+                elif 'kernelVersion' in properties:
+                    os_version = f"Kernel {properties.get('kernelVersion', '')}"
+                    
+                    # Si osVersion est également disponible
+                    if 'osVersion' in properties:
+                        os_version = f"{properties.get('osVersion', '')} (Kernel {properties.get('kernelVersion', '')})"
+                
+                # Si aucune propriété spécifique n'est trouvée, chercher dans les tags
+                if os_version == "Non spécifié" and 'tags' in host_details:
+                    for tag in host_details.get('tags', []):
+                        # Chercher les tags liés à l'OS
+                        if tag.get('key') in ['OS', 'os', 'Operating System', 'system']:
+                            os_version = tag.get('value', "Non spécifié")
+                            break
+            
             # Créer l'objet de métriques d'hôte
             host_metrics.append({
                 'id': host_id,
                 'name': host_details.get('displayName', 'Unknown') if host_details else 'Unknown',
                 'cpu': cpu_usage,
                 'ram': ram_usage,
+                'os_version': os_version,  # Ajout de la version de l'OS
                 'dt_url': f"{self.env_url}/#entity/{host_id}",
                 'cpu_history': cpu_history,
                 'ram_history': ram_history
