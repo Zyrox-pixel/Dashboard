@@ -199,7 +199,6 @@ export const OptimizedAppProvider: React.FC<OptimizedAppProviderProps> = ({ chil
           
           if (Array.isArray(processData) && processData.length > 0) {
             // Transformer les données pour le frontend
-            // Correction: ajouter l'ID manquant dans le mapping
             const processGroups: ProcessGroup[] = processData.map((process: ProcessResponse) => {
               // Créer l'icône en fonction du type de technologie
               let icon = <></>;
@@ -216,7 +215,7 @@ export const OptimizedAppProvider: React.FC<OptimizedAppProviderProps> = ({ chil
               }
               
               return {
-                id: process.id || `proc-${Math.random().toString(36).substring(2, 9)}`, // Ajout de l'ID manquant
+                id: process.id || `proc-${Math.random().toString(36).substring(2, 9)}`,
                 name: process.name || "Processus inconnu",
                 technology: process.technology || "Non spécifié",
                 icon: icon,
@@ -310,29 +309,28 @@ export const OptimizedAppProvider: React.FC<OptimizedAppProviderProps> = ({ chil
         return;
       }
       
-      // Récupérer le résumé et les problèmes en parallèle
       // Récupérer uniquement les MZ VFG depuis le fichier .env (via le backend)
-    try {
+      try {
         // Nous récupérons directement les VFG du backend sans passer par l'API Dynatrace
         const vitalForGroupResponse = await optimizedApiMethods.getVitalForGroupMZs();
         
         if (!vitalForGroupResponse.error && vitalForGroupResponse.data) {
-        const vfgData = vitalForGroupResponse.data as VitalForGroupMZsResponse;
-        if (vfgData.mzs && Array.isArray(vfgData.mzs) && vfgData.mzs.length > 0) {
+          const vfgData = vitalForGroupResponse.data as VitalForGroupMZsResponse;
+          if (vfgData.mzs && Array.isArray(vfgData.mzs) && vfgData.mzs.length > 0) {
             // Créer directement les MZ à partir des noms du fichier .env
             const vfgMZs: ManagementZone[] = vfgData.mzs.map(mzName => ({
-            id: `env-${mzName.replace(/\s+/g, '-')}`,
-            name: mzName,
-            code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
-            icon: getZoneIcon(mzName),
-            problemCount: 0,
-            apps: 0,
-            services: 0,
-            hosts: 0,
-            availability: "100%",
-            status: "healthy" as "healthy" | "warning",
-            color: getZoneColor(mzName),
-            dt_url: "#"
+              id: `env-${mzName.replace(/\s+/g, '-')}`,
+              name: mzName,
+              code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
+              icon: getZoneIcon(mzName),
+              problemCount: 0,
+              apps: 0,
+              services: 0,
+              hosts: 0,
+              availability: "100%",
+              status: "healthy" as "healthy" | "warning",
+              color: getZoneColor(mzName),
+              dt_url: "#"
             }));
             
             // Définir les MZ VFG
@@ -340,12 +338,12 @@ export const OptimizedAppProvider: React.FC<OptimizedAppProviderProps> = ({ chil
             
             // Pour compatibilité, utiliser aussi ces MZ comme liste complète
             setManagementZones(vfgMZs);
+          }
         }
-        }
-    } catch (error) {
+      } catch (error) {
         console.error('Erreur lors de la récupération des MZs VFG:', error);
         // Ne pas afficher d'erreur critique - nous continuons avec les MZ du .env
-    }
+      }
       
       // Si une zone est sélectionnée, charger ses données détaillées
       if (selectedZone) {

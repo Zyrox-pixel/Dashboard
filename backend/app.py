@@ -91,7 +91,7 @@ def get_vital_for_group_mzs_endpoint():
             'source': 'env_file',
             'error': str(e)
         }), 500
-        
+
 # Fonction pour récupérer la Management Zone actuelle
 def get_current_mz():
     # Récupérer la MZ depuis le fichier
@@ -346,6 +346,9 @@ def get_problems():
         logger.error(f"Erreur lors de la récupération des problèmes: {e}")
         return {'error': str(e)}
 
+# Modifiez la fonction get_management_zones() dans app.py pour ajouter une récupération de secours
+# Cherchez cette fonction et remplacez-la par le code suivant:
+
 @app.route('/api/management-zones', methods=['GET'])
 @cached('management_zones')
 @time_execution
@@ -353,7 +356,25 @@ def get_management_zones():
     try:
         logger.info("Récupération des management zones...")
         
-        # Essayer l'ancienne API v1 qui est plus rapide pour ce cas
+        # MODIFICATION : D'abord essayer de récupérer les MZ VFG
+        vfg_mz_string = os.environ.get('VFG_MZ_LIST', '')
+        if vfg_mz_string:
+            mzs_from_env = [mz.strip() for mz in vfg_mz_string.split(',')]
+            logger.info(f"Utilisation des MZ depuis le fichier .env: {mzs_from_env}")
+            
+            # Créer les objets de management zone directement
+            management_zones = []
+            for i, mz_name in enumerate(mzs_from_env):
+                management_zones.append({
+                    'id': f"env-{i}",
+                    'name': mz_name,
+                    'dt_url': f"{DT_ENV_URL}/#settings/managementzones"
+                })
+            
+            logger.info(f"Trouvé {len(management_zones)} management zones depuis le fichier .env")
+            return management_zones
+        
+        # Sinon, essayer l'API Dynatrace
         url = f"{DT_ENV_URL}/api/config/v1/managementZones"
         headers = {
             'Authorization': f'Api-Token {API_TOKEN}',
@@ -362,8 +383,6 @@ def get_management_zones():
         response = requests.get(url, headers=headers, verify=False)
         response.raise_for_status()
         mz_data = response.json()
-        
-        logger.debug(f"Réponse API: {json.dumps(mz_data, indent=2)}")
         
         management_zones = []
         
@@ -379,6 +398,26 @@ def get_management_zones():
         return management_zones
     except Exception as e:
         logger.error(f"Erreur lors de la récupération des management zones: {e}")
+        
+        # MODIFICATION : En cas d'erreur, toujours essayer d'utiliser les MZ du fichier .env
+        try:
+            vfg_mz_string = os.environ.get('VFG_MZ_LIST', '')
+            if vfg_mz_string:
+                mzs_from_env = [mz.strip() for mz in vfg_mz_string.split(',')]
+                logger.info(f"Fallback: Utilisation des MZ depuis .env: {mzs_from_env}")
+                
+                management_zones = []
+                for i, mz_name in enumerate(mzs_from_env):
+                    management_zones.append({
+                        'id': f"env-{i}",
+                        'name': mz_name,
+                        'dt_url': "#"
+                    })
+                
+                return management_zones
+        except Exception as fallback_error:
+            logger.error(f"Erreur lors du fallback sur .env: {fallback_error}")
+        
         return {'error': str(e)}
 
 @app.route('/api/status', methods=['GET'])
