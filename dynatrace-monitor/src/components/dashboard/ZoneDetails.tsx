@@ -352,13 +352,13 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
       cellClassName: 'text-sm',
       render: (host: Host) => (
         <span className={`${
-          host.cpu ? 
+          host.cpu !== null ? 
             (host.cpu > 80 ? 'text-red-500' : 
             host.cpu > 60 ? 'text-yellow-500' : 
             'text-green-500') : 
             'text-slate-400'
         }`}>
-          {host.cpu ? `${host.cpu}%` : 'N/A'}
+          {host.cpu !== null ? `${host.cpu}%` : 'N/A'}
         </span>
       ),
     },
@@ -381,13 +381,13 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
       cellClassName: 'text-sm',
       render: (host: Host) => (
         <span className={`${
-          host.ram ? 
+          host.ram !== null ? 
             (host.ram > 80 ? 'text-red-500' : 
             host.ram > 60 ? 'text-yellow-500' : 
             'text-green-500') : 
             'text-slate-400'
         }`}>
-          {host.ram ? `${host.ram}%` : 'N/A'}
+          {host.ram !== null ? `${host.ram}%` : 'N/A'}
         </span>
       ),
     },

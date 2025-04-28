@@ -918,7 +918,7 @@ class OptimizedAPIClient:
                 if 'data' in result and result['data']:
                     values = result['data'][0].get('values', [])
                     if values and values[0] is not None:
-                        cpu_usage = int(values[0])
+                        cpu_usage = round(values[0], 1)
             
             # Traitement des données RAM
             if ram_data and 'result' in ram_data and ram_data['result']:
@@ -926,7 +926,7 @@ class OptimizedAPIClient:
                 if 'data' in result and result['data']:
                     values = result['data'][0].get('values', [])
                     if values and values[0] is not None:
-                        ram_usage = int(values[0])
+                        ram_usage = round(values[0], 1)
             
             # Traiter les historiques (uniquement si disponible dans le dictionnaire)
             cpu_history = []
@@ -1277,7 +1277,7 @@ class OptimizedAPIClient:
                             total_cpu += cpu_usage
                             valid_cpu_count += 1
             
-            avg_cpu = round(total_cpu / valid_cpu_count) if valid_cpu_count > 0 else 0
+            avg_cpu = round(total_cpu / valid_cpu_count, 1) if valid_cpu_count > 0 else 0
             
             # Pour les services, ne prendre que les MAX_METRICS_ENTITIES premiers
             service_entities = services_data.get('entities', [])[:max_metrics_entities]
