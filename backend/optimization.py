@@ -1,29 +1,36 @@
-"""
-Module d'optimisation des requêtes API Dynatrace - CORRIGÉ
-Ce module fournit des fonctions pour améliorer les performances des requêtes API
-en utilisant des techniques comme les requêtes parallèles et la mise en cache intelligente.
-"""
-import asyncio
-import time
-import concurrent.futures
-import threading
-import requests
-import urllib3
-from functools import wraps
-from datetime import datetime, timedelta
-import logging
+# 1. Ajouter ces variables au fichier backend/.env
+MAX_WORKERS=20
+MAX_CONNECTIONS=50
+REQUEST_CHUNK_SIZE=15
+CACHE_DURATION=300  # Vérifiez que cette variable existe déjà
 
-# Configuration du logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
+# 2. Modifications dans backend/app.py
+# Modifier l'initialisation du client API (chercher la section qui initialise api_client)
 
-# Désactiver les avertissements SSL si nécessaire
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+# Récupérer les variables d'environnement
+DT_ENV_URL = os.environ.get('DT_ENV_URL')
+API_TOKEN = os.environ.get('API_TOKEN')
+CACHE_DURATION = int(os.environ.get('CACHE_DURATION', 300))  # 5 minutes en secondes
+MAX_WORKERS = int(os.environ.get('MAX_WORKERS', 20))  # Valeur par défaut augmentée
+MAX_CONNECTIONS = int(os.environ.get('MAX_CONNECTIONS', 50))  # Nouvelle variable
+
+# Initialiser le client API optimisé avec plus de workers et connexions
+api_client = OptimizedAPIClient(
+    env_url=DT_ENV_URL,
+    api_token=API_TOKEN,
+    verify_ssl=os.environ.get('VERIFY_SSL', 'False').lower() in ('true', '1', 't'),
+    max_workers=MAX_WORKERS,
+    max_connections=MAX_CONNECTIONS,  # Ajouter ce paramètre
+    cache_duration=CACHE_DURATION
+)
+
+# 3. Modifications dans backend/optimization.py
+# Remplacer la classe OptimizedAPIClient par cette version améliorée
 
 class OptimizedAPIClient:
     """Client API optimisé pour Dynatrace avec support de requêtes parallèles et cache intelligent"""
     
-    def __init__(self, env_url, api_token, verify_ssl=False, max_workers=10, cache_duration=300):
+    def __init__(self, env_url, api_token, verify_ssl=False, max_workers=20, max_connections=50, cache_duration=300):
         """
         Initialise un client API optimisé
         
@@ -32,24 +39,45 @@ class OptimizedAPIClient:
             api_token (str): Token API Dynatrace
             verify_ssl (bool): Vérifier les certificats SSL
             max_workers (int): Nombre maximum de workers parallèles
+            max_connections (int): Nombre maximum de connexions HTTP simultanées
             cache_duration (int): Durée de vie du cache en secondes
         """
         self.env_url = env_url
         self.api_token = api_token
         self.verify_ssl = verify_ssl
         self.max_workers = max_workers
+        self.max_connections = max_connections
         self.cache_duration = cache_duration
         self.cache = {}
         self.cache_lock = threading.Lock()
         
+        # Configuration avancée des connexions
+        adapter = requests.adapters.HTTPAdapter(
+            pool_connections=max_connections,
+            pool_maxsize=max_connections,
+            max_retries=3,
+            pool_block=False  # Ne pas bloquer lorsque le pool est plein
+        )
+        
         # Créer une session pour réutiliser les connexions
         self.session = requests.Session()
+        self.session.mount('http://', adapter)
+        self.session.mount('https://', adapter)
         self.session.headers.update({
             'Authorization': f'Api-Token {self.api_token}',
             'Accept': 'application/json'
         })
         self.session.verify = self.verify_ssl
-
+        
+        # Utiliser des sémaphores pour contrôler l'accès aux ressources
+        self.semaphore = threading.BoundedSemaphore(value=self.max_connections)
+        
+        # Ajouter un compteur de requêtes pour le monitoring
+        self.request_count = 0
+        self.request_count_lock = threading.Lock()
+        
+        logger.info(f"Client API initialisé avec {max_workers} workers et {max_connections} connexions maximales")
+    
     def get_cached(self, cache_key):
         """Récupère une valeur du cache si elle existe et n'est pas expirée"""
         with self.cache_lock:
@@ -84,10 +112,28 @@ class OptimizedAPIClient:
             else:
                 self.cache.clear()
         logger.info(f"Cache cleared. Pattern: {pattern}")
+    
+    # Ajouter une méthode pour gérer les requêtes avec sémaphore
+    def _request_with_semaphore(self, method, url, **kwargs):
+        with self.semaphore:
+            with self.request_count_lock:
+                self.request_count += 1
+            
+            try:
+                response = self.session.request(method, url, **kwargs)
+                response.raise_for_status()
+                return response
+            except requests.exceptions.RequestException as e:
+                logger.error(f"Erreur de requête HTTP: {e}")
+                raise
+            finally:
+                # Libérer la connexion explicitement
+                if 'response' in locals():
+                    response.close()
 
     def query_api(self, endpoint, params=None, use_cache=True, cache_key=None):
         """
-        Exécute une requête API avec gestion du cache
+        Exécute une requête API avec gestion du cache et sémaphore
         
         Args:
             endpoint (str): Point de terminaison de l'API
@@ -109,11 +155,10 @@ class OptimizedAPIClient:
             if cached_data is not None:
                 return cached_data
         
-        # Exécuter la requête
+        # Exécuter la requête avec sémaphore
         url = f"{self.env_url}/api/v2/{endpoint}"
         try:
-            response = self.session.get(url, params=params)
-            response.raise_for_status()
+            response = self._request_with_semaphore("GET", url, params=params, timeout=(5, 30))
             result = response.json()
             
             # Mettre en cache le résultat
@@ -123,6 +168,18 @@ class OptimizedAPIClient:
             return result
         except requests.RequestException as e:
             logger.error(f"API request error for {endpoint}: {str(e)}")
+            # Réessayer une fois en cas d'erreur de connexion
+            if "Connection" in str(e):
+                logger.info(f"Tentative de reconnexion pour {endpoint}")
+                time.sleep(1)  # Attendre 1 seconde avant de réessayer
+                try:
+                    response = self._request_with_semaphore("GET", url, params=params, timeout=(5, 30))
+                    result = response.json()
+                    if use_cache:
+                        self.set_cache(cache_key, result)
+                    return result
+                except Exception as retry_e:
+                    logger.error(f"Échec de la seconde tentative: {retry_e}")
             raise
 
     async def query_api_async(self, endpoint, params=None, use_cache=True, cache_key=None):
@@ -135,13 +192,33 @@ class OptimizedAPIClient:
 
     def batch_query(self, queries):
         """
-        Exécute plusieurs requêtes API en parallèle
+        Exécute plusieurs requêtes API en parallèle avec contrôle de charge
         
         Args:
             queries (list): Liste de tuples (endpoint, params, use_cache, cache_key)
             
         Returns:
             list: Liste des résultats correspondants
+        """
+        # Si trop de requêtes, diviser en lots plus petits
+        if len(queries) > self.max_connections:
+            logger.info(f"Divisant {len(queries)} requêtes en lots de {self.max_connections}")
+            results = []
+            # Diviser les requêtes en groupes de max_connections
+            for i in range(0, len(queries), self.max_connections):
+                chunk = queries[i:i + self.max_connections]
+                chunk_results = self._execute_batch(chunk)
+                results.extend(chunk_results)
+                # Pause courte entre les lots pour éviter la surcharge
+                if i + self.max_connections < len(queries):
+                    time.sleep(0.5)
+            return results
+        else:
+            return self._execute_batch(queries)
+
+    def _execute_batch(self, queries):
+        """
+        Exécute un lot de requêtes avec ThreadPoolExecutor
         """
         with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             futures = {}  # Utiliser un dictionnaire pour conserver le mapping entre futures et queries
@@ -368,7 +445,8 @@ class OptimizedAPIClient:
 
     def get_service_metrics_parallel(self, service_ids, from_time, to_time):
         """
-        Récupère les métriques pour plusieurs services en parallèle - CORRIGÉ
+        Récupère les métriques pour plusieurs services en parallèle
+        Optimisé pour gérer de grands nombres de services
         
         Args:
             service_ids (list): Liste des IDs de services
@@ -377,6 +455,34 @@ class OptimizedAPIClient:
             
         Returns:
             list: Métriques pour tous les services
+        """
+        # Si trop de services, traiter par lots
+        chunk_size = int(os.environ.get('REQUEST_CHUNK_SIZE', 15))
+        if len(service_ids) > chunk_size:
+            logger.info(f"Traitement par lots de {len(service_ids)} services")
+            all_service_metrics = []
+            
+            # Diviser les IDs en lots plus petits
+            for i in range(0, len(service_ids), chunk_size):
+                chunk_ids = service_ids[i:i + chunk_size]
+                logger.info(f"Traitement du lot {i//chunk_size + 1}/{(len(service_ids) + chunk_size - 1)//chunk_size} ({len(chunk_ids)} services)")
+                
+                # Traiter ce lot
+                chunk_metrics = self._process_service_chunk(chunk_ids, from_time, to_time)
+                all_service_metrics.extend(chunk_metrics)
+                
+                # Petite pause entre les lots pour éviter de surcharger l'API
+                if i + chunk_size < len(service_ids):
+                    time.sleep(1)
+            
+            return all_service_metrics
+        else:
+            # Si peu de services, utiliser la méthode normale
+            return self._process_service_chunk(service_ids, from_time, to_time)
+
+    def _process_service_chunk(self, service_ids, from_time, to_time):
+        """
+        Traite un lot de services
         """
         # Préparer les requêtes pour la récupération des détails des services avec ID explicite
         service_details_queries = []
@@ -456,25 +562,19 @@ class OptimizedAPIClient:
             request_metrics[service_id] = all_metric_results[result_index]
             result_index += 1
         
-        # Récupérer les technologies en parallèle
-        tech_queries = []
-        for service_id in service_ids:
-            tech_queries.append((
-                f"entities/{service_id}", 
-                None, 
-                True,
-                f"tech:{service_id}"  # Clé explicite avec ID
-            ))
-        
-        tech_results = self.batch_query(tech_queries)
+        # Récupérer les technologies en parallèle avec caching
         tech_dict = {}
-        for i, service_id in enumerate(service_ids):
+        for service_id in service_ids:
             tech_info = self.extract_technology(service_id)
             tech_dict[service_id] = tech_info
         
+        # Pour l'historique, ne le faire que pour un sous-ensemble si trop nombreux
+        history_sample_size = min(len(service_ids), 5)  # Limiter l'historique aux 5 premiers services
+        history_service_ids = service_ids[:history_sample_size]
+        
         # Préparer les requêtes d'historique avec clés explicites
         history_queries = []
-        for service_id in service_ids:
+        for service_id in history_service_ids:
             # Historique du temps de réponse
             history_queries.append((
                 "metrics/query",
@@ -527,7 +627,7 @@ class OptimizedAPIClient:
         
         # Distribuer les résultats d'historique dans des dictionnaires par ID de service
         result_index = 0
-        for service_id in service_ids:
+        for service_id in history_service_ids:
             rt_history_dict[service_id] = history_results[result_index]
             result_index += 1
             er_history_dict[service_id] = history_results[result_index]
@@ -583,55 +683,58 @@ class OptimizedAPIClient:
             # Extraire la technologie du dictionnaire
             tech_info = tech_dict[service_id]
             
-            # Traiter les historiques
+            # Traiter les historiques (uniquement si disponible dans le dictionnaire)
             response_time_history = []
             error_rate_history = []
             request_count_history = []
             
-            # Historique du temps de réponse
-            rt_history_data = rt_history_dict[service_id]
-            if rt_history_data and 'result' in rt_history_data and rt_history_data['result']:
-                result = rt_history_data['result'][0]
-                if 'data' in result and result['data']:
-                    values = result['data'][0].get('values', [])
-                    timestamps = result['data'][0].get('timestamps', [])
-                    if values and timestamps:
-                        for i in range(len(values)):
-                            if values[i] is not None:
-                                response_time_history.append({
-                                    'timestamp': timestamps[i],
-                                    'value': values[i]
-                                })
+            # Historique du temps de réponse (uniquement si disponible)
+            if service_id in rt_history_dict:
+                rt_history_data = rt_history_dict[service_id]
+                if rt_history_data and 'result' in rt_history_data and rt_history_data['result']:
+                    result = rt_history_data['result'][0]
+                    if 'data' in result and result['data']:
+                        values = result['data'][0].get('values', [])
+                        timestamps = result['data'][0].get('timestamps', [])
+                        if values and timestamps:
+                            for i in range(len(values)):
+                                if values[i] is not None:
+                                    response_time_history.append({
+                                        'timestamp': timestamps[i],
+                                        'value': values[i]
+                                    })
             
-            # Historique du taux d'erreur
-            er_history_data = er_history_dict[service_id]
-            if er_history_data and 'result' in er_history_data and er_history_data['result']:
-                result = er_history_data['result'][0]
-                if 'data' in result and result['data']:
-                    values = result['data'][0].get('values', [])
-                    timestamps = result['data'][0].get('timestamps', [])
-                    if values and timestamps:
-                        for i in range(len(values)):
-                            if values[i] is not None:
-                                error_rate_history.append({
-                                    'timestamp': timestamps[i],
-                                    'value': values[i]
-                                })
+            # Historique du taux d'erreur (uniquement si disponible)
+            if service_id in er_history_dict:
+                er_history_data = er_history_dict[service_id]
+                if er_history_data and 'result' in er_history_data and er_history_data['result']:
+                    result = er_history_data['result'][0]
+                    if 'data' in result and result['data']:
+                        values = result['data'][0].get('values', [])
+                        timestamps = result['data'][0].get('timestamps', [])
+                        if values and timestamps:
+                            for i in range(len(values)):
+                                if values[i] is not None:
+                                    error_rate_history.append({
+                                        'timestamp': timestamps[i],
+                                        'value': values[i]
+                                    })
             
-            # Historique du nombre de requêtes
-            req_history_data = req_history_dict[service_id]
-            if req_history_data and 'result' in req_history_data and req_history_data['result']:
-                result = req_history_data['result'][0]
-                if 'data' in result and result['data']:
-                    values = result['data'][0].get('values', [])
-                    timestamps = result['data'][0].get('timestamps', [])
-                    if values and timestamps:
-                        for i in range(len(values)):
-                            if values[i] is not None:
-                                request_count_history.append({
-                                    'timestamp': timestamps[i],
-                                    'value': values[i]
-                                })
+            # Historique du nombre de requêtes (uniquement si disponible)
+            if service_id in req_history_dict:
+                req_history_data = req_history_dict[service_id]
+                if req_history_data and 'result' in req_history_data and req_history_data['result']:
+                    result = req_history_data['result'][0]
+                    if 'data' in result and result['data']:
+                        values = result['data'][0].get('values', [])
+                        timestamps = result['data'][0].get('timestamps', [])
+                        if values and timestamps:
+                            for i in range(len(values)):
+                                if values[i] is not None:
+                                    request_count_history.append({
+                                        'timestamp': timestamps[i],
+                                        'value': values[i]
+                                    })
             
             # Créer l'objet de métriques pour ce service
             service_metrics.append({
@@ -652,6 +755,46 @@ class OptimizedAPIClient:
         return service_metrics
 
     def get_hosts_metrics_parallel(self, host_ids, from_time, to_time):
+        """
+        Récupère les métriques pour plusieurs hôtes en parallèle
+        Optimisé pour gérer de grands nombres d'hôtes
+        
+        Args:
+            host_ids (list): Liste des IDs d'hôtes
+            from_time (int): Timestamp de début
+            to_time (int): Timestamp de fin
+            
+        Returns:
+            list: Métriques pour tous les hôtes
+        """
+        # Si trop d'hôtes, traiter par lots
+        chunk_size = int(os.environ.get('REQUEST_CHUNK_SIZE', 15))
+        if len(host_ids) > chunk_size:
+            logger.info(f"Traitement par lots de {len(host_ids)} hôtes")
+            all_host_metrics = []
+            
+            # Diviser les IDs en lots plus petits
+            for i in range(0, len(host_ids), chunk_size):
+                chunk_ids = host_ids[i:i + chunk_size]
+                logger.info(f"Traitement du lot {i//chunk_size + 1}/{(len(host_ids) + chunk_size - 1)//chunk_size} ({len(chunk_ids)} hôtes)")
+                
+                # Traiter ce lot
+                chunk_metrics = self._process_host_chunk(chunk_ids, from_time, to_time)
+                all_host_metrics.extend(chunk_metrics)
+                
+                # Petite pause entre les lots pour éviter de surcharger l'API
+                if i + chunk_size < len(host_ids):
+                    time.sleep(1)
+            
+            return all_host_metrics
+        else:
+            # Si peu d'hôtes, utiliser la méthode normale
+            return self._process_host_chunk(host_ids, from_time, to_time)
+
+    def _process_host_chunk(self, host_ids, from_time, to_time):
+        """
+        Traite un lot d'hôtes
+        """
         # Préparer les requêtes pour la récupération des détails des hôtes avec ID explicite
         host_details_queries = []
         for host_id in host_ids:
@@ -714,9 +857,13 @@ class OptimizedAPIClient:
             ram_metrics[host_id] = all_metric_results[result_index]
             result_index += 1
         
+        # Pour l'historique, ne le faire que pour un sous-ensemble si trop nombreux
+        history_sample_size = min(len(host_ids), 5)  # Limiter l'historique aux 5 premiers hôtes
+        history_host_ids = host_ids[:history_sample_size]
+        
         # Préparer les requêtes d'historique avec clés explicites
         history_queries = []
-        for host_id in host_ids:
+        for host_id in history_host_ids:
             # Historique CPU avec ID explicite
             history_queries.append((
                 "metrics/query",
@@ -754,7 +901,7 @@ class OptimizedAPIClient:
         
         # Distribuer les résultats d'historique dans des dictionnaires par ID d'hôte
         result_index = 0
-        for host_id in host_ids:
+        for host_id in history_host_ids:
             cpu_history_dict[host_id] = history_results[result_index]
             result_index += 1
             ram_history_dict[host_id] = history_results[result_index]
@@ -787,39 +934,41 @@ class OptimizedAPIClient:
                     if values and values[0] is not None:
                         ram_usage = int(values[0])
             
-            # Traiter les historiques
+            # Traiter les historiques (uniquement si disponible dans le dictionnaire)
             cpu_history = []
             ram_history = []
             
-            # Historique CPU
-            cpu_history_data = cpu_history_dict[host_id]
-            if cpu_history_data and 'result' in cpu_history_data and cpu_history_data['result']:
-                result = cpu_history_data['result'][0]
-                if 'data' in result and result['data']:
-                    values = result['data'][0].get('values', [])
-                    timestamps = result['data'][0].get('timestamps', [])
-                    if values and timestamps:
-                        for i in range(len(values)):
-                            if values[i] is not None:
-                                cpu_history.append({
-                                    'timestamp': timestamps[i],
-                                    'value': values[i]
-                                })
+            # Historique CPU (uniquement si disponible)
+            if host_id in cpu_history_dict:
+                cpu_history_data = cpu_history_dict[host_id]
+                if cpu_history_data and 'result' in cpu_history_data and cpu_history_data['result']:
+                    result = cpu_history_data['result'][0]
+                    if 'data' in result and result['data']:
+                        values = result['data'][0].get('values', [])
+                        timestamps = result['data'][0].get('timestamps', [])
+                        if values and timestamps:
+                            for i in range(len(values)):
+                                if values[i] is not None:
+                                    cpu_history.append({
+                                        'timestamp': timestamps[i],
+                                        'value': values[i]
+                                    })
             
-            # Historique RAM
-            ram_history_data = ram_history_dict[host_id]
-            if ram_history_data and 'result' in ram_history_data and ram_history_data['result']:
-                result = ram_history_data['result'][0]
-                if 'data' in result and result['data']:
-                    values = result['data'][0].get('values', [])
-                    timestamps = result['data'][0].get('timestamps', [])
-                    if values and timestamps:
-                        for i in range(len(values)):
-                            if values[i] is not None:
-                                ram_history.append({
-                                    'timestamp': timestamps[i],
-                                    'value': values[i]
-                                })
+            # Historique RAM (uniquement si disponible)
+            if host_id in ram_history_dict:
+                ram_history_data = ram_history_dict[host_id]
+                if ram_history_data and 'result' in ram_history_data and ram_history_data['result']:
+                    result = ram_history_data['result'][0]
+                    if 'data' in result and result['data']:
+                        values = result['data'][0].get('values', [])
+                        timestamps = result['data'][0].get('timestamps', [])
+                        if values and timestamps:
+                            for i in range(len(values)):
+                                if values[i] is not None:
+                                    ram_history.append({
+                                        'timestamp': timestamps[i],
+                                        'value': values[i]
+                                    })
             
             # Extraire la version de l'OS des propriétés de l'hôte
             os_version = "Non spécifié"
@@ -961,7 +1110,7 @@ class OptimizedAPIClient:
 
     def get_summary_parallelized(self, mz_name, from_time, to_time):
         """
-        Récupère un résumé des métriques en utilisant des requêtes parallèles - CORRIGÉ
+        Récupère un résumé des métriques en utilisant des requêtes parallèles optimisées
         
         Args:
             mz_name (str): Nom de la Management Zone
@@ -977,7 +1126,7 @@ class OptimizedAPIClient:
             return cached_data
         
         try:
-            # Préparer les requêtes de base avec clés explicites
+            # Préparer les requêtes de base avec clés explicites et timeout
             entity_queries = [
                 (
                     "entities",
@@ -1009,22 +1158,87 @@ class OptimizedAPIClient:
                 )
             ]
             
-            # Exécuter les requêtes en parallèle
-            results = self.batch_query(entity_queries)
+            # Exécuter les requêtes en parallèle avec un retry en cas d'échec
+            results = None
+            retry_count = 0
+            max_retries = 3
+            
+            while results is None and retry_count < max_retries:
+                try:
+                    results = self.batch_query(entity_queries)
+                    if not all(results):
+                        # Si une des requêtes a échoué, réessayer
+                        logger.warning(f"Certaines requêtes ont échoué, retry {retry_count+1}/{max_retries}")
+                        results = None
+                        retry_count += 1
+                        time.sleep(1)  # Attendre avant de réessayer
+                        continue
+                except Exception as e:
+                    logger.error(f"Erreur lors des requêtes en lot: {e}, retry {retry_count+1}/{max_retries}")
+                    retry_count += 1
+                    time.sleep(1)  # Attendre avant de réessayer
+                    if retry_count >= max_retries:
+                        raise
+
+            # S'il n'y a toujours pas de résultats après les tentatives
+            if results is None:
+                logger.error("Impossible d'obtenir les résultats après plusieurs tentatives")
+                return {
+                    'error': "Impossible d'obtenir les données après plusieurs tentatives",
+                    'timestamp': int(time.time() * 1000)
+                }
             
             # Utiliser des index explicites
             services_data = results[0]
             hosts_data = results[1]
             problems_data = results[2]
             
+            # Vérifier que les résultats sont valides
+            if not services_data or not hosts_data:
+                logger.warning("Données incomplètes reçues de l'API")
+                services_count = 0 if not services_data else len(services_data.get('entities', []))
+                hosts_count = 0 if not hosts_data else len(hosts_data.get('entities', []))
+                problems_count = 0 if not problems_data else len(problems_data.get('problems', []))
+                
+                # Créer un résumé minimal avec les informations disponibles
+                summary = {
+                    'hosts': {
+                        'count': hosts_count,
+                        'avg_cpu': 0,
+                        'critical_count': 0
+                    },
+                    'services': {
+                        'count': services_count,
+                        'with_errors': 0,
+                        'avg_error_rate': 0
+                    },
+                    'requests': {
+                        'total': 0,
+                        'hourly_avg': 0
+                    },
+                    'problems': {
+                        'count': problems_count
+                    },
+                    'timestamp': int(time.time() * 1000),
+                    'data_quality': 'partial'  # Indiquer que les données sont partielles
+                }
+                
+                self.set_cache(cache_key, summary)
+                return summary
+            
             # Calculer les métriques résumées
             services_count = len(services_data.get('entities', []))
             hosts_count = len(hosts_data.get('entities', []))
             problems_count = len(problems_data.get('problems', []))
             
-            # Préparer les requêtes de métriques en lot pour les hôtes
+            # Limiter le nombre d'hôtes et de services pour éviter la surcharge
+            max_metrics_entities = int(os.environ.get('MAX_METRICS_ENTITIES', 20))
+            
+            # Pour les hôtes, ne prendre que les MAX_METRICS_ENTITIES premiers
+            host_entities = hosts_data.get('entities', [])[:max_metrics_entities]
+            
+            # Préparer les requêtes de métriques en lot pour les hôtes limités
             host_metric_queries = []
-            host_entities = hosts_data.get('entities', [])
             
             for host in host_entities:
                 host_id = host.get('entityId')
@@ -1052,6 +1266,7 @@ class OptimizedAPIClient:
             # Calculer l'utilisation moyenne du CPU et le nombre d'hôtes critiques
             total_cpu = 0
             critical_hosts = 0
+            valid_cpu_count = 0
             
             for host in host_entities:
                 host_id = host.get('entityId')
@@ -1066,12 +1281,15 @@ class OptimizedAPIClient:
                             if cpu_usage > 80:
                                 critical_hosts += 1
                             total_cpu += cpu_usage
+                            valid_cpu_count += 1
             
-            avg_cpu = round(total_cpu / hosts_count) if hosts_count > 0 else 0
+            avg_cpu = round(total_cpu / valid_cpu_count) if valid_cpu_count > 0 else 0
             
-            # Préparer les requêtes de métriques pour les services
+            # Pour les services, ne prendre que les MAX_METRICS_ENTITIES premiers
+            service_entities = services_data.get('entities', [])[:max_metrics_entities]
+            
+            # Préparer les requêtes de métriques pour les services limités
             service_metric_queries = []
-            service_entities = services_data.get('entities', [])
             
             for service in service_entities:
                 service_id = service.get('entityId')
@@ -1170,7 +1388,8 @@ class OptimizedAPIClient:
                 'problems': {
                     'count': problems_count
                 },
-                'timestamp': int(time.time() * 1000)
+                'timestamp': int(time.time() * 1000),
+                'data_quality': 'full'  # Indiquer que les données sont complètes
             }
             
             # Mettre en cache le résumé
@@ -1181,18 +1400,6 @@ class OptimizedAPIClient:
             logger.error(f"Erreur lors de la récupération du résumé: {e}")
             return {
                 'error': str(e),
-                'timestamp': int(time.time() * 1000)
+                'timestamp': int(time.time() * 1000),
+                'data_quality': 'error'
             }
-
-# Décorateur pour mesurer le temps d'exécution des fonctions
-def time_execution(func):
-    """Décorateur pour mesurer le temps d'exécution des fonctions"""
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        start_time = time.time()
-        result = func(*args, **kwargs)
-        end_time = time.time()
-        elapsed_time = end_time - start_time
-        logger.info(f"Fonction {func.__name__} exécutée en {elapsed_time:.2f} secondes")
-        return result
-    return wrapper

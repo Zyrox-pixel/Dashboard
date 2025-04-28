@@ -25,18 +25,17 @@ load_dotenv()
 # Récupérer les variables d'environnement
 DT_ENV_URL = os.environ.get('DT_ENV_URL')
 API_TOKEN = os.environ.get('API_TOKEN')
-CACHE_DURATION = int(os.environ.get('CACHE_DURATION', 300))  # 5 minutes en secondes
+CACHE_DURATION = int(os.environ.get('CACHE_DURATION', 300))
+MAX_WORKERS = int(os.environ.get('MAX_WORKERS', 20))
+MAX_CONNECTIONS = int(os.environ.get('MAX_CONNECTIONS', 50))
 
-# Créer l'application Flask
-app = Flask(__name__)
-CORS(app)  # Activer CORS pour toutes les routes
-
-# Initialiser le client API optimisé
+# Initialiser le client API optimisé avec plus de workers et connexions
 api_client = OptimizedAPIClient(
     env_url=DT_ENV_URL,
     api_token=API_TOKEN,
     verify_ssl=os.environ.get('VERIFY_SSL', 'False').lower() in ('true', '1', 't'),
-    max_workers=10,
+    max_workers=MAX_WORKERS,
+    max_connections=MAX_CONNECTIONS,
     cache_duration=CACHE_DURATION
 )
 
