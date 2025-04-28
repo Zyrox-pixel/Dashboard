@@ -410,8 +410,6 @@ const AdvancedOsFilter: React.FC<AdvancedOsFilterProps> = ({
                           </div>
                           <div className="overflow-hidden">
                             <span className="block text-ellipsis overflow-hidden">{version.version}</span>
-                            {/* Version complète en texte plus petit sur une deuxième ligne */}
-                            <span className="block text-xs opacity-70 overflow-hidden text-ellipsis">{version.version}</span>
                           </div>
                         </div>
                         <span className={`ml-2 flex-shrink-0 text-xs px-1.5 py-0.5 rounded-full ${
