@@ -1,5 +1,5 @@
 """
-Module d'optimisation des requêtes API Dynatrace
+Module d'optimisation des requêtes API Dynatrace - CORRIGÉ
 Ce module fournit des fonctions pour améliorer les performances des requêtes API
 en utilisant des techniques comme les requêtes parallèles et la mise en cache intelligente.
 """
@@ -144,8 +144,9 @@ class OptimizedAPIClient:
             list: Liste des résultats correspondants
         """
         with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            futures = []
-            for query in queries:
+            futures = {}  # Utiliser un dictionnaire pour conserver le mapping entre futures et queries
+            
+            for i, query in enumerate(queries):
                 # Gérer les différents formats de requêtes
                 if isinstance(query, tuple):
                     if len(query) == 2:
@@ -160,18 +161,18 @@ class OptimizedAPIClient:
                     endpoint, params = query, None
                     use_cache, cache_key = True, None
                 
-                futures.append(
-                    executor.submit(self.query_api, endpoint, params, use_cache, cache_key)
-                )
+                # Utiliser l'index comme identifiant unique pour chaque future
+                future = executor.submit(self.query_api, endpoint, params, use_cache, cache_key)
+                futures[i] = future
             
-            # Collecter les résultats
-            results = []
-            for future in concurrent.futures.as_completed(futures):
+            # Collecter les résultats dans l'ordre original des requêtes
+            results = [None] * len(queries)
+            for i, future in futures.items():
                 try:
-                    results.append(future.result())
+                    results[i] = future.result()
                 except Exception as e:
-                    logger.error(f"Error in batch query: {str(e)}")
-                    results.append(None)
+                    logger.error(f"Error in batch query for index {i}: {str(e)}")
+                    results[i] = None
             
             return results
 
@@ -367,7 +368,7 @@ class OptimizedAPIClient:
 
     def get_service_metrics_parallel(self, service_ids, from_time, to_time):
         """
-        Récupère les métriques pour plusieurs services en parallèle
+        Récupère les métriques pour plusieurs services en parallèle - CORRIGÉ
         
         Args:
             service_ids (list): Liste des IDs de services
@@ -375,18 +376,30 @@ class OptimizedAPIClient:
             to_time (int): Timestamp de fin
             
         Returns:
-            dict: Métriques pour tous les services
+            list: Métriques pour tous les services
         """
-        # Préparer les requêtes pour la récupération des détails des services
-        service_details_queries = [(f"entities/{service_id}", None) for service_id in service_ids]
+        # Préparer les requêtes pour la récupération des détails des services avec ID explicite
+        service_details_queries = []
+        for service_id in service_ids:
+            service_details_queries.append((
+                f"entities/{service_id}", 
+                None, 
+                True,
+                f"service_details:{service_id}"  # Clé de cache explicite avec ID
+            ))
         
         # Récupérer les détails des services en parallèle
-        service_details_list = self.batch_query(service_details_queries)
+        service_details_results = self.batch_query(service_details_queries)
         
-        # Préparer les requêtes de métriques pour tous les services
+        # Créer un dictionnaire pour associer les résultats aux services
+        service_details_dict = {}
+        for i, service_id in enumerate(service_ids):
+            service_details_dict[service_id] = service_details_results[i]
+        
+        # Préparer les requêtes de métriques pour tous les services avec clés explicites
         metric_queries = []
         for service_id in service_ids:
-            # Requête pour le temps de réponse
+            # Requête pour le temps de réponse avec ID explicite
             metric_queries.append((
                 "metrics/query",
                 {
@@ -396,10 +409,10 @@ class OptimizedAPIClient:
                     "entitySelector": f"entityId({service_id})"
                 },
                 True,
-                f"response_time:{service_id}:{from_time}:{to_time}"
+                f"response_time:{service_id}:{from_time}:{to_time}"  # Clé explicite avec ID
             ))
             
-            # Requête pour le taux d'erreur
+            # Requête pour le taux d'erreur avec ID explicite
             metric_queries.append((
                 "metrics/query",
                 {
@@ -409,10 +422,10 @@ class OptimizedAPIClient:
                     "entitySelector": f"entityId({service_id})"
                 },
                 True,
-                f"error_rate:{service_id}:{from_time}:{to_time}"
+                f"error_rate:{service_id}:{from_time}:{to_time}"  # Clé explicite avec ID
             ))
             
-            # Requête pour le nombre de requêtes
+            # Requête pour le nombre de requêtes avec ID explicite
             metric_queries.append((
                 "metrics/query",
                 {
@@ -422,18 +435,110 @@ class OptimizedAPIClient:
                     "entitySelector": f"entityId({service_id})"
                 },
                 True,
-                f"requests:{service_id}:{from_time}:{to_time}"
+                f"requests:{service_id}:{from_time}:{to_time}"  # Clé explicite avec ID
             ))
         
         # Exécuter toutes les requêtes de métriques en parallèle
-        metric_results = self.batch_query(metric_queries)
+        all_metric_results = self.batch_query(metric_queries)
         
-        # Organiser les résultats par service
-        service_metrics = {}
-        metric_index = 0
+        # Créer des dictionnaires pour associer les résultats de métriques aux services
+        response_time_metrics = {}
+        error_rate_metrics = {}
+        request_metrics = {}
         
+        # Distribuer les résultats dans des dictionnaires par ID de service
+        result_index = 0
+        for service_id in service_ids:
+            response_time_metrics[service_id] = all_metric_results[result_index]
+            result_index += 1
+            error_rate_metrics[service_id] = all_metric_results[result_index]
+            result_index += 1
+            request_metrics[service_id] = all_metric_results[result_index]
+            result_index += 1
+        
+        # Récupérer les technologies en parallèle
+        tech_queries = []
+        for service_id in service_ids:
+            tech_queries.append((
+                f"entities/{service_id}", 
+                None, 
+                True,
+                f"tech:{service_id}"  # Clé explicite avec ID
+            ))
+        
+        tech_results = self.batch_query(tech_queries)
+        tech_dict = {}
         for i, service_id in enumerate(service_ids):
-            service_details = service_details_list[i]
+            tech_info = self.extract_technology(service_id)
+            tech_dict[service_id] = tech_info
+        
+        # Préparer les requêtes d'historique avec clés explicites
+        history_queries = []
+        for service_id in service_ids:
+            # Historique du temps de réponse
+            history_queries.append((
+                "metrics/query",
+                {
+                    "metricSelector": "builtin:service.response.time",
+                    "from": from_time,
+                    "to": to_time,
+                    "resolution": "1h",
+                    "entitySelector": f"entityId({service_id})"
+                },
+                True,
+                f"rt_history:{service_id}:{from_time}:{to_time}"  # Clé explicite avec ID
+            ))
+            
+            # Historique du taux d'erreur
+            history_queries.append((
+                "metrics/query",
+                {
+                    "metricSelector": "builtin:service.errors.total.rate",
+                    "from": from_time,
+                    "to": to_time,
+                    "resolution": "1h",
+                    "entitySelector": f"entityId({service_id})"
+                },
+                True,
+                f"er_history:{service_id}:{from_time}:{to_time}"  # Clé explicite avec ID
+            ))
+            
+            # Historique du nombre de requêtes
+            history_queries.append((
+                "metrics/query",
+                {
+                    "metricSelector": "builtin:service.requestCount.total",
+                    "from": from_time,
+                    "to": to_time,
+                    "resolution": "1h",
+                    "entitySelector": f"entityId({service_id})"
+                },
+                True,
+                f"req_history:{service_id}:{from_time}:{to_time}"  # Clé explicite avec ID
+            ))
+        
+        # Exécuter les requêtes d'historique en parallèle
+        history_results = self.batch_query(history_queries)
+        
+        # Créer des dictionnaires pour associer les résultats d'historique aux services
+        rt_history_dict = {}
+        er_history_dict = {}
+        req_history_dict = {}
+        
+        # Distribuer les résultats d'historique dans des dictionnaires par ID de service
+        result_index = 0
+        for service_id in service_ids:
+            rt_history_dict[service_id] = history_results[result_index]
+            result_index += 1
+            er_history_dict[service_id] = history_results[result_index]
+            result_index += 1
+            req_history_dict[service_id] = history_results[result_index]
+            result_index += 1
+        
+        # Maintenant, assembler les métriques pour chaque service
+        service_metrics = []
+        for service_id in service_ids:
+            service_details = service_details_dict[service_id]
             
             # Vérification du type de service et activité
             service_status = "Actif"
@@ -442,12 +547,9 @@ class OptimizedAPIClient:
                     service_status = "Inactif"
             
             # Extraire les métriques pour ce service
-            response_time_data = metric_results[metric_index]
-            metric_index += 1
-            error_rate_data = metric_results[metric_index]
-            metric_index += 1
-            requests_data = metric_results[metric_index]
-            metric_index += 1
+            response_time_data = response_time_metrics[service_id]
+            error_rate_data = error_rate_metrics[service_id]
+            requests_data = request_metrics[service_id]
             
             # Traiter les résultats des métriques
             response_time = None
@@ -478,91 +580,16 @@ class OptimizedAPIClient:
                     if values and values[0] is not None:
                         requests_count = int(values[0])
             
-            # Extraire la technologie de façon parallélisée ultérieurement
-            service_metrics[service_id] = {
-                'id': service_id,
-                'name': service_details.get('displayName', 'Unknown') if service_details else 'Unknown',
-                'response_time': response_time,
-                'error_rate': error_rate,
-                'requests': requests_count,
-                'status': service_status,
-                'dt_url': f"{self.env_url}/#entity/{service_id}"
-            }
-        
-        # Récupérer les technologies en parallèle
-        tech_queries = [(f"entities/{service_id}", None) for service_id in service_ids]
-        tech_results = self.batch_query(tech_queries)
-        
-        # Extraire et ajouter les technologies
-        for i, service_id in enumerate(service_ids):
-            tech_info = self.extract_technology(service_id)
-            service_metrics[service_id]['technology'] = tech_info['name']
-            service_metrics[service_id]['tech_icon'] = tech_info['icon']
-        
-        # Récupérer les historiques de métriques en parallèle
-        history_queries = []
-        for service_id in service_ids:
-            history_queries.append((
-                "metrics/query",
-                {
-                    "metricSelector": "builtin:service.response.time",
-                    "from": from_time,
-                    "to": to_time,
-                    "resolution": "1h",
-                    "entitySelector": f"entityId({service_id})"
-                },
-                True,
-                f"rt_history:{service_id}:{from_time}:{to_time}"
-            ))
-            history_queries.append((
-                "metrics/query",
-                {
-                    "metricSelector": "builtin:service.errors.total.rate",
-                    "from": from_time,
-                    "to": to_time,
-                    "resolution": "1h",
-                    "entitySelector": f"entityId({service_id})"
-                },
-                True,
-                f"er_history:{service_id}:{from_time}:{to_time}"
-            ))
-            history_queries.append((
-                "metrics/query",
-                {
-                    "metricSelector": "builtin:service.requestCount.total",
-                    "from": from_time,
-                    "to": to_time,
-                    "resolution": "1h",
-                    "entitySelector": f"entityId({service_id})"
-                },
-                True,
-                f"req_history:{service_id}:{from_time}:{to_time}"
-            ))
-        
-        # Exécuter les requêtes d'historique en parallèle
-        history_results = self.batch_query(history_queries)
-        
-        # Traiter les résultats d'historique
-        history_index = 0
-        for service_id in service_ids:
-            # Historique du temps de réponse
-            rt_history_data = history_results[history_index]
-            history_index += 1
+            # Extraire la technologie du dictionnaire
+            tech_info = tech_dict[service_id]
             
-            # Historique du taux d'erreur
-            er_history_data = history_results[history_index]
-            history_index += 1
-            
-            # Historique du nombre de requêtes
-            req_history_data = history_results[history_index]
-            history_index += 1
-            
-            # Transformer les données pour l'affichage
+            # Traiter les historiques
             response_time_history = []
             error_rate_history = []
             request_count_history = []
             
-            # Traiter l'historique du temps de réponse
+            # Historique du temps de réponse
+            rt_history_data = rt_history_dict[service_id]
             if rt_history_data and 'result' in rt_history_data and rt_history_data['result']:
                 result = rt_history_data['result'][0]
                 if 'data' in result and result['data']:
@@ -576,7 +603,8 @@ class OptimizedAPIClient:
                                     'value': values[i]
                                 })
             
-            # Traiter l'historique du taux d'erreur
+            # Historique du taux d'erreur
+            er_history_data = er_history_dict[service_id]
             if er_history_data and 'result' in er_history_data and er_history_data['result']:
                 result = er_history_data['result'][0]
                 if 'data' in result and result['data']:
@@ -590,7 +618,8 @@ class OptimizedAPIClient:
                                     'value': values[i]
                                 })
             
-            # Traiter l'historique du nombre de requêtes
+            # Historique du nombre de requêtes
+            req_history_data = req_history_dict[service_id]
             if req_history_data and 'result' in req_history_data and req_history_data['result']:
                 result = req_history_data['result'][0]
                 if 'data' in result and result['data']:
@@ -604,16 +633,27 @@ class OptimizedAPIClient:
                                     'value': values[i]
                                 })
             
-            # Ajouter les historiques aux métriques du service
-            service_metrics[service_id]['response_time_history'] = response_time_history
-            service_metrics[service_id]['error_rate_history'] = error_rate_history
-            service_metrics[service_id]['request_count_history'] = request_count_history
+            # Créer l'objet de métriques pour ce service
+            service_metrics.append({
+                'id': service_id,
+                'name': service_details.get('displayName', 'Unknown') if service_details else 'Unknown',
+                'response_time': response_time,
+                'error_rate': error_rate,
+                'requests': requests_count,
+                'status': service_status,
+                'technology': tech_info['name'],
+                'tech_icon': tech_info['icon'],
+                'dt_url': f"{self.env_url}/#entity/{service_id}",
+                'response_time_history': response_time_history,
+                'error_rate_history': error_rate_history,
+                'request_count_history': request_count_history
+            })
         
-        return list(service_metrics.values())
+        return service_metrics
 
     def get_hosts_metrics_parallel(self, host_ids, from_time, to_time):
         """
-        Récupère les métriques pour plusieurs hôtes en parallèle
+        Récupère les métriques pour plusieurs hôtes en parallèle - CORRIGÉ
         
         Args:
             host_ids (list): Liste des IDs d'hôtes
@@ -623,16 +663,28 @@ class OptimizedAPIClient:
         Returns:
             list: Métriques pour tous les hôtes
         """
-        # Préparer les requêtes pour la récupération des détails des hôtes
-        host_details_queries = [(f"entities/{host_id}", None) for host_id in host_ids]
+        # Préparer les requêtes pour la récupération des détails des hôtes avec ID explicite
+        host_details_queries = []
+        for host_id in host_ids:
+            host_details_queries.append((
+                f"entities/{host_id}", 
+                None, 
+                True,
+                f"host_details:{host_id}"  # Clé de cache explicite avec ID
+            ))
         
         # Récupérer les détails des hôtes en parallèle
-        host_details_list = self.batch_query(host_details_queries)
+        host_details_results = self.batch_query(host_details_queries)
         
-        # Préparer les requêtes de métriques pour tous les hôtes
+        # Créer un dictionnaire pour associer les résultats aux hôtes
+        host_details_dict = {}
+        for i, host_id in enumerate(host_ids):
+            host_details_dict[host_id] = host_details_results[i]
+        
+        # Préparer les requêtes de métriques avec clés explicites
         metric_queries = []
         for host_id in host_ids:
-            # Requête pour l'utilisation CPU
+            # Requête pour l'utilisation CPU avec ID explicite
             metric_queries.append((
                 "metrics/query",
                 {
@@ -642,10 +694,10 @@ class OptimizedAPIClient:
                     "entitySelector": f"entityId({host_id})"
                 },
                 True,
-                f"cpu_usage:{host_id}:{from_time}:{to_time}"
+                f"cpu_usage:{host_id}:{from_time}:{to_time}"  # Clé explicite avec ID
             ))
             
-            # Requête pour l'utilisation RAM
+            # Requête pour l'utilisation RAM avec ID explicite
             metric_queries.append((
                 "metrics/query",
                 {
@@ -655,30 +707,82 @@ class OptimizedAPIClient:
                     "entitySelector": f"entityId({host_id})"
                 },
                 True,
-                f"ram_usage:{host_id}:{from_time}:{to_time}"
+                f"ram_usage:{host_id}:{from_time}:{to_time}"  # Clé explicite avec ID
             ))
         
         # Exécuter toutes les requêtes de métriques en parallèle
-        metric_results = self.batch_query(metric_queries)
+        all_metric_results = self.batch_query(metric_queries)
         
-        # Organiser les résultats par hôte
-        host_metrics = {}
-        metric_index = 0
+        # Créer des dictionnaires pour associer les résultats de métriques aux hôtes
+        cpu_metrics = {}
+        ram_metrics = {}
         
-        for i, host_id in enumerate(host_ids):
-            host_details = host_details_list[i]
+        # Distribuer les résultats dans des dictionnaires par ID d'hôte
+        result_index = 0
+        for host_id in host_ids:
+            cpu_metrics[host_id] = all_metric_results[result_index]
+            result_index += 1
+            ram_metrics[host_id] = all_metric_results[result_index]
+            result_index += 1
+        
+        # Préparer les requêtes d'historique avec clés explicites
+        history_queries = []
+        for host_id in host_ids:
+            # Historique CPU avec ID explicite
+            history_queries.append((
+                "metrics/query",
+                {
+                    "metricSelector": "builtin:host.cpu.usage",
+                    "from": from_time,
+                    "to": to_time,
+                    "resolution": "1h",
+                    "entitySelector": f"entityId({host_id})"
+                },
+                True,
+                f"cpu_history:{host_id}:{from_time}:{to_time}"  # Clé explicite avec ID
+            ))
             
-            # Extraire les métriques pour cet hôte
-            cpu_data = metric_results[metric_index]
-            metric_index += 1
-            ram_data = metric_results[metric_index]
-            metric_index += 1
+            # Historique RAM avec ID explicite
+            history_queries.append((
+                "metrics/query",
+                {
+                    "metricSelector": "builtin:host.mem.usage",
+                    "from": from_time,
+                    "to": to_time,
+                    "resolution": "1h",
+                    "entitySelector": f"entityId({host_id})"
+                },
+                True,
+                f"ram_history:{host_id}:{from_time}:{to_time}"  # Clé explicite avec ID
+            ))
+        
+        # Exécuter les requêtes d'historique en parallèle
+        history_results = self.batch_query(history_queries)
+        
+        # Créer des dictionnaires pour associer les résultats d'historique aux hôtes
+        cpu_history_dict = {}
+        ram_history_dict = {}
+        
+        # Distribuer les résultats d'historique dans des dictionnaires par ID d'hôte
+        result_index = 0
+        for host_id in host_ids:
+            cpu_history_dict[host_id] = history_results[result_index]
+            result_index += 1
+            ram_history_dict[host_id] = history_results[result_index]
+            result_index += 1
+        
+        # Maintenant, assembler les métriques pour chaque hôte
+        host_metrics = []
+        for host_id in host_ids:
+            host_details = host_details_dict[host_id]
+            cpu_data = cpu_metrics[host_id]
+            ram_data = ram_metrics[host_id]
             
-            # Traiter les résultats des métriques
+            # Extraire les valeurs de métriques
             cpu_usage = None
             ram_usage = None
             
-            # Extraire l'utilisation CPU
+            # Traitement des données CPU
             if cpu_data and 'result' in cpu_data and cpu_data['result']:
                 result = cpu_data['result'][0]
                 if 'data' in result and result['data']:
@@ -686,7 +790,7 @@ class OptimizedAPIClient:
                     if values and values[0] is not None:
                         cpu_usage = int(values[0])
             
-            # Extraire l'utilisation RAM
+            # Traitement des données RAM
             if ram_data and 'result' in ram_data and ram_data['result']:
                 result = ram_data['result'][0]
                 if 'data' in result and result['data']:
@@ -694,61 +798,12 @@ class OptimizedAPIClient:
                     if values and values[0] is not None:
                         ram_usage = int(values[0])
             
-            host_metrics[host_id] = {
-                'id': host_id,
-                'name': host_details.get('displayName', 'Unknown') if host_details else 'Unknown',
-                'cpu': cpu_usage,
-                'ram': ram_usage,
-                'dt_url': f"{self.env_url}/#entity/{host_id}"
-            }
-        
-        # Récupérer les historiques de métriques en parallèle
-        history_queries = []
-        for host_id in host_ids:
-            history_queries.append((
-                "metrics/query",
-                {
-                    "metricSelector": "builtin:host.cpu.usage",
-                    "from": from_time,
-                    "to": to_time,
-                    "resolution": "1h",
-                    "entitySelector": f"entityId({host_id})"
-                },
-                True,
-                f"cpu_history:{host_id}:{from_time}:{to_time}"
-            ))
-            history_queries.append((
-                "metrics/query",
-                {
-                    "metricSelector": "builtin:host.mem.usage",
-                    "from": from_time,
-                    "to": to_time,
-                    "resolution": "1h",
-                    "entitySelector": f"entityId({host_id})"
-                },
-                True,
-                f"ram_history:{host_id}:{from_time}:{to_time}"
-            ))
-        
-        # Exécuter les requêtes d'historique en parallèle
-        history_results = self.batch_query(history_queries)
-        
-        # Traiter les résultats d'historique
-        history_index = 0
-        for host_id in host_ids:
-            # Historique CPU
-            cpu_history_data = history_results[history_index]
-            history_index += 1
-            
-            # Historique RAM
-            ram_history_data = history_results[history_index]
-            history_index += 1
-            
-            # Transformer les données pour l'affichage
+            # Traiter les historiques
             cpu_history = []
             ram_history = []
             
-            # Traiter l'historique CPU
+            # Historique CPU
+            cpu_history_data = cpu_history_dict[host_id]
             if cpu_history_data and 'result' in cpu_history_data and cpu_history_data['result']:
                 result = cpu_history_data['result'][0]
                 if 'data' in result and result['data']:
@@ -762,7 +817,8 @@ class OptimizedAPIClient:
                                     'value': values[i]
                                 })
             
-            # Traiter l'historique RAM
+            # Historique RAM
+            ram_history_data = ram_history_dict[host_id]
             if ram_history_data and 'result' in ram_history_data and ram_history_data['result']:
                 result = ram_history_data['result'][0]
                 if 'data' in result and result['data']:
@@ -776,11 +832,18 @@ class OptimizedAPIClient:
                                     'value': values[i]
                                 })
             
-            # Ajouter les historiques aux métriques de l'hôte
-            host_metrics[host_id]['cpu_history'] = cpu_history
-            host_metrics[host_id]['ram_history'] = ram_history
+            # Créer l'objet de métriques d'hôte
+            host_metrics.append({
+                'id': host_id,
+                'name': host_details.get('displayName', 'Unknown') if host_details else 'Unknown',
+                'cpu': cpu_usage,
+                'ram': ram_usage,
+                'dt_url': f"{self.env_url}/#entity/{host_id}",
+                'cpu_history': cpu_history,
+                'ram_history': ram_history
+            })
         
-        return list(host_metrics.values())
+        return host_metrics
 
     def get_problems_filtered(self, mz_name=None, time_from="-24h", status="OPEN"):
         """
@@ -880,7 +943,7 @@ class OptimizedAPIClient:
 
     def get_summary_parallelized(self, mz_name, from_time, to_time):
         """
-        Récupère un résumé des métriques en utilisant des requêtes parallèles
+        Récupère un résumé des métriques en utilisant des requêtes parallèles - CORRIGÉ
         
         Args:
             mz_name (str): Nom de la Management Zone
@@ -896,7 +959,7 @@ class OptimizedAPIClient:
             return cached_data
         
         try:
-            # Préparer les requêtes de base
+            # Préparer les requêtes de base avec clés explicites
             entity_queries = [
                 (
                     "entities",
@@ -931,6 +994,7 @@ class OptimizedAPIClient:
             # Exécuter les requêtes en parallèle
             results = self.batch_query(entity_queries)
             
+            # Utiliser des index explicites
             services_data = results[0]
             hosts_data = results[1]
             problems_data = results[2]
@@ -955,18 +1019,25 @@ class OptimizedAPIClient:
                         "entitySelector": f"entityId({host_id})"
                     },
                     True,
-                    f"host_cpu:{host_id}:{from_time}:{to_time}"
+                    f"summary_host_cpu:{host_id}:{from_time}:{to_time}"  # Clé explicite avec ID
                 ))
             
             # Exécuter les requêtes CPU en parallèle
             host_cpu_results = self.batch_query(host_metric_queries)
             
+            # Créer un mapping hôte ID -> résultats CPU
+            host_cpu_dict = {}
+            for i, host in enumerate(host_entities):
+                host_id = host.get('entityId')
+                host_cpu_dict[host_id] = host_cpu_results[i]
+            
             # Calculer l'utilisation moyenne du CPU et le nombre d'hôtes critiques
             total_cpu = 0
             critical_hosts = 0
             
-            for i, host in enumerate(host_entities):
-                cpu_data = host_cpu_results[i]
+            for host in host_entities:
+                host_id = host.get('entityId')
+                cpu_data = host_cpu_dict[host_id]
                 
                 if cpu_data and 'result' in cpu_data and cpu_data['result']:
                     result = cpu_data['result'][0]
@@ -996,7 +1067,7 @@ class OptimizedAPIClient:
                         "entitySelector": f"entityId({service_id})"
                     },
                     True,
-                    f"service_requests:{service_id}:{from_time}:{to_time}"
+                    f"summary_service_requests:{service_id}:{from_time}:{to_time}"  # Clé explicite avec ID
                 ))
                 
                 # Requête pour le taux d'erreur
@@ -1009,21 +1080,35 @@ class OptimizedAPIClient:
                         "entitySelector": f"entityId({service_id})"
                     },
                     True,
-                    f"service_errors:{service_id}:{from_time}:{to_time}"
+                    f"summary_service_errors:{service_id}:{from_time}:{to_time}"  # Clé explicite avec ID
                 ))
             
             # Exécuter les requêtes de services en parallèle
             service_metric_results = self.batch_query(service_metric_queries)
+            
+            # Créer des dictionnaires pour associer les résultats aux services
+            service_requests_dict = {}
+            service_errors_dict = {}
+            
+            # Distribuer les résultats dans des dictionnaires
+            result_index = 0
+            for service in service_entities:
+                service_id = service.get('entityId')
+                service_requests_dict[service_id] = service_metric_results[result_index]
+                result_index += 1
+                service_errors_dict[service_id] = service_metric_results[result_index]
+                result_index += 1
             
             # Calculer le nombre total de requêtes et le taux d'erreur moyen
             total_requests = 0
             total_errors = 0
             services_with_errors = 0
             
-            for i, service in enumerate(service_entities):
+            for service in service_entities:
+                service_id = service.get('entityId')
+                
                 # Extraire les données de requêtes
-                request_index = i * 2
-                requests_data = service_metric_results[request_index]
+                requests_data = service_requests_dict[service_id]
                 
                 if requests_data and 'result' in requests_data and requests_data['result']:
                     result = requests_data['result'][0]
@@ -1034,8 +1119,7 @@ class OptimizedAPIClient:
                             total_requests += requests_count
                 
                 # Extraire les données d'erreurs
-                error_index = i * 2 + 1
-                error_rate_data = service_metric_results[error_index]
+                error_rate_data = service_errors_dict[service_id]
                 
                 if error_rate_data and 'result' in error_rate_data and error_rate_data['result']:
                     result = error_rate_data['result'][0]
