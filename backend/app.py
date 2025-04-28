@@ -94,13 +94,13 @@ def cached(cache_key):
                 
             # Vérifier si les données sont en cache et valides
             if cache[cache_key]['data'] is not None and time.time() - cache[cache_key]['timestamp'] < CACHE_DURATION:
-                return jsonify(cache[cache_key]['data'])  # Ajouter jsonify ici
+                return jsonify(cache[cache_key]['data'])
             
             # Si non, exécuter la fonction et mettre en cache
             result = f(*args, **kwargs)
             cache[cache_key]['data'] = result
             cache[cache_key]['timestamp'] = time.time()
-            return jsonify(result)  # Ajouter jsonify ici
+            return jsonify(result)
         return decorated_function
     return decorator
 
@@ -124,44 +124,59 @@ def get_batch_metrics(entity_ids, metric_selector, from_time, to_time, resolutio
     if not entity_ids:
         return {}
     
-    # Construire le sélecteur d'entités pour toutes les entités
-    entity_selector = "entityId(" + "),entityId(".join(entity_ids) + ")"
+    # Limiter le nombre d'entités par requête pour éviter les URL trop longues
+    batch_size = 50
+    results = {}
     
-    try:
-        data = query_api(
-            endpoint="metrics/query",
-            params={
-                "metricSelector": metric_selector,
-                "from": from_time,
-                "to": to_time,
-                "resolution": resolution,
-                "entitySelector": entity_selector
-            }
-        )
+    # Traiter les entités par lots
+    for i in range(0, len(entity_ids), batch_size):
+        batch_ids = entity_ids[i:i+batch_size]
+        entity_selector = "entityId(" + "),entityId(".join(batch_ids) + ")"
         
-        # Organiser les résultats par entité
-        results = {}
-        
-        if data.get('result', []):
-            for result in data.get('result', []):
-                for data_point in result.get('data', []):
-                    entity_id = data_point.get('dimensions', [])[0] if data_point.get('dimensions') else None
-                    if entity_id:
-                        values = data_point.get('values', [])
-                        timestamps = data_point.get('timestamps', [])
-                        
-                        if values and timestamps:
-                            # Stocker la valeur actuelle
-                            if values[0] is not None:
+        try:
+            data = query_api(
+                endpoint="metrics/query",
+                params={
+                    "metricSelector": metric_selector,
+                    "from": from_time,
+                    "to": to_time,
+                    "resolution": resolution,
+                    "entitySelector": entity_selector
+                }
+            )
+            
+            # Debug pour voir la structure de la réponse
+            print(f"Structure de la réponse: {json.dumps(data.get('result', [])[:1], indent=2)}")
+            
+            if data.get('result', []):
+                for result in data.get('result', []):
+                    for data_point in result.get('data', []):
+                        # Vérification plus sûre des dimensions
+                        dimensions = data_point.get('dimensions', [])
+                        if dimensions and len(dimensions) > 0:
+                            entity_id = dimensions[0]
+                            values = data_point.get('values', [])
+                            timestamps = data_point.get('timestamps', [])
+                            
+                            if values and timestamps and len(values) > 0:
+                                # Stocker la valeur actuelle
                                 results[entity_id] = {
-                                    'current': values[0],
+                                    'current': values[0] if values[0] is not None else None,
                                     'history': [
                                         {'timestamp': timestamps[i], 'value': values[i]} 
-                                        for i in range(len(values)) if values[i] is not None
+                                        for i in range(len(values)) if i < len(timestamps) and values[i] is not None
                                     ]
                                 }
-        
-        return results
+        except Exception as e:
+            print(f"Erreur lors de la récupération des métriques pour le lot {i//batch_size}: {e}")
+            # Continuer avec les autres lots plutôt que d'abandonner complètement
+    
+    # S'assurer que chaque entité demandée a une entrée dans les résultats
+    for entity_id in entity_ids:
+        if entity_id not in results:
+            results[entity_id] = {'current': None, 'history': []}
+    
+    return results
     except Exception as e:
         print(f"Erreur lors de la récupération des métriques en batch pour {metric_selector}: {e}")
         return {}
