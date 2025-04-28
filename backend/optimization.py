@@ -612,175 +612,205 @@ class OptimizedAPIClient:
         return list(service_metrics.values())
 
     def get_hosts_metrics_parallel(self, host_ids, from_time, to_time):
-        """
-        Récupère les métriques pour plusieurs hôtes en parallèle
+    """
+    Récupère les métriques pour plusieurs hôtes en parallèle
+    
+    Args:
+        host_ids (list): Liste des IDs d'hôtes
+        from_time (int): Timestamp de début
+        to_time (int): Timestamp de fin
         
-        Args:
-            host_ids (list): Liste des IDs d'hôtes
-            from_time (int): Timestamp de début
-            to_time (int): Timestamp de fin
-            
-        Returns:
-            list: Métriques pour tous les hôtes
-        """
-        # Préparer les requêtes pour la récupération des détails des hôtes
-        host_details_queries = [(f"entities/{host_id}", None) for host_id in host_ids]
+    Returns:
+        list: Métriques pour tous les hôtes
+    """
+    # Préparer les requêtes pour la récupération des détails des hôtes
+    host_details_queries = [(f"entities/{host_id}", None) for host_id in host_ids]
+    
+    # Récupérer les détails des hôtes en parallèle
+    host_details_list = self.batch_query(host_details_queries)
+    
+    # Préparer les requêtes de métriques pour tous les hôtes
+    metric_queries = []
+    for host_id in host_ids:
+        # Requête pour l'utilisation CPU
+        metric_queries.append((
+            "metrics/query",
+            {
+                "metricSelector": "builtin:host.cpu.usage",
+                "from": from_time,
+                "to": to_time,
+                "entitySelector": f"entityId({host_id})"
+            },
+            False,  # Désactivation du cache pour ce call
+            f"cpu_usage:{host_id}:{from_time}:{to_time}"
+        ))
         
-        # Récupérer les détails des hôtes en parallèle
-        host_details_list = self.batch_query(host_details_queries)
+        # Requête pour l'utilisation RAM
+        metric_queries.append((
+            "metrics/query",
+            {
+                "metricSelector": "builtin:host.mem.usage",
+                "from": from_time,
+                "to": to_time,
+                "entitySelector": f"entityId({host_id})"
+            },
+            False,  # Désactivation du cache pour ce call
+            f"ram_usage:{host_id}:{from_time}:{to_time}"
+        ))
+    
+    # Exécuter toutes les requêtes de métriques en parallèle
+    metric_results = self.batch_query(metric_queries)
+    
+    # Organiser les résultats par hôte
+    host_metrics = {}
+    metric_index = 0
+    
+    for i, host_id in enumerate(host_ids):
+        host_details = host_details_list[i]
         
-        # Préparer les requêtes de métriques pour tous les hôtes
-        metric_queries = []
-        for host_id in host_ids:
-            # Requête pour l'utilisation CPU
-            metric_queries.append((
-                "metrics/query",
-                {
-                    "metricSelector": "builtin:host.cpu.usage",
-                    "from": from_time,
-                    "to": to_time,
-                    "entitySelector": f"entityId({host_id})"
-                },
-                True,
-                f"cpu_usage:{host_id}:{from_time}:{to_time}"
-            ))
-            
-            # Requête pour l'utilisation RAM
-            metric_queries.append((
-                "metrics/query",
-                {
-                    "metricSelector": "builtin:host.mem.usage",
-                    "from": from_time,
-                    "to": to_time,
-                    "entitySelector": f"entityId({host_id})"
-                },
-                True,
-                f"ram_usage:{host_id}:{from_time}:{to_time}"
-            ))
+        # Extraire les métriques pour cet hôte
+        cpu_data = metric_results[metric_index]
+        metric_index += 1
+        ram_data = metric_results[metric_index]
+        metric_index += 1
         
-        # Exécuter toutes les requêtes de métriques en parallèle
-        metric_results = self.batch_query(metric_queries)
+        # Traiter les résultats des métriques
+        cpu_usage = None
+        ram_usage = None
         
-        # Organiser les résultats par hôte
-        host_metrics = {}
-        metric_index = 0
-        
-        for i, host_id in enumerate(host_ids):
-            host_details = host_details_list[i]
-            
-            # Extraire les métriques pour cet hôte
-            cpu_data = metric_results[metric_index]
-            metric_index += 1
-            ram_data = metric_results[metric_index]
-            metric_index += 1
-            
-            # Traiter les résultats des métriques
-            cpu_usage = None
-            ram_usage = None
-            
-            # Extraire l'utilisation CPU
+        # Extraire l'utilisation CPU - LOGIQUE EXACTE DE code.py
+        logger.info(f"Traitement CPU pour l'hôte: {host_id}")
+        try:
             if cpu_data and 'result' in cpu_data and cpu_data['result']:
                 result = cpu_data['result'][0]
+                logger.info(f"Host {host_id} - CPU result: {result}")
+                
                 if 'data' in result and result['data']:
                     values = result['data'][0].get('values', [])
+                    logger.info(f"Host {host_id} - CPU values brutes: {values}")
+                    
                     if values and values[0] is not None:
+                        # Exactement comme dans code.py
                         cpu_usage = int(values[0])
-            
-            # Extraire l'utilisation RAM
+                        logger.info(f"Host {host_id} - CPU usage calculé: {cpu_usage}")
+                    else:
+                        logger.info(f"Host {host_id} - Pas de valeurs CPU (hôte inactif?)")
+                else:
+                    logger.info(f"Host {host_id} - Pas de résultats pour le CPU (mauvaise métrique?)")
+        except Exception as e:
+            logger.error(f"Host {host_id} - Erreur pour CPU: {e}")
+        
+        # Extraire l'utilisation RAM - LOGIQUE EXACTE DE code.py
+        logger.info(f"Traitement RAM pour l'hôte: {host_id}")
+        try:
             if ram_data and 'result' in ram_data and ram_data['result']:
                 result = ram_data['result'][0]
+                logger.info(f"Host {host_id} - RAM result: {result}")
+                
                 if 'data' in result and result['data']:
                     values = result['data'][0].get('values', [])
+                    logger.info(f"Host {host_id} - RAM values brutes: {values}")
+                    
                     if values and values[0] is not None:
+                        # Exactement comme dans code.py
                         ram_usage = int(values[0])
-            
-            host_metrics[host_id] = {
-                'id': host_id,
-                'name': host_details.get('displayName', 'Unknown') if host_details else 'Unknown',
-                'cpu': cpu_usage,
-                'ram': ram_usage,
-                'dt_url': f"{self.env_url}/#entity/{host_id}"
-            }
+                        logger.info(f"Host {host_id} - RAM usage calculé: {ram_usage}")
+                    else:
+                        logger.info(f"Host {host_id} - Pas de valeurs RAM (hôte inactif?)")
+                else:
+                    logger.info(f"Host {host_id} - Pas de résultats pour la RAM (mauvaise métrique?)")
+        except Exception as e:
+            logger.error(f"Host {host_id} - Erreur pour RAM: {e}")
         
-        # Récupérer les historiques de métriques en parallèle
-        history_queries = []
-        for host_id in host_ids:
-            history_queries.append((
-                "metrics/query",
-                {
-                    "metricSelector": "builtin:host.cpu.usage",
-                    "from": from_time,
-                    "to": to_time,
-                    "resolution": "1h",
-                    "entitySelector": f"entityId({host_id})"
-                },
-                True,
-                f"cpu_history:{host_id}:{from_time}:{to_time}"
-            ))
-            history_queries.append((
-                "metrics/query",
-                {
-                    "metricSelector": "builtin:host.mem.usage",
-                    "from": from_time,
-                    "to": to_time,
-                    "resolution": "1h",
-                    "entitySelector": f"entityId({host_id})"
-                },
-                True,
-                f"ram_history:{host_id}:{from_time}:{to_time}"
-            ))
+        host_metrics[host_id] = {
+            'id': host_id,
+            'name': host_details.get('displayName', 'Unknown') if host_details else 'Unknown',
+            'cpu': cpu_usage,
+            'ram': ram_usage,
+            'dt_url': f"{self.env_url}/#entity/{host_id}"
+        }
         
-        # Exécuter les requêtes d'historique en parallèle
-        history_results = self.batch_query(history_queries)
+        logger.info(f"Host {host_id} - Données finales: CPU={cpu_usage}, RAM={ram_usage}")
+    
+    # Récupérer les historiques de métriques en parallèle
+    history_queries = []
+    for host_id in host_ids:
+        history_queries.append((
+            "metrics/query",
+            {
+                "metricSelector": "builtin:host.cpu.usage",
+                "from": from_time,
+                "to": to_time,
+                "resolution": "1h",
+                "entitySelector": f"entityId({host_id})"
+            },
+            False,  # Désactivation du cache pour ce call
+            f"cpu_history:{host_id}:{from_time}:{to_time}"
+        ))
+        history_queries.append((
+            "metrics/query",
+            {
+                "metricSelector": "builtin:host.mem.usage",
+                "from": from_time,
+                "to": to_time,
+                "resolution": "1h",
+                "entitySelector": f"entityId({host_id})"
+            },
+            False,  # Désactivation du cache pour ce call
+            f"ram_history:{host_id}:{from_time}:{to_time}"
+        ))
+    
+    # Exécuter les requêtes d'historique en parallèle
+    history_results = self.batch_query(history_queries)
+    
+    # Traiter les résultats d'historique
+    history_index = 0
+    for host_id in host_ids:
+        # Historique CPU
+        cpu_history_data = history_results[history_index]
+        history_index += 1
         
-        # Traiter les résultats d'historique
-        history_index = 0
-        for host_id in host_ids:
-            # Historique CPU
-            cpu_history_data = history_results[history_index]
-            history_index += 1
-            
-            # Historique RAM
-            ram_history_data = history_results[history_index]
-            history_index += 1
-            
-            # Transformer les données pour l'affichage
-            cpu_history = []
-            ram_history = []
-            
-            # Traiter l'historique CPU
-            if cpu_history_data and 'result' in cpu_history_data and cpu_history_data['result']:
-                result = cpu_history_data['result'][0]
-                if 'data' in result and result['data']:
-                    values = result['data'][0].get('values', [])
-                    timestamps = result['data'][0].get('timestamps', [])
-                    if values and timestamps:
-                        for i in range(len(values)):
-                            if values[i] is not None:
-                                cpu_history.append({
-                                    'timestamp': timestamps[i],
-                                    'value': values[i]
-                                })
-            
-            # Traiter l'historique RAM
-            if ram_history_data and 'result' in ram_history_data and ram_history_data['result']:
-                result = ram_history_data['result'][0]
-                if 'data' in result and result['data']:
-                    values = result['data'][0].get('values', [])
-                    timestamps = result['data'][0].get('timestamps', [])
-                    if values and timestamps:
-                        for i in range(len(values)):
-                            if values[i] is not None:
-                                ram_history.append({
-                                    'timestamp': timestamps[i],
-                                    'value': values[i]
-                                })
-            
-            # Ajouter les historiques aux métriques de l'hôte
-            host_metrics[host_id]['cpu_history'] = cpu_history
-            host_metrics[host_id]['ram_history'] = ram_history
+        # Historique RAM
+        ram_history_data = history_results[history_index]
+        history_index += 1
         
-        return list(host_metrics.values())
+        # Transformer les données pour l'affichage
+        cpu_history = []
+        ram_history = []
+        
+        # Traiter l'historique CPU
+        if cpu_history_data and 'result' in cpu_history_data and cpu_history_data['result']:
+            result = cpu_history_data['result'][0]
+            if 'data' in result and result['data']:
+                values = result['data'][0].get('values', [])
+                timestamps = result['data'][0].get('timestamps', [])
+                if values and timestamps:
+                    for i in range(len(values)):
+                        if values[i] is not None:
+                            cpu_history.append({
+                                'timestamp': timestamps[i],
+                                'value': values[i]
+                            })
+        
+        # Traiter l'historique RAM
+        if ram_history_data and 'result' in ram_history_data and ram_history_data['result']:
+            result = ram_history_data['result'][0]
+            if 'data' in result and result['data']:
+                values = result['data'][0].get('values', [])
+                timestamps = result['data'][0].get('timestamps', [])
+                if values and timestamps:
+                    for i in range(len(values)):
+                        if values[i] is not None:
+                            ram_history.append({
+                                'timestamp': timestamps[i],
+                                'value': values[i]
+                            })
+        
+        # Ajouter les historiques aux métriques de l'hôte
+        host_metrics[host_id]['cpu_history'] = cpu_history
+        host_metrics[host_id]['ram_history'] = ram_history
+    
+    return list(host_metrics.values())
 
     def get_problems_filtered(self, mz_name=None, time_from="-24h", status="OPEN"):
         """
