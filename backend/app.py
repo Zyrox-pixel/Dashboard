@@ -8,6 +8,13 @@ import requests
 import urllib3
 from functools import wraps
 from dotenv import load_dotenv
+import logging
+import threading
+from optimization import OptimizedAPIClient, time_execution
+
+# Configuration du logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 # Désactiver les avertissements SSL
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -18,11 +25,20 @@ load_dotenv()
 # Récupérer les variables d'environnement
 DT_ENV_URL = os.environ.get('DT_ENV_URL')
 API_TOKEN = os.environ.get('API_TOKEN')
-VERIFY_SSL = os.environ.get('VERIFY_SSL', 'False').lower() in ('true', '1', 't')
-CACHE_DURATION = 600  # 10 minutes en secondes, augmenté pour améliorer les performances
+CACHE_DURATION = int(os.environ.get('CACHE_DURATION', 300))  # 5 minutes en secondes
 
+# Créer l'application Flask
 app = Flask(__name__)
 CORS(app)  # Activer CORS pour toutes les routes
+
+# Initialiser le client API optimisé
+api_client = OptimizedAPIClient(
+    env_url=DT_ENV_URL,
+    api_token=API_TOKEN,
+    verify_ssl=os.environ.get('VERIFY_SSL', 'False').lower() in ('true', '1', 't'),
+    max_workers=10,
+    cache_duration=CACHE_DURATION
+)
 
 # Fonction pour construire les sélecteurs d'entités avec filtrage par MZ
 def build_entity_selector(entity_type, mz_name):
@@ -31,7 +47,7 @@ def build_entity_selector(entity_type, mz_name):
     """
     return f"type({entity_type}),mzName(\"{mz_name}\")"
 
-# Fonction pour obtenir la liste des MZs Vital for Group (depuis .env)
+# Fonction pour obtenir la liste des MZs Vital for Group
 def get_vital_for_group_mzs():
     # Récupérer la liste depuis la variable d'environnement
     vfg_mz_string = os.environ.get('VFG_MZ_LIST', '')
@@ -43,7 +59,7 @@ def get_vital_for_group_mzs():
     # Diviser la chaîne en liste de MZs
     return [mz.strip() for mz in vfg_mz_string.split(',')]
 
-# Endpoint pour obtenir les Management Zones de Vital for Group
+# Nouvel endpoint pour obtenir les Management Zones de Vital for Group
 @app.route('/api/vital-for-group-mzs', methods=['GET'])
 def get_vital_for_group_mzs_endpoint():
     try:
@@ -54,17 +70,8 @@ def get_vital_for_group_mzs_endpoint():
             'mzs': vfg_mzs
         })
     except Exception as e:
+        logger.error(f"Erreur lors de la récupération des MZs Vital for Group: {e}")
         return jsonify({'error': str(e)}), 500
-
-# Structure de cache simple
-cache = {
-    'services': {'data': None, 'timestamp': 0},
-    'hosts': {'data': None, 'timestamp': 0},
-    'process_groups': {'data': None, 'timestamp': 0},
-    'problems': {'data': None, 'timestamp': 0},
-    'summary': {'data': None, 'timestamp': 0},
-    'management_zones': {'data': None, 'timestamp': 0}
-}
 
 # Fonction pour récupérer la Management Zone actuelle
 def get_current_mz():
@@ -77,343 +84,41 @@ def get_current_mz():
                 current_mz = config.get('current_mz')
                 if current_mz:
                     return current_mz
-            except:
-                pass
+            except Exception as e:
+                logger.error(f"Erreur lors de la lecture du fichier de config MZ: {e}")
     
     # Si pas dans le fichier, utiliser la variable d'environnement
     return os.environ.get('MZ_NAME', '')
 
-# Décorateur pour la mise en cache
-def cached(cache_key):
+# Décorateur pour la mise en cache (version optimisée)
+def cached(cache_key_prefix):
     def decorator(f):
         @wraps(f)
         def decorated_function(*args, **kwargs):
-            # Vérifier si la clé existe dans le cache
-            if cache_key not in cache:
-                cache[cache_key] = {'data': None, 'timestamp': 0}
-                
-            # Vérifier si les données sont en cache et valides
-            if cache[cache_key]['data'] is not None and time.time() - cache[cache_key]['timestamp'] < CACHE_DURATION:
-                return jsonify(cache[cache_key]['data'])
+            # Initialiser le résultat
+            result = None
             
-            # Si non, exécuter la fonction et mettre en cache
-            result = f(*args, **kwargs)
-            cache[cache_key]['data'] = result
-            cache[cache_key]['timestamp'] = time.time()
+            try:
+                # Récupérer la clé de cache complète
+                cache_key = f"{cache_key_prefix}:{get_current_mz()}"
+                
+                # Vérifier si les données sont en cache
+                cached_data = api_client.get_cached(cache_key)
+                if cached_data is not None:
+                    return jsonify(cached_data)
+                
+                # Si non, exécuter la fonction et mettre en cache
+                result = f(*args, **kwargs)
+                api_client.set_cache(cache_key, result)
+            except Exception as e:
+                logger.error(f"Erreur dans le décorateur cached: {e}")
+                # Récupérer le résultat malgré tout
+                if result is None:
+                    result = f(*args, **kwargs)
+            
             return jsonify(result)
         return decorated_function
     return decorator
-
-
-# Fonction pour effectuer des appels API directs à Dynatrace
-def query_api(endpoint, params=None):
-    url = f"{DT_ENV_URL}/api/v2/{endpoint}"
-    headers = {
-        'Authorization': f'Api-Token {API_TOKEN}',
-        'Accept': 'application/json'
-    }
-    response = requests.get(url, headers=headers, params=params, verify=VERIFY_SSL)
-    response.raise_for_status()
-    return response.json()
-
-# Fonction pour récupérer des métriques en batch pour plusieurs entités
-def get_batch_metrics(entity_ids, metric_selector, from_time, to_time, resolution="1h"):
-    """
-    Récupère les métriques pour plusieurs entités en une seule requête API
-    """
-    if not entity_ids:
-        return {}
-    
-    # Limiter le nombre d'entités par requête pour éviter les URL trop longues
-    batch_size = 50
-    results = {}
-    
-    # Traiter les entités par lots
-    for i in range(0, len(entity_ids), batch_size):
-        batch_ids = entity_ids[i:i+batch_size]
-        entity_selector = "entityId(" + "),entityId(".join(batch_ids) + ")"
-        
-        try:
-            data = query_api(
-                endpoint="metrics/query",
-                params={
-                    "metricSelector": metric_selector,
-                    "from": from_time,
-                    "to": to_time,
-                    "resolution": resolution,
-                    "entitySelector": entity_selector
-                }
-            )
-            
-            # Debug pour voir la structure de la réponse
-            print(f"Structure de la réponse: {json.dumps(data.get('result', [])[:1], indent=2)}")
-            
-            if data.get('result', []):
-                for result in data.get('result', []):
-                    for data_point in result.get('data', []):
-                        # Vérification plus sûre des dimensions
-                        dimensions = data_point.get('dimensions', [])
-                        if dimensions and len(dimensions) > 0:
-                            entity_id = dimensions[0]
-                            values = data_point.get('values', [])
-                            timestamps = data_point.get('timestamps', [])
-                            
-                            if values and timestamps and len(values) > 0:
-                                # Stocker la valeur actuelle
-                                results[entity_id] = {
-                                    'current': values[0] if values[0] is not None else None,
-                                    'history': [
-                                        {'timestamp': timestamps[i], 'value': values[i]} 
-                                        for i in range(len(values)) if i < len(timestamps) and values[i] is not None
-                                    ]
-                                }
-        except Exception as e:
-            print(f"Erreur lors de la récupération des métriques pour le lot {i//batch_size}: {e}")
-            # Continuer avec les autres lots plutôt que d'abandonner complètement
-    
-    # S'assurer que chaque entité demandée a une entrée dans les résultats
-    for entity_id in entity_ids:
-        if entity_id not in results:
-            results[entity_id] = {'current': None, 'history': []}
-    
-    return results
-    except Exception as e:
-        print(f"Erreur lors de la récupération des métriques en batch pour {metric_selector}: {e}")
-        return {}
-
-# Fonction pour extraire la technologie d'une entité
-def extract_technology(entity):
-    try:
-        entity_details = query_api(f"entities/{entity['id']}")
-        
-        # Récupération des technologies selon le type d'entité
-        tech_info = []
-        tech_icon = "code"  # Icône par défaut
-        
-        # Pour les services
-        if 'softwareTechnologies' in entity_details.get('properties', {}):
-            techs = entity_details['properties']['softwareTechnologies']
-            for tech in techs:
-                if 'type' in tech:
-                    tech_info.append(tech['type'])
-        
-        # Pour les process groups
-        elif 'softwareTechnologies' in entity_details.get('fromRelationships', {}):
-            techs = entity_details['fromRelationships']['softwareTechnologies']
-            for tech in techs:
-                if 'type' in tech:
-                    tech_info.append(tech['type'])
-        
-        # Approche alternative, chercher des indices dans les tags ou le nom
-        if not tech_info:
-            # Chercher dans les tags
-            if 'tags' in entity_details:
-                for tag in entity_details['tags']:
-                    if tag.get('key') == 'Technology' or tag.get('key') == 'technology':
-                        tech_info.append(tag.get('value'))
-        
-        # Si rien n'est trouvé, chercher des mots-clés dans le nom
-        if not tech_info:
-            name = entity.get('displayName', '').lower()
-            tech_keywords = {
-                'java': ('java', 'coffee'),
-                'python': ('python', 'snake'),
-                'node.js': ('nodejs', 'node'),
-                'nodejs': ('nodejs', 'node'),
-                'php': ('php', 'elephant'),
-                '.net': ('dotnet', 'windows'),
-                'ruby': ('ruby', 'gem'),
-                'go': ('go', 'gopher'),
-                'postgresql': ('database', 'database'),
-                'mysql': ('database', 'database'),
-                'mongodb': ('database', 'database'),
-                'oracle': ('database', 'database')
-            }
-            
-            for tech, (keyword, icon) in tech_keywords.items():
-                if tech in name:
-                    tech_info.append(tech.upper())
-                    tech_icon = icon
-                    break
-        
-        # Déterminer l'icône à utiliser
-        if tech_info:
-            tech_name = tech_info[0].lower()
-            if 'java' in tech_name:
-                tech_icon = 'coffee'
-            elif 'python' in tech_name:
-                tech_icon = 'snake'
-            elif 'node' in tech_name:
-                tech_icon = 'node'
-            elif 'php' in tech_name:
-                tech_icon = 'elephant'
-            elif 'dot' in tech_name or '.net' in tech_name:
-                tech_icon = 'windows'
-            elif 'ruby' in tech_name:
-                tech_icon = 'gem'
-            elif 'go' in tech_name:
-                tech_icon = 'gopher'
-            elif any(db in tech_name for db in ['sql', 'postgres', 'oracle', 'mongo', 'db']):
-                tech_icon = 'database'
-        
-        return {
-            'name': ", ".join(tech_info) if tech_info else "Non spécifié",
-            'icon': tech_icon
-        }
-    except Exception as e:
-        print(f"Erreur lors de l'extraction de la technologie pour {entity.get('displayName', 'Unknown')}: {e}")
-        return {
-            'name': "Non spécifié",
-            'icon': 'question'
-        }
-
-# Fonction optimisée pour extraire les technologies par lots
-def extract_technologies_batch(entities, chunk_size=10):
-    """
-    Extrait les technologies pour plusieurs entités en utilisant des requêtes en lot
-    """
-    tech_info_map = {}
-    
-    for i in range(0, len(entities), chunk_size):
-        batch = entities[i:i+chunk_size]
-        entity_ids = [entity.get('entityId') for entity in batch]
-        
-        # Construire le sélecteur d'entités pour toutes les entités du lot
-        entity_selector = "entityId(" + "),entityId(".join(entity_ids) + ")"
-        
-        try:
-            # Récupérer les détails pour toutes ces entités en une seule requête
-            entities_details = query_api("entities", {
-                "entitySelector": entity_selector,
-                "fields": "+properties.softwareTechnologies,+fromRelationships.softwareTechnologies,+tags",
-                "pageSize": chunk_size
-            })
-            
-            # Traiter chaque entité dans la réponse
-            for entity_detail in entities_details.get('entities', []):
-                entity_id = entity_detail.get('entityId')
-                
-                # Récupération des technologies selon le type d'entité
-                tech_info = []
-                tech_icon = "code"  # Icône par défaut
-                
-                # Pour les services
-                if 'softwareTechnologies' in entity_detail.get('properties', {}):
-                    techs = entity_detail['properties']['softwareTechnologies']
-                    for tech in techs:
-                        if 'type' in tech:
-                            tech_info.append(tech['type'])
-                
-                # Pour les process groups
-                elif 'softwareTechnologies' in entity_detail.get('fromRelationships', {}):
-                    techs = entity_detail['fromRelationships']['softwareTechnologies']
-                    for tech in techs:
-                        if 'type' in tech:
-                            tech_info.append(tech['type'])
-                
-                # Approche alternative, chercher des indices dans les tags
-                if not tech_info:
-                    # Chercher dans les tags
-                    if 'tags' in entity_detail:
-                        for tag in entity_detail['tags']:
-                            if tag.get('key') == 'Technology' or tag.get('key') == 'technology':
-                                tech_info.append(tag.get('value'))
-                
-                # Si rien n'est trouvé, chercher des mots-clés dans le nom
-                if not tech_info:
-                    name = next((e.get('displayName', '').lower() for e in batch if e.get('entityId') == entity_id), '')
-                    tech_keywords = {
-                        'java': ('java', 'coffee'),
-                        'python': ('python', 'snake'),
-                        'node.js': ('nodejs', 'node'),
-                        'nodejs': ('nodejs', 'node'),
-                        'php': ('php', 'elephant'),
-                        '.net': ('dotnet', 'windows'),
-                        'ruby': ('ruby', 'gem'),
-                        'go': ('go', 'gopher'),
-                        'postgresql': ('database', 'database'),
-                        'mysql': ('database', 'database'),
-                        'mongodb': ('database', 'database'),
-                        'oracle': ('database', 'database')
-                    }
-                    
-                    for tech, (keyword, icon) in tech_keywords.items():
-                        if tech in name:
-                            tech_info.append(tech.upper())
-                            tech_icon = icon
-                            break
-                
-                # Déterminer l'icône à utiliser
-                if tech_info:
-                    tech_name = tech_info[0].lower()
-                    if 'java' in tech_name:
-                        tech_icon = 'coffee'
-                    elif 'python' in tech_name:
-                        tech_icon = 'snake'
-                    elif 'node' in tech_name:
-                        tech_icon = 'node'
-                    elif 'php' in tech_name:
-                        tech_icon = 'elephant'
-                    elif 'dot' in tech_name or '.net' in tech_name:
-                        tech_icon = 'windows'
-                    elif 'ruby' in tech_name:
-                        tech_icon = 'gem'
-                    elif 'go' in tech_name:
-                        tech_icon = 'gopher'
-                    elif any(db in tech_name for db in ['sql', 'postgres', 'oracle', 'mongo', 'db']):
-                        tech_icon = 'database'
-                
-                # Stocker les résultats
-                tech_info_map[entity_id] = {
-                    'name': ", ".join(tech_info) if tech_info else "Non spécifié",
-                    'icon': tech_icon
-                }
-        
-        except Exception as e:
-            print(f"Erreur lors de l'extraction par lots des technologies: {e}")
-            # En cas d'erreur, définir les valeurs par défaut pour toutes les entités manquantes
-            for entity in batch:
-                entity_id = entity.get('entityId')
-                if entity_id not in tech_info_map:
-                    tech_info_map[entity_id] = {
-                        'name': "Non spécifié",
-                        'icon': 'question'
-                    }
-    
-    return tech_info_map
-
-# Fonction pour récupérer l'historique des métriques
-def get_metric_history(entity_id, metric_selector, from_time, to_time, resolution="1h"):
-    try:
-        data = query_api(
-            endpoint="metrics/query",
-            params={
-                "metricSelector": metric_selector,
-                "from": from_time,
-                "to": to_time,
-                "resolution": resolution,
-                "entitySelector": f"entityId({entity_id})"
-            }
-        )
-        
-        if data.get('result', []) and data['result'][0].get('data', []):
-            values = data['result'][0]['data'][0].get('values', [])
-            timestamps = data['result'][0]['data'][0].get('timestamps', [])
-            
-            # Créer un tableau de points pour les graphiques
-            history = []
-            if values and timestamps:
-                for i in range(len(values)):
-                    if values[i] is not None:
-                        history.append({
-                            'timestamp': timestamps[i],
-                            'value': values[i]
-                        })
-            return history
-        return []
-    except Exception as e:
-        print(f"Erreur lors de la récupération de l'historique pour {metric_selector}: {e}")
-        return []
 
 # Routes API pour gestion des Management Zones
 @app.route('/api/set-management-zone', methods=['POST'])
@@ -432,9 +137,12 @@ def set_management_zone():
         with open(config_file, 'w') as f:
             json.dump(config, f)
         
-        # Réinitialiser tous les caches pour forcer le rechargement avec la nouvelle MZ
-        for cache_key in cache:
-            cache[cache_key]['timestamp'] = 0
+        # Réinitialiser tous les caches de type entités
+        api_client.clear_cache('services:')
+        api_client.clear_cache('hosts:')
+        api_client.clear_cache('process_groups:')
+        api_client.clear_cache('problems:')
+        api_client.clear_cache('summary:')
         
         return jsonify({
             'success': True, 
@@ -442,6 +150,7 @@ def set_management_zone():
             'management_zone': mz_name
         })
     except Exception as e:
+        logger.error(f"Erreur lors de la définition de la MZ: {e}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/current-management-zone', methods=['GET'])
@@ -452,11 +161,13 @@ def get_current_management_zone():
             'management_zone': current_mz
         })
     except Exception as e:
+        logger.error(f"Erreur lors de la récupération de la MZ actuelle: {e}")
         return jsonify({'error': str(e)}), 500
 
 # Routes API optimisées
 @app.route('/api/summary', methods=['GET'])
 @cached('summary')
+@time_execution
 def get_summary():
     try:
         now = datetime.now()
@@ -468,135 +179,15 @@ def get_summary():
         if not current_mz:
             return {'error': 'Aucune Management Zone définie'}
         
-        # Récupérer les données de base en utilisant les sélecteurs d'entités
-        services_data = query_api("entities", {
-            "entitySelector": build_entity_selector("SERVICE", current_mz),
-            "fields": "+properties,+fromRelationships"
-        })
-        
-        hosts_data = query_api("entities", {
-            "entitySelector": build_entity_selector("HOST", current_mz),
-            "fields": "+properties,+fromRelationships"
-        })
-        
-        problems_data = query_api(
-            endpoint="problems",
-            params={
-                "from": "-24h",
-                "status": "OPEN"
-            }
-        )
-        
-        # Calculer les métriques résumées
-        services_count = len(services_data.get('entities', []))
-        hosts_count = len(hosts_data.get('entities', []))
-        
-        # Filtrer les problèmes pour notre MZ
-        mz_problems = []
-        for problem in problems_data.get('problems', []):
-            # Vérifier si le problème est lié à notre Management Zone
-            is_in_mz = False
-            
-            # Rechercher dans les management zones directement attachées au problème
-            if 'managementZones' in problem:
-                for mz in problem.get('managementZones', []):
-                    if mz.get('name') == current_mz:
-                        is_in_mz = True
-                        break
-            
-            # Rechercher aussi dans les entités affectées
-            if not is_in_mz:
-                for entity in problem.get('affectedEntities', []):
-                    # Vérifier les management zones de chaque entité affectée
-                    for mz in entity.get('managementZones', []):
-                        if mz.get('name') == current_mz:
-                            is_in_mz = True
-                            break
-                    if is_in_mz:
-                        break
-            
-            if is_in_mz:
-                mz_problems.append(problem)
-        
-        problems_count = len(mz_problems)
-        
-        # Extraire les IDs d'entités pour les requêtes en batch
-        host_ids = [host.get('entityId') for host in hosts_data.get('entities', [])]
-        service_ids = [service.get('entityId') for service in services_data.get('entities', [])]
-        
-        # Récupérer les métriques CPU en une seule requête
-        cpu_metrics = get_batch_metrics(host_ids, "builtin:host.cpu.usage", from_time, to_time)
-        
-        # Récupérer les métriques de taux d'erreur en une seule requête
-        error_metrics = get_batch_metrics(service_ids, "builtin:service.errors.total.rate", from_time, to_time)
-        
-        # Récupérer les métriques de nombre de requêtes en une seule requête
-        request_metrics = get_batch_metrics(service_ids, "builtin:service.requestCount.total", from_time, to_time)
-        
-        # Calculer l'utilisation moyenne du CPU et le nombre d'hôtes critiques
-        total_cpu = 0
-        critical_hosts = 0
-        
-        for host_id in host_ids:
-            cpu_data = cpu_metrics.get(host_id, {})
-            if 'current' in cpu_data and cpu_data['current'] is not None:
-                cpu_usage = int(cpu_data['current'])
-                if cpu_usage > 80:
-                    critical_hosts += 1
-                total_cpu += cpu_usage
-        
-        avg_cpu = round(total_cpu / hosts_count) if hosts_count > 0 else 0
-        
-        # Calculer le nombre total de requêtes et le taux d'erreur moyen
-        total_requests = 0
-        total_errors = 0
-        services_with_errors = 0
-        
-        for service_id in service_ids:
-            # Comptage des requêtes
-            request_data = request_metrics.get(service_id, {})
-            if 'current' in request_data and request_data['current'] is not None:
-                requests_count = int(request_data['current'])
-                total_requests += requests_count
-            
-            # Taux d'erreur
-            error_data = error_metrics.get(service_id, {})
-            if 'current' in error_data and error_data['current'] is not None:
-                error_rate = round(error_data['current'], 1)
-                if error_rate > 0:
-                    total_errors += error_rate
-                    services_with_errors += 1
-        
-        avg_error_rate = round(total_errors / services_with_errors, 1) if services_with_errors > 0 else 0
-        
-        return {
-            'hosts': {
-                'count': hosts_count,
-                'avg_cpu': avg_cpu,
-                'critical_count': critical_hosts
-            },
-            'services': {
-                'count': services_count,
-                'with_errors': services_with_errors,
-                'avg_error_rate': avg_error_rate
-            },
-            'requests': {
-                'total': total_requests,
-                'hourly_avg': round(total_requests / 24) if total_requests > 0 else 0
-            },
-            'problems': {
-                'count': problems_count
-            },
-            'timestamp': int(time.time() * 1000)
-        }
+        # Utiliser la méthode optimisée pour récupérer le résumé
+        return api_client.get_summary_parallelized(current_mz, from_time, to_time)
     except Exception as e:
-        print(f"Erreur dans get_summary: {str(e)}")
-        import traceback
-        traceback.print_exc()
+        logger.error(f"Erreur lors de la récupération du résumé: {e}")
         return {'error': str(e)}
 
 @app.route('/api/hosts', methods=['GET'])
 @cached('hosts')
+@time_execution
 def get_hosts():
     try:
         now = datetime.now()
@@ -611,58 +202,28 @@ def get_hosts():
         # Utiliser la fonction build_entity_selector
         entity_selector = build_entity_selector("HOST", current_mz)
         
-        # Récupérer tous les hôtes d'un coup
-        hosts_data = query_api("entities", {
+        # Récupérer les entités hôtes
+        hosts_data = api_client.query_api("entities", {
             "entitySelector": entity_selector,
             "fields": "+properties,+fromRelationships"
         })
         
-        # Extraire les IDs d'entités
+        # Extraire les IDs des hôtes
         host_ids = [host.get('entityId') for host in hosts_data.get('entities', [])]
         
-        # Récupérer toutes les métriques CPU en une seule requête
-        cpu_metrics = get_batch_metrics(host_ids, "builtin:host.cpu.usage", from_time, to_time)
+        # Si aucun hôte n'est trouvé, retourner une liste vide
+        if not host_ids:
+            return []
         
-        # Récupérer toutes les métriques RAM en une seule requête
-        ram_metrics = get_batch_metrics(host_ids, "builtin:host.mem.usage", from_time, to_time)
-        
-        host_metrics = []
-        
-        for host in hosts_data.get('entities', []):
-            host_id = host.get('entityId')
-            
-            # Obtenir les métriques CPU pour cet hôte
-            cpu_data = cpu_metrics.get(host_id, {})
-            cpu_usage = int(cpu_data.get('current', 0)) if cpu_data.get('current') is not None else None
-            cpu_history = cpu_data.get('history', [])
-            
-            # Obtenir les métriques RAM pour cet hôte
-            ram_data = ram_metrics.get(host_id, {})
-            ram_usage = int(ram_data.get('current', 0)) if ram_data.get('current') is not None else None
-            ram_history = ram_data.get('history', [])
-            
-            # Récupérer l'URL Dynatrace de l'entité
-            dt_url = f"{DT_ENV_URL}/#entity/{host_id}"
-            
-            host_metrics.append({
-                'id': host_id,
-                'name': host.get('displayName'),
-                'cpu': cpu_usage,
-                'ram': ram_usage,
-                'cpu_history': cpu_history,
-                'ram_history': ram_history,
-                'dt_url': dt_url
-            })
-        
-        return host_metrics
+        # Récupérer les métriques pour tous les hôtes en parallèle
+        return api_client.get_hosts_metrics_parallel(host_ids, from_time, to_time)
     except Exception as e:
-        print(f"Erreur dans get_hosts: {str(e)}")
-        import traceback
-        traceback.print_exc()
+        logger.error(f"Erreur lors de la récupération des hôtes: {e}")
         return {'error': str(e)}
 
 @app.route('/api/services', methods=['GET'])
 @cached('services')
+@time_execution
 def get_services():
     try:
         now = datetime.now()
@@ -677,80 +238,28 @@ def get_services():
         # Utiliser la fonction build_entity_selector
         entity_selector = build_entity_selector("SERVICE", current_mz)
         
-        # Récupérer tous les services d'un coup
-        services_data = query_api("entities", {
+        # Récupérer les entités services
+        services_data = api_client.query_api("entities", {
             "entitySelector": entity_selector,
             "fields": "+properties,+fromRelationships"
         })
         
-        # Extraire les IDs d'entités
+        # Extraire les IDs des services
         service_ids = [service.get('entityId') for service in services_data.get('entities', [])]
         
-        # Récupérer toutes les métriques de temps de réponse en une seule requête
-        response_time_metrics = get_batch_metrics(service_ids, "builtin:service.response.time", from_time, to_time)
+        # Si aucun service n'est trouvé, retourner une liste vide
+        if not service_ids:
+            return []
         
-        # Récupérer toutes les métriques de taux d'erreur en une seule requête
-        error_rate_metrics = get_batch_metrics(service_ids, "builtin:service.errors.total.rate", from_time, to_time)
-        
-        # Récupérer toutes les métriques de nombre de requêtes en une seule requête
-        request_count_metrics = get_batch_metrics(service_ids, "builtin:service.requestCount.total", from_time, to_time)
-        
-        # Récupérer les technologies des services en batch
-        tech_infos = extract_technologies_batch(services_data.get('entities', []))
-        
-        service_metrics = []
-        
-        for service in services_data.get('entities', []):
-            service_id = service.get('entityId')
-            
-            # Vérification du type de service et activité
-            service_status = "Actif"  # Par défaut
-            
-            # Obtenir les métriques de temps de réponse pour ce service
-            response_time_data = response_time_metrics.get(service_id, {})
-            response_time = int(response_time_data.get('current', 0)) if response_time_data.get('current') is not None else None
-            response_time_history = response_time_data.get('history', [])
-            
-            # Obtenir les métriques de taux d'erreur pour ce service
-            error_rate_data = error_rate_metrics.get(service_id, {})
-            error_rate = round(error_rate_data.get('current', 0), 1) if error_rate_data.get('current') is not None else None
-            error_rate_history = error_rate_data.get('history', [])
-            
-            # Obtenir les métriques de nombre de requêtes pour ce service
-            request_count_data = request_count_metrics.get(service_id, {})
-            requests_count = int(request_count_data.get('current', 0)) if request_count_data.get('current') is not None else None
-            request_count_history = request_count_data.get('history', [])
-            
-            # Récupération de la technologie
-            tech_info = tech_infos.get(service_id, {'name': 'Non spécifié', 'icon': 'code'})
-            
-            # Récupérer l'URL Dynatrace de l'entité
-            dt_url = f"{DT_ENV_URL}/#entity/{service_id}"
-            
-            service_metrics.append({
-                'id': service_id,
-                'name': service.get('displayName'),
-                'response_time': response_time,
-                'error_rate': error_rate,
-                'requests': requests_count,
-                'technology': tech_info['name'],
-                'tech_icon': tech_info['icon'],
-                'status': service_status,
-                'response_time_history': response_time_history,
-                'error_rate_history': error_rate_history,
-                'request_count_history': request_count_history,
-                'dt_url': dt_url
-            })
-        
-        return service_metrics
+        # Récupérer les métriques pour tous les services en parallèle
+        return api_client.get_service_metrics_parallel(service_ids, from_time, to_time)
     except Exception as e:
-        print(f"Erreur dans get_services: {str(e)}")
-        import traceback
-        traceback.print_exc()
+        logger.error(f"Erreur lors de la récupération des services: {e}")
         return {'error': str(e)}
 
 @app.route('/api/processes', methods=['GET'])
 @cached('process_groups')
+@time_execution
 def get_processes():
     try:
         # Récupérer la Management Zone actuelle
@@ -761,42 +270,50 @@ def get_processes():
         # Utiliser la fonction build_entity_selector
         entity_selector = build_entity_selector("PROCESS_GROUP", current_mz)
         
-        process_groups_data = query_api("entities", {
+        # Récupérer les groupes de processus
+        process_groups_data = api_client.query_api("entities", {
             "entitySelector": entity_selector,
             "fields": "+properties,+fromRelationships"
         })
         
-        # Récupérer les technologies des process groups en batch
-        tech_infos = extract_technologies_batch(process_groups_data.get('entities', []))
-        
         process_metrics = []
         
+        # Requêtes en lot pour les technologies
+        process_ids = []
         for pg in process_groups_data.get('entities', []):
-            pg_id = pg.get('entityId')
+            process_ids.append(pg.get('entityId'))
+        
+        # Traiter les processus en lot si disponibles
+        if process_ids:
+            # Récupérer les détails de technologie en parallèle
+            tech_queries = [(f"entities/{pg_id}", None) for pg_id in process_ids]
+            tech_results = api_client.batch_query(tech_queries)
             
-            # Récupération de la technologie
-            tech_info = tech_infos.get(pg_id, {'name': 'Non spécifié', 'icon': 'code'})
-            
-            # Récupérer l'URL Dynatrace de l'entité
-            dt_url = f"{DT_ENV_URL}/#entity/{pg_id}"
-            
-            process_metrics.append({
-                'id': pg_id,
-                'name': pg.get('displayName'),
-                'technology': tech_info['name'],
-                'tech_icon': tech_info['icon'],
-                'dt_url': dt_url
-            })
+            for i, pg in enumerate(process_groups_data.get('entities', [])):
+                pg_id = pg.get('entityId')
+                
+                # Récupération avancée de la technologie
+                tech_info = api_client.extract_technology(pg_id)
+                
+                # Récupérer l'URL Dynatrace de l'entité
+                dt_url = f"{DT_ENV_URL}/#entity/{pg_id}"
+                
+                process_metrics.append({
+                    'id': pg_id,
+                    'name': pg.get('displayName'),
+                    'technology': tech_info['name'],
+                    'tech_icon': tech_info['icon'],
+                    'dt_url': dt_url
+                })
         
         return process_metrics
     except Exception as e:
-        print(f"Erreur dans get_processes: {str(e)}")
-        import traceback
-        traceback.print_exc()
+        logger.error(f"Erreur lors de la récupération des processus: {e}")
         return {'error': str(e)}
 
 @app.route('/api/problems', methods=['GET'])
 @cached('problems')
+@time_execution
 def get_problems():
     try:
         # Récupérer la Management Zone actuelle
@@ -804,158 +321,125 @@ def get_problems():
         if not current_mz:
             return {'error': 'Aucune Management Zone définie'}
         
-        # Récupérer tous les problèmes ouverts sans filtrer par MZ via l'API
-        problems_data = query_api(
-            endpoint="problems",
-            params={
-                "from": "-24h",
-                "status": "OPEN"
-                # Nous retirons le filtre managementZone pour éviter les problèmes de filtrage incorrect
-            }
-        )
-        
-        active_problems = []
-        if 'problems' in problems_data:
-            total_problems = len(problems_data['problems'])
-            print(f"Nombre total de problèmes récupérés: {total_problems}")
-            
-            # On va filtrer manuellement les problèmes liés à notre Management Zone
-            mz_problems = 0
-            for problem in problems_data['problems']:
-                # Vérifier si le problème est lié à notre Management Zone
-                is_in_mz = False
-                
-                # Rechercher dans les management zones directement attachées au problème
-                if 'managementZones' in problem:
-                    for mz in problem.get('managementZones', []):
-                        if mz.get('name') == current_mz:
-                            is_in_mz = True
-                            break
-                
-                # Rechercher aussi dans les entités affectées
-                if not is_in_mz:
-                    for entity in problem.get('affectedEntities', []):
-                        # Vérifier les management zones de chaque entité affectée
-                        for mz in entity.get('managementZones', []):
-                            if mz.get('name') == current_mz:
-                                is_in_mz = True
-                                break
-                        if is_in_mz:
-                            break
-                
-                # Si le problème est dans notre MZ, l'ajouter à notre liste
-                if is_in_mz:
-                    mz_problems += 1
-                    active_problems.append({
-                        'id': problem.get('problemId', 'Unknown'),
-                        'title': problem.get('title', 'Problème inconnu'),
-                        'impact': problem.get('impactLevel', 'UNKNOWN'),
-                        'status': problem.get('status', 'OPEN'),
-                        'affected_entities': len(problem.get('affectedEntities', [])),
-                        'start_time': datetime.fromtimestamp(problem.get('startTime', 0)/1000).strftime('%Y-%m-%d %H:%M'),
-                        'dt_url': f"{DT_ENV_URL}/#problems/problemdetails;pid={problem.get('problemId', 'Unknown')}",
-                        'zone': current_mz
-                    })
-            
-            print(f"Problèmes filtrés appartenant à {current_mz}: {mz_problems}/{total_problems}")
-        
-        return active_problems
+        # Utiliser la méthode optimisée pour récupérer les problèmes filtrés
+        return api_client.get_problems_filtered(current_mz, "-24h", "OPEN")
     except Exception as e:
-        print(f"Erreur lors de la récupération des problèmes: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.error(f"Erreur lors de la récupération des problèmes: {e}")
         return {'error': str(e)}
 
-# Route séparée pour obtenir TOUTES les Management Zones (fonctionnalité future)
-# Route séparée pour obtenir TOUTES les Management Zones (fonctionnalité future)
-# Route séparée pour obtenir TOUTES les Management Zones (fonctionnalité future)
 @app.route('/api/management-zones', methods=['GET'])
 @cached('management_zones')
+@time_execution
 def get_management_zones():
-    # Vérifier d'abord si l'API est accessible sans générer d'erreur
     try:
-        # Tentative simplifiée avec HEAD pour vérifier l'accès sans télécharger les données
+        logger.info("Récupération des management zones...")
+        
+        # Essayer l'ancienne API v1 qui est plus rapide pour ce cas
         url = f"{DT_ENV_URL}/api/config/v1/managementZones"
         headers = {
             'Authorization': f'Api-Token {API_TOKEN}',
             'Accept': 'application/json'
         }
+        response = requests.get(url, headers=headers, verify=False)
+        response.raise_for_status()
+        mz_data = response.json()
         
-        # Utiliser la méthode HEAD avec un timeout court
-        response = requests.head(url, headers=headers, verify=VERIFY_SSL, timeout=2)
+        logger.debug(f"Réponse API: {json.dumps(mz_data, indent=2)}")
         
-        # Si l'API n'est pas accessible (403), retourner un message sans erreur
-        if response.status_code == 403:
-            return {
-                'message': 'Liste des Management Zones non disponible',
-                'note': 'Accès limité par les permissions API'
-            }
+        management_zones = []
         
-        # Si l'API est accessible, procéder à la requête complète
-        if response.status_code == 200:
-            response = requests.get(url, headers=headers, verify=VERIFY_SSL, timeout=5)
-            mz_data = response.json()
-            
-            management_zones = []
-            
-            # Pour l'API v1 config
-            for mz in mz_data.get('values', []):
-                management_zones.append({
-                    'id': mz.get('id'),
-                    'name': mz.get('name'),
-                    'dt_url': f"{DT_ENV_URL}/#settings/managementzones;id={mz.get('id')}"
-                })
-            
-            return management_zones
-        else:
-            return {
-                'message': f'API non disponible (code: {response.status_code})',
-                'note': 'Vérifiez la configuration de votre environnement Dynatrace'
-            }
-            
-    except requests.exceptions.RequestException:
-        # Gérer silencieusement les erreurs de connexion ou de timeout
-        return {
-            'message': 'Liste des Management Zones non disponible',
-            'note': 'Service temporairement indisponible'
-        }
-    except Exception:
-        # Gérer toute autre erreur silencieusement
-        return {
-            'message': 'Liste des Management Zones non disponible',
-            'note': 'Erreur interne'
-        }
+        # Pour l'API v1 config
+        for mz in mz_data.get('values', []):
+            management_zones.append({
+                'id': mz.get('id'),
+                'name': mz.get('name'),
+                'dt_url': f"{DT_ENV_URL}/#settings/managementzones;id={mz.get('id')}"
+            })
+        
+        logger.info(f"Trouvé {len(management_zones)} management zones")
+        return management_zones
+    except Exception as e:
+        logger.error(f"Erreur lors de la récupération des management zones: {e}")
+        return {'error': str(e)}
 
 @app.route('/api/status', methods=['GET'])
 def get_status():
+    # Vérifier les statuts de cache
+    cache_statuses = {}
+    cache_expiry = {}
+    
+    for cache_key in ['services', 'hosts', 'process_groups', 'problems', 'summary']:
+        cached_data = api_client.get_cached(f"{cache_key}:{get_current_mz()}")
+        if cached_data is not None:
+            cache_statuses[cache_key] = 'fresh'
+            # Calculer le temps restant jusqu'à l'expiration
+            cache_item = api_client.cache.get(f"{cache_key}:{get_current_mz()}")
+            if cache_item:
+                cache_expiry[cache_key] = int(cache_item['timestamp'] + CACHE_DURATION - time.time())
+            else:
+                cache_expiry[cache_key] = 0
+        else:
+            cache_statuses[cache_key] = 'stale'
+            cache_expiry[cache_key] = 0
+    
     return jsonify({
         'status': 'online',
-        'cache_status': {
-            'services': 'fresh' if time.time() - cache['services']['timestamp'] < CACHE_DURATION else 'stale',
-            'hosts': 'fresh' if time.time() - cache['hosts']['timestamp'] < CACHE_DURATION else 'stale',
-            'process_groups': 'fresh' if time.time() - cache['process_groups']['timestamp'] < CACHE_DURATION else 'stale',
-            'problems': 'fresh' if time.time() - cache['problems']['timestamp'] < CACHE_DURATION else 'stale',
-            'summary': 'fresh' if time.time() - cache['summary']['timestamp'] < CACHE_DURATION else 'stale'
-        },
-        'cache_expiry': {
-            'services': int(cache['services']['timestamp'] + CACHE_DURATION - time.time()),
-            'hosts': int(cache['hosts']['timestamp'] + CACHE_DURATION - time.time()),
-            'process_groups': int(cache['process_groups']['timestamp'] + CACHE_DURATION - time.time()),
-            'problems': int(cache['problems']['timestamp'] + CACHE_DURATION - time.time()),
-            'summary': int(cache['summary']['timestamp'] + CACHE_DURATION - time.time())
-        },
+        'cache_status': cache_statuses,
+        'cache_expiry': cache_expiry,
         'server_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-        'version': '1.0.0'
+        'version': '1.1.0',
+        'optimized': True
     })
 
 @app.route('/api/refresh/<cache_type>', methods=['POST'])
 def refresh_cache(cache_type):
-    if cache_type not in cache:
-        return jsonify({'error': f'Cache type {cache_type} not found'}), 404
+    if cache_type not in ['services', 'hosts', 'process_groups', 'problems', 'summary', 'all']:
+        return jsonify({'error': f'Type de cache {cache_type} non trouvé'}), 404
     
-    # Réinitialiser le timestamp pour forcer une actualisation à la prochaine requête
-    cache[cache_type]['timestamp'] = 0
-    return jsonify({'success': True, 'message': f'Cache {cache_type} will be refreshed on next request'})
+    # Si 'all', effacer tous les caches
+    if cache_type == 'all':
+        api_client.clear_cache()
+        return jsonify({'success': True, 'message': 'Tous les caches ont été effacés'})
+    
+    # Sinon, effacer uniquement le cache spécifié
+    api_client.clear_cache(f"{cache_type}:")
+    return jsonify({'success': True, 'message': f'Cache {cache_type} effacé avec succès'})
+
+@app.route('/api/performance', methods=['GET'])
+def get_performance():
+    """Endpoint pour obtenir des statistiques de performance"""
+    # Collecter les statistiques de cache
+    cache_stats = {
+        'size': len(api_client.cache),
+        'hit_rate': 0,  # Cela nécessiterait un suivi plus détaillé des hits/misses
+        'items': []
+    }
+    
+    # Ajouter des informations sur les éléments du cache
+    for key, item in api_client.cache.items():
+        age = time.time() - item['timestamp']
+        expiry = CACHE_DURATION - age
+        if expiry > 0:
+            cache_stats['items'].append({
+                'key': key,
+                'age': round(age, 2),
+                'expiry': round(expiry, 2),
+                'size': len(str(item['data']))
+            })
+    
+    # Trier les éléments par âge
+    cache_stats['items'] = sorted(cache_stats['items'], key=lambda x: x['age'])
+    
+    # Limiter à 10 éléments pour éviter des réponses trop volumineuses
+    cache_stats['items'] = cache_stats['items'][:10]
+    
+    return jsonify({
+        'cache': cache_stats,
+        'server_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        'uptime': 0,  # Nécessiterait de stocker l'heure de démarrage
+        'api_client_version': '1.0',
+        'optimized': True
+    })
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0')
