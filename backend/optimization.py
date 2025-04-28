@@ -617,7 +617,6 @@ class OptimizedAPIClient:
 def get_hosts_metrics_parallel(self, host_ids, from_time, to_time):
     """
     Récupère les métriques pour plusieurs hôtes en parallèle
-    Version optimisée sans historique CPU/RAM
     
     Args:
         host_ids (list): Liste des IDs d'hôtes
@@ -736,8 +735,83 @@ def get_hosts_metrics_parallel(self, host_ids, from_time, to_time):
         
         logger.info(f"Host {host_id} - Données finales: CPU={cpu_usage}, RAM={ram_usage}")
     
-    # On ne récupère plus les historiques de métriques en parallèle
-    # C'est la partie supprimée qui récupérait l'historique
+    # Récupérer les historiques de métriques en parallèle
+    history_queries = []
+    for host_id in host_ids:
+        history_queries.append((
+            "metrics/query",
+            {
+                "metricSelector": "builtin:host.cpu.usage",
+                "from": from_time,
+                "to": to_time,
+                "resolution": "1h",
+                "entitySelector": f"entityId({host_id})"
+            },
+            False,  # Désactivation du cache pour ce call
+            f"cpu_history:{host_id}:{from_time}:{to_time}"
+        ))
+        history_queries.append((
+            "metrics/query",
+            {
+                "metricSelector": "builtin:host.mem.usage",
+                "from": from_time,
+                "to": to_time,
+                "resolution": "1h",
+                "entitySelector": f"entityId({host_id})"
+            },
+            False,  # Désactivation du cache pour ce call
+            f"ram_history:{host_id}:{from_time}:{to_time}"
+        ))
+    
+    # Exécuter les requêtes d'historique en parallèle
+    history_results = self.batch_query(history_queries)
+    
+    # Traiter les résultats d'historique
+    history_index = 0
+    for host_id in host_ids:
+        # Historique CPU
+        cpu_history_data = history_results[history_index]
+        history_index += 1
+        
+        # Historique RAM
+        ram_history_data = history_results[history_index]
+        history_index += 1
+        
+        # Transformer les données pour l'affichage
+        cpu_history = []
+        ram_history = []
+        
+        # Traiter l'historique CPU
+        if cpu_history_data and 'result' in cpu_history_data and cpu_history_data['result']:
+            result = cpu_history_data['result'][0]
+            if 'data' in result and result['data']:
+                values = result['data'][0].get('values', [])
+                timestamps = result['data'][0].get('timestamps', [])
+                if values and timestamps:
+                    for i in range(len(values)):
+                        if values[i] is not None:
+                            cpu_history.append({
+                                'timestamp': timestamps[i],
+                                'value': values[i]
+                            })
+        
+        # Traiter l'historique RAM
+        if ram_history_data and 'result' in ram_history_data and ram_history_data['result']:
+            result = ram_history_data['result'][0]
+            if 'data' in result and result['data']:
+                values = result['data'][0].get('values', [])
+                timestamps = result['data'][0].get('timestamps', [])
+                if values and timestamps:
+                    for i in range(len(values)):
+                        if values[i] is not None:
+                            ram_history.append({
+                                'timestamp': timestamps[i],
+                                'value': values[i]
+                            })
+        
+        # Ajouter les historiques aux métriques de l'hôte
+        host_metrics[host_id]['cpu_history'] = cpu_history
+        host_metrics[host_id]['ram_history'] = ram_history
     
     return list(host_metrics.values())
 
