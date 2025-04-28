@@ -63,11 +63,20 @@ def get_vital_for_group_mzs():
 @app.route('/api/vital-for-group-mzs', methods=['GET'])
 def get_vital_for_group_mzs_endpoint():
     try:
-        vfg_mzs = get_vital_for_group_mzs()
+        # Récupérer directement la liste depuis la variable d'environnement
+        vfg_mz_string = os.environ.get('VFG_MZ_LIST', '')
+        
+        # Si la variable n'est pas définie, retourner une liste vide
+        if not vfg_mz_string:
+            return jsonify({'mzs': [], 'source': 'env_file'})
+        
+        # Diviser la chaîne en liste de MZs
+        vfg_mzs = [mz.strip() for mz in vfg_mz_string.split(',')]
         
         # Format de réponse simple
         return jsonify({
-            'mzs': vfg_mzs
+            'mzs': vfg_mzs,
+            'source': 'env_file'  # Indique que les données viennent du fichier .env
         })
     except Exception as e:
         logger.error(f"Erreur lors de la récupération des MZs Vital for Group: {e}")

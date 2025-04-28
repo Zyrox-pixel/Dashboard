@@ -311,70 +311,41 @@ export const OptimizedAppProvider: React.FC<OptimizedAppProviderProps> = ({ chil
       }
       
       // Récupérer le résumé et les problèmes en parallèle
-      const [managementZonesResponse, vitalForGroupResponse] = await Promise.all([
-        optimizedApiMethods.getManagementZones(),
-        optimizedApiMethods.getVitalForGroupMZs()
-      ]);
-      
-      // Traitement des Management Zones
-      if (!managementZonesResponse.error && managementZonesResponse.data) {
-        const mzData = managementZonesResponse.data as any[];
+      // Récupérer uniquement les MZ VFG depuis le fichier .env (via le backend)
+    try {
+        // Nous récupérons directement les VFG du backend sans passer par l'API Dynatrace
+        const vitalForGroupResponse = await optimizedApiMethods.getVitalForGroupMZs();
         
-        // Transformer les données pour le frontend
-        const formattedMZs: ManagementZone[] = mzData.map(mz => ({
-          id: mz.id,
-          name: mz.name,
-          code: mz.id,
-          icon: getZoneIcon(mz.name),
-          problemCount: 0, // Sera mis à jour après avoir récupéré les problèmes
-          apps: 0, // Ces valeurs seront fournies par l'API résumé
-          services: 0,
-          hosts: 0,
-          availability: "100%", // Valeur par défaut, sera mise à jour si disponible
-          status: "healthy" as "healthy" | "warning",
-          color: getZoneColor(mz.name),
-          dt_url: mz.dt_url || "#"
-        }));
-        
-        setManagementZones(formattedMZs);
-      }
-      
-      // Traitement des Management Zones VFG
-      if (!vitalForGroupResponse.error && vitalForGroupResponse.data) {
+        if (!vitalForGroupResponse.error && vitalForGroupResponse.data) {
         const vfgData = vitalForGroupResponse.data as VitalForGroupMZsResponse;
         if (vfgData.mzs && Array.isArray(vfgData.mzs) && vfgData.mzs.length > 0) {
-          // Filtrer les MZs pour ne garder que celles de Vital for Group
-          const vfgMZs: ManagementZone[] = [];
-          
-          // Obtenir toutes les MZs et filtrer celles qui sont dans VFG
-          for (const mzName of vfgData.mzs) {
-            // Chercher la MZ dans les MZs déjà récupérées
-            const existingMZ = managementZones.find(mz => mz.name === mzName);
+            // Créer directement les MZ à partir des noms du fichier .env
+            const vfgMZs: ManagementZone[] = vfgData.mzs.map(mzName => ({
+            id: `env-${mzName.replace(/\s+/g, '-')}`,
+            name: mzName,
+            code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
+            icon: getZoneIcon(mzName),
+            problemCount: 0,
+            apps: 0,
+            services: 0,
+            hosts: 0,
+            availability: "100%",
+            status: "healthy" as "healthy" | "warning",
+            color: getZoneColor(mzName),
+            dt_url: "#"
+            }));
             
-            if (existingMZ) {
-              vfgMZs.push(existingMZ);
-            } else {
-              // Si la MZ n'existe pas encore, créer une entrée temporaire
-              vfgMZs.push({
-                id: `tmp-${mzName.replace(/\s+/g, '-')}`,
-                name: mzName,
-                code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1'),
-                icon: getZoneIcon(mzName),
-                problemCount: 0,
-                apps: 0,
-                services: 0,
-                hosts: 0,
-                availability: "100%",
-                status: "healthy" as "healthy" | "warning",
-                color: getZoneColor(mzName),
-                dt_url: "#"
-              });
-            }
-          }
-          
-          setVitalForGroupMZs(vfgMZs);
+            // Définir les MZ VFG
+            setVitalForGroupMZs(vfgMZs);
+            
+            // Pour compatibilité, utiliser aussi ces MZ comme liste complète
+            setManagementZones(vfgMZs);
         }
-      }
+        }
+    } catch (error) {
+        console.error('Erreur lors de la récupération des MZs VFG:', error);
+        // Ne pas afficher d'erreur critique - nous continuons avec les MZ du .env
+    }
       
       // Si une zone est sélectionnée, charger ses données détaillées
       if (selectedZone) {
