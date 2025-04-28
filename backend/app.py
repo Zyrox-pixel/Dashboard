@@ -29,7 +29,11 @@ CACHE_DURATION = int(os.environ.get('CACHE_DURATION', 300))
 MAX_WORKERS = int(os.environ.get('MAX_WORKERS', 20))
 MAX_CONNECTIONS = int(os.environ.get('MAX_CONNECTIONS', 50))
 
-# Initialiser le client API optimisé avec plus de workers et connexions
+# Créer l'application Flask
+app = Flask(__name__)
+CORS(app)  # Activer CORS pour toutes les routes
+
+# Initialiser le client API optimisé
 api_client = OptimizedAPIClient(
     env_url=DT_ENV_URL,
     api_token=API_TOKEN,
