@@ -94,13 +94,13 @@ def cached(cache_key):
                 
             # Vérifier si les données sont en cache et valides
             if cache[cache_key]['data'] is not None and time.time() - cache[cache_key]['timestamp'] < CACHE_DURATION:
-                return cache[cache_key]['data']
+                return jsonify(cache[cache_key]['data'])  # Ajouter jsonify ici
             
             # Si non, exécuter la fonction et mettre en cache
             result = f(*args, **kwargs)
             cache[cache_key]['data'] = result
             cache[cache_key]['timestamp'] = time.time()
-            return result
+            return jsonify(result)  # Ajouter jsonify ici
         return decorated_function
     return decorator
 
