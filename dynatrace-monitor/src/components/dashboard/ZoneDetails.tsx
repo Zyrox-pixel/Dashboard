@@ -1,5 +1,5 @@
 import React, { useMemo, useCallback, useState, useEffect } from 'react';
-import { ChevronLeft, Clock, AlertTriangle, ExternalLink, RefreshCw, Cpu, Activity, Server, Filter, Loader, Database, Search, ArrowUp, ArrowDown } from 'lucide-react';
+import { ChevronLeft, Clock, AlertTriangle, ExternalLink, RefreshCw, Cpu, Activity, Server, Filter, Loader, Database, Search, ArrowUp, ArrowDown, X, Check, Monitor, Sliders } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { ManagementZone, Problem, ProcessGroup, Host, Service } from '../../api/types';
 import ProblemsList from './ProblemsList';
@@ -32,24 +32,19 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
   const { isDarkTheme } = useTheme();
   const { refreshData } = useApp();
   
-  // Ajouter du debug pour voir ce qui se passe avec les données hosts
-  useEffect(() => {
-    console.log("Hosts reçus dans ZoneDetails:", hosts);
-    console.log("Hosts est un tableau?", Array.isArray(hosts));
-    if (Array.isArray(hosts)) {
-      console.log("Nombre d'hôtes:", hosts.length);
-      if (hosts.length > 0) {
-        console.log("Premier hôte:", hosts[0]);
-      }
-    }
-  }, [hosts]);
-  
   // États pour le tri et la recherche
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'ascending' | 'descending' | null }>({
     key: '',
     direction: null
   });
+  
+  // États pour la recherche
   const [hostSearchTerm, setHostSearchTerm] = useState<string>('');
+  const [serviceSearchTerm, setServiceSearchTerm] = useState<string>('');
+  
+  // États pour les filtres OS
+  const [selectedOsFilters, setSelectedOsFilters] = useState<string[]>([]);
+  const [showOsFilter, setShowOsFilter] = useState<boolean>(false);
   
   // Filtrer les problèmes pour la zone courante (mémorisé)
   const zoneProblems = useMemo(() => 
@@ -142,12 +137,11 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
   
   // Normaliser les données d'hôte
   const normalizedHosts = useMemo(() => {
-    console.log("Normalisation des hôtes...");
     return normalizeHostData(hosts);
   }, [hosts]);
   
   // Fonction pour obtenir les données triées et filtrées
-  const getSortedData = <T extends {}>( data: T[], searchTerm: string = ''): T[] => {
+  const getSortedData = <T extends {}>( data: T[], searchTerm: string = '', filters: any = {}): T[] => {
     if (!data || !Array.isArray(data) || data.length === 0) {
       return [];
     }
@@ -158,6 +152,15 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
     if (searchTerm && sortableData.length > 0 && 'name' in sortableData[0]) {
       sortableData = sortableData.filter(item => 
         ((item as any).name || '').toString().toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+    
+    // Appliquer des filtres spécifiques (comme le filtre OS)
+    if (filters.osFilters && filters.osFilters.length > 0 && sortableData.length > 0 && 'os_version' in sortableData[0]) {
+      sortableData = sortableData.filter(item => 
+        filters.osFilters.some((filter: string) => 
+          (item as any).os_version.toLowerCase().includes(filter.toLowerCase())
+        )
       );
     }
     
@@ -190,11 +193,59 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
     });
   };
   
+  // Extraire la liste des OS uniques des hôtes
+  const uniqueOperatingSystems = useMemo(() => {
+    if (!normalizedHosts || normalizedHosts.length === 0) return [];
+    
+    const osSet = new Set<string>();
+    
+    normalizedHosts.forEach(host => {
+      if (host.os_version) {
+        // Simplifions la détection des OS pour le filtrage
+        let osType = "Autre";
+        
+        if (host.os_version.toLowerCase().includes('linux')) {
+          osType = "Linux";
+        } else if (host.os_version.toLowerCase().includes('windows')) {
+          osType = "Windows";
+        } else if (host.os_version.toLowerCase().includes('unix')) {
+          osType = "Unix";
+        } else if (host.os_version.toLowerCase().includes('aix')) {
+          osType = "AIX";
+        } else if (host.os_version.toLowerCase().includes('mac') || host.os_version.toLowerCase().includes('darwin')) {
+          osType = "MacOS";
+        }
+        
+        osSet.add(osType);
+      }
+    });
+    
+    return Array.from(osSet);
+  }, [normalizedHosts]);
+  
+  // Fonction pour basculer un filtre OS
+  const toggleOsFilter = (os: string) => {
+    if (selectedOsFilters.includes(os)) {
+      setSelectedOsFilters(selectedOsFilters.filter(filter => filter !== os));
+    } else {
+      setSelectedOsFilters([...selectedOsFilters, os]);
+    }
+  };
+  
+  // Fonction pour effacer tous les filtres OS
+  const clearOsFilters = () => {
+    setSelectedOsFilters([]);
+  };
+  
   // Obtenir les données triées et filtrées pour les hôtes
   const sortedHosts = useMemo(() => {
-    console.log("Calcul des hôtes triés, avec", normalizedHosts.length, "hôtes");
-    return getSortedData(normalizedHosts, hostSearchTerm);
-  }, [normalizedHosts, sortConfig, hostSearchTerm]);
+    return getSortedData(normalizedHosts, hostSearchTerm, { osFilters: selectedOsFilters });
+  }, [normalizedHosts, sortConfig, hostSearchTerm, selectedOsFilters]);
+  
+  // Obtenir les données triées et filtrées pour les services
+  const sortedServices = useMemo(() => {
+    return getSortedData(services, serviceSearchTerm);
+  }, [services, sortConfig, serviceSearchTerm]);
   
   // Définition des colonnes pour les tableaux (mémorisée)
   const processColumns = useMemo<Column<ProcessGroup>[]>(() => [
@@ -235,7 +286,20 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
   const serviceColumns = useMemo(() => [
     {
       key: 'name',
-      label: 'Nom',
+      label: (
+        <div className="flex items-center cursor-pointer" onClick={() => requestSort('name')}>
+          Nom
+          {sortConfig.key === 'name' && (
+            <span className="ml-1">
+              {sortConfig.direction === 'ascending' ? (
+                <ArrowUp size={14} />
+              ) : sortConfig.direction === 'descending' ? (
+                <ArrowDown size={14} />
+              ) : null}
+            </span>
+          )}
+        </div>
+      ),
       cellClassName: 'font-medium text-sm',
       render: (service: Service) => (
         <div className="flex items-center gap-2">
@@ -246,7 +310,20 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
     },
     {
       key: 'technology',
-      label: 'Technologie',
+      label: (
+        <div className="flex items-center cursor-pointer" onClick={() => requestSort('technology')}>
+          Technologie
+          {sortConfig.key === 'technology' && (
+            <span className="ml-1">
+              {sortConfig.direction === 'ascending' ? (
+                <ArrowUp size={14} />
+              ) : sortConfig.direction === 'descending' ? (
+                <ArrowDown size={14} />
+              ) : null}
+            </span>
+          )}
+        </div>
+      ),
       cellClassName: 'text-sm',
       render: (service: Service) => (
         <div className="flex items-center gap-2">
@@ -256,31 +333,78 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
     },
     {
       key: 'response_time',
-      label: 'Temps de réponse',
+      label: (
+        <div className="flex items-center cursor-pointer" onClick={() => requestSort('response_time')}>
+          Temps de réponse
+          {sortConfig.key === 'response_time' && (
+            <span className="ml-1">
+              {sortConfig.direction === 'ascending' ? (
+                <ArrowUp size={14} />
+              ) : sortConfig.direction === 'descending' ? (
+                <ArrowDown size={14} />
+              ) : null}
+            </span>
+          )}
+        </div>
+      ),
       cellClassName: 'text-sm',
       render: (service: Service) => (
-        service.response_time ? `${service.response_time} ms` : 'N/A'
+        <span className={`${
+          service.response_time !== null ? 
+            (service.response_time > 1000 ? 'text-red-500' : 
+            service.response_time > 500 ? 'text-yellow-500' : 
+            'text-green-500') : 
+            'text-slate-400'
+        }`}>
+          {service.response_time !== null ? `${service.response_time} ms` : 'N/A'}
+        </span>
       ),
     },
     {
       key: 'error_rate',
-      label: 'Taux d\'erreur',
+      label: (
+        <div className="flex items-center cursor-pointer" onClick={() => requestSort('error_rate')}>
+          Taux d'erreur
+          {sortConfig.key === 'error_rate' && (
+            <span className="ml-1">
+              {sortConfig.direction === 'ascending' ? (
+                <ArrowUp size={14} />
+              ) : sortConfig.direction === 'descending' ? (
+                <ArrowDown size={14} />
+              ) : null}
+            </span>
+          )}
+        </div>
+      ),
       cellClassName: 'text-sm',
       render: (service: Service) => (
         <span className={`${
-          service.error_rate ? 
+          service.error_rate !== null ? 
             (service.error_rate > 5 ? 'text-red-500' : 
             service.error_rate > 1 ? 'text-yellow-500' : 
             'text-green-500') : 
             'text-green-500'
         }`}>
-          {service.error_rate ? `${service.error_rate}%` : '0%'}
+          {service.error_rate !== null ? `${service.error_rate}%` : '0%'}
         </span>
       ),
     },
     {
       key: 'requests',
-      label: 'Requêtes',
+      label: (
+        <div className="flex items-center cursor-pointer" onClick={() => requestSort('requests')}>
+          Requêtes
+          {sortConfig.key === 'requests' && (
+            <span className="ml-1">
+              {sortConfig.direction === 'ascending' ? (
+                <ArrowUp size={14} />
+              ) : sortConfig.direction === 'descending' ? (
+                <ArrowDown size={14} />
+              ) : null}
+            </span>
+          )}
+        </div>
+      ),
       cellClassName: 'text-sm',
       render: (service: Service) => (
         service.requests ? service.requests.toLocaleString() : 'N/A'
@@ -302,12 +426,25 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
         </a>
       ),
     },
-  ], []);
+  ], [sortConfig]);
 
   const hostColumns = useMemo(() => [
     {
       key: 'name',
-      label: 'Nom',
+      label: (
+        <div className="flex items-center cursor-pointer" onClick={() => requestSort('name')}>
+          Nom
+          {sortConfig.key === 'name' && (
+            <span className="ml-1">
+              {sortConfig.direction === 'ascending' ? (
+                <ArrowUp size={14} />
+              ) : sortConfig.direction === 'descending' ? (
+                <ArrowDown size={14} />
+              ) : null}
+            </span>
+          )}
+        </div>
+      ),
       cellClassName: 'font-medium text-sm',
     },
     {
@@ -328,9 +465,10 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
       ),
       cellClassName: 'text-sm',
       render: (host: Host) => (
-        <span>
-          {host.os_version || 'Non spécifié'}
-        </span>
+        <div className="flex items-center gap-2">
+          {getOsIcon(host.os_version)}
+          <span>{host.os_version || 'Non spécifié'}</span>
+        </div>
       ),
     },
     {
@@ -409,6 +547,23 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
     },
   ], [sortConfig]);
 
+  // Helper pour obtenir l'icône du système d'exploitation
+  const getOsIcon = (osVersion: string = '') => {
+    const os = osVersion.toLowerCase();
+    
+    if (os.includes('linux')) {
+      return <span className="text-orange-500">🐧</span>;
+    } else if (os.includes('windows')) {
+      return <span className="text-blue-500">🪟</span>;
+    } else if (os.includes('mac') || os.includes('darwin')) {
+      return <span className="text-gray-500">🍎</span>;
+    } else if (os.includes('unix') || os.includes('aix')) {
+      return <span className="text-purple-500">🖥️</span>;
+    }
+    
+    return <Monitor size={14} className="text-slate-400" />;
+  };
+
   // Optimiser le gestionnaire d'événements avec useCallback
   const handleTabClick = useCallback((tab: string) => {
     onTabChange(tab);
@@ -434,11 +589,6 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
         </div>
       </div>
     );
-  }
-
-  // Message de débogage si pas d'hôtes
-  if (Array.isArray(hosts) && hosts.length === 0) {
-    console.log("Aucun hôte trouvé!");
   }
 
   return (
@@ -599,52 +749,113 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
         <section className={`rounded-lg overflow-hidden ${
           isDarkTheme ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
         } border`}>
-          <div className="flex justify-between items-center p-3 border-b border-slate-700">
-            <h2 className="font-semibold flex items-center gap-2">
-              <Server className={zoneColors.text} size={16} />
-              <span>Hôtes</span>
-              <span className="text-xs text-slate-400 ml-2">({sortedHosts.length})</span>
-            </h2>
-            
-            {/* Barre de recherche pour les hôtes */}
-            <div className="flex items-center gap-3">
-              <div className="relative">
-                <input 
-                  type="text" 
-                  value={hostSearchTerm}
-                  onChange={(e) => setHostSearchTerm(e.target.value)}
-                  placeholder="Rechercher un hôte..."
-                  className={`w-64 h-8 pl-8 pr-4 rounded-md ${
-                    isDarkTheme 
-                      ? 'bg-slate-700 border-slate-600 text-white placeholder-slate-400' 
-                      : 'bg-slate-100 border-slate-200 text-slate-900 placeholder-slate-500'
-                  } border focus:outline-none focus:ring-1 focus:ring-indigo-500`}
-                />
-                <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 text-slate-400" size={14} />
-              </div>
+          <div className="flex flex-col gap-2">
+            <div className="flex justify-between items-center p-3 border-b border-slate-700">
+              <h2 className="font-semibold flex items-center gap-2">
+                <Server className={zoneColors.text} size={16} />
+                <span>Hôtes</span>
+                <span className="text-xs text-slate-400 ml-2">({sortedHosts.length})</span>
+              </h2>
               
-              <button className={`flex items-center gap-1 px-3 py-1 rounded-md border text-sm ${
-                isDarkTheme ? 'border-slate-600 text-slate-300 hover:bg-slate-700' : 'border-slate-300 text-slate-600 hover:bg-slate-100'
+              {/* Barre de recherche et bouton de filtre pour les hôtes */}
+              <div className="flex items-center gap-3">
+                <div className="relative">
+                  <input 
+                    type="text" 
+                    value={hostSearchTerm}
+                    onChange={(e) => setHostSearchTerm(e.target.value)}
+                    placeholder="Rechercher un hôte..."
+                    className={`w-64 h-8 pl-8 pr-4 rounded-md ${
+                      isDarkTheme 
+                        ? 'bg-slate-700 border-slate-600 text-white placeholder-slate-400' 
+                        : 'bg-slate-100 border-slate-200 text-slate-900 placeholder-slate-500'
+                    } border focus:outline-none focus:ring-1 focus:ring-indigo-500`}
+                  />
+                  <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 text-slate-400" size={14} />
+                  {hostSearchTerm && (
+                    <button
+                      onClick={() => setHostSearchTerm('')}
+                      className="absolute right-2.5 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-500"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+                
+                <button 
+                  onClick={() => setShowOsFilter(!showOsFilter)}
+                  className={`flex items-center gap-1 px-3 py-1 rounded-md border text-sm ${
+                    isDarkTheme 
+                      ? selectedOsFilters.length > 0 
+                        ? 'border-indigo-600 bg-indigo-700/30 text-indigo-400' 
+                        : 'border-slate-600 text-slate-300 hover:bg-slate-700' 
+                      : selectedOsFilters.length > 0 
+                        ? 'border-indigo-600 bg-indigo-100 text-indigo-600' 
+                        : 'border-slate-300 text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  <Sliders size={12} />
+                  <span>Filtrer par OS {selectedOsFilters.length > 0 && `(${selectedOsFilters.length})`}</span>
+                </button>
+              </div>
+            </div>
+            
+            {/* Filtres OS */}
+            {showOsFilter && (
+              <div className={`px-4 py-3 border-b ${
+                isDarkTheme ? 'bg-slate-800/70 border-slate-700' : 'bg-slate-50 border-slate-200'
               }`}>
-                <Filter size={12} />
-                <span>Filtrer</span>
-              </button>
-            </div>
+                <div className="flex justify-between items-center mb-2">
+                  <h3 className="text-sm font-medium">Filtrer par système d'exploitation</h3>
+                  {selectedOsFilters.length > 0 && (
+                    <button 
+                      onClick={clearOsFilters}
+                      className={`text-xs ${isDarkTheme ? 'text-indigo-400' : 'text-indigo-600'} hover:underline`}
+                    >
+                      Effacer les filtres
+                    </button>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {uniqueOperatingSystems.map(os => (
+                    <button
+                      key={os}
+                      onClick={() => toggleOsFilter(os)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                        selectedOsFilters.includes(os)
+                          ? isDarkTheme 
+                            ? 'bg-indigo-700/40 text-indigo-300 border-indigo-600' 
+                            : 'bg-indigo-100 text-indigo-700 border-indigo-200'
+                          : isDarkTheme 
+                            ? 'bg-slate-700/50 text-slate-300 border-slate-600 hover:bg-slate-700' 
+                            : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                      } border`}
+                    >
+                      <span className="flex items-center justify-center w-4 h-4">
+                        {getOsIcon(os)}
+                      </span>
+                      <span>{os}</span>
+                      {selectedOsFilters.includes(os) && (
+                        <Check size={12} className={isDarkTheme ? 'text-indigo-400' : 'text-indigo-600'} />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {/* Section principale du tableau */}
+            <PaginatedTable 
+              data={sortedHosts}
+              columns={hostColumns}
+              pageSize={20}
+              emptyMessage={
+                selectedOsFilters.length > 0
+                  ? "Aucun hôte ne correspond aux filtres sélectionnés."
+                  : "Aucun hôte trouvé pour cette management zone."
+              }
+            />
           </div>
-
-          {/* Ajouter un message de debug si nécessaire */}
-          {sortedHosts.length === 0 && (
-            <div className="p-4 bg-yellow-100 border border-yellow-300 text-yellow-800 rounded m-4">
-              <strong>Débogage:</strong> Aucun hôte trouvé. Vérifiez la console pour plus de détails.
-            </div>
-          )}
-
-          <PaginatedTable 
-            data={sortedHosts}
-            columns={hostColumns}
-            pageSize={20}
-            emptyMessage="Aucun hôte trouvé pour cette management zone."
-          />
         </section>
       )}
       
@@ -657,18 +868,45 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
             <h2 className="font-semibold flex items-center gap-2">
               <Activity className={zoneColors.text} size={16} />
               <span>Services</span>
-              <span className="text-xs text-slate-400 ml-2">({services.length})</span>
+              <span className="text-xs text-slate-400 ml-2">({sortedServices.length})</span>
             </h2>
-            <button className={`flex items-center gap-1 px-3 py-1 rounded-md border text-sm ${
-              isDarkTheme ? 'border-slate-600 text-slate-300 hover:bg-slate-700' : 'border-slate-300 text-slate-600 hover:bg-slate-100'
-            }`}>
-              <Filter size={12} />
-              <span>Filtrer</span>
-            </button>
+            
+            {/* Barre de recherche pour les services */}
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <input 
+                  type="text" 
+                  value={serviceSearchTerm}
+                  onChange={(e) => setServiceSearchTerm(e.target.value)}
+                  placeholder="Rechercher un service..."
+                  className={`w-64 h-8 pl-8 pr-4 rounded-md ${
+                    isDarkTheme 
+                      ? 'bg-slate-700 border-slate-600 text-white placeholder-slate-400' 
+                      : 'bg-slate-100 border-slate-200 text-slate-900 placeholder-slate-500'
+                  } border focus:outline-none focus:ring-1 focus:ring-indigo-500`}
+                />
+                <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 text-slate-400" size={14} />
+                {serviceSearchTerm && (
+                  <button
+                    onClick={() => setServiceSearchTerm('')}
+                    className="absolute right-2.5 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-500"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+              
+              <button className={`flex items-center gap-1 px-3 py-1 rounded-md border text-sm ${
+                isDarkTheme ? 'border-slate-600 text-slate-300 hover:bg-slate-700' : 'border-slate-300 text-slate-600 hover:bg-slate-100'
+              }`}>
+                <Filter size={12} />
+                <span>Filtrer</span>
+              </button>
+            </div>
           </div>
 
           <PaginatedTable 
-            data={services}
+            data={sortedServices}
             columns={serviceColumns}
             pageSize={20}
             emptyMessage="Aucun service trouvé pour cette management zone."
