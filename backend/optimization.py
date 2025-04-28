@@ -651,228 +651,301 @@ class OptimizedAPIClient:
         
         return service_metrics
 
-    def get_hosts_metrics_parallel(self, host_ids, from_time, to_time):
-    """
-    Récupère les métriques pour plusieurs hôtes en parallèle - CORRIGÉ
-    
-    Args:
-            host_ids (list): Liste des IDs d'hôtes
-            from_time (int): Timestamp de début
-            to_time (int): Timestamp de fin
-            
-        Returns:
-            list: Métriques pour tous les hôtes
-        """
-        # Préparer les requêtes pour la récupération des détails des hôtes avec ID explicite
-        host_details_queries = []
-        for host_id in host_ids:
-            host_details_queries.append((
-                f"entities/{host_id}", 
+    def get_service_metrics_parallel(self, service_ids, from_time, to_time):
+    # Préparer les requêtes pour la récupération des détails des services avec ID explicite
+        service_details_queries = []
+        for service_id in service_ids:
+            service_details_queries.append((
+                f"entities/{service_id}", 
                 None, 
                 True,
-                f"host_details:{host_id}"  # Clé de cache explicite avec ID
+                f"service_details:{service_id}"  # Clé de cache explicite avec ID
             ))
         
-        # Récupérer les détails des hôtes en parallèle
-        host_details_results = self.batch_query(host_details_queries)
+        # Récupérer les détails des services en parallèle
+        service_details_results = self.batch_query(service_details_queries)
         
-        # Créer un dictionnaire pour associer les résultats aux hôtes
-        host_details_dict = {}
-        for i, host_id in enumerate(host_ids):
-            host_details_dict[host_id] = host_details_results[i]
+        # Créer un dictionnaire pour associer les résultats aux services
+        service_details_dict = {}
+        for i, service_id in enumerate(service_ids):
+            service_details_dict[service_id] = service_details_results[i]
         
-        # Préparer les requêtes de métriques avec clés explicites
+        # Préparer les requêtes de métriques pour tous les services avec clés explicites
         metric_queries = []
-        for host_id in host_ids:
-            # Requête pour l'utilisation CPU avec ID explicite
+        for service_id in service_ids:
+            # Requête pour le temps de réponse avec ID explicite
             metric_queries.append((
                 "metrics/query",
                 {
-                    "metricSelector": "builtin:host.cpu.usage",
+                    "metricSelector": "builtin:service.response.time",
                     "from": from_time,
                     "to": to_time,
-                    "entitySelector": f"entityId({host_id})"
+                    "entitySelector": f"entityId({service_id})"
                 },
                 True,
-                f"cpu_usage:{host_id}:{from_time}:{to_time}"  # Clé explicite avec ID
+                f"response_time:{service_id}:{from_time}:{to_time}"  # Clé explicite avec ID
             ))
             
-            # Requête pour l'utilisation RAM avec ID explicite
+            # Requête pour le taux d'erreur avec ID explicite
             metric_queries.append((
                 "metrics/query",
                 {
-                    "metricSelector": "builtin:host.mem.usage",
+                    "metricSelector": "builtin:service.errors.total.rate",
                     "from": from_time,
                     "to": to_time,
-                    "entitySelector": f"entityId({host_id})"
+                    "entitySelector": f"entityId({service_id})"
                 },
                 True,
-                f"ram_usage:{host_id}:{from_time}:{to_time}"  # Clé explicite avec ID
+                f"error_rate:{service_id}:{from_time}:{to_time}"  # Clé explicite avec ID
+            ))
+            
+            # Requête pour le nombre de requêtes avec ID explicite
+            metric_queries.append((
+                "metrics/query",
+                {
+                    "metricSelector": "builtin:service.requestCount.total",
+                    "from": from_time,
+                    "to": to_time,
+                    "entitySelector": f"entityId({service_id})"
+                },
+                True,
+                f"requests:{service_id}:{from_time}:{to_time}"  # Clé explicite avec ID
             ))
         
         # Exécuter toutes les requêtes de métriques en parallèle
         all_metric_results = self.batch_query(metric_queries)
         
-        # Créer des dictionnaires pour associer les résultats de métriques aux hôtes
-        cpu_metrics = {}
-        ram_metrics = {}
+        # Créer des dictionnaires pour associer les résultats de métriques aux services
+        response_time_metrics = {}
+        error_rate_metrics = {}
+        request_metrics = {}
         
-        # Distribuer les résultats dans des dictionnaires par ID d'hôte
+        # Distribuer les résultats dans des dictionnaires par ID de service
         result_index = 0
-        for host_id in host_ids:
-            cpu_metrics[host_id] = all_metric_results[result_index]
+        for service_id in service_ids:
+            response_time_metrics[service_id] = all_metric_results[result_index]
             result_index += 1
-            ram_metrics[host_id] = all_metric_results[result_index]
+            error_rate_metrics[service_id] = all_metric_results[result_index]
             result_index += 1
+            request_metrics[service_id] = all_metric_results[result_index]
+            result_index += 1
+        
+        # Récupérer les technologies en parallèle
+        tech_queries = []
+        for service_id in service_ids:
+            tech_queries.append((
+                f"entities/{service_id}", 
+                None, 
+                True,
+                f"tech:{service_id}"  # Clé explicite avec ID
+            ))
+        
+        tech_results = self.batch_query(tech_queries)
+        tech_dict = {}
+        for i, service_id in enumerate(service_ids):
+            tech_info = self.extract_technology(service_id)
+            tech_dict[service_id] = tech_info
         
         # Préparer les requêtes d'historique avec clés explicites
         history_queries = []
-        for host_id in host_ids:
-            # Historique CPU avec ID explicite
+        for service_id in service_ids:
+            # Historique du temps de réponse
             history_queries.append((
                 "metrics/query",
                 {
-                    "metricSelector": "builtin:host.cpu.usage",
+                    "metricSelector": "builtin:service.response.time",
                     "from": from_time,
                     "to": to_time,
                     "resolution": "1h",
-                    "entitySelector": f"entityId({host_id})"
+                    "entitySelector": f"entityId({service_id})"
                 },
                 True,
-                f"cpu_history:{host_id}:{from_time}:{to_time}"  # Clé explicite avec ID
+                f"rt_history:{service_id}:{from_time}:{to_time}"  # Clé explicite avec ID
             ))
             
-            # Historique RAM avec ID explicite
+            # Historique du taux d'erreur
             history_queries.append((
                 "metrics/query",
                 {
-                    "metricSelector": "builtin:host.mem.usage",
+                    "metricSelector": "builtin:service.errors.total.rate",
                     "from": from_time,
                     "to": to_time,
                     "resolution": "1h",
-                    "entitySelector": f"entityId({host_id})"
+                    "entitySelector": f"entityId({service_id})"
                 },
                 True,
-                f"ram_history:{host_id}:{from_time}:{to_time}"  # Clé explicite avec ID
+                f"er_history:{service_id}:{from_time}:{to_time}"  # Clé explicite avec ID
+            ))
+            
+            # Historique du nombre de requêtes
+            history_queries.append((
+                "metrics/query",
+                {
+                    "metricSelector": "builtin:service.requestCount.total",
+                    "from": from_time,
+                    "to": to_time,
+                    "resolution": "1h",
+                    "entitySelector": f"entityId({service_id})"
+                },
+                True,
+                f"req_history:{service_id}:{from_time}:{to_time}"  # Clé explicite avec ID
             ))
         
         # Exécuter les requêtes d'historique en parallèle
         history_results = self.batch_query(history_queries)
         
-        # Créer des dictionnaires pour associer les résultats d'historique aux hôtes
-        cpu_history_dict = {}
-        ram_history_dict = {}
+        # Créer des dictionnaires pour associer les résultats d'historique aux services
+        rt_history_dict = {}
+        er_history_dict = {}
+        req_history_dict = {}
         
-        # Distribuer les résultats d'historique dans des dictionnaires par ID d'hôte
+        # Distribuer les résultats d'historique dans des dictionnaires par ID de service
         result_index = 0
-        for host_id in host_ids:
-            cpu_history_dict[host_id] = history_results[result_index]
+        for service_id in service_ids:
+            rt_history_dict[service_id] = history_results[result_index]
             result_index += 1
-            ram_history_dict[host_id] = history_results[result_index]
+            er_history_dict[service_id] = history_results[result_index]
+            result_index += 1
+            req_history_dict[service_id] = history_results[result_index]
             result_index += 1
         
-        # Maintenant, assembler les métriques pour chaque hôte
-        host_metrics = []
-        for host_id in host_ids:
-            host_details = host_details_dict[host_id]
-            cpu_data = cpu_metrics[host_id]
-            ram_data = ram_metrics[host_id]
+        # Maintenant, assembler les métriques pour chaque service
+        service_metrics = []
+        for service_id in service_ids:
+            service_details = service_details_dict[service_id]
             
-            # Extraire les valeurs de métriques
-            cpu_usage = None
-            ram_usage = None
+            # Vérification du type de service et activité
+            service_status = "Actif"
+            if service_details and 'properties' in service_details and 'monitoring' in service_details['properties']:
+                if service_details['properties']['monitoring'].get('monitoringState') != "ACTIVE":
+                    service_status = "Inactif"
             
-            # Traitement des données CPU
-            if cpu_data and 'result' in cpu_data and cpu_data['result']:
-                result = cpu_data['result'][0]
+            # Extraire les métriques pour ce service
+            response_time_data = response_time_metrics[service_id]
+            error_rate_data = error_rate_metrics[service_id]
+            requests_data = request_metrics[service_id]
+            
+            # Traiter les résultats des métriques
+            response_time = None
+            error_rate = None
+            requests_count = None
+            
+            # Extraire le temps de réponse
+            # CORRECTION: Traitement amélioré du temps de réponse
+            if response_time_data and 'result' in response_time_data and response_time_data['result']:
+                result = response_time_data['result'][0]
                 if 'data' in result and result['data']:
                     values = result['data'][0].get('values', [])
                     if values and values[0] is not None:
-                        cpu_usage = int(values[0])
+                        raw_value = values[0]
+                        
+                        # Vérifier si la valeur semble être en microsecondes ou trop élevée
+                        if raw_value > 10000:  # Si > 10 secondes, considère comme µs
+                            response_time = round(raw_value / 1000)  # Convertir µs en ms
+                            logger.info(f"Converted large response time from {raw_value} to {response_time} ms for service {service_id}")
+                        else:
+                            response_time = round(raw_value)
+                            
+                        # Vérifier si la valeur est raisonnable pour un temps de réponse
+                        if response_time > 60000:  # Si > 1 minute
+                            logger.warning(f"Extremely high response time: {response_time} ms for service {service_id}")
+                            # Limiter à une valeur raisonnable pour l'affichage
+                            response_time = min(response_time, 60000)
             
-            # Traitement des données RAM
-            if ram_data and 'result' in ram_data and ram_data['result']:
-                result = ram_data['result'][0]
+            # Extraire le taux d'erreur
+            if error_rate_data and 'result' in error_rate_data and error_rate_data['result']:
+                result = error_rate_data['result'][0]
                 if 'data' in result and result['data']:
                     values = result['data'][0].get('values', [])
                     if values and values[0] is not None:
-                        ram_usage = int(values[0])
+                        error_rate = round(values[0], 1)
+            
+            # Extraire le nombre de requêtes
+            if requests_data and 'result' in requests_data and requests_data['result']:
+                result = requests_data['result'][0]
+                if 'data' in result and result['data']:
+                    values = result['data'][0].get('values', [])
+                    if values and values[0] is not None:
+                        requests_count = int(values[0])
+            
+            # Extraire la technologie du dictionnaire
+            tech_info = tech_dict[service_id]
             
             # Traiter les historiques
-            cpu_history = []
-            ram_history = []
+            response_time_history = []
+            error_rate_history = []
+            request_count_history = []
             
-            # Historique CPU
-            cpu_history_data = cpu_history_dict[host_id]
-            if cpu_history_data and 'result' in cpu_history_data and cpu_history_data['result']:
-                result = cpu_history_data['result'][0]
+            # Historique du temps de réponse avec correction
+            rt_history_data = rt_history_dict[service_id]
+            if rt_history_data and 'result' in rt_history_data and rt_history_data['result']:
+                result = rt_history_data['result'][0]
                 if 'data' in result and result['data']:
                     values = result['data'][0].get('values', [])
                     timestamps = result['data'][0].get('timestamps', [])
                     if values and timestamps:
                         for i in range(len(values)):
                             if values[i] is not None:
-                                cpu_history.append({
+                                # Appliquer la même correction que pour la valeur instantanée
+                                rt_value = values[i]
+                                if rt_value > 10000:  # Si > 10 secondes, considère comme µs
+                                    rt_value = rt_value / 1000  # Convertir µs en ms
+                                
+                                # Limiter à une valeur raisonnable
+                                rt_value = min(round(rt_value), 60000)
+                                
+                                response_time_history.append({
                                     'timestamp': timestamps[i],
-                                    'value': values[i]
+                                    'value': rt_value
                                 })
             
-            # Historique RAM
-            ram_history_data = ram_history_dict[host_id]
-            if ram_history_data and 'result' in ram_history_data and ram_history_data['result']:
-                result = ram_history_data['result'][0]
+            # Historique du taux d'erreur
+            er_history_data = er_history_dict[service_id]
+            if er_history_data and 'result' in er_history_data and er_history_data['result']:
+                result = er_history_data['result'][0]
                 if 'data' in result and result['data']:
                     values = result['data'][0].get('values', [])
                     timestamps = result['data'][0].get('timestamps', [])
                     if values and timestamps:
                         for i in range(len(values)):
                             if values[i] is not None:
-                                ram_history.append({
+                                error_rate_history.append({
                                     'timestamp': timestamps[i],
                                     'value': values[i]
                                 })
             
-            # Extraire la version de l'OS des propriétés de l'hôte
-            os_version = "Non spécifié"
-            if host_details and 'properties' in host_details:
-                properties = host_details.get('properties', {})
-                
-                # Vérifier différentes propriétés possibles pour l'OS
-                if 'osType' in properties:
-                    os_type = properties.get('osType', "")
-                    os_version = os_type
-                    
-                    # Ajouter la version si disponible
-                    if 'osVersion' in properties:
-                        os_version = f"{os_type} {properties.get('osVersion', '')}"
-                elif 'kernelVersion' in properties:
-                    os_version = f"Kernel {properties.get('kernelVersion', '')}"
-                    
-                    # Si osVersion est également disponible
-                    if 'osVersion' in properties:
-                        os_version = f"{properties.get('osVersion', '')} (Kernel {properties.get('kernelVersion', '')})"
-                
-                # Si aucune propriété spécifique n'est trouvée, chercher dans les tags
-                if os_version == "Non spécifié" and 'tags' in host_details:
-                    for tag in host_details.get('tags', []):
-                        # Chercher les tags liés à l'OS
-                        if tag.get('key') in ['OS', 'os', 'Operating System', 'system']:
-                            os_version = tag.get('value', "Non spécifié")
-                            break
+            # Historique du nombre de requêtes
+            req_history_data = req_history_dict[service_id]
+            if req_history_data and 'result' in req_history_data and req_history_data['result']:
+                result = req_history_data['result'][0]
+                if 'data' in result and result['data']:
+                    values = result['data'][0].get('values', [])
+                    timestamps = result['data'][0].get('timestamps', [])
+                    if values and timestamps:
+                        for i in range(len(values)):
+                            if values[i] is not None:
+                                request_count_history.append({
+                                    'timestamp': timestamps[i],
+                                    'value': values[i]
+                                })
             
-            # Créer l'objet de métriques d'hôte
-            host_metrics.append({
-                'id': host_id,
-                'name': host_details.get('displayName', 'Unknown') if host_details else 'Unknown',
-                'cpu': cpu_usage,
-                'ram': ram_usage,
-                'os_version': os_version,  # Ajout de la version de l'OS
-                'dt_url': f"{self.env_url}/#entity/{host_id}",
-                'cpu_history': cpu_history,
-                'ram_history': ram_history
+            # Créer l'objet de métriques pour ce service
+            service_metrics.append({
+                'id': service_id,
+                'name': service_details.get('displayName', 'Unknown') if service_details else 'Unknown',
+                'response_time': response_time,
+                'error_rate': error_rate,
+                'requests': requests_count,
+                'status': service_status,
+                'technology': tech_info['name'],
+                'tech_icon': tech_info['icon'],
+                'dt_url': f"{self.env_url}/#entity/{service_id}",
+                'response_time_history': response_time_history,
+                'error_rate_history': error_rate_history,
+                'request_count_history': request_count_history
             })
         
-        return host_metrics
+        return service_metrics
 
     def get_problems_filtered(self, mz_name=None, time_from="-24h", status="OPEN"):
         """
