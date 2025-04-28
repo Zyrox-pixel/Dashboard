@@ -195,6 +195,133 @@ def get_active_problems():
         traceback.print_exc()
         return []
 
+def get_service_metrics(service_id, service, from_time, to_time):
+    """Fonction pour récupérer toutes les métriques d'un service de façon fiable"""
+    try:
+        # Vérification du type de service et activité
+        service_details = query_api(f"entities/{service_id}")
+        service_type = service_details.get('type', '')
+        service_status = "Actif"
+        
+        # Vérifie si le service est inactif
+        if 'monitoring' in service_details.get('properties', {}) and 'monitoringState' in service_details['properties']['monitoring']:
+            if service_details['properties']['monitoring']['monitoringState'] != "ACTIVE":
+                service_status = "Inactif"
+                print(f"  Service {service.display_name} est inactif")
+        
+        # Initialisation des métriques avec None
+        response_time = None
+        error_rate = None
+        requests_count = None
+        response_time_history = []
+        error_rate_history = []
+        request_count_history = []
+        
+        # Récupération du temps de réponse
+        try:
+            response_time_data = query_api(
+                endpoint="metrics/query",
+                params={
+                    "metricSelector": "builtin:service.response.time",
+                    "from": from_time,
+                    "to": to_time,
+                    "entitySelector": f"entityId({service_id})"
+                }
+            )
+            
+            if response_time_data.get('result', []) and response_time_data['result'][0].get('data', []):
+                values = response_time_data['result'][0]['data'][0].get('values', [])
+                if values and values[0] is not None:  # Vérifier si la valeur n'est pas None
+                    response_time = int(values[0])
+                else:
+                    print(f"  Pas de valeurs pour le temps de réponse (service inactif?)")
+            else:
+                print(f"  Pas de résultats pour le temps de réponse (mauvaise métrique?)")
+                
+            # Récupérer l'historique du temps de réponse pour les graphiques
+            response_time_history = get_metric_history(service_id, "builtin:service.response.time", from_time, to_time)
+        except Exception as e:
+            print(f"  Erreur pour le temps de réponse: {e}")
+        
+        # Récupération du taux d'erreur
+        try:
+            error_rate_data = query_api(
+                endpoint="metrics/query",
+                params={
+                    "metricSelector": "builtin:service.errors.total.rate",
+                    "from": from_time,
+                    "to": to_time,
+                    "entitySelector": f"entityId({service_id})"
+                }
+            )
+            if error_rate_data.get('result', []) and error_rate_data['result'][0].get('data', []):
+                values = error_rate_data['result'][0]['data'][0].get('values', [])
+                if values and values[0] is not None:  # Vérifier si la valeur n'est pas None
+                    error_rate = round(values[0], 1)
+                
+            # Récupérer l'historique du taux d'erreur
+            error_rate_history = get_metric_history(service_id, "builtin:service.errors.total.rate", from_time, to_time)
+        except Exception as e:
+            print(f"  Erreur pour le taux d'erreur: {e}")
+        
+        # Récupération du nombre de requêtes
+        try:
+            requests_data = query_api(
+                endpoint="metrics/query",
+                params={
+                    "metricSelector": "builtin:service.requestCount.total",
+                    "from": from_time,
+                    "to": to_time,
+                    "entitySelector": f"entityId({service_id})"
+                }
+            )
+            if requests_data.get('result', []) and requests_data['result'][0].get('data', []):
+                values = requests_data['result'][0]['data'][0].get('values', [])
+                if values and values[0] is not None:  # Vérifier si la valeur n'est pas None
+                    requests_count = int(values[0])
+            
+            # Récupérer l'historique du nombre de requêtes
+            request_count_history = get_metric_history(service_id, "builtin:service.requestCount.total", from_time, to_time)
+        except Exception as e:
+            print(f"  Erreur pour le nombre de requêtes: {e}")
+        
+        # Récupération avancée de la technologie
+        tech_info = extract_technology(service)
+        
+        # Récupérer l'URL Dynatrace de l'entité
+        dt_url = f"{DT_ENV_URL}/#entity/{service_id}"
+        
+        # Retourner toutes les métriques dans un dictionnaire
+        return {
+            'name': service.display_name,
+            'id': service_id,
+            'response_time': response_time,
+            'error_rate': error_rate,
+            'requests': requests_count,
+            'technology': tech_info['name'],
+            'tech_icon': tech_info['icon'],
+            'status': service_status,
+            'response_time_history': response_time_history,
+            'error_rate_history': error_rate_history,
+            'request_count_history': request_count_history,
+            'dt_url': dt_url
+        }
+    except Exception as e:
+        print(f"Erreur globale lors du traitement du service {service.display_name}: {e}")
+        return {
+            'name': service.display_name,
+            'id': service_id,
+            'response_time': None,
+            'error_rate': None,
+            'requests': None,
+            'technology': "Non spécifié",
+            'tech_icon': 'question',
+            'status': "Erreur",
+            'response_time_history': [],
+            'error_rate_history': [],
+            'request_count_history': [],
+            'dt_url': f"{DT_ENV_URL}/#entity/{service_id}"
+        }
 
 try:
     # === RÉCUPÉRATION DES ENTITÉS ===
@@ -247,7 +374,7 @@ try:
             )
             if cpu_data.get('result', []) and cpu_data['result'][0].get('data', []):
                 values = cpu_data['result'][0]['data'][0].get('values', [])
-                if values:
+                if values and values[0] is not None:
                     cpu_usage = int(values[0])
                     if cpu_usage > 80:
                         critical_hosts += 1
@@ -270,7 +397,7 @@ try:
             )
             if ram_data.get('result', []) and ram_data['result'][0].get('data', []):
                 values = ram_data['result'][0]['data'][0].get('values', [])
-                if values:
+                if values and values[0] is not None:
                     ram_usage = int(values[0])
            
             # Récupérer l'historique RAM pour les graphiques
@@ -303,115 +430,18 @@ try:
     for service in services:
         service_id = service.entity_id
         print(f"Traitement du service: {service.display_name}")
-       
-        # Vérification du type de service et activité
-        service_details = query_api(f"entities/{service_id}")
-        service_type = service_details.get('type', '')
-        service_status = "Actif"
-       
-        # Vérifie si le service est inactif (aucune donnée récente)
-        if 'monitoring' in service_details.get('properties', {}) and 'monitoringState' in service_details['properties']['monitoring']:
-            if service_details['properties']['monitoring']['monitoringState'] != "ACTIVE":
-                service_status = "Inactif"
-                print(f"  Service {service.display_name} est inactif")
-       
-        # Récupération des métriques
-        response_time = None
-        error_rate = None
-        requests_count = None
-        response_time_history = []
-        error_rate_history = []
-        request_count_history = []
-       
-        try:
-            response_time_data = query_api(
-                endpoint="metrics/query",
-                params={
-                    "metricSelector": "builtin:service.response.time",
-                    "from": from_time,
-                    "to": to_time,
-                    "entitySelector": f"entityId({service_id})"
-                }
-            )
-           
-            if response_time_data.get('result', []) and response_time_data['result'][0].get('data', []):
-                values = response_time_data['result'][0]['data'][0].get('values', [])
-                if values:
-                    response_time = int(values[0])
-                else:
-                    print(f"  Pas de valeurs pour le temps de réponse (service inactif?)")
-            else:
-                print(f"  Pas de résultats pour le temps de réponse (mauvaise métrique?)")
-               
-            # Récupérer l'historique du temps de réponse pour les graphiques
-            response_time_history = get_metric_history(service_id, "builtin:service.response.time", from_time, to_time)
-        except Exception as e:
-            print(f"  Erreur pour le temps de réponse: {e}")
-       
-        try:
-            error_rate_data = query_api(
-                endpoint="metrics/query",
-                params={
-                    "metricSelector": "builtin:service.errors.total.rate",
-                    "from": from_time,
-                    "to": to_time,
-                    "entitySelector": f"entityId({service_id})"
-                }
-            )
-            if error_rate_data.get('result', []) and error_rate_data['result'][0].get('data', []):
-                values = error_rate_data['result'][0]['data'][0].get('values', [])
-                if values:
-                    error_rate = round(values[0], 1)
-                    if error_rate > 0:
-                        total_errors += error_rate
-                        services_with_errors += 1
-           
-            # Récupérer l'historique du taux d'erreur
-            error_rate_history = get_metric_history(service_id, "builtin:service.errors.total.rate", from_time, to_time)
-        except Exception as e:
-            print(f"  Erreur pour le taux d'erreur: {e}")
-       
-        try:
-            requests_data = query_api(
-                endpoint="metrics/query",
-                params={
-                    "metricSelector": "builtin:service.requestCount.total",
-                    "from": from_time,
-                    "to": to_time,
-                    "entitySelector": f"entityId({service_id})"
-                }
-            )
-            if requests_data.get('result', []) and requests_data['result'][0].get('data', []):
-                values = requests_data['result'][0]['data'][0].get('values', [])
-                if values:
-                    requests_count = int(values[0])
-                    total_requests += requests_count
-           
-            # Récupérer l'historique du nombre de requêtes
-            request_count_history = get_metric_history(service_id, "builtin:service.requestCount.total", from_time, to_time)
-        except Exception as e:
-            print(f"  Erreur pour le nombre de requêtes: {e}")
-       
-        # Récupération avancée de la technologie
-        tech_info = extract_technology(service)
-       
-        # Récupérer l'URL Dynatrace de l'entité
-        dt_url = f"{DT_ENV_URL}/#entity/{service_id}"
-       
-        service_metrics.append({
-            'name': service.display_name,
-            'id': service_id,
-            'response_time': response_time,
-            'error_rate': error_rate,
-            'requests': requests_count,
-            'technology': tech_info['name'],
-            'tech_icon': tech_info['icon'],
-            'status': service_status,
-            'response_time_history': response_time_history,
-            'error_rate_history': error_rate_history,
-            'request_count_history': request_count_history,
-            'dt_url': dt_url
-        })
+        
+        # Récupérer toutes les métriques du service avec la nouvelle fonction robuste
+        service_data = get_service_metrics(service_id, service, from_time, to_time)
+        service_metrics.append(service_data)
+        
+        # Mettre à jour les statistiques globales
+        if service_data['error_rate'] and service_data['error_rate'] > 0:
+            total_errors += service_data['error_rate']
+            services_with_errors += 1
+            
+        if service_data['requests']:
+            total_requests += service_data['requests']
    
     # Calcul du taux d'erreur moyen
     avg_error_rate = round(total_errors / services_with_errors, 1) if services_with_errors > 0 else 0
