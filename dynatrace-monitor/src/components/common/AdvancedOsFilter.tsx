@@ -1,6 +1,6 @@
 // src/components/common/AdvancedOsFilter.tsx
 import React, { useState, useMemo } from 'react';
-import { X, Check, ChevronDown, ChevronUp, Filter } from 'lucide-react';
+import { X, Check, ChevronDown, ChevronUp, Filter, Info } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { Host } from '../../api/types';
 
@@ -112,8 +112,9 @@ const AdvancedOsFilter: React.FC<AdvancedOsFilterProps> = ({
     const filter = selectedFilters.find(f => f.type === osType);
     if (!filter) return 'none';
     
-    const totalVersions = groupedVersions.get(osType)?.length || 0;
     if (filter.versions.length === 0) return 'all'; // All versions selected
+    
+    const totalVersions = groupedVersions.get(osType)?.length || 0;
     if (filter.versions.length === totalVersions) return 'all';
     return 'some';
   };
@@ -122,7 +123,11 @@ const AdvancedOsFilter: React.FC<AdvancedOsFilterProps> = ({
   const isVersionSelected = (osType: string, version: string): boolean => {
     const filter = selectedFilters.find(f => f.type === osType);
     if (!filter) return false;
-    if (filter.versions.length === 0) return true; // All versions selected
+    
+    // Si versions est vide, toutes les versions sont sélectionnées
+    if (filter.versions.length === 0) return true;
+    
+    // Sinon, vérifier si cette version spécifique est dans la liste
     return filter.versions.includes(version);
   };
   
@@ -132,7 +137,7 @@ const AdvancedOsFilter: React.FC<AdvancedOsFilterProps> = ({
     const newFilters = [...selectedFilters.filter(f => f.type !== osType)];
     
     if (currentState === 'none' || currentState === 'some') {
-      // Select all versions
+      // Select all versions (empty versions array means "all selected")
       newFilters.push({ type: osType, versions: [] });
     }
     // If 'all' is current state, removing the filter deselects it
@@ -142,35 +147,40 @@ const AdvancedOsFilter: React.FC<AdvancedOsFilterProps> = ({
   
   // Toggle specific version selection
   const toggleVersion = (osType: string, version: string) => {
+    // Find if this OS type already has a filter
     const filterIndex = selectedFilters.findIndex(f => f.type === osType);
     const newFilters = [...selectedFilters];
     
     if (filterIndex === -1) {
-      // OS type not in filters, add it with this version
-      const allVersions = groupedVersions.get(osType)?.map(v => v.version) || [];
-      const versionsToAdd = allVersions.filter(v => v !== version);
-      newFilters.push({ type: osType, versions: versionsToAdd });
+      // OS type not in filters, add this specific version
+      newFilters.push({ 
+        type: osType, 
+        versions: [version] // Explicitly add just this version
+      });
     } else {
       // OS type exists in filters
       const filter = {...newFilters[filterIndex]};
       const allVersions = groupedVersions.get(osType)?.map(v => v.version) || [];
       
       if (filter.versions.length === 0) {
-        // All versions are selected, now exclude this one
-        filter.versions = allVersions.filter(v => v !== version);
+        // All versions are currently selected, exclude all except this one
+        const versionsToKeep = [version];
+        filter.versions = versionsToKeep;
       } else if (filter.versions.includes(version)) {
-        // This version is excluded, remove it from exclusions (include it)
+        // This version is already selected, deselect it
         filter.versions = filter.versions.filter(v => v !== version);
-        // If no exclusions left, simplify to "all versions"
-        if (filter.versions.length === 0 || filter.versions.length === allVersions.length) {
-          filter.versions = [];
+        
+        // If no versions left, remove the filter completely
+        if (filter.versions.length === 0) {
+          newFilters.splice(filterIndex, 1);
+        } else {
+          newFilters[filterIndex] = filter;
         }
       } else {
-        // This version is included, add it to exclusions
+        // This version is not selected, select it
         filter.versions.push(version);
+        newFilters[filterIndex] = filter;
       }
-      
-      newFilters[filterIndex] = filter;
     }
     
     onFilterChange(newFilters);
@@ -187,12 +197,11 @@ const AdvancedOsFilter: React.FC<AdvancedOsFilterProps> = ({
     
     selectedFilters.forEach(filter => {
       if (filter.versions.length === 0) {
-        // All versions selected
+        // All versions selected for this OS type
         count += groupedVersions.get(filter.type)?.length || 0;
       } else {
-        // Only count specific versions
-        const totalVersions = groupedVersions.get(filter.type)?.length || 0;
-        count += totalVersions - filter.versions.length;
+        // Only specific versions selected
+        count += filter.versions.length;
       }
     });
     
@@ -237,7 +246,7 @@ const AdvancedOsFilter: React.FC<AdvancedOsFilterProps> = ({
       isDarkTheme 
         ? 'bg-slate-800 border-slate-700' 
         : 'bg-white border-slate-200'
-    } max-w-3xl w-full`}>
+    } max-w-4xl w-full`}>
       <div className="flex justify-between items-center mb-4">
         <div className="flex items-center gap-2">
           <Filter className={isDarkTheme ? 'text-indigo-400' : 'text-indigo-600'} size={18} />
@@ -270,6 +279,19 @@ const AdvancedOsFilter: React.FC<AdvancedOsFilterProps> = ({
           >
             <X size={18} />
           </button>
+        </div>
+      </div>
+      
+      {/* Information explicative */}
+      <div className={`p-3 mb-4 rounded-md flex items-start gap-3 ${
+        isDarkTheme ? 'bg-indigo-900/20 border border-indigo-900/30' : 'bg-indigo-50 border border-indigo-100'
+      } text-sm`}>
+        <div className={isDarkTheme ? 'text-indigo-400' : 'text-indigo-600'}>
+          <Info size={16} />
+        </div>
+        <div className={isDarkTheme ? 'text-indigo-300' : 'text-indigo-700'}>
+          Sélectionnez un type d'OS pour voir toutes ses versions, ou cliquez sur une version spécifique. 
+          Les systèmes sélectionnés apparaîtront dans le tableau.
         </div>
       </div>
       
@@ -354,46 +376,54 @@ const AdvancedOsFilter: React.FC<AdvancedOsFilterProps> = ({
               
               {/* Versions List */}
               {isExpanded && (
-                <div className={`p-2 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 ${
+                <div className={`p-2 grid grid-cols-1 md:grid-cols-2 gap-2 ${
                   isDarkTheme ? 'bg-slate-800' : 'bg-white'
                 }`}>
-                  {versions.map(version => (
-                    <div 
-                      key={version.version} 
-                      className={`flex items-center justify-between p-2 rounded text-sm ${
-                        isVersionSelected(osType, version.version)
-                          ? isDarkTheme 
-                            ? 'bg-indigo-900/20 border-indigo-700 text-indigo-300' 
-                            : 'bg-indigo-50 border-indigo-200 text-indigo-700'
-                          : isDarkTheme
-                            ? 'bg-slate-700/30 border-slate-700 text-slate-300'
-                            : 'bg-slate-50 border-slate-200 text-slate-700'
-                      } border cursor-pointer hover:border-indigo-400`}
-                      onClick={() => toggleVersion(osType, version.version)}
-                    >
-                      <div className="flex items-center gap-2 truncate">
-                        <div className={`flex-shrink-0 w-4 h-4 rounded flex items-center justify-center ${
-                          isVersionSelected(osType, version.version)
-                            ? isDarkTheme
-                              ? 'bg-indigo-600 text-white'
-                              : 'bg-indigo-600 text-white'
+                  {versions.map(version => {
+                    const isSelected = isVersionSelected(osType, version.version);
+                    return (
+                      <div 
+                        key={version.version} 
+                        className={`flex items-center justify-between p-2 rounded text-sm ${
+                          isSelected
+                            ? isDarkTheme 
+                              ? 'bg-indigo-900/20 border-indigo-700 text-indigo-300' 
+                              : 'bg-indigo-50 border-indigo-200 text-indigo-700'
                             : isDarkTheme
-                              ? 'bg-slate-700 border border-slate-600'
-                              : 'bg-white border border-slate-300'
-                        }`}>
-                          {isVersionSelected(osType, version.version) && <Check size={10} />}
+                              ? 'bg-slate-700/30 border-slate-700 text-slate-300'
+                              : 'bg-slate-50 border-slate-200 text-slate-700'
+                        } border cursor-pointer hover:border-indigo-400`}
+                        onClick={() => toggleVersion(osType, version.version)}
+                        title={version.version} // Ajout d'un tooltip
+                      >
+                        <div className="flex items-center gap-2 overflow-hidden">
+                          <div className={`flex-shrink-0 w-4 h-4 rounded flex items-center justify-center ${
+                            isSelected
+                              ? isDarkTheme
+                                ? 'bg-indigo-600 text-white'
+                                : 'bg-indigo-600 text-white'
+                              : isDarkTheme
+                                ? 'bg-slate-700 border border-slate-600'
+                                : 'bg-white border border-slate-300'
+                          }`}>
+                            {isSelected && <Check size={10} />}
+                          </div>
+                          <div className="overflow-hidden">
+                            <span className="block text-ellipsis overflow-hidden">{version.version}</span>
+                            {/* Version complète en texte plus petit sur une deuxième ligne */}
+                            <span className="block text-xs opacity-70 overflow-hidden text-ellipsis">{version.version}</span>
+                          </div>
                         </div>
-                        <span className="truncate" title={version.version}>{version.version}</span>
+                        <span className={`ml-2 flex-shrink-0 text-xs px-1.5 py-0.5 rounded-full ${
+                          isDarkTheme 
+                            ? 'bg-slate-700 text-slate-300' 
+                            : 'bg-slate-200 text-slate-700'
+                        }`}>
+                          {version.count}
+                        </span>
                       </div>
-                      <span className={`text-xs px-1.5 py-0.5 rounded-full ${
-                        isDarkTheme 
-                          ? 'bg-slate-700 text-slate-300' 
-                          : 'bg-slate-200 text-slate-700'
-                      }`}>
-                        {version.count}
-                      </span>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>

@@ -148,91 +148,88 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
   }, [hosts]);
   
   // Fonction pour obtenir les données triées et filtrées
-  const getSortedData = <T extends {}>( data: T[], searchTerm: string = '', filters: any = {}): T[] => {
-    if (!data || !Array.isArray(data) || data.length === 0) {
-      return [];
-    }
-    
-    let sortableData = [...data];
-    
-    // Filtrer les données si un terme de recherche est fourni
-    if (searchTerm && sortableData.length > 0 && 'name' in sortableData[0]) {
-      sortableData = sortableData.filter(item => 
-        ((item as any).name || '').toString().toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
-    
-    // Appliquer des filtres avancés d'OS
-    if (filters.osFilters && filters.osFilters.length > 0 && sortableData.length > 0 && 'os_version' in sortableData[0]) {
-      sortableData = sortableData.filter(item => {
-        const osVersion = (item as any).os_version;
-        if (!osVersion) return false;
-        
-        // Vérifie si l'OS est filtré
-        for (const filter of filters.osFilters) {
-          // Déterminer le type d'OS de l'élément
-          let itemOsType = "Autre";
-          if (osVersion.toLowerCase().includes('linux')) {
-            itemOsType = "Linux";
-          } else if (osVersion.toLowerCase().includes('windows')) {
-            itemOsType = "Windows";
-          } else if (osVersion.toLowerCase().includes('unix')) {
-            itemOsType = "Unix";
-          } else if (osVersion.toLowerCase().includes('aix')) {
-            itemOsType = "AIX";
-          } else if (osVersion.toLowerCase().includes('mac') || osVersion.toLowerCase().includes('darwin')) {
-            itemOsType = "MacOS";
+  // Fonction modifiée dans ZoneDetails.tsx pour corriger la logique de filtrage
+
+const getSortedData = <T extends {}>( data: T[], searchTerm: string = '', filters: any = {}): T[] => {
+  if (!data || !Array.isArray(data) || data.length === 0) {
+    return [];
+  }
+  
+  let sortableData = [...data];
+  
+  // Filtrer les données si un terme de recherche est fourni
+  if (searchTerm && sortableData.length > 0 && 'name' in sortableData[0]) {
+    sortableData = sortableData.filter(item => 
+      ((item as any).name || '').toString().toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }
+  
+  // Appliquer des filtres avancés d'OS
+  if (filters.osFilters && filters.osFilters.length > 0 && sortableData.length > 0 && 'os_version' in sortableData[0]) {
+    sortableData = sortableData.filter(item => {
+      const osVersion = (item as any).os_version;
+      if (!osVersion) return false;
+      
+      // Déterminer le type d'OS de l'élément
+      let itemOsType = "Autre";
+      if (osVersion.toLowerCase().includes('linux')) {
+        itemOsType = "Linux";
+      } else if (osVersion.toLowerCase().includes('windows')) {
+        itemOsType = "Windows";
+      } else if (osVersion.toLowerCase().includes('unix')) {
+        itemOsType = "Unix";
+      } else if (osVersion.toLowerCase().includes('aix')) {
+        itemOsType = "AIX";
+      } else if (osVersion.toLowerCase().includes('mac') || osVersion.toLowerCase().includes('darwin')) {
+        itemOsType = "MacOS";
+      }
+      
+      // Vérifier si cet OS est dans nos filtres
+      for (const filter of filters.osFilters) {
+        if (filter.type === itemOsType) {
+          // Si versions est vide, toutes les versions sont incluses
+          if (filter.versions.length === 0) {
+            return true;
           }
           
-          // Si ce type d'OS est filtré
-          if (filter.type === itemOsType) {
-            // Si la liste des versions est vide, toutes les versions sont incluses
-            if (filter.versions.length === 0) {
-              return true;
-            }
-            
-            // Si la version spécifique n'est pas dans la liste d'exclusion
-            if (!filter.versions.includes(osVersion)) {
-              return true;
-            }
-            
-            return false;
-          }
+          // Sinon, vérifier si cette version spécifique est dans la liste
+          return filter.versions.includes(osVersion);
         }
-        
-        // Si aucun filtre ne correspond au type d'OS, n'incluez pas cet élément
-        return filters.osFilters.length === 0;
-      });
-    }
-    
-    // Si aucun tri n'est configuré, retourner les données filtrées
-    if (!sortConfig.key || !sortConfig.direction) {
-      return sortableData;
-    }
-    
-    // Trier les données
-    return sortableData.sort((a, b) => {
-      if (!(sortConfig.key in a) || !(sortConfig.key in b)) {
-        return 0;
       }
       
-      const aValue = (a as any)[sortConfig.key];
-      const bValue = (b as any)[sortConfig.key];
-      
-      // Gestion des valeurs null ou undefined
-      if (aValue == null && bValue == null) return 0;
-      if (aValue == null) return 1;
-      if (bValue == null) return -1;
-      
-      if (aValue < bValue) {
-        return sortConfig.direction === 'ascending' ? -1 : 1;
-      }
-      if (aValue > bValue) {
-        return sortConfig.direction === 'ascending' ? 1 : -1;
-      }
-      return 0;
+      // Si aucun filtre ne correspond au type d'OS, exclure cet élément
+      return false;
     });
-  };
+  }
+  
+  // Si aucun tri n'est configuré, retourner les données filtrées
+  if (!sortConfig.key || !sortConfig.direction) {
+    return sortableData;
+  }
+  
+  // Trier les données
+  return sortableData.sort((a, b) => {
+    if (!(sortConfig.key in a) || !(sortConfig.key in b)) {
+      return 0;
+    }
+    
+    const aValue = (a as any)[sortConfig.key];
+    const bValue = (b as any)[sortConfig.key];
+    
+    // Gestion des valeurs null ou undefined
+    if (aValue == null && bValue == null) return 0;
+    if (aValue == null) return 1;
+    if (bValue == null) return -1;
+    
+    if (aValue < bValue) {
+      return sortConfig.direction === 'ascending' ? -1 : 1;
+    }
+    if (aValue > bValue) {
+      return sortConfig.direction === 'ascending' ? 1 : -1;
+    }
+    return 0;
+  });
+};
   
   // Extraire la liste des OS uniques des hôtes
   const uniqueOperatingSystems = useMemo(() => {
