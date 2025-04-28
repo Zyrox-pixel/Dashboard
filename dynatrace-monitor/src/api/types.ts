@@ -48,14 +48,13 @@ export interface ProcessGroup {
   dt_url?: string;
 }
 
+
 // Type pour les hôtes
 export interface Host {
   id: string;
   name: string;
   cpu: number | null;
   ram: number | null;
-  cpu_history: MetricHistory[];
-  ram_history: MetricHistory[];
   dt_url: string;
 }
 

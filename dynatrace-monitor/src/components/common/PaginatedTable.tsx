@@ -7,7 +7,7 @@ import { useTheme } from '../../contexts/ThemeContext';
  */
 export interface Column<T> {
   key: string;
-  label: string;
+  label: string | React.ReactNode;
   className?: string;
   cellClassName?: string;
   render?: (item: T) => React.ReactNode;
@@ -30,7 +30,7 @@ interface PaginatedTableProps<T> {
 const PaginatedTable = <T extends { id?: string }>({
   data,
   columns,
-  pageSize = 10,
+  pageSize = 20, // Augmenté à 20 éléments par page par défaut
   emptyMessage = "Aucune donnée disponible"
 }: PaginatedTableProps<T>) => {
   const { isDarkTheme } = useTheme();

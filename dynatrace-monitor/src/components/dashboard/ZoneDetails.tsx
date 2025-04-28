@@ -1,5 +1,5 @@
-import React, { useMemo, useCallback } from 'react';
-import { ChevronLeft, Clock, AlertTriangle, ExternalLink, RefreshCw, Cpu, Activity, Server, Filter, Loader, Database } from 'lucide-react';
+import React, { useMemo, useCallback, useState } from 'react';
+import { ChevronLeft, Clock, AlertTriangle, ExternalLink, RefreshCw, Cpu, Activity, Server, Filter, Loader, Database, Search, ArrowUp, ArrowDown } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { ManagementZone, Problem, ProcessGroup, Host, Service } from '../../api/types';
 import ProblemsList from './ProblemsList';
@@ -32,6 +32,13 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
 }) => {
   const { isDarkTheme } = useTheme();
   const { refreshData } = useApp();
+  
+  // États pour le tri et la recherche
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'ascending' | 'descending' | null }>({
+    key: '',
+    direction: null
+  });
+  const [hostSearchTerm, setHostSearchTerm] = useState<string>('');
   
   // Filtrer les problèmes pour la zone courante (mémorisé)
   const zoneProblems = useMemo(() => 
@@ -88,6 +95,67 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
     
     return colors[zone.color] || colors.blue;
   }, [zone.color, isDarkTheme]);
+  
+  // Fonction pour gérer le tri des colonnes
+  const requestSort = (key: string) => {
+    let direction: 'ascending' | 'descending' | null = 'ascending';
+    
+    if (sortConfig.key === key) {
+      if (sortConfig.direction === 'ascending') {
+        direction = 'descending';
+      } else if (sortConfig.direction === 'descending') {
+        direction = null;
+      }
+    }
+    
+    setSortConfig({ key, direction });
+  };
+  
+  // Fonction pour obtenir les données triées et filtrées
+  const getSortedData = <T extends {}>(data: T[], searchTerm: string = ''): T[] => {
+    let sortableData = [...data];
+    
+    // Filtrer les données si un terme de recherche est fourni
+    if (searchTerm && 'name' in sortableData[0]) {
+      sortableData = sortableData.filter(item => 
+        (item as any).name.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+    
+    // Si aucun tri n'est configuré, retourner les données filtrées
+    if (!sortConfig.key || !sortConfig.direction) {
+      return sortableData;
+    }
+    
+    // Trier les données
+    return sortableData.sort((a, b) => {
+      if (!(sortConfig.key in a) || !(sortConfig.key in b)) {
+        return 0;
+      }
+      
+      const aValue = (a as any)[sortConfig.key];
+      const bValue = (b as any)[sortConfig.key];
+      
+      // Gestion des valeurs null ou undefined
+      if (aValue == null && bValue == null) return 0;
+      if (aValue == null) return 1;
+      if (bValue == null) return -1;
+      
+      if (aValue < bValue) {
+        return sortConfig.direction === 'ascending' ? -1 : 1;
+      }
+      if (aValue > bValue) {
+        return sortConfig.direction === 'ascending' ? 1 : -1;
+      }
+      return 0;
+    });
+  };
+  
+  // Obtenir les données triées et filtrées pour les hôtes
+  const sortedHosts = useMemo(() => 
+    getSortedData(hosts, hostSearchTerm),
+    [hosts, sortConfig, hostSearchTerm]
+  );
   
   // Définition des colonnes pour les tableaux (mémorisée)
   const processColumns = useMemo<Column<ProcessGroup>[]>(() => [
@@ -205,7 +273,20 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
     },
     {
       key: 'cpu',
-      label: 'CPU',
+      label: (
+        <div className="flex items-center cursor-pointer" onClick={() => requestSort('cpu')}>
+          CPU
+          {sortConfig.key === 'cpu' && (
+            <span className="ml-1">
+              {sortConfig.direction === 'ascending' ? (
+                <ArrowUp size={14} />
+              ) : sortConfig.direction === 'descending' ? (
+                <ArrowDown size={14} />
+              ) : null}
+            </span>
+          )}
+        </div>
+      ),
       cellClassName: 'text-sm',
       render: (host: Host) => (
         <span className={`${
@@ -220,30 +301,21 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
       ),
     },
     {
-      key: 'cpu_chart',
-      label: 'Historique CPU',
-      cellClassName: 'text-sm',
-      render: (host: Host) => (
-        <div className="w-48 h-12">
-          {host.cpu_history && host.cpu_history.length > 0 ? (
-            <MetricChart 
-              history={host.cpu_history} 
-              color="red"
-              height={50}
-              unit="%"
-              label="CPU"
-            />
-          ) : (
-            <div className="text-xs text-slate-400 h-full flex items-center justify-center">
-              Aucune donnée
-            </div>
+      key: 'ram',
+      label: (
+        <div className="flex items-center cursor-pointer" onClick={() => requestSort('ram')}>
+          RAM
+          {sortConfig.key === 'ram' && (
+            <span className="ml-1">
+              {sortConfig.direction === 'ascending' ? (
+                <ArrowUp size={14} />
+              ) : sortConfig.direction === 'descending' ? (
+                <ArrowDown size={14} />
+              ) : null}
+            </span>
           )}
         </div>
       ),
-    },
-    {
-      key: 'ram',
-      label: 'RAM',
       cellClassName: 'text-sm',
       render: (host: Host) => (
         <span className={`${
@@ -255,28 +327,6 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
         }`}>
           {host.ram ? `${host.ram}%` : 'N/A'}
         </span>
-      ),
-    },
-    {
-      key: 'ram_chart',
-      label: 'Historique RAM',
-      cellClassName: 'text-sm',
-      render: (host: Host) => (
-        <div className="w-48 h-12">
-          {host.ram_history && host.ram_history.length > 0 ? (
-            <MetricChart 
-              history={host.ram_history} 
-              color="blue"
-              height={50}
-              unit="%"
-              label="RAM"
-            />
-          ) : (
-            <div className="text-xs text-slate-400 h-full flex items-center justify-center">
-              Aucune donnée
-            </div>
-          )}
-        </div>
       ),
     },
     {
@@ -295,7 +345,7 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
         </a>
       ),
     },
-  ], []);
+  ], [sortConfig]);
 
   // Optimiser le gestionnaire d'événements avec useCallback
   const handleTabClick = useCallback((tab: string) => {
@@ -426,12 +476,12 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
         />
       )}
       
-      {/* Navigation par onglets */}
+      {/* Navigation par onglets - CHANGEMENT D'ORDRE DES ONGLETS */}
       <div className="flex border-b mb-5 overflow-x-auto no-scrollbar">
         <button 
-          onClick={() => handleTabClick('process-groups')}
+          onClick={() => handleTabClick('hosts')}
           className={`px-4 py-2 font-medium text-sm whitespace-nowrap border-b-2 -mb-px transition-colors ${
-            activeTab === 'process-groups' 
+            activeTab === 'hosts' 
               ? `border-${zone.color}-500 ${zoneColors.text}` 
               : `border-transparent ${
                   isDarkTheme ? 'text-slate-400 hover:text-slate-300' : 'text-slate-600 hover:text-slate-900'
@@ -439,8 +489,8 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
           }`}
         >
           <div className="flex items-center gap-2">
-            <Cpu size={14} />
-            <span>Process Groups</span>
+            <Server size={14} />
+            <span>Hôtes</span>
           </div>
         </button>
         <button 
@@ -459,9 +509,9 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
           </div>
         </button>
         <button 
-          onClick={() => handleTabClick('hosts')}
+          onClick={() => handleTabClick('process-groups')}
           className={`px-4 py-2 font-medium text-sm whitespace-nowrap border-b-2 -mb-px transition-colors ${
-            activeTab === 'hosts' 
+            activeTab === 'process-groups' 
               ? `border-${zone.color}-500 ${zoneColors.text}` 
               : `border-transparent ${
                   isDarkTheme ? 'text-slate-400 hover:text-slate-300' : 'text-slate-600 hover:text-slate-900'
@@ -469,36 +519,57 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
           }`}
         >
           <div className="flex items-center gap-2">
-            <Server size={14} />
-            <span>Hôtes</span>
+            <Cpu size={14} />
+            <span>Process Groups</span>
           </div>
         </button>
       </div>
       
       {/* Contenu des onglets - Utilisation du composant PaginatedTable */}
-      {activeTab === 'process-groups' && (
+      
+      {/* Onglet Hôtes */}
+      {activeTab === 'hosts' && (
         <section className={`rounded-lg overflow-hidden ${
           isDarkTheme ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
         } border`}>
           <div className="flex justify-between items-center p-3 border-b border-slate-700">
             <h2 className="font-semibold flex items-center gap-2">
-              <Cpu className={zoneColors.text} size={16} />
-              <span>Process Groups</span>
-              <span className="text-xs text-slate-400 ml-2">({processGroups.length})</span>
+              <Server className={zoneColors.text} size={16} />
+              <span>Hôtes</span>
+              <span className="text-xs text-slate-400 ml-2">({sortedHosts.length})</span>
             </h2>
-            <button className={`flex items-center gap-1 px-3 py-1 rounded-md border text-sm ${
-              isDarkTheme ? 'border-slate-600 text-slate-300 hover:bg-slate-700' : 'border-slate-300 text-slate-600 hover:bg-slate-100'
-            }`}>
-              <Filter size={12} />
-              <span>Filtrer</span>
-            </button>
+            
+            {/* Barre de recherche pour les hôtes */}
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <input 
+                  type="text" 
+                  value={hostSearchTerm}
+                  onChange={(e) => setHostSearchTerm(e.target.value)}
+                  placeholder="Rechercher un hôte..."
+                  className={`w-64 h-8 pl-8 pr-4 rounded-md ${
+                    isDarkTheme 
+                      ? 'bg-slate-700 border-slate-600 text-white placeholder-slate-400' 
+                      : 'bg-slate-100 border-slate-200 text-slate-900 placeholder-slate-500'
+                  } border focus:outline-none focus:ring-1 focus:ring-indigo-500`}
+                />
+                <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 text-slate-400" size={14} />
+              </div>
+              
+              <button className={`flex items-center gap-1 px-3 py-1 rounded-md border text-sm ${
+                isDarkTheme ? 'border-slate-600 text-slate-300 hover:bg-slate-700' : 'border-slate-300 text-slate-600 hover:bg-slate-100'
+              }`}>
+                <Filter size={12} />
+                <span>Filtrer</span>
+              </button>
+            </div>
           </div>
 
-          <PaginatedTable<ProcessGroup> 
-            data={processGroups}
-            columns={processColumns}
-            pageSize={10}
-            emptyMessage="Aucun process group trouvé pour cette management zone."
+          <PaginatedTable 
+            data={sortedHosts}
+            columns={hostColumns}
+            pageSize={20}
+            emptyMessage="Aucun hôte trouvé pour cette management zone."
           />
         </section>
       )}
@@ -525,22 +596,22 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
           <PaginatedTable 
             data={services}
             columns={serviceColumns}
-            pageSize={8}
+            pageSize={20}
             emptyMessage="Aucun service trouvé pour cette management zone."
           />
         </section>
       )}
       
-      {/* Onglet Hôtes */}
-      {activeTab === 'hosts' && (
+      {/* Onglet Process Groups */}
+      {activeTab === 'process-groups' && (
         <section className={`rounded-lg overflow-hidden ${
           isDarkTheme ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
         } border`}>
           <div className="flex justify-between items-center p-3 border-b border-slate-700">
             <h2 className="font-semibold flex items-center gap-2">
-              <Server className={zoneColors.text} size={16} />
-              <span>Hôtes</span>
-              <span className="text-xs text-slate-400 ml-2">({hosts.length})</span>
+              <Cpu className={zoneColors.text} size={16} />
+              <span>Process Groups</span>
+              <span className="text-xs text-slate-400 ml-2">({processGroups.length})</span>
             </h2>
             <button className={`flex items-center gap-1 px-3 py-1 rounded-md border text-sm ${
               isDarkTheme ? 'border-slate-600 text-slate-300 hover:bg-slate-700' : 'border-slate-300 text-slate-600 hover:bg-slate-100'
@@ -551,10 +622,10 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
           </div>
 
           <PaginatedTable 
-            data={hosts}
-            columns={hostColumns}
-            pageSize={8}
-            emptyMessage="Aucun hôte trouvé pour cette management zone."
+            data={processGroups}
+            columns={processColumns}
+            pageSize={20}
+            emptyMessage="Aucun process group trouvé pour cette management zone."
           />
         </section>
       )}
