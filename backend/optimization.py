@@ -1,31 +1,25 @@
-# 1. Ajouter ces variables au fichier backend/.env
-MAX_WORKERS=20
-MAX_CONNECTIONS=50
-REQUEST_CHUNK_SIZE=15
-CACHE_DURATION=300  # Vérifiez que cette variable existe déjà
+"""
+Module d'optimisation des requêtes API Dynatrace - OPTIMISÉ
+Ce module fournit des fonctions pour améliorer les performances des requêtes API
+en utilisant des techniques comme les requêtes parallèles et la mise en cache intelligente.
+"""
+import asyncio
+import time
+import concurrent.futures
+import threading
+import requests
+import urllib3
+from functools import wraps
+from datetime import datetime, timedelta
+import logging
+import os
 
-# 2. Modifications dans backend/app.py
-# Modifier l'initialisation du client API (chercher la section qui initialise api_client)
+# Configuration du logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
-# Récupérer les variables d'environnement
-DT_ENV_URL = os.environ.get('DT_ENV_URL')
-API_TOKEN = os.environ.get('API_TOKEN')
-CACHE_DURATION = int(os.environ.get('CACHE_DURATION', 300))  # 5 minutes en secondes
-MAX_WORKERS = int(os.environ.get('MAX_WORKERS', 20))  # Valeur par défaut augmentée
-MAX_CONNECTIONS = int(os.environ.get('MAX_CONNECTIONS', 50))  # Nouvelle variable
-
-# Initialiser le client API optimisé avec plus de workers et connexions
-api_client = OptimizedAPIClient(
-    env_url=DT_ENV_URL,
-    api_token=API_TOKEN,
-    verify_ssl=os.environ.get('VERIFY_SSL', 'False').lower() in ('true', '1', 't'),
-    max_workers=MAX_WORKERS,
-    max_connections=MAX_CONNECTIONS,  # Ajouter ce paramètre
-    cache_duration=CACHE_DURATION
-)
-
-# 3. Modifications dans backend/optimization.py
-# Remplacer la classe OptimizedAPIClient par cette version améliorée
+# Désactiver les avertissements SSL si nécessaire
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 class OptimizedAPIClient:
     """Client API optimisé pour Dynatrace avec support de requêtes parallèles et cache intelligent"""
@@ -1403,3 +1397,16 @@ class OptimizedAPIClient:
                 'timestamp': int(time.time() * 1000),
                 'data_quality': 'error'
             }
+
+# Décorateur pour mesurer le temps d'exécution des fonctions
+def time_execution(func):
+    """Décorateur pour mesurer le temps d'exécution des fonctions"""
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        start_time = time.time()
+        result = func(*args, **kwargs)
+        end_time = time.time()
+        elapsed_time = end_time - start_time
+        logger.info(f"Fonction {func.__name__} exécutée en {elapsed_time:.2f} secondes")
+        return result
+    return wrapper
