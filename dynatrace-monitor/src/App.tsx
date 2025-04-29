@@ -9,7 +9,6 @@ import Dashboard from './pages/Dashboard';
 import EntrepriseDashboard from './pages/EntrepriseDashboard';
 import OptimizedDashboard from './pages/OptimizedDashboard';
 import OptimizedEntrepriseDashboard from './pages/OptimizedEntrepriseDashboard';
-import NotFound from './pages/NotFound';
 
 function App() {
   return (
@@ -65,9 +64,8 @@ function App() {
             </OptimizedAppProvider>
           } />
           
-          {/* Gestion des routes non trouvées */}
-          <Route path="/not-found" element={<NotFound />} />
-          <Route path="*" element={<Navigate to="/not-found" replace />} />
+          {/* Redirection des routes non trouvées vers la page d'accueil */}
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Router>
     </ThemeProvider>
