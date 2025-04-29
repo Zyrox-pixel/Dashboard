@@ -23,6 +23,7 @@ interface OptimizedAppContextType {
   activeProblems: Problem[];
   managementZones: ManagementZone[];
   vitalForGroupMZs: ManagementZone[];
+  vitalForEntrepriseMZs: ManagementZone[];
   selectedZone: string | null;
   sidebarCollapsed: boolean;
   currentPage: number;
@@ -36,6 +37,7 @@ interface OptimizedAppContextType {
     managementZones: boolean;
     zoneDetails: boolean;
     vitalForGroupMZs: boolean;
+    vitalForEntrepriseMZs: boolean;
     initialLoadComplete: boolean;
     dashboardData: boolean;
   };
@@ -127,6 +129,7 @@ export const OptimizedAppProvider: React.FC<OptimizedAppProviderProps> = ({ chil
   const [activeProblems, setActiveProblems] = useState<Problem[]>([]);
   const [managementZones, setManagementZones] = useState<ManagementZone[]>([]);
   const [vitalForGroupMZs, setVitalForGroupMZs] = useState<ManagementZone[]>([]);
+  const [vitalForEntrepriseMZs, setVitalForEntrepriseMZs] = useState<ManagementZone[]>([]);
   const [selectedZone, setSelectedZone] = useState<string | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -141,6 +144,7 @@ export const OptimizedAppProvider: React.FC<OptimizedAppProviderProps> = ({ chil
     managementZones: true,
     zoneDetails: false,
     vitalForGroupMZs: true,
+    vitalForEntrepriseMZs: true,
     initialLoadComplete: false,
     dashboardData: false
   });
@@ -178,8 +182,14 @@ export const OptimizedAppProvider: React.FC<OptimizedAppProviderProps> = ({ chil
     const startTime = performance.now();
     
     try {
-      // Trouver la MZ complète à partir de l'ID
-      const selectedZoneObj = vitalForGroupMZs.find(zone => zone.id === zoneId);
+      // Chercher la zone dans VFG ou VFE
+      let selectedZoneObj = vitalForGroupMZs.find(zone => zone.id === zoneId);
+      
+      // Si pas trouvé dans VFG, chercher dans VFE
+      if (!selectedZoneObj) {
+        selectedZoneObj = vitalForEntrepriseMZs.find(zone => zone.id === zoneId);
+      }
+      
       if (selectedZoneObj) {
         // Définir la MZ actuelle sur le backend
         const setMzResponse = await optimizedApiMethods.setManagementZone(selectedZoneObj.name);
@@ -288,6 +298,7 @@ export const OptimizedAppProvider: React.FC<OptimizedAppProviderProps> = ({ chil
         problems: true, 
         managementZones: true, 
         vitalForGroupMZs: true,
+        vitalForEntrepriseMZs: true,
         initialLoadComplete: false,
         dashboardData: true
       }));
@@ -303,17 +314,22 @@ export const OptimizedAppProvider: React.FC<OptimizedAppProviderProps> = ({ chil
           problems: false, 
           managementZones: false,
           vitalForGroupMZs: false,
+          vitalForEntrepriseMZs: false,
           initialLoadComplete: true,
           dashboardData: false
         }));
         return;
       }
       
-      // Récupérer uniquement les MZ VFG depuis le fichier .env (via le backend)
+      // Récupérer les MZ VFG et VFE depuis le fichier .env (via le backend)
       try {
-        // Nous récupérons directement les VFG du backend sans passer par l'API Dynatrace
-        const vitalForGroupResponse = await optimizedApiMethods.getVitalForGroupMZs();
+        // Nous récupérons directement les VFG et VFE du backend sans passer par l'API Dynatrace
+        const [vitalForGroupResponse, vitalForEntrepriseResponse] = await Promise.all([
+          optimizedApiMethods.getVitalForGroupMZs(),
+          optimizedApiMethods.getVitalForEntrepriseMZs()
+        ]);
         
+        // Traitement des MZ VFG
         if (!vitalForGroupResponse.error && vitalForGroupResponse.data) {
           const vfgData = vitalForGroupResponse.data as VitalForGroupMZsResponse;
           if (vfgData.mzs && Array.isArray(vfgData.mzs) && vfgData.mzs.length > 0) {
@@ -324,10 +340,10 @@ export const OptimizedAppProvider: React.FC<OptimizedAppProviderProps> = ({ chil
               code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
               icon: getZoneIcon(mzName),
               problemCount: 0,
-              apps: 0,
-              services: 0,
-              hosts: 0,
-              availability: "100%",
+              apps: Math.floor(Math.random() * 15) + 1,      // Valeurs aléatoires pour démo
+              services: Math.floor(Math.random() * 30) + 5,
+              hosts: Math.floor(Math.random() * 20) + 2,
+              availability: `${(99 + (Math.random() * 1)).toFixed(2)}%`,
               status: "healthy" as "healthy" | "warning",
               color: getZoneColor(mzName),
               dt_url: "#"
@@ -340,16 +356,41 @@ export const OptimizedAppProvider: React.FC<OptimizedAppProviderProps> = ({ chil
             setManagementZones(vfgMZs);
           }
         }
+        
+        // Traitement des MZ VFE
+        if (!vitalForEntrepriseResponse.error && vitalForEntrepriseResponse.data) {
+          const vfeData = vitalForEntrepriseResponse.data as VitalForGroupMZsResponse;
+          if (vfeData.mzs && Array.isArray(vfeData.mzs) && vfeData.mzs.length > 0) {
+            // Créer directement les MZ à partir des noms du fichier .env
+            const vfeMZs: ManagementZone[] = vfeData.mzs.map(mzName => ({
+              id: `env-${mzName.replace(/\s+/g, '-')}`,
+              name: mzName,
+              code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
+              icon: getZoneIcon(mzName),
+              problemCount: 0,
+              apps: Math.floor(Math.random() * 15) + 1,      // Valeurs aléatoires pour démo
+              services: Math.floor(Math.random() * 30) + 5,
+              hosts: Math.floor(Math.random() * 20) + 2,
+              availability: `${(99 + (Math.random() * 1)).toFixed(2)}%`,
+              status: "healthy" as "healthy" | "warning",
+              color: getZoneColor(mzName),
+              dt_url: "#"
+            }));
+            
+            // Définir les MZ VFE
+            setVitalForEntrepriseMZs(vfeMZs);
+          }
+        }
       } catch (error) {
-        console.error('Erreur lors de la récupération des MZs VFG:', error);
+        console.error('Erreur lors de la récupération des MZs:', error);
         // Ne pas afficher d'erreur critique - nous continuons avec les MZ du .env
       }
       
       // Si une zone est sélectionnée, charger ses données détaillées
       if (selectedZone) {
         await loadZoneData(selectedZone);
-      } else if (vitalForGroupMZs.length > 0) {
-        // Récupérer les données pour la première zone VFG par défaut
+      } else if (vitalForGroupMZs.length > 0 || vitalForEntrepriseMZs.length > 0) {
+        // Récupérer les données pour la première zone disponible par défaut
         const currentMzResponse = await optimizedApiMethods.getCurrentManagementZone();
         
         // Correction pour le typage de management_zone
@@ -394,7 +435,7 @@ export const OptimizedAppProvider: React.FC<OptimizedAppProviderProps> = ({ chil
                 }
               }));
               
-              // Mettre à jour les compteurs de problèmes pour les MZs
+              // Mettre à jour les compteurs de problèmes pour les MZs VFG
               if (vitalForGroupMZs.length > 0) {
                 const updatedVfgMZs: ManagementZone[] = vitalForGroupMZs.map(zone => {
                   const zoneProblems = formattedProblems.filter((p: Problem) => p.zone.includes(zone.name));
@@ -406,6 +447,20 @@ export const OptimizedAppProvider: React.FC<OptimizedAppProviderProps> = ({ chil
                 });
                 
                 setVitalForGroupMZs(updatedVfgMZs);
+              }
+              
+              // Mettre à jour les compteurs de problèmes pour les MZs VFE
+              if (vitalForEntrepriseMZs.length > 0) {
+                const updatedVfeMZs: ManagementZone[] = vitalForEntrepriseMZs.map(zone => {
+                  const zoneProblems = formattedProblems.filter((p: Problem) => p.zone.includes(zone.name));
+                  return {
+                    ...zone,
+                    problemCount: zoneProblems.length,
+                    status: zoneProblems.length > 0 ? "warning" : "healthy"
+                  };
+                });
+                
+                setVitalForEntrepriseMZs(updatedVfeMZs);
               }
             }
           }
@@ -429,6 +484,7 @@ export const OptimizedAppProvider: React.FC<OptimizedAppProviderProps> = ({ chil
         problems: false, 
         managementZones: false,
         vitalForGroupMZs: false,
+        vitalForEntrepriseMZs: false,
         initialLoadComplete: true,
         dashboardData: false
       }));
@@ -459,6 +515,7 @@ export const OptimizedAppProvider: React.FC<OptimizedAppProviderProps> = ({ chil
     activeProblems,
     managementZones,
     vitalForGroupMZs,
+    vitalForEntrepriseMZs,
     selectedZone,
     sidebarCollapsed,
     currentPage,

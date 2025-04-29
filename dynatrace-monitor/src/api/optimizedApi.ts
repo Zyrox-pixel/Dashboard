@@ -405,6 +405,11 @@ const optimizedApiMethods = {
     return optimizedApi.get<VitalForGroupMZsResponse>(ENDPOINTS.VITAL_FOR_GROUP_MZS);
   },
 
+  // Récupérer les management zones de Vital for Entreprise
+  getVitalForEntrepriseMZs() {
+    return optimizedApi.get<VitalForGroupMZsResponse>(ENDPOINTS.VITAL_FOR_ENTREPRISE_MZS);
+  },
+
   // Définir la management zone actuelle
   setManagementZone(name: string) {
     // Effacer le cache pour forcer le rechargement des données

@@ -6,10 +6,10 @@ import ManagementZoneList from '../components/dashboard/ManagementZoneList';
 import ZoneDetails from '../components/dashboard/ZoneDetails';
 import { useOptimizedApp } from '../contexts/OptimizedAppContext';
 
-const OptimizedDashboard: React.FC = () => {
+const OptimizedEntrepriseDashboard: React.FC = () => {
   const { 
     activeProblems,
-    vitalForGroupMZs, 
+    vitalForEntrepriseMZs, 
     selectedZone, 
     setSelectedZone,
     activeTab,
@@ -35,7 +35,7 @@ const OptimizedDashboard: React.FC = () => {
   
   const handleZoneClick = (zoneId: string) => {
     setSelectedZone(zoneId);
-    setActiveTab('hosts'); // Changé de 'process-groups' à 'hosts'
+    setActiveTab('hosts');
   };
   
   const handleBackClick = () => {
@@ -47,7 +47,7 @@ const OptimizedDashboard: React.FC = () => {
   };
   
   // Trouver la zone sélectionnée
-  const currentZone = vitalForGroupMZs.find(zone => zone.id === selectedZone);
+  const currentZone = vitalForEntrepriseMZs.find(zone => zone.id === selectedZone);
   
   // Formatter le temps de chargement pour l'affichage
   const formatLoadTime = (timeMs: number): string => {
@@ -60,9 +60,9 @@ const OptimizedDashboard: React.FC = () => {
   // Afficher un écran de chargement si le chargement initial n'est pas terminé
   if (!isLoading.initialLoadComplete || isLoading.dashboardData) {
     return (
-      <Layout title="Vital for Group (Optimisé)">
+      <Layout title="Vital for Entreprise (Optimisé)">
         <div className="flex flex-col items-center justify-center h-64">
-          <div className="w-16 h-16 border-t-4 border-b-4 border-indigo-500 rounded-full animate-spin mb-4"></div>
+          <div className="w-16 h-16 border-t-4 border-b-4 border-amber-500 rounded-full animate-spin mb-4"></div>
           <p className="text-xl text-slate-400">Chargement des données...</p>
         </div>
       </Layout>
@@ -72,7 +72,7 @@ const OptimizedDashboard: React.FC = () => {
   // Afficher un message d'erreur si le backend n'est pas connecté
   if (!backendConnected) {
     return (
-      <Layout title="Vital for Group (Optimisé)">
+      <Layout title="Vital for Entreprise (Optimisé)">
         <div className="flex flex-col items-center justify-center h-64 p-10 mt-20 bg-red-50 border border-red-200 rounded-lg dark:bg-red-900/20 dark:border-red-800">
           <AlertOctagon className="w-16 h-16 text-red-500 mb-4" />
           <p className="text-xl text-red-600 dark:text-red-400 mb-4">Le serveur backend n'est pas accessible</p>
@@ -81,7 +81,7 @@ const OptimizedDashboard: React.FC = () => {
           </p>
           <button 
             onClick={() => refreshData()}
-            className="px-6 py-3 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 flex items-center gap-2"
+            className="px-6 py-3 bg-amber-600 text-white rounded-md hover:bg-amber-700 flex items-center gap-2"
           >
             <RefreshCw size={18} />
             <span>Réessayer</span>
@@ -94,14 +94,14 @@ const OptimizedDashboard: React.FC = () => {
   // Afficher un message d'erreur générale si nécessaire
   if (error) {
     return (
-      <Layout title="Vital for Group (Optimisé)">
+      <Layout title="Vital for Entreprise (Optimisé)">
         <div className="flex flex-col items-center justify-center h-64 p-10 mt-20 bg-red-50 border border-red-200 rounded-lg dark:bg-red-900/20 dark:border-red-800">
           <AlertOctagon className="w-16 h-16 text-red-500 mb-4" />
           <p className="text-xl text-red-600 dark:text-red-400 mb-4">Une erreur est survenue</p>
           <p className="text-slate-600 dark:text-slate-300 mb-8 text-center max-w-lg">{error}</p>
           <button 
             onClick={() => refreshData()}
-            className="px-6 py-3 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 flex items-center gap-2"
+            className="px-6 py-3 bg-amber-600 text-white rounded-md hover:bg-amber-700 flex items-center gap-2"
           >
             <RefreshCw size={18} />
             <span>Réessayer</span>
@@ -112,18 +112,18 @@ const OptimizedDashboard: React.FC = () => {
   }
   
   // Si aucune MZ n'est trouvée après le chargement
-  if (vitalForGroupMZs.length === 0 && !isLoading.vitalForGroupMZs) {
+  if (vitalForEntrepriseMZs.length === 0 && !isLoading.vitalForGroupMZs) {
     return (
-      <Layout title="Vital for Group (Optimisé)">
-        <div className="flex flex-col items-center justify-center h-64 p-10 mt-20 bg-blue-50 border border-blue-200 rounded-lg dark:bg-blue-900/20 dark:border-blue-800">
-          <Shield className="w-16 h-16 text-blue-500 mb-4" />
-          <p className="text-xl text-blue-600 dark:text-blue-400 mb-4">Aucune Management Zone trouvée</p>
+      <Layout title="Vital for Entreprise (Optimisé)">
+        <div className="flex flex-col items-center justify-center h-64 p-10 mt-20 bg-amber-50 border border-amber-200 rounded-lg dark:bg-amber-900/20 dark:border-amber-800">
+          <Shield className="w-16 h-16 text-amber-500 mb-4" />
+          <p className="text-xl text-amber-600 dark:text-amber-400 mb-4">Aucune Management Zone trouvée</p>
           <p className="text-slate-600 dark:text-slate-300 mb-8 text-center max-w-lg">
-            Aucune Management Zone pour Vital for Group n'a été trouvée. Vérifiez votre configuration.
+            Aucune Management Zone pour Vital for Entreprise n'a été trouvée. Vérifiez votre configuration.
           </p>
           <button 
             onClick={() => refreshData()}
-            className="px-6 py-3 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 flex items-center gap-2"
+            className="px-6 py-3 bg-amber-600 text-white rounded-md hover:bg-amber-700 flex items-center gap-2"
           >
             <RefreshCw size={18} />
             <span>Actualiser</span>
@@ -136,20 +136,20 @@ const OptimizedDashboard: React.FC = () => {
   // L'affichage normal commence ici
   return (
     <Layout
-      title="Vital for Group (Optimisé)"
+      title="Vital for Entreprise (Optimisé)"
       subtitle={currentZone?.name}
     >
       {/* Section des métriques de performance */}
-      <div className="mb-6 p-4 bg-green-500/10 border border-green-200 rounded-lg dark:bg-green-900/20 dark:border-green-800">
+      <div className="mb-6 p-4 bg-amber-500/10 border border-amber-200 rounded-lg dark:bg-amber-900/20 dark:border-amber-800">
         <div className="flex items-start gap-4">
-          <BarChart className="text-green-500 mt-1" size={24} />
+          <BarChart className="text-amber-500 mt-1" size={24} />
           <div className="flex-1">
-            <h2 className="text-lg font-semibold text-green-600 dark:text-green-400 mb-1">Optimisation des performances</h2>
+            <h2 className="text-lg font-semibold text-amber-600 dark:text-amber-400 mb-1">Optimisation des performances</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
               <div>
                 <p className="text-slate-600 dark:text-slate-300 flex items-center">
-                  <Clock className="mr-2 text-green-500" size={16} />
-                  Temps de chargement: <span className="ml-2 font-semibold text-green-600 dark:text-green-400">{formatLoadTime(performanceMetrics.loadTime)}</span>
+                  <Clock className="mr-2 text-amber-500" size={16} />
+                  Temps de chargement: <span className="ml-2 font-semibold text-amber-600 dark:text-amber-400">{formatLoadTime(performanceMetrics.loadTime)}</span>
                 </p>
               </div>
               <div>
@@ -166,7 +166,7 @@ const OptimizedDashboard: React.FC = () => {
           </div>
           <button 
             onClick={() => refreshData()}
-            className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 flex items-center gap-2 ml-auto"
+            className="px-4 py-2 bg-amber-600 text-white rounded hover:bg-amber-700 flex items-center gap-2 ml-auto"
           >
             <RefreshCw size={16} />
             <span>Rafraîchir</span>
@@ -176,7 +176,7 @@ const OptimizedDashboard: React.FC = () => {
     
       {isLoading.vitalForGroupMZs || isLoading.problems ? (
         <div className="flex justify-center items-center h-64">
-          <Loader className="w-10 h-10 text-indigo-500 animate-spin" />
+          <Loader className="w-10 h-10 text-amber-500 animate-spin" />
         </div>
       ) : selectedZone && currentZone ? (
         // Vue détaillée d'une Management Zone
@@ -193,14 +193,14 @@ const OptimizedDashboard: React.FC = () => {
         />
       ) : (
         <>
-          {/* Bannière d'introduction pour Vital for Group */}
-          <div className="mb-6 p-4 bg-blue-500/10 border border-blue-200 rounded-lg dark:bg-blue-900/20 dark:border-blue-800">
+          {/* Bannière d'introduction pour Vital for Entreprise */}
+          <div className="mb-6 p-4 bg-amber-500/10 border border-amber-200 rounded-lg dark:bg-amber-900/20 dark:border-amber-800">
             <div className="flex items-start gap-4">
-              <Shield className="text-blue-500 mt-1" size={24} />
+              <Shield className="text-amber-500 mt-1" size={24} />
               <div>
-                <h2 className="text-lg font-semibold text-blue-600 dark:text-blue-400 mb-1">Vital for Group</h2>
+                <h2 className="text-lg font-semibold text-amber-600 dark:text-amber-400 mb-1">Vital for Entreprise</h2>
                 <p className="text-slate-600 dark:text-slate-300">
-                  Supervision des applications critiques du groupe avec performance optimisée.
+                  Supervision des applications critiques pour l'entreprise avec performance optimisée.
                 </p>
               </div>
             </div>
@@ -257,12 +257,12 @@ const OptimizedDashboard: React.FC = () => {
             </div>
           )}
         
-          <ProblemsList problems={activeProblems} title="Problèmes actifs sur Vital for Group" />
-          <ManagementZoneList zones={vitalForGroupMZs} onZoneClick={handleZoneClick} />
+          <ProblemsList problems={activeProblems} title="Problèmes actifs sur Vital for Entreprise" />
+          <ManagementZoneList zones={vitalForEntrepriseMZs} onZoneClick={handleZoneClick} />
         </>
       )}
     </Layout>
   );
 };
 
-export default OptimizedDashboard;
+export default OptimizedEntrepriseDashboard;

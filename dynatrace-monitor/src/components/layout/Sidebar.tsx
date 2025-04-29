@@ -93,13 +93,13 @@ const Sidebar: React.FC = () => {
           </li>
           <li>
             <Link 
-              to="/vfa" 
+              to="/vfe" 
               className={`flex items-center gap-3 py-3 ${
                 sidebarCollapsed ? 'px-0 justify-center' : 'px-5'
-              } ${
+              } border-l-4 ${
                 isDarkTheme 
-                  ? 'text-slate-400 hover:bg-slate-700 hover:text-white' 
-                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                  ? 'bg-amber-900/10 text-amber-400 border-amber-500' 
+                  : 'bg-amber-100 text-amber-700 border-amber-500'
               }`}
             >
               <Award size={20} className="flex-shrink-0" />

@@ -194,6 +194,11 @@ const api = {
     return this.get<VitalForGroupMZsResponse>(ENDPOINTS.VITAL_FOR_GROUP_MZS);
   },
 
+  // Récupérer les management zones de Vital for Entreprise
+  getVitalForEntrepriseMZs() {
+    return this.get<VitalForGroupMZsResponse>(ENDPOINTS.VITAL_FOR_ENTREPRISE_MZS);
+  },
+
   // Définir la management zone actuelle
   setManagementZone(name: string) {
     return this.post(ENDPOINTS.SET_MANAGEMENT_ZONE, { name });
