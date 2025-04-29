@@ -63,6 +63,38 @@ def get_vital_for_group_mzs():
     return [mz.strip() for mz in vfg_mz_string.split(',')]
 
 # Nouvel endpoint pour obtenir les Management Zones de Vital for Group
+@app.route('/api/vital-for-entreprise-mzs', methods=['GET'])
+def get_vital_for_entreprise_mzs_endpoint():
+    try:
+        # Récupérer directement la liste depuis la variable d'environnement
+        vfe_mz_string = os.environ.get('VFE_MZ_LIST', '')
+        
+        # Logging pour debug
+        logger.info(f"VFE_MZ_LIST from .env: {vfe_mz_string}")
+        
+        # Si la variable n'est pas définie, retourner une liste vide
+        if not vfe_mz_string:
+            logger.warning("VFE_MZ_LIST is empty or not defined in .env file")
+            return jsonify({'mzs': [], 'source': 'env_file'})
+        
+        # Diviser la chaîne en liste de MZs
+        vfe_mzs = [mz.strip() for mz in vfe_mz_string.split(',')]
+        logger.info(f"Parsed VFE MZs: {vfe_mzs}")
+        
+        # Format de réponse simple
+        return jsonify({
+            'mzs': vfe_mzs,
+            'source': 'env_file'  # Indique que les données viennent du fichier .env
+        })
+    except Exception as e:
+        logger.error(f"Erreur lors de la récupération des MZs Vital for Entreprise: {e}")
+        # Retourner une réponse même en cas d'erreur
+        return jsonify({
+            'mzs': [],
+            'source': 'env_file',
+            'error': str(e)
+        }), 500
+        
 @app.route('/api/vital-for-group-mzs', methods=['GET'])
 def get_vital_for_group_mzs_endpoint():
     try:
