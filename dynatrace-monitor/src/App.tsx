@@ -1,7 +1,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AppProvider } from './contexts/AppContext';
-import { OptimizedAppProvider } from './contexts/OptimizedAppContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 
 // Pages
@@ -49,19 +48,19 @@ function App() {
           
           {/* Routes pour l'application optimisée */}
           <Route path="/optimized" element={
-            <OptimizedAppProvider>
+            <AppProvider optimized={true}>
               <OptimizedDashboard />
-            </OptimizedAppProvider>
+            </AppProvider>
           } />
           <Route path="/vfg-optimized" element={
-            <OptimizedAppProvider>
+            <AppProvider optimized={true}>
               <OptimizedDashboard />
-            </OptimizedAppProvider>
+            </AppProvider>
           } />
           <Route path="/vfe-optimized" element={
-            <OptimizedAppProvider>
+            <AppProvider optimized={true}>
               <OptimizedEntrepriseDashboard />
-            </OptimizedAppProvider>
+            </AppProvider>
           } />
           
           {/* Redirection des routes non trouvées vers la page d'accueil */}
