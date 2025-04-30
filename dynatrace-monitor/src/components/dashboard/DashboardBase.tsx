@@ -1,5 +1,5 @@
 import React from 'react';
-import { Shield, Loader, AlertOctagon, RefreshCw, Clock, BarChart } from 'lucide-react';
+import { Shield, Loader, AlertOctagon, RefreshCw, Clock, BarChart, ChevronLeft } from 'lucide-react';
 import Layout from '../layout/Layout';
 import ProblemsList from './ProblemsList';
 import ManagementZoneList from './ManagementZoneList';
@@ -184,7 +184,7 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
           onClick={handleBackClick}
           className="mb-5 flex items-center gap-2 px-4 py-1.5 rounded-lg border border-slate-600 text-slate-300 hover:bg-slate-700"
         >
-          <RefreshCw size={14} />
+          <ChevronLeft size={14} />
           <span>Retour aux Management Zones</span>
         </button>
         
