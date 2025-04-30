@@ -182,10 +182,10 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
     // Déterminer le pourcentage de progression à afficher
     // basé sur l'état de chargement réel des données
     const progressStage = 
-      // Vous pouvez ajuster cette logique en fonction de vos états de chargement réels
-      !isLoading.hosts && !isLoading.services && !isLoading.processGroups ? 90 :
-      !isLoading.hosts && !isLoading.services ? 75 :
-      !isLoading.hosts ? 50 :
+    // Calcul basé sur les données disponibles plutôt que sur isLoading
+      hosts.length > 0 && services.length > 0 && processGroups.length > 0 ? 90 :
+      hosts.length > 0 && services.length > 0 ? 75 :
+      hosts.length > 0 ? 50 :
       25; // Début du chargement
       
     return (
