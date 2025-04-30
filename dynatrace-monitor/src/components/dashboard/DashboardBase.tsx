@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import Layout from '../layout/Layout';
 import ProblemsList from './ProblemsList';
 import ManagementZoneList from './ManagementZoneList';
@@ -42,52 +42,6 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
     performanceMetrics,
     refreshData
   } = context;
-  
-  // État pour suivre la progression du chargement
-  const [loadingProgress, setLoadingProgress] = useState(0);
-  
-  // Effet pour simuler la progression du chargement
-  useEffect(() => {
-    // Seulement exécuter si le chargement des détails de zone est en cours
-    if (isLoading.zoneDetails && selectedZone) {
-      let timer: NodeJS.Timeout;
-      
-      // Démarrer à 0 et progresser jusqu'à 98%
-      if (loadingProgress < 98) {
-        timer = setTimeout(() => {
-          // Calculer la vitesse de progression en fonction de la progression actuelle
-          let increment = 1;
-          
-          // Progression plus rapide au début
-          if (loadingProgress < 30) {
-            increment = 2;
-          } 
-          // Ralentissement au milieu (simulation de traitement)
-          else if (loadingProgress < 60) {
-            increment = 0.8;
-          } 
-          // Très lent autour de 60-80% (simuler un travail intensif)
-          else if (loadingProgress < 80) {
-            increment = 0.5;
-          } 
-          // Accélération finale
-          else {
-            increment = 1;
-          }
-          
-          setLoadingProgress(prev => Math.min(prev + increment, 98));
-        }, 50); // Ajuster ce délai pour contrôler la vitesse globale
-      }
-      
-      // Nettoyer le timer lorsque le composant est démonté ou lorsque l'état change
-      return () => {
-        if (timer) clearTimeout(timer);
-      };
-    } else {
-      // Réinitialiser la progression à 0 quand le chargement est terminé
-      setLoadingProgress(0);
-    }
-  }, [isLoading.zoneDetails, selectedZone, loadingProgress]);
   
   // Déterminer les zones à afficher selon la variante
   const zones = variant === 'vfg' ? vitalForGroupMZs : vitalForEntrepriseMZs;
@@ -225,7 +179,7 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
   
   // Afficher l'écran de chargement des détails de zone
   if (isLoading.zoneDetails && selectedZone) {
-    // Déterminez le pourcentage de progression à afficher
+    // Déterminer le pourcentage de progression à afficher
     // basé sur l'état de chargement réel des données
     const progressStage = 
       // Vous pouvez ajuster cette logique en fonction de vos états de chargement réels
@@ -233,7 +187,7 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
       !isLoading.hosts && !isLoading.services ? 75 :
       !isLoading.hosts ? 50 :
       25; // Début du chargement
-  
+      
     return (
       <Layout title={title} subtitle={currentZone?.name}>
         <button 
