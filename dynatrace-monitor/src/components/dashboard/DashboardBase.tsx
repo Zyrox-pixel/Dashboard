@@ -1,10 +1,11 @@
 import React from 'react';
-import { Shield, Loader, AlertOctagon, RefreshCw, Clock, BarChart, ChevronLeft } from 'lucide-react';
 import Layout from '../layout/Layout';
 import ProblemsList from './ProblemsList';
 import ManagementZoneList from './ManagementZoneList';
 import ZoneDetails from './ZoneDetails';
 import { AppContextType } from '../../contexts/AppContext';
+import { Shield, Loader, AlertOctagon, RefreshCw, Clock, BarChart, ChevronLeft, Check, Server } from 'lucide-react';
+
 
 interface DashboardBaseProps {
   title: string;
