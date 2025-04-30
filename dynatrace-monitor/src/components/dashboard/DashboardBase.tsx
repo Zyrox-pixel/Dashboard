@@ -61,6 +61,7 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
   
   // Gérer le clic sur une zone
   const handleZoneClick = (zoneId: string) => {
+    console.log(`Zone clicked: ${zoneId}`);
     setSelectedZone(zoneId);
     setActiveTab('hosts');
   };
@@ -85,6 +86,15 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
     }
     return `${(timeMs / 1000).toFixed(2)} s`;
   };
+  
+  console.log("Dashboard render state:", {
+    isLoading,
+    backendConnected,
+    error,
+    selectedZone,
+    currentZone,
+    zonesCount: zones.length
+  });
   
   // Afficher un écran de chargement si le chargement initial n'est pas terminé
   if (!isLoading.initialLoadComplete || (isLoading.dashboardData && optimized)) {
@@ -129,7 +139,10 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
           <p className="text-xl text-red-600 dark:text-red-400 mb-4">Une erreur est survenue</p>
           <p className="text-slate-600 dark:text-slate-300 mb-8 text-center max-w-lg">{error}</p>
           <button 
-            onClick={() => refreshData()}
+            onClick={() => {
+              setSelectedZone(null); // Réinitialiser la zone sélectionnée
+              refreshData();
+            }}
             className={`px-6 py-3 ${cssClasses.accentBg} text-white rounded-md ${cssClasses.hoverBg} flex items-center gap-2`}
           >
             <RefreshCw size={18} />
@@ -158,6 +171,26 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
             <RefreshCw size={18} />
             <span>Actualiser</span>
           </button>
+        </div>
+      </Layout>
+    );
+  }
+  
+  // Afficher l'écran de chargement des détails de zone
+  if (isLoading.zoneDetails && selectedZone) {
+    return (
+      <Layout title={title} subtitle={currentZone?.name}>
+        <button 
+          onClick={handleBackClick}
+          className="mb-5 flex items-center gap-2 px-4 py-1.5 rounded-lg border border-slate-600 text-slate-300 hover:bg-slate-700"
+        >
+          <RefreshCw size={14} />
+          <span>Retour aux Management Zones</span>
+        </button>
+        
+        <div className="flex flex-col items-center justify-center h-64">
+          <div className={`w-16 h-16 border-t-4 border-b-4 ${cssClasses.accent} rounded-full animate-spin mb-4`}></div>
+          <p className="text-xl text-slate-400">Chargement des données de la zone...</p>
         </div>
       </Layout>
     );

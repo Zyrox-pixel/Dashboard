@@ -181,113 +181,169 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
   const initialLoadRef = useRef(false);
 
   // Fonction optimisée pour charger les données d'une zone
-  const loadZoneData = useCallback(async (zoneId: string) => {
-    setState(prev => ({ ...prev, isLoading: { ...prev.isLoading, zoneDetails: true } }));
-    const startTime = performance.now();
+
+const loadZoneData = useCallback(async (zoneId: string) => {
+  console.log(`Loading zone data for zoneId: ${zoneId}`);
+  setState(prev => ({ ...prev, isLoading: { ...prev.isLoading, zoneDetails: true } }));
+  const startTime = performance.now();
+  
+  try {
+    // Chercher la zone dans les deux collections
+    let selectedZoneObj = state.vitalForGroupMZs.find(zone => zone.id === zoneId) ||
+                          state.vitalForEntrepriseMZs.find(zone => zone.id === zoneId);
     
+    if (!selectedZoneObj) {
+      console.error(`Zone not found with id: ${zoneId}`);
+      setState(prev => ({ 
+        ...prev, 
+        error: `Zone introuvable (ID: ${zoneId})`,
+        isLoading: { ...prev.isLoading, zoneDetails: false }
+      }));
+      return;
+    }
+    
+    console.log(`Found zone: ${selectedZoneObj.name}`);
+    
+    // Utiliser soit l'API optimisée soit l'API standard
+    const apiClient = api; // Utiliser toujours l'API standard pour éviter tout problème
+    
+    // Définir la management zone
+    console.log(`Setting management zone: ${selectedZoneObj.name}`);
     try {
-      let selectedZoneObj = state.vitalForGroupMZs.find(zone => zone.id === zoneId);
-      if (!selectedZoneObj) {
-        selectedZoneObj = state.vitalForEntrepriseMZs.find(zone => zone.id === zoneId);
-      }
-      
-      if (!selectedZoneObj) return;
-      
-      // Utiliser soit l'API optimisée soit l'API standard
-      const apiClient = optimized ? optimizedApiMethods : api;
-      
-      // Définir la management zone
       const setMzResponse = await apiClient.setManagementZone(selectedZoneObj.name);
       
       if (setMzResponse.error) {
-        setState(prev => ({ ...prev, error: `Erreur: ${setMzResponse.error}` }));
+        console.error('Erreur lors de la définition de la MZ:', setMzResponse.error);
+        setState(prev => ({ 
+          ...prev, 
+          error: `Erreur lors de la définition de la MZ: ${setMzResponse.error}`,
+          isLoading: { ...prev.isLoading, zoneDetails: false }
+        }));
         return;
       }
-      
-      // Utiliser l'API standard - charger les données séparément
-      const [processResponse, hostsResponse, servicesResponse] = await Promise.all([
-        apiClient.getProcesses(),
-        apiClient.getHosts(),
-        apiClient.getServices()
-      ]);
-      
-      // Mise à jour des process groups
+    } catch (error) {
+      console.error('Exception lors de la définition de la MZ:', error);
+      setState(prev => ({ 
+        ...prev, 
+        error: 'Erreur réseau lors de la définition de la zone',
+        isLoading: { ...prev.isLoading, zoneDetails: false }
+      }));
+      return;
+    }
+    
+    // Utiliser try/catch individuels pour chaque appel API pour une meilleure robustesse
+    let processData: ProcessResponse[] = [];
+    let hostsData: Host[] = [];
+    let servicesData: Service[] = [];
+    
+    // Récupérer les données des process
+    try {
+      console.log('Fetching process data...');
+      const processResponse = await apiClient.getProcesses();
       if (!processResponse.error && processResponse.data) {
-        const processData = processResponse.data as ProcessResponse[];
-        
-        if (Array.isArray(processData) && processData.length > 0) {
-          const processGroups: ProcessGroup[] = processData.map((process: ProcessResponse) => ({
-            id: process.id || `proc-${Math.random().toString(36).substring(2, 9)}`,
-            name: process.name || "Processus inconnu",
-            technology: process.technology || "Non spécifié",
-            icon: getProcessIcon(process.tech_icon || ''),
-            dt_url: process.dt_url || "#",
-            // Make sure to use a type that's compatible with ProcessGroup
-            type: ((process.tech_icon && process.tech_icon.toLowerCase().includes('database')) 
-              ? 'database' : 'technology') as 'database' | 'technology' | 'server'
-          }));
-          
-          setState(prev => ({ ...prev, processGroups }));
-          
-          if (optimized) {
-            setPerformanceMetrics(prev => ({
-              ...prev,
-              dataSizes: { ...prev.dataSizes, processes: processGroups.length }
-            }));
-          }
-        } else {
-          setState(prev => ({ ...prev, processGroups: [] }));
-        }
+        processData = Array.isArray(processResponse.data) ? processResponse.data : [];
+      } else if (processResponse.error) {
+        console.error('Error fetching processes:', processResponse.error);
       }
-      
-      // Mise à jour des hosts
+    } catch (error) {
+      console.error('Exception lors de la récupération des processes:', error);
+    }
+    
+    // Récupérer les données des hosts
+    try {
+      console.log('Fetching hosts data...');
+      const hostsResponse = await apiClient.getHosts();
       if (!hostsResponse.error && hostsResponse.data) {
-        setState(prev => ({ ...prev, hosts: hostsResponse.data as Host[] }));
-        
-        if (optimized) {
-          setPerformanceMetrics(prev => ({
-            ...prev,
-            dataSizes: { ...prev.dataSizes, hosts: (hostsResponse.data as Host[]).length }
-          }));
-        }
-      } else {
-        setState(prev => ({ ...prev, hosts: [] }));
+        hostsData = Array.isArray(hostsResponse.data) ? hostsResponse.data : [];
+      } else if (hostsResponse.error) {
+        console.error('Error fetching hosts:', hostsResponse.error);
       }
-      
-      // Mise à jour des services
+    } catch (error) {
+      console.error('Exception lors de la récupération des hosts:', error);
+    }
+    
+    // Récupérer les données des services
+    try {
+      console.log('Fetching services data...');
+      const servicesResponse = await apiClient.getServices();
       if (!servicesResponse.error && servicesResponse.data) {
-        setState(prev => ({ ...prev, services: servicesResponse.data as Service[] }));
-        
-        if (optimized) {
-          setPerformanceMetrics(prev => ({
-            ...prev,
-            dataSizes: { ...prev.dataSizes, services: (servicesResponse.data as Service[]).length }
-          }));
-        }
-      } else {
-        setState(prev => ({ ...prev, services: [] }));
+        servicesData = Array.isArray(servicesResponse.data) ? servicesResponse.data : [];
+      } else if (servicesResponse.error) {
+        console.error('Error fetching services:', servicesResponse.error);
       }
+    } catch (error) {
+      console.error('Exception lors de la récupération des services:', error);
+    }
+    
+    // Transformer les données des process groups
+    if (processData.length > 0) {
+      console.log(`Processing ${processData.length} process groups...`);
+      const processGroups: ProcessGroup[] = processData.map((process: ProcessResponse) => ({
+        id: process.id || `proc-${Math.random().toString(36).substring(2, 9)}`,
+        name: process.name || "Processus inconnu",
+        technology: process.technology || "Non spécifié",
+        icon: getProcessIcon(process.tech_icon || ''),
+        dt_url: process.dt_url || "#",
+        type: ((process.tech_icon && process.tech_icon.toLowerCase().includes('database')) 
+          ? 'database' : 'technology') as 'database' | 'technology' | 'server'
+      }));
       
-      const endTime = performance.now();
+      setState(prev => ({ ...prev, processGroups }));
       
       if (optimized) {
         setPerformanceMetrics(prev => ({
           ...prev,
-          loadTime: endTime - startTime,
-          lastRefresh: new Date()
+          dataSizes: { ...prev.dataSizes, processes: processGroups.length }
         }));
       }
-      
-    } catch (error: any) {
-      console.error('Erreur lors du chargement des données de la zone:', error);
-      setState(prev => ({ 
-        ...prev, 
-        error: 'Erreur lors du chargement des données pour la zone sélectionnée.'
-      }));
-    } finally {
-      setState(prev => ({ ...prev, isLoading: { ...prev.isLoading, zoneDetails: false } }));
+    } else {
+      console.log('No process groups found, setting empty array');
+      setState(prev => ({ ...prev, processGroups: [] }));
     }
-  }, [state.vitalForGroupMZs, state.vitalForEntrepriseMZs, optimized]);
+    
+    // Mettre à jour les hosts
+    console.log(`Processing ${hostsData.length} hosts...`);
+    setState(prev => ({ ...prev, hosts: hostsData }));
+    
+    if (optimized) {
+      setPerformanceMetrics(prev => ({
+        ...prev,
+        dataSizes: { ...prev.dataSizes, hosts: hostsData.length }
+      }));
+    }
+    
+    // Mettre à jour les services
+    console.log(`Processing ${servicesData.length} services...`);
+    setState(prev => ({ ...prev, services: servicesData }));
+    
+    if (optimized) {
+      setPerformanceMetrics(prev => ({
+        ...prev,
+        dataSizes: { ...prev.dataSizes, services: servicesData.length }
+      }));
+    }
+    
+    const endTime = performance.now();
+    console.log(`Zone data loaded in ${endTime - startTime}ms`);
+    
+    if (optimized) {
+      setPerformanceMetrics(prev => ({
+        ...prev,
+        loadTime: endTime - startTime,
+        lastRefresh: new Date()
+      }));
+    }
+    
+  } catch (error: any) {
+    console.error('Erreur globale lors du chargement des données de la zone:', error);
+    setState(prev => ({ 
+      ...prev, 
+      error: 'Erreur lors du chargement des données pour la zone sélectionnée.'
+    }));
+  } finally {
+    setState(prev => ({ ...prev, isLoading: { ...prev.isLoading, zoneDetails: false } }));
+  }
+}, [state.vitalForGroupMZs, state.vitalForEntrepriseMZs, optimized]);
 
   // Fonction pour obtenir les icônes des process
   const getProcessIcon = (techIcon: string) => {
