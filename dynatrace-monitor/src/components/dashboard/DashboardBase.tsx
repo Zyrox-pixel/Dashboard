@@ -177,24 +177,55 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
   }
   
   // Afficher l'écran de chargement des détails de zone
-  if (isLoading.zoneDetails && selectedZone) {
-    return (
-      <Layout title={title} subtitle={currentZone?.name}>
-        <button 
-          onClick={handleBackClick}
-          className="mb-5 flex items-center gap-2 px-4 py-1.5 rounded-lg border border-slate-600 text-slate-300 hover:bg-slate-700"
-        >
-          <ChevronLeft size={14} />
-          <span>Retour aux Management Zones</span>
-        </button>
-        
-        <div className="flex flex-col items-center justify-center h-64">
-          <div className={`w-16 h-16 border-t-4 border-b-4 ${cssClasses.accent} rounded-full animate-spin mb-4`}></div>
-          <p className="text-xl text-slate-400">Chargement des données de la zone...</p>
-        </div>
-      </Layout>
-    );
-  }
+// Afficher l'écran de chargement des détails de zone
+    if (isLoading.zoneDetails && selectedZone) {
+        return (
+        <Layout title={title} subtitle={currentZone?.name}>
+            <button 
+            onClick={handleBackClick}
+            className="mb-5 flex items-center gap-2 px-4 py-1.5 rounded-lg border border-slate-600 text-slate-300 hover:bg-slate-700"
+            >
+            <ChevronLeft size={14} />
+            <span>Retour aux Management Zones</span>
+            </button>
+            
+            <div className="flex flex-col items-center justify-center p-12">
+            {/* Indicateur de chargement élégant */}
+            <div className="relative">
+                {/* Cercle extérieur pulsant */}
+                <div className={`absolute -inset-4 ${cssClasses.bgLightOpacity} rounded-full opacity-30 animate-pulse`}></div>
+                
+                {/* Cercle principal qui tourne */}
+                <div className="w-16 h-16 rounded-full bg-slate-800 shadow-lg flex items-center justify-center relative">
+                
+                {/* Anneau animé */}
+                <div className={`absolute inset-0.5 rounded-full border-2 border-transparent ${cssClasses.accent.replace('text', 'border')} 
+                    animate-spin opacity-70`} style={{ borderTopColor: 'transparent', borderLeftColor: 'transparent' }}></div>
+                
+                {/* Deuxième anneau animé en sens inverse avec délai */}
+                <div className={`absolute inset-2 rounded-full border border-transparent ${cssClasses.accent.replace('text', 'border')} 
+                    animate-spin opacity-40`} style={{ borderTopColor: 'transparent', borderRightColor: 'transparent', animationDirection: 'reverse', animationDuration: '1.5s' }}></div>
+                
+                {/* Icône au centre - utiliser l'icône de la zone si disponible */}
+                <div className={`${cssClasses.accent} z-10`}>
+                    {currentZone?.icon || <Shield size={18} />}
+                </div>
+                </div>
+            </div>
+            
+            {/* Texte de chargement avec animation de points */}
+            <div className="mt-6 text-slate-400 font-medium flex items-center">
+                <span>Chargement des détails</span>
+                <span className="ml-1 inline-flex">
+                <span className="animate-pulse" style={{ animationDelay: '0s' }}>.</span>
+                <span className="animate-pulse" style={{ animationDelay: '0.2s' }}>.</span>
+                <span className="animate-pulse" style={{ animationDelay: '0.4s' }}>.</span>
+                </span>
+            </div>
+            </div>
+        </Layout>
+        );
+    }
   
   return (
     <Layout

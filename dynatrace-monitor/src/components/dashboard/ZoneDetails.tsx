@@ -828,7 +828,6 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
   }, [onTabChange]);
 
   // État de chargement pour les détails de la zone
-  // État de chargement pour les détails de la zone
   if (isLoading) {
     return (
       <div>
@@ -842,40 +841,9 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
           <span>Retour aux Management Zones</span>
         </button>
         
-        <div className="flex flex-col items-center justify-center p-12">
-          {/* Indicateur de chargement élégant */}
-          <div className="relative">
-            {/* Cercle extérieur pulsant */}
-            <div className={`absolute -inset-4 ${zoneColors.bg} rounded-full opacity-20 animate-pulse`}></div>
-            
-            {/* Cercle principal qui tourne */}
-            <div className={`w-16 h-16 rounded-full ${isDarkTheme ? 'bg-slate-800' : 'bg-white'} 
-              shadow-lg flex items-center justify-center relative`}>
-              
-              {/* Anneau animé */}
-              <div className={`absolute inset-0.5 rounded-full border-2 border-transparent ${zoneColors.text.replace('text', 'border')} 
-                animate-spin opacity-70`} style={{ borderTopColor: 'transparent', borderLeftColor: 'transparent' }}></div>
-              
-              {/* Deuxième anneau animé en sens inverse avec délai */}
-              <div className={`absolute inset-2 rounded-full border border-transparent ${zoneColors.text.replace('text', 'border')} 
-                animate-spin opacity-40`} style={{ borderTopColor: 'transparent', borderRightColor: 'transparent', animationDirection: 'reverse', animationDuration: '1.5s' }}></div>
-              
-              {/* Icône au centre */}
-              <div className={`${zoneColors.text} z-10`}>
-                {zone.icon}
-              </div>
-            </div>
-          </div>
-          
-          {/* Texte de chargement avec animation de points */}
-          <div className="mt-6 text-slate-400 font-medium flex items-center">
-            <span>Chargement des détails</span>
-            <span className="ml-1 inline-flex">
-              <span className="animate-pulse" style={{ animationDelay: '0s' }}>.</span>
-              <span className="animate-pulse" style={{ animationDelay: '0.2s' }}>.</span>
-              <span className="animate-pulse" style={{ animationDelay: '0.4s' }}>.</span>
-            </span>
-          </div>
+        <div className="flex flex-col items-center justify-center h-64">
+          <Loader className="w-10 h-10 text-indigo-500 animate-spin mb-4" />
+          <p className="text-slate-400">Chargement des détails de la zone...</p>
         </div>
       </div>
     );
