@@ -15,7 +15,7 @@ interface DashboardBaseProps {
 
 /**
  * Composant de base réutilisable pour les tableaux de bord (standard et optimisé)
- * Cela permet d'éviter la duplication entre les 4 composants de dashboard
+ * Permet d'éviter la duplication entre les 4 composants de dashboard
  */
 const DashboardBase: React.FC<DashboardBaseProps> = ({ 
   title, 
@@ -45,16 +45,18 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
   // Déterminer les zones à afficher selon la variante
   const zones = variant === 'vfg' ? vitalForGroupMZs : vitalForEntrepriseMZs;
   
-  // Déterminer les couleurs de l'interface selon la variante
-  const colors = {
-    primary: variant === 'vfg' ? 'blue' : 'amber',
-    accent: variant === 'vfg' ? 'blue-500' : 'amber-500',
-    text: variant === 'vfg' ? 'blue-600' : 'amber-600',
-    darkText: variant === 'vfg' ? 'blue-400' : 'amber-400',
-    bgLight: variant === 'vfg' ? 'blue-100' : 'amber-100',
-    bgDark: variant === 'vfg' ? 'blue-900/20' : 'amber-900/20',
-    borderLight: variant === 'vfg' ? 'blue-200' : 'amber-200',
-    borderDark: variant === 'vfg' ? 'blue-800' : 'amber-800',
+  // Déterminer les classes CSS selon la variante (pas de template strings dynamiques)
+  const cssClasses = {
+    accent: variant === 'vfg' ? 'text-blue-500' : 'text-amber-500',
+    accentBg: variant === 'vfg' ? 'bg-blue-500' : 'bg-amber-500',
+    text: variant === 'vfg' ? 'text-blue-600' : 'text-amber-600',
+    darkText: variant === 'vfg' ? 'text-blue-400' : 'text-amber-400',
+    bgLight: variant === 'vfg' ? 'bg-blue-100' : 'bg-amber-100',
+    bgLightOpacity: variant === 'vfg' ? 'bg-blue-500/10' : 'bg-amber-500/10',
+    bgDark: variant === 'vfg' ? 'bg-blue-900/20' : 'bg-amber-900/20',
+    borderLight: variant === 'vfg' ? 'border-blue-200' : 'border-amber-200',
+    borderDark: variant === 'vfg' ? 'border-blue-800' : 'border-amber-800',
+    hoverBg: variant === 'vfg' ? 'hover:bg-blue-700' : 'hover:bg-amber-700',
   };
   
   // Gérer le clic sur une zone
@@ -89,7 +91,7 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
     return (
       <Layout title={title}>
         <div className="flex flex-col items-center justify-center h-64">
-          <div className={`w-16 h-16 border-t-4 border-b-4 border-${colors.accent} rounded-full animate-spin mb-4`}></div>
+          <div className={`w-16 h-16 border-t-4 border-b-4 ${cssClasses.accent} rounded-full animate-spin mb-4`}></div>
           <p className="text-xl text-slate-400">Chargement des données...</p>
         </div>
       </Layout>
@@ -108,7 +110,7 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
           </p>
           <button 
             onClick={() => refreshData()}
-            className={`px-6 py-3 bg-${colors.accent} text-white rounded-md hover:bg-${colors.primary}-700 flex items-center gap-2`}
+            className={`px-6 py-3 ${cssClasses.accentBg} text-white rounded-md ${cssClasses.hoverBg} flex items-center gap-2`}
           >
             <RefreshCw size={18} />
             <span>Réessayer</span>
@@ -128,7 +130,7 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
           <p className="text-slate-600 dark:text-slate-300 mb-8 text-center max-w-lg">{error}</p>
           <button 
             onClick={() => refreshData()}
-            className={`px-6 py-3 bg-${colors.accent} text-white rounded-md hover:bg-${colors.primary}-700 flex items-center gap-2`}
+            className={`px-6 py-3 ${cssClasses.accentBg} text-white rounded-md ${cssClasses.hoverBg} flex items-center gap-2`}
           >
             <RefreshCw size={18} />
             <span>Réessayer</span>
@@ -143,15 +145,15 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
      (variant === 'vfg' ? !isLoading.vitalForGroupMZs : !isLoading.vitalForEntrepriseMZs)) {
     return (
       <Layout title={title}>
-        <div className={`flex flex-col items-center justify-center h-64 p-10 mt-20 bg-${colors.bgLight} border border-${colors.borderLight} rounded-lg dark:bg-${colors.bgDark} dark:border-${colors.borderDark}`}>
-          <Shield className={`w-16 h-16 text-${colors.accent} mb-4`} />
-          <p className={`text-xl text-${colors.text} dark:text-${colors.darkText} mb-4`}>Aucune Management Zone trouvée</p>
+        <div className={`flex flex-col items-center justify-center h-64 p-10 mt-20 ${cssClasses.bgLight} border ${cssClasses.borderLight} rounded-lg dark:${cssClasses.bgDark} dark:${cssClasses.borderDark}`}>
+          <Shield className={`w-16 h-16 ${cssClasses.accent} mb-4`} />
+          <p className={`text-xl ${cssClasses.text} dark:${cssClasses.darkText} mb-4`}>Aucune Management Zone trouvée</p>
           <p className="text-slate-600 dark:text-slate-300 mb-8 text-center max-w-lg">
             Aucune Management Zone n'a été trouvée. Vérifiez votre configuration.
           </p>
           <button 
             onClick={() => refreshData()}
-            className={`px-6 py-3 bg-${colors.accent} text-white rounded-md hover:bg-${colors.primary}-700 flex items-center gap-2`}
+            className={`px-6 py-3 ${cssClasses.accentBg} text-white rounded-md ${cssClasses.hoverBg} flex items-center gap-2`}
           >
             <RefreshCw size={18} />
             <span>Actualiser</span>
@@ -168,16 +170,16 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
     >
       {/* Section des métriques de performance (version optimisée uniquement) */}
       {optimized && performanceMetrics && (
-        <div className={`mb-6 p-4 bg-${colors.primary}-500/10 border border-${colors.borderLight} rounded-lg dark:bg-${colors.bgDark} dark:border-${colors.borderDark}`}>
+        <div className={`mb-6 p-4 ${cssClasses.bgLightOpacity} border ${cssClasses.borderLight} rounded-lg dark:${cssClasses.bgDark} dark:${cssClasses.borderDark}`}>
           <div className="flex items-start gap-4">
-            <BarChart className={`text-${colors.accent} mt-1`} size={24} />
+            <BarChart className={cssClasses.accent} size={24} />
             <div className="flex-1">
-              <h2 className={`text-lg font-semibold text-${colors.text} dark:text-${colors.darkText} mb-1`}>Optimisation des performances</h2>
+              <h2 className={`text-lg font-semibold ${cssClasses.text} dark:${cssClasses.darkText} mb-1`}>Optimisation des performances</h2>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
                 <div>
                   <p className="text-slate-600 dark:text-slate-300 flex items-center">
-                    <Clock className={`mr-2 text-${colors.accent}`} size={16} />
-                    Temps de chargement: <span className={`ml-2 font-semibold text-${colors.text} dark:text-${colors.darkText}`}>{formatLoadTime(performanceMetrics.loadTime)}</span>
+                    <Clock className={`mr-2 ${cssClasses.accent}`} size={16} />
+                    Temps de chargement: <span className={`ml-2 font-semibold ${cssClasses.text} dark:${cssClasses.darkText}`}>{formatLoadTime(performanceMetrics.loadTime)}</span>
                   </p>
                 </div>
                 <div>
@@ -194,7 +196,7 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
             </div>
             <button 
               onClick={() => refreshData()}
-              className={`px-4 py-2 bg-${colors.accent} text-white rounded hover:bg-${colors.primary}-700 flex items-center gap-2 ml-auto`}
+              className={`px-4 py-2 ${cssClasses.accentBg} text-white rounded ${cssClasses.hoverBg} flex items-center gap-2 ml-auto`}
             >
               <RefreshCw size={16} />
               <span>Rafraîchir</span>
@@ -205,7 +207,7 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
     
       {(isLoading.vitalForGroupMZs || isLoading.problems) && !isLoading.initialLoadComplete ? (
         <div className="flex justify-center items-center h-64">
-          <Loader className={`w-10 h-10 text-${colors.accent} animate-spin`} />
+          <Loader className={`w-10 h-10 ${cssClasses.accent} animate-spin`} />
         </div>
       ) : selectedZone && currentZone ? (
         // Vue détaillée d'une Management Zone
@@ -223,11 +225,11 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
       ) : (
         <>
           {/* Bannière d'introduction */}
-          <div className={`mb-6 p-4 bg-${colors.primary}-500/10 border border-${colors.borderLight} rounded-lg dark:bg-${colors.bgDark} dark:border-${colors.borderDark}`}>
+          <div className={`mb-6 p-4 ${cssClasses.bgLightOpacity} border ${cssClasses.borderLight} rounded-lg dark:${cssClasses.bgDark} dark:${cssClasses.borderDark}`}>
             <div className="flex items-start gap-4">
-              <Shield className={`text-${colors.accent} mt-1`} size={24} />
+              <Shield className={cssClasses.accent} size={24} />
               <div>
-                <h2 className={`text-lg font-semibold text-${colors.text} dark:text-${colors.darkText} mb-1`}>{title}</h2>
+                <h2 className={`text-lg font-semibold ${cssClasses.text} dark:${cssClasses.darkText} mb-1`}>{title}</h2>
                 <p className="text-slate-600 dark:text-slate-300">
                   {variant === 'vfg' 
                     ? 'Supervision des applications critiques du groupe.'
