@@ -181,6 +181,11 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
 // Remplacez le bloc de chargement dans DashboardBase.tsx par cette version plus informative
 
 // Afficher l'écran de chargement des détails de zone
+// Remplacez le bloc de chargement dans DashboardBase.tsx par cette version corrigée
+// Assurez-vous d'abord que ces icônes sont importées en haut du fichier:
+// import { Shield, Loader, AlertOctagon, RefreshCw, Clock, BarChart, ChevronLeft, Check, Server } from 'lucide-react';
+
+// Afficher l'écran de chargement des détails de zone
     if (isLoading.zoneDetails && selectedZone) {
         return (
         <Layout title={title} subtitle={currentZone?.name}>
@@ -246,21 +251,16 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
                 </div>
             </div>
             
-            {/* Ligne de progression globale */}
+            {/* Ligne de progression globale avec animation CSS*/}
             <div className="w-full bg-slate-700 h-1 rounded-full overflow-hidden mb-4">
-                <div className={`h-full ${cssClasses.accentBg}`} style={{ 
-                width: '40%', 
-                animation: 'progressAnimation 2s ease-in-out infinite',
-                }}></div>
+                <div 
+                className={`h-full ${cssClasses.accentBg}`} 
+                style={{ 
+                    width: '40%', 
+                    animation: 'progress-animation 2s ease-in-out infinite'
+                }}
+                ></div>
             </div>
-            
-            <style jsx>{`
-                @keyframes progressAnimation {
-                0% { width: 10%; }
-                50% { width: 40%; }
-                100% { width: 10%; }
-                }
-            `}</style>
             
             {/* Message explicatif */}
             <p className="text-sm text-slate-400 text-center">
@@ -268,6 +268,17 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
                 <br/>Cette opération peut prendre quelques instants...
             </p>
             </div>
+    
+            {/* Ajout du style global directement ici */}
+            <style>
+            {`
+                @keyframes progress-animation {
+                0% { width: 10%; }
+                50% { width: 40%; }
+                100% { width: 10%; }
+                }
+            `}
+            </style>
         </Layout>
         );
     }
