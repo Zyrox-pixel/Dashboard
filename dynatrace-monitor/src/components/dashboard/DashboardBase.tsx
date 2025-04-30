@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Layout from '../layout/Layout';
 import ProblemsList from './ProblemsList';
 import ManagementZoneList from './ManagementZoneList';
@@ -42,6 +42,44 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
     performanceMetrics,
     refreshData
   } = context;
+  
+  // État pour suivre la progression du chargement
+  const [loadingProgress, setLoadingProgress] = useState(0);
+  
+  // Effet pour simuler la progression du chargement
+  useEffect(() => {
+    // Seulement si nous sommes en chargement et que la progression n'est pas à 100%
+    if (isLoading.zoneDetails && selectedZone && loadingProgress < 98) {
+      const timer = setTimeout(() => {
+        // Incrémenter la progression
+        let increment = 1;
+        
+        // Progression plus rapide au début
+        if (loadingProgress < 30) {
+          increment = 2;
+        } 
+        // Ralentissement au milieu (simulation de traitement)
+        else if (loadingProgress < 60) {
+          increment = 0.8;
+        } 
+        // Très lent autour de 60-80% (simuler un travail intensif)
+        else if (loadingProgress < 80) {
+          increment = 0.5;
+        } 
+        // Accélération finale
+        else {
+          increment = 1;
+        }
+        
+        setLoadingProgress(prev => Math.min(prev + increment, 98));
+      }, 50); // Ajustez ce délai pour contrôler la vitesse globale
+      
+      return () => clearTimeout(timer);
+    } else if (!isLoading.zoneDetails) {
+      // Réinitialiser la progression quand le chargement est terminé
+      setLoadingProgress(0);
+    }
+  }, [isLoading.zoneDetails, selectedZone, loadingProgress]);
   
   // Déterminer les zones à afficher selon la variante
   const zones = variant === 'vfg' ? vitalForGroupMZs : vitalForEntrepriseMZs;
@@ -179,15 +217,6 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
   
   // Afficher l'écran de chargement des détails de zone
   if (isLoading.zoneDetails && selectedZone) {
-    // Déterminer le pourcentage de progression à afficher
-    // basé sur l'état de chargement réel des données
-    const progressStage = 
-    // Calcul basé sur les données disponibles plutôt que sur isLoading
-      hosts.length > 0 && services.length > 0 && processGroups.length > 0 ? 90 :
-      hosts.length > 0 && services.length > 0 ? 75 :
-      hosts.length > 0 ? 50 :
-      25; // Début du chargement
-      
     return (
       <Layout title={title} subtitle={currentZone?.name}>
         <button 
@@ -234,11 +263,11 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
                 <div className="flex items-center">
                   <div className="h-1.5 w-24 bg-slate-700 rounded-full overflow-hidden">
                     <div 
-                      className={`h-full ${cssClasses.accentBg}`}
-                      style={{ width: `${progressStage}%` }}
+                      className={`h-full ${cssClasses.accentBg} rounded-full`}
+                      style={{ width: `${loadingProgress}%`, transition: 'width 0.3s ease-out' }}
                     ></div>
                   </div>
-                  <span className="ml-2 text-xs text-slate-400">{progressStage}%</span>
+                  <span className="ml-2 text-xs text-slate-400">{Math.round(loadingProgress)}%</span>
                 </div>
               </div>
             </div>
@@ -259,7 +288,10 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
           <div className="w-full bg-slate-700 h-1 rounded-full overflow-hidden mb-4">
             <div 
               className={`h-full ${cssClasses.accentBg}`} 
-              style={{ width: `${progressStage}%` }}
+              style={{ 
+                width: `${loadingProgress}%`,
+                transition: 'width 0.3s ease-out'
+              }}
             ></div>
           </div>
           
