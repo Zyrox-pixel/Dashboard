@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo } from 'react';
-import { api, CACHE_TYPES, optimizedApiMethods } from '../api';
+import { api, CACHE_TYPES } from '../api';
 import { 
   Problem, 
   ManagementZone, 
@@ -12,7 +12,10 @@ import {
   SummaryData
 } from '../api/types';
 import { Database, Shield, Key, Globe, Server, Grid, Building, CreditCard } from 'lucide-react';
-import { useDataFetching } from '../hooks/useDataFetching';
+
+// On utilise les APIs existantes
+// Ajoutez ceci si vous n'avez pas encore modifié src/api/index.ts
+const optimizedApiMethods = api;
 
 // Types unifiés pour les contextes
 export interface AppStateType {
@@ -198,94 +201,68 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
         return;
       }
       
-      // Si on utilise l'API optimisée, on peut charger toutes les données en une seule requête
-      if (optimized && apiClient.loadDashboardData) {
-        const { processes, hosts, services } = await apiClient.loadDashboardData(selectedZoneObj.name);
+      // Utiliser l'API standard - charger les données séparément
+      const [processResponse, hostsResponse, servicesResponse] = await Promise.all([
+        apiClient.getProcesses(),
+        apiClient.getHosts(),
+        apiClient.getServices()
+      ]);
+      
+      // Mise à jour des process groups
+      if (!processResponse.error && processResponse.data) {
+        const processData = processResponse.data as ProcessResponse[];
         
-        if (!processes.error && processes.data) {
-          const processData = processes.data;
+        if (Array.isArray(processData) && processData.length > 0) {
+          const processGroups: ProcessGroup[] = processData.map((process: ProcessResponse) => ({
+            id: process.id || `proc-${Math.random().toString(36).substring(2, 9)}`,
+            name: process.name || "Processus inconnu",
+            technology: process.technology || "Non spécifié",
+            icon: getProcessIcon(process.tech_icon || ''),
+            dt_url: process.dt_url || "#",
+            // Make sure to use a type that's compatible with ProcessGroup
+            type: ((process.tech_icon && process.tech_icon.toLowerCase().includes('database')) 
+              ? 'database' : 'technology') as 'database' | 'technology' | 'server'
+          }));
           
-          // Transformer les données de process groups
-          if (Array.isArray(processData) && processData.length > 0) {
-            const processGroups = processData.map((process: ProcessResponse) => ({
-              id: process.id || `proc-${Math.random().toString(36).substring(2, 9)}`,
-              name: process.name || "Processus inconnu",
-              technology: process.technology || "Non spécifié",
-              icon: getProcessIcon(process.tech_icon || ''),
-              dt_url: process.dt_url || "#",
-              type: (process.tech_icon && process.tech_icon.toLowerCase().includes('database')) 
-                ? 'database' : 'technology'
-            }));
-            
-            setState(prev => ({ ...prev, processGroups }));
-            
-            if (optimized) {
-              setPerformanceMetrics(prev => ({
-                ...prev,
-                dataSizes: { ...prev.dataSizes, processes: processGroups.length }
-              }));
-            }
-          }
-        }
-        
-        // Mettre à jour les états des hosts et services
-        if (!hosts.error && hosts.data) {
-          setState(prev => ({ ...prev, hosts: hosts.data }));
+          setState(prev => ({ ...prev, processGroups }));
           
           if (optimized) {
             setPerformanceMetrics(prev => ({
               ...prev,
-              dataSizes: { ...prev.dataSizes, hosts: hosts.data.length }
+              dataSizes: { ...prev.dataSizes, processes: processGroups.length }
             }));
           }
+        } else {
+          setState(prev => ({ ...prev, processGroups: [] }));
         }
+      }
+      
+      // Mise à jour des hosts
+      if (!hostsResponse.error && hostsResponse.data) {
+        setState(prev => ({ ...prev, hosts: hostsResponse.data as Host[] }));
         
-        if (!services.error && services.data) {
-          setState(prev => ({ ...prev, services: services.data }));
-          
-          if (optimized) {
-            setPerformanceMetrics(prev => ({
-              ...prev,
-              dataSizes: { ...prev.dataSizes, services: services.data.length }
-            }));
-          }
+        if (optimized) {
+          setPerformanceMetrics(prev => ({
+            ...prev,
+            dataSizes: { ...prev.dataSizes, hosts: (hostsResponse.data as Host[]).length }
+          }));
         }
       } else {
-        // API standard - charger les données séparément
-        const [processResponse, hostsResponse, servicesResponse] = await Promise.all([
-          apiClient.getProcesses(),
-          apiClient.getHosts(),
-          apiClient.getServices()
-        ]);
+        setState(prev => ({ ...prev, hosts: [] }));
+      }
+      
+      // Mise à jour des services
+      if (!servicesResponse.error && servicesResponse.data) {
+        setState(prev => ({ ...prev, services: servicesResponse.data as Service[] }));
         
-        // Mise à jour des process groups
-        if (!processResponse.error && processResponse.data) {
-          const processData = processResponse.data as ProcessResponse[];
-          
-          if (Array.isArray(processData) && processData.length > 0) {
-            const processGroups = processData.map((process: ProcessResponse) => ({
-              id: process.id || `proc-${Math.random().toString(36).substring(2, 9)}`,
-              name: process.name || "Processus inconnu",
-              technology: process.technology || "Non spécifié",
-              icon: getProcessIcon(process.tech_icon || ''),
-              dt_url: process.dt_url || "#",
-              type: (process.tech_icon && process.tech_icon.toLowerCase().includes('database')) 
-                ? 'database' : 'technology'
-            }));
-            
-            setState(prev => ({ ...prev, processGroups }));
-          }
+        if (optimized) {
+          setPerformanceMetrics(prev => ({
+            ...prev,
+            dataSizes: { ...prev.dataSizes, services: (servicesResponse.data as Service[]).length }
+          }));
         }
-        
-        // Mise à jour des hosts
-        if (!hostsResponse.error && hostsResponse.data) {
-          setState(prev => ({ ...prev, hosts: hostsResponse.data as Host[] }));
-        }
-        
-        // Mise à jour des services
-        if (!servicesResponse.error && servicesResponse.data) {
-          setState(prev => ({ ...prev, services: servicesResponse.data as Service[] }));
-        }
+      } else {
+        setState(prev => ({ ...prev, services: [] }));
       }
       
       const endTime = performance.now();
@@ -397,7 +374,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
             services: Math.floor(Math.random() * 30) + 5,
             hosts: Math.floor(Math.random() * 20) + 2,
             availability: `${(99 + (Math.random() * 1)).toFixed(2)}%`,
-            status: "healthy" as "healthy" | "warning",
+            status: "healthy", // Correct type
             color: getZoneColor(mzName),
             dt_url: "#"
           }));
@@ -426,7 +403,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
             services: Math.floor(Math.random() * 30) + 5,
             hosts: Math.floor(Math.random() * 20) + 2,
             availability: `${(99 + (Math.random() * 1)).toFixed(2)}%`,
-            status: "healthy" as "healthy" | "warning",
+            status: "healthy" as "healthy" | "warning", // Correct type
             color: getZoneColor(mzName),
             dt_url: "#"
           }));
@@ -549,14 +526,9 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
   const refreshData = useCallback(async () => {
     setState(prev => ({ ...prev, error: null }));
     
-    if (optimized) {
-      // Rafraîchir tous les caches côté serveur et client
-      await optimizedApiMethods.refreshAllCaches();
-    }
-    
     // Recharger toutes les données
     await loadAllData();
-  }, [loadAllData, optimized]);
+  }, [loadAllData]);
 
   // Fonctions pour modifier l'état
   const setSidebarCollapsed = useCallback((collapsed: boolean) => {

@@ -7,6 +7,7 @@ import {
   ProcessResponse
 } from './types';
 
+
 // Création d'une instance axios avec des configurations de base
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -231,3 +232,4 @@ const api = {
 };
 
 export { api, CACHE_TYPES, batchRequests };
+export const optimizedApiMethods = api;

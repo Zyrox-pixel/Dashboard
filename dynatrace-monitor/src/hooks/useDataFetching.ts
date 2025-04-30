@@ -43,7 +43,7 @@ export function useDataFetching<T>(
     if (autoFetch) {
       fetchData();
     }
-  }, [autoFetch, fetchFunction, fetchData]);
+  }, [autoFetch, fetchData]);
 
   return [data, { isLoading, error }, fetchData];
 }
@@ -79,7 +79,8 @@ export function useMultipleFetching<T extends Record<string, any>>(
         if (response.error) {
           hasError = true;
         } else if (response.data) {
-          newData[key] = response.data;
+          // Utilisation d'assertion de type pour éviter l'erreur d'indexation
+          (newData as any)[key] = response.data;
         }
       }
       
