@@ -442,33 +442,41 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
           }
           
           // Mettre à jour les compteurs de problèmes pour les MZs
-          setState(prev => {
+          // Version corrigée qui respecte les types:
+          
+          if (state.vitalForGroupMZs.length > 0) {
             // Mettre à jour VFG
-            const updatedVfgMZs = prev.vitalForGroupMZs.map(zone => {
+            const updatedVfgMZs = state.vitalForGroupMZs.map(zone => {
               const zoneProblems = problems.filter(p => p.zone.includes(zone.name));
               return {
                 ...zone,
                 problemCount: zoneProblems.length,
-                status: zoneProblems.length > 0 ? "warning" : "healthy"
+                status: (zoneProblems.length > 0 ? "warning" : "healthy") as "warning" | "healthy"
               };
             });
             
-            // Mettre à jour VFE
-            const updatedVfeMZs = prev.vitalForEntrepriseMZs.map(zone => {
-              const zoneProblems = problems.filter(p => p.zone.includes(zone.name));
-              return {
-                ...zone,
-                problemCount: zoneProblems.length,
-                status: zoneProblems.length > 0 ? "warning" : "healthy"
-              };
-            });
-            
-            return {
+            setState(prev => ({
               ...prev,
-              vitalForGroupMZs: updatedVfgMZs,
+              vitalForGroupMZs: updatedVfgMZs
+            }));
+          }
+          
+          if (state.vitalForEntrepriseMZs.length > 0) {
+            // Mettre à jour VFE
+            const updatedVfeMZs = state.vitalForEntrepriseMZs.map(zone => {
+              const zoneProblems = problems.filter(p => p.zone.includes(zone.name));
+              return {
+                ...zone,
+                problemCount: zoneProblems.length,
+                status: (zoneProblems.length > 0 ? "warning" : "healthy") as "warning" | "healthy"
+              };
+            });
+            
+            setState(prev => ({
+              ...prev,
               vitalForEntrepriseMZs: updatedVfeMZs
-            };
-          });
+            }));
+          }
         }
       }
       
@@ -507,7 +515,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
         } 
       }));
     }
-  }, [state.selectedZone, loadZoneData, optimized]);
+  }, [state.selectedZone, state.vitalForGroupMZs, state.vitalForEntrepriseMZs, loadZoneData, optimized]);
 
   // Charger les données initiales
   useEffect(() => {
