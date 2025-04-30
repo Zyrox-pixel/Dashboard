@@ -1,44 +1,46 @@
-// src/components/common/FilterBadges.tsx
 import React from 'react';
 import { X } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 
-interface OsFilter {
-  type: string;
-  versions: string[];
+export interface FilterBadge {
+  id: string;
+  categoryId: string;
+  categoryLabel: string; 
+  value: string;
+  label: string;
+  icon?: React.ReactNode;
+  color?: string;
 }
 
 interface FilterBadgesProps {
-  filters: OsFilter[];
-  onRemoveFilter: (type: string, version?: string) => void;
-  onClearAllFilters: () => void;
+  badges: FilterBadge[];
+  onRemoveBadge: (categoryId: string, value?: string) => void;
+  onClearAllBadges: () => void;
 }
 
 const FilterBadges: React.FC<FilterBadgesProps> = ({
-  filters,
-  onRemoveFilter,
-  onClearAllFilters
+  badges,
+  onRemoveBadge,
+  onClearAllBadges
 }) => {
   const { isDarkTheme } = useTheme();
   
-  if (filters.length === 0) {
+  if (badges.length === 0) {
     return null;
   }
   
-  // Get the icon for an OS type
-  const getOsTypeIcon = (osType: string): React.ReactNode => {
-    switch(osType.toLowerCase()) {
-      case 'linux':
-        return <span className="text-orange-500">🐧</span>;
-      case 'windows':
-        return <span className="text-blue-500">🪟</span>;
-      case 'macos':
-        return <span className="text-gray-500">🍎</span>;
-      case 'unix':
-      case 'aix':
-        return <span className="text-purple-500">🖥️</span>;
-      default:
-        return null;
+  // Fonction pour obtenir la couleur selon le type et la valeur du filtre
+  const getBadgeColor = (badge: FilterBadge): string => {
+    // Si une couleur spécifique est fournie, l'utiliser
+    if (badge.color) {
+      return badge.color;
+    }
+    
+    // Couleurs par défaut
+    if (isDarkTheme) {
+      return 'bg-indigo-900/30 text-indigo-300 border-indigo-700/50';
+    } else {
+      return 'bg-indigo-50 text-indigo-700 border-indigo-200';
     }
   };
   
@@ -48,23 +50,20 @@ const FilterBadges: React.FC<FilterBadgesProps> = ({
         Filtres actifs:
       </span>
       
-      {filters.map(filter => (
+      {badges.map(badge => (
         <span 
-          key={filter.type}
-          className={`inline-flex items-center gap-1.5 px-2 py-1 text-xs font-medium rounded-full ${
-            isDarkTheme
-              ? 'bg-indigo-900/30 text-indigo-300 border border-indigo-700/50'
-              : 'bg-indigo-50 text-indigo-700 border border-indigo-200'
-          }`}
+          key={`${badge.categoryId}-${badge.value}`}
+          className={`inline-flex items-center gap-1.5 px-2 py-1 text-xs font-medium rounded-full border ${getBadgeColor(badge)}`}
         >
-          {getOsTypeIcon(filter.type)}
-          <span>{filter.type}</span>
+          {badge.icon}
+          <span className="font-medium">{badge.categoryLabel}:</span>
+          <span>{badge.label}</span>
           <button
-            onClick={() => onRemoveFilter(filter.type)}
+            onClick={() => onRemoveBadge(badge.categoryId, badge.value)}
             className={`ml-1 p-0.5 rounded-full ${
               isDarkTheme
-                ? 'hover:bg-indigo-800 text-indigo-300'
-                : 'hover:bg-indigo-100 text-indigo-600'
+                ? 'hover:bg-slate-700 text-slate-300'
+                : 'hover:bg-slate-200 text-slate-600'
             }`}
           >
             <X size={10} />
@@ -72,9 +71,9 @@ const FilterBadges: React.FC<FilterBadgesProps> = ({
         </span>
       ))}
       
-      {filters.length > 0 && (
+      {badges.length > 0 && (
         <button
-          onClick={onClearAllFilters}
+          onClick={onClearAllBadges}
           className={`text-xs px-2 py-1 rounded ${
             isDarkTheme
               ? 'text-slate-300 hover:bg-slate-700'

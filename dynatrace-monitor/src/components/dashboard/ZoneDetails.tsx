@@ -5,17 +5,8 @@ import { ManagementZone, Problem, ProcessGroup, Host, Service } from '../../api/
 import ProblemsList from './ProblemsList';
 import PaginatedTable, { Column } from '../common/PaginatedTable';
 import { useApp } from '../../contexts/AppContext';
-import AdvancedOsFilter from '../common/AdvancedOsFilter';
-import FilterBadges from '../common/FilterBadges';
-import AdvancedServiceFilter from '../common/AdvancedServiceFilter';
-import AdvancedProcessGroupFilter from '../common/AdvancedProcessGroupFilter';
-import ServiceFilterBadges from '../common/ServiceFilterBadges';
-import ProcessFilterBadges from '../common/ProcessFilterBadges';
-
-interface OsFilter {
-  type: string;
-  versions: string[];
-}
+import AdvancedFilter, { FilterCategory, FilterValue, FilterItem } from '../common/AdvancedFilter';
+import FilterBadges, { FilterBadge } from '../common/FilterBadges';
 
 interface ZoneDetailsProps {
   zone: ManagementZone;
@@ -53,23 +44,14 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
   const [hostSearchTerm, setHostSearchTerm] = useState<string>('');
   const [serviceSearchTerm, setServiceSearchTerm] = useState<string>('');
   
-  // États pour les filtres avancés d'OS
-  const [showAdvancedOsFilter, setShowAdvancedOsFilter] = useState<boolean>(false);
-  const [osFilters, setOsFilters] = useState<OsFilter[]>([]);
+  // États pour les filtres avancés
+  const [showAdvancedFilter, setShowAdvancedFilter] = useState<boolean>(false);
+  const [filterType, setFilterType] = useState<'os' | 'service' | 'process' | null>(null);
   
-  // États pour les filtres avancés de services
-  const [showAdvancedServiceFilter, setShowAdvancedServiceFilter] = useState<boolean>(false);
-  const [serviceFilters, setServiceFilters] = useState<{
-    type: 'technology' | 'response_time' | 'error_rate' | 'status';
-    values: string[];
-  }[]>([]);
-
-  // États pour les filtres avancés de process groups
-  const [showAdvancedProcessFilter, setShowAdvancedProcessFilter] = useState<boolean>(false);
-  const [processFilters, setProcessFilters] = useState<{
-    type: 'technology' | 'process_type';
-    values: string[];
-  }[]>([]);
+  // États pour les filtres
+  const [osFilters, setOsFilters] = useState<FilterValue[]>([]);
+  const [serviceFilters, setServiceFilters] = useState<FilterValue[]>([]);
+  const [processFilters, setProcessFilters] = useState<FilterValue[]>([]);
   
   // Filtrer les problèmes pour la zone courante (mémorisé)
   const zoneProblems = useMemo(() => 
@@ -145,7 +127,6 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
   // Fonction pour normaliser les données d'hôte au format attendu
   const normalizeHostData = (hostData: any): Host[] => {
     if (!hostData || !Array.isArray(hostData)) {
-      console.log("normalizeHostData: Les données ne sont pas un tableau", hostData);
       return [];
     }
     
@@ -166,7 +147,7 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
   }, [hosts]);
   
   // Fonction pour obtenir les données triées et filtrées
-  const getSortedData = <T extends {}>( data: T[], searchTerm: string = '', filters: any = {}): T[] => {
+  const getSortedData = <T extends {}>( data: T[], searchTerm: string = ''): T[] => {
     if (!data || !Array.isArray(data) || data.length === 0) {
       return [];
     }
@@ -178,44 +159,6 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
       sortableData = sortableData.filter(item => 
         ((item as any).name || '').toString().toLowerCase().includes(searchTerm.toLowerCase())
       );
-    }
-    
-    // Appliquer des filtres avancés d'OS
-    if (filters.osFilters && filters.osFilters.length > 0 && sortableData.length > 0 && 'os_version' in sortableData[0]) {
-      sortableData = sortableData.filter(item => {
-        const osVersion = (item as any).os_version;
-        if (!osVersion) return false;
-        
-        // Déterminer le type d'OS de l'élément
-        let itemOsType = "Autre";
-        if (osVersion.toLowerCase().includes('linux')) {
-          itemOsType = "Linux";
-        } else if (osVersion.toLowerCase().includes('windows')) {
-          itemOsType = "Windows";
-        } else if (osVersion.toLowerCase().includes('unix')) {
-          itemOsType = "Unix";
-        } else if (osVersion.toLowerCase().includes('aix')) {
-          itemOsType = "AIX";
-        } else if (osVersion.toLowerCase().includes('mac') || osVersion.toLowerCase().includes('darwin')) {
-          itemOsType = "MacOS";
-        }
-        
-        // Vérifier si cet OS est dans nos filtres
-        for (const filter of filters.osFilters) {
-          if (filter.type === itemOsType) {
-            // Si versions est vide, toutes les versions sont incluses
-            if (filter.versions.length === 0) {
-              return true;
-            }
-            
-            // Sinon, vérifier si cette version spécifique est dans la liste
-            return filter.versions.includes(osVersion);
-          }
-        }
-        
-        // Si aucun filtre ne correspond au type d'OS, exclure cet élément
-        return false;
-      });
     }
     
     // Si aucun tri n'est configuré, retourner les données filtrées
@@ -276,236 +219,451 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
     
     return Array.from(osSet);
   }, [normalizedHosts]);
-
-  // Fonction pour supprimer un filtre OS
-  const handleRemoveFilter = (type: string, version?: string) => {
-    if (version) {
-      // Supprimer une version spécifique du filtre
-      const filterIndex = osFilters.findIndex(f => f.type === type);
-      if (filterIndex >= 0) {
-        const newFilters = [...osFilters];
-        const filter = {...newFilters[filterIndex]};
-        
-        if (filter.versions.includes(version)) {
-          // Retirer cette version de la liste d'exclusion
-          filter.versions = filter.versions.filter(v => v !== version);
-          
-          // Si plus aucune exclusion, simplifier à "toutes les versions"
-          if (filter.versions.length === 0) {
-            newFilters[filterIndex] = { type, versions: [] };
-          } else {
-            newFilters[filterIndex] = filter;
-          }
-        } else {
-          // Si cette version n'est pas exclue, l'ajouter aux exclusions
-          const allVersions = normalizedHosts
-            .filter(host => {
-              const osVersion = host.os_version || "";
-              let itemOsType = "Autre";
-              
-              if (osVersion.toLowerCase().includes('linux')) {
-                itemOsType = "Linux";
-              } else if (osVersion.toLowerCase().includes('windows')) {
-                itemOsType = "Windows";
-              } else if (osVersion.toLowerCase().includes('unix')) {
-                itemOsType = "Unix";
-              } else if (osVersion.toLowerCase().includes('aix')) {
-                itemOsType = "AIX";
-              } else if (osVersion.toLowerCase().includes('mac') || osVersion.toLowerCase().includes('darwin')) {
-                itemOsType = "MacOS";
-              }
-              
-              return itemOsType === type;
-            })
-            .map(host => host.os_version || "");
-            
-            if (!filter.versions.includes(version)) {
-              filter.versions.push(version);
-            }
-          
-          // Si toutes les versions sont exclues, supprimer le filtre
-          if (filter.versions.length >= allVersions.length) {
-            newFilters.splice(filterIndex, 1);
-          } else {
-            newFilters[filterIndex] = filter;
-          }
-        }
-        
-        setOsFilters(newFilters);
-      }
-    } else {
-      // Supprimer un filtre complet
-      setOsFilters(osFilters.filter(f => f.type !== type));
-    }
-  };
   
-  // Fonction pour supprimer un filtre service
-  const handleRemoveServiceFilter = (type: string, value?: string) => {
-    if (!value) {
-      // Supprimer tout le type de filtre
-      setServiceFilters(serviceFilters.filter(f => f.type !== type));
-      return;
-    }
-    
-    // Supprimer une valeur spécifique
-    const newFilters = [...serviceFilters];
-    const filterIndex = newFilters.findIndex(f => f.type === type);
-    
-    if (filterIndex !== -1) {
-      const filter = {...newFilters[filterIndex]};
-      filter.values = filter.values.filter(v => v !== value);
-      
-      if (filter.values.length === 0) {
-        // Si plus aucune valeur, supprimer le filtre
-        newFilters.splice(filterIndex, 1);
-      } else {
-        // Sinon mettre à jour le filtre
-        newFilters[filterIndex] = filter;
-      }
-      
-      setServiceFilters(newFilters);
-    }
-  };
-
-  // Fonction pour supprimer un filtre process
-  const handleRemoveProcessFilter = (type: string, value?: string) => {
-    if (!value) {
-      // Supprimer tout le type de filtre
-      setProcessFilters(processFilters.filter(f => f.type !== type));
-      return;
-    }
-    
-    // Supprimer une valeur spécifique
-    const newFilters = [...processFilters];
-    const filterIndex = newFilters.findIndex(f => f.type === type);
-    
-    if (filterIndex !== -1) {
-      const filter = {...newFilters[filterIndex]};
-      filter.values = filter.values.filter(v => v !== value);
-      
-      if (filter.values.length === 0) {
-        // Si plus aucune valeur, supprimer le filtre
-        newFilters.splice(filterIndex, 1);
-      } else {
-        // Sinon mettre à jour le filtre
-        newFilters[filterIndex] = filter;
-      }
-      
-      setProcessFilters(newFilters);
-    }
-  };
+  // Obtenir les données triées pour les hôtes
+  const sortedHosts = useMemo(() => getSortedData(normalizedHosts, hostSearchTerm), 
+    [normalizedHosts, sortConfig, hostSearchTerm]);
   
-  // Fonction pour obtenir le nombre total de filtres appliqués
-  const getSelectedFiltersCount = (): number => {
-    let count = 0;
+  // Obtenir les données triées pour les services
+  const sortedServices = useMemo(() => getSortedData(services, serviceSearchTerm), 
+    [services, sortConfig, serviceSearchTerm]);
+
+  // Préparer les catégories de filtres pour les OS
+  const osFilterCategories = useMemo((): FilterCategory[] => {
+    // Calculer toutes les versions OS par type
+    const osVersionsByType = new Map<string, {version: string, count: number}[]>();
     
-    osFilters.forEach(filter => {
-      if (filter.versions.length === 0) {
-        count += 1; // Compte l'OS entier comme un filtre
+    normalizedHosts.forEach(host => {
+      if (!host.os_version) return;
+      
+      // Déterminer le type d'OS
+      let osType = "Autre";
+      if (host.os_version.toLowerCase().includes('linux')) {
+        osType = "Linux";
+      } else if (host.os_version.toLowerCase().includes('windows')) {
+        osType = "Windows";
+      } else if (host.os_version.toLowerCase().includes('unix')) {
+        osType = "Unix";
+      } else if (host.os_version.toLowerCase().includes('aix')) {
+        osType = "AIX";
+      } else if (host.os_version.toLowerCase().includes('mac') || host.os_version.toLowerCase().includes('darwin')) {
+        osType = "MacOS";
+      }
+      
+      // Récupérer les versions existantes pour ce type d'OS
+      const versions = osVersionsByType.get(osType) || [];
+      
+      // Trouver si cette version existe déjà
+      const existingVersion = versions.find(v => v.version === host.os_version);
+      
+      if (existingVersion) {
+        existingVersion.count++;
       } else {
-        count += 1; // Compte chaque filtre de version
+        versions.push({ version: host.os_version, count: 1 });
+      }
+      
+      osVersionsByType.set(osType, versions);
+    });
+    
+    // Convertir la map en catégories de filtres
+    return Array.from(osVersionsByType.entries()).map(([osType, versions]) => ({
+      id: osType,
+      label: osType,
+      icon: getOsIcon(osType),
+      items: versions.map(v => ({
+        id: v.version,
+        label: v.version,
+        value: v.version,
+        count: v.count,
+        icon: getOsIcon(osType, true)
+      }))
+    }));
+  }, [normalizedHosts]);
+  
+  // Préparer les catégories de filtres pour les services
+  const serviceFilterCategories = useMemo((): FilterCategory[] => {
+    // Technologies
+    const technologies = new Map<string, number>();
+    services.forEach(service => {
+      if (service.technology) {
+        const count = technologies.get(service.technology) || 0;
+        technologies.set(service.technology, count + 1);
       }
     });
     
-    return count;
-  };
-
-  // Obtenir le compte des filtres actifs pour services et process
-  const getServiceFiltersCount = () => {
-    return serviceFilters.reduce((count, filter) => count + filter.values.length, 0);
-  };
-
-  const getProcessFiltersCount = () => {
-    return processFilters.reduce((count, filter) => count + filter.values.length, 0);
-  };
+    const technologyCategory: FilterCategory = {
+      id: 'technology',
+      label: 'Technologies',
+      icon: <Activity size={18} />,
+      items: Array.from(technologies.entries()).map(([tech, count]) => ({
+        id: tech,
+        label: tech,
+        value: tech,
+        count,
+        icon: getTechnologyIcon(tech)
+      }))
+    };
+    
+    // Temps de réponse
+    const responseTimeBuckets = [
+      { id: 'fast', label: 'Rapide (<100ms)', range: [0, 100] },
+      { id: 'medium', label: 'Moyen (100-500ms)', range: [100, 500] },
+      { id: 'slow', label: 'Lent (>500ms)', range: [500, Infinity] }
+    ];
+    
+    const responseTimeCategory: FilterCategory = {
+      id: 'response_time',
+      label: 'Temps de réponse',
+      icon: <Clock size={18} />,
+      items: responseTimeBuckets.map(bucket => ({
+        id: bucket.id,
+        label: bucket.label,
+        value: bucket.id,
+        count: services.filter(s => 
+          s.response_time !== null && 
+          s.response_time >= bucket.range[0] && 
+          s.response_time < bucket.range[1]
+        ).length,
+        icon: bucket.id === 'fast' ? <span className="text-green-500">⚡</span> :
+              bucket.id === 'medium' ? <span className="text-yellow-500">⏱</span> :
+              <span className="text-red-500">🐢</span>
+      }))
+    };
+    
+    // Taux d'erreur
+    const errorRateBuckets = [
+      { id: 'normal', label: 'Normal (<1%)', range: [0, 1] },
+      { id: 'elevated', label: 'Élevé (1-5%)', range: [1, 5] },
+      { id: 'critical', label: 'Critique (>5%)', range: [5, Infinity] }
+    ];
+    
+    const errorRateCategory: FilterCategory = {
+      id: 'error_rate',
+      label: 'Taux d\'erreur',
+      icon: <AlertTriangle size={18} />,
+      items: errorRateBuckets.map(bucket => ({
+        id: bucket.id,
+        label: bucket.label,
+        value: bucket.id,
+        count: services.filter(s => 
+          s.error_rate !== null && 
+          s.error_rate >= bucket.range[0] && 
+          s.error_rate < bucket.range[1]
+        ).length,
+        icon: bucket.id === 'normal' ? <span className="text-green-500">✓</span> :
+              bucket.id === 'elevated' ? <span className="text-yellow-500">⚠</span> :
+              <span className="text-red-500">⛔</span>
+      }))
+    };
+    
+    return [technologyCategory, responseTimeCategory, errorRateCategory];
+  }, [services]);
   
-  // Obtenir les données triées et filtrées pour les hôtes
-  const sortedHosts = useMemo(() => {
-    return getSortedData(normalizedHosts, hostSearchTerm, { osFilters: osFilters });
-  }, [normalizedHosts, sortConfig, hostSearchTerm, osFilters]);
+  // Préparer les catégories de filtres pour les process groups
+  const processFilterCategories = useMemo((): FilterCategory[] => {
+    // Technologies
+    const technologies = new Map<string, number>();
+    processGroups.forEach(process => {
+      if (process.technology) {
+        const count = technologies.get(process.technology) || 0;
+        technologies.set(process.technology, count + 1);
+      }
+    });
+    
+    const technologyCategory: FilterCategory = {
+      id: 'technology',
+      label: 'Technologies',
+      icon: <Activity size={18} />,
+      items: Array.from(technologies.entries()).map(([tech, count]) => ({
+        id: tech,
+        label: tech,
+        value: tech,
+        count,
+        icon: getTechnologyIcon(tech)
+      }))
+    };
+    
+    // Types de process
+    const processTypes = [
+      { id: 'technology', label: 'Technologie', icon: <Cpu size={14} /> },
+      { id: 'database', label: 'Base de données', icon: <Database size={14} /> },
+      { id: 'server', label: 'Serveur', icon: <Server size={14} /> }
+    ];
+    
+    const processTypeCategory: FilterCategory = {
+      id: 'process_type',
+      label: 'Types de processus',
+      icon: <Cpu size={18} />,
+      items: processTypes.map(type => ({
+        id: type.id,
+        label: type.label,
+        value: type.id,
+        count: processGroups.filter(p => p.type === type.id).length,
+        icon: type.icon
+      }))
+    };
+    
+    return [technologyCategory, processTypeCategory];
+  }, [processGroups]);
   
-  // Obtenir les données triées et filtrées pour les services
-  const sortedServices = useMemo(() => {
-    return getSortedData(services, serviceSearchTerm);
-  }, [services, sortConfig, serviceSearchTerm]);
-
-  // Filtrer les services selon les critères avancés
-  const getFilteredServices = () => {
+  // Convertir les filtres en badges pour l'affichage
+  const getOsFilterBadges = useMemo((): FilterBadge[] => {
+    const badges: FilterBadge[] = [];
+    
+    osFilters.forEach(filter => {
+      const category = osFilterCategories.find(c => c.id === filter.categoryId);
+      if (!category) return;
+      
+      if (filter.values.length === 0) {
+        // Tous les éléments sont sélectionnés
+        badges.push({
+          id: `${filter.categoryId}-all`,
+          categoryId: filter.categoryId,
+          categoryLabel: category.label,
+          value: '',
+          label: 'Tous',
+          icon: category.icon
+        });
+      } else {
+        // Éléments spécifiques sélectionnés
+        filter.values.forEach(value => {
+          const item = category.items.find(i => i.value === value);
+          if (!item) return;
+          
+          badges.push({
+            id: `${filter.categoryId}-${value}`,
+            categoryId: filter.categoryId,
+            categoryLabel: category.label,
+            value,
+            label: item.label,
+            icon: item.icon
+          });
+        });
+      }
+    });
+    
+    return badges;
+  }, [osFilters, osFilterCategories]);
+  
+  const getServiceFilterBadges = useMemo((): FilterBadge[] => {
+    const badges: FilterBadge[] = [];
+    
+    serviceFilters.forEach(filter => {
+      const category = serviceFilterCategories.find(c => c.id === filter.categoryId);
+      if (!category) return;
+      
+      if (filter.values.length === 0) {
+        // Tous les éléments sont sélectionnés
+        badges.push({
+          id: `${filter.categoryId}-all`,
+          categoryId: filter.categoryId,
+          categoryLabel: category.label,
+          value: '',
+          label: 'Tous',
+          icon: category.icon
+        });
+      } else {
+        // Éléments spécifiques sélectionnés
+        filter.values.forEach(value => {
+          const item = category.items.find(i => i.value === value);
+          if (!item) return;
+          
+          badges.push({
+            id: `${filter.categoryId}-${value}`,
+            categoryId: filter.categoryId,
+            categoryLabel: category.label,
+            value,
+            label: item.label,
+            icon: item.icon
+          });
+        });
+      }
+    });
+    
+    return badges;
+  }, [serviceFilters, serviceFilterCategories]);
+  
+  const getProcessFilterBadges = useMemo((): FilterBadge[] => {
+    const badges: FilterBadge[] = [];
+    
+    processFilters.forEach(filter => {
+      const category = processFilterCategories.find(c => c.id === filter.categoryId);
+      if (!category) return;
+      
+      if (filter.values.length === 0) {
+        // Tous les éléments sont sélectionnés
+        badges.push({
+          id: `${filter.categoryId}-all`,
+          categoryId: filter.categoryId,
+          categoryLabel: category.label,
+          value: '',
+          label: 'Tous',
+          icon: category.icon
+        });
+      } else {
+        // Éléments spécifiques sélectionnés
+        filter.values.forEach(value => {
+          const item = category.items.find(i => i.value === value);
+          if (!item) return;
+          
+          badges.push({
+            id: `${filter.categoryId}-${value}`,
+            categoryId: filter.categoryId,
+            categoryLabel: category.label,
+            value,
+            label: item.label,
+            icon: item.icon
+          });
+        });
+      }
+    });
+    
+    return badges;
+  }, [processFilters, processFilterCategories]);
+  
+  // Filtrer les hôtes en fonction des filtres OS
+  const filteredHosts = useMemo(() => {
+    if (osFilters.length === 0) return sortedHosts;
+    
+    return sortedHosts.filter(host => {
+      const osVersion = host.os_version || '';
+      
+      // Déterminer le type d'OS
+      let hostOsType = "Autre";
+      if (osVersion.toLowerCase().includes('linux')) {
+        hostOsType = "Linux";
+      } else if (osVersion.toLowerCase().includes('windows')) {
+        hostOsType = "Windows";
+      } else if (osVersion.toLowerCase().includes('unix')) {
+        hostOsType = "Unix";
+      } else if (osVersion.toLowerCase().includes('aix')) {
+        hostOsType = "AIX";
+      } else if (osVersion.toLowerCase().includes('mac') || osVersion.toLowerCase().includes('darwin')) {
+        hostOsType = "MacOS";
+      }
+      
+      // Vérifier si ce type d'OS est sélectionné
+      const osTypeFilter = osFilters.find(f => f.categoryId === hostOsType);
+      
+      if (!osTypeFilter) return false;
+      
+      // Si values est vide, toutes les versions sont sélectionnées
+      if (osTypeFilter.values.length === 0) return true;
+      
+      // Sinon, vérifier si cette version spécifique est sélectionnée
+      return osTypeFilter.values.includes(osVersion);
+    });
+  }, [sortedHosts, osFilters]);
+  
+  // Filtrer les services en fonction des filtres
+  const filteredServices = useMemo(() => {
     if (serviceFilters.length === 0) return sortedServices;
     
     return sortedServices.filter(service => {
-      // Pour chaque groupe de filtres (technology, response_time, etc.)
-      return serviceFilters.every(filterGroup => {
-        // Si aucune valeur n'est sélectionnée dans ce groupe, considérer comme "match"
-        if (filterGroup.values.length === 0) return true;
+      // Vérifier chaque type de filtre
+      return serviceFilters.every(filter => {
+        // Si aucune valeur sélectionnée, considérer comme match
+        if (filter.values.length === 0) return true;
         
-        switch (filterGroup.type) {
+        switch (filter.categoryId) {
           case 'technology':
-            return filterGroup.values.includes(service.technology);
+            return filter.values.includes(service.technology);
             
           case 'response_time':
             if (service.response_time === null) return false;
             
-            if (filterGroup.values.includes('fast'))
-              if (service.response_time < 100) return true;
-              
-            if (filterGroup.values.includes('medium'))
-              if (service.response_time >= 100 && service.response_time < 500) return true;
-              
-            if (filterGroup.values.includes('slow'))
-              if (service.response_time >= 500) return true;
-              
-            return false;
+            const responseTime = service.response_time;
+            return (
+              (filter.values.includes('fast') && responseTime < 100) ||
+              (filter.values.includes('medium') && responseTime >= 100 && responseTime < 500) ||
+              (filter.values.includes('slow') && responseTime >= 500)
+            );
             
           case 'error_rate':
             if (service.error_rate === null) return false;
             
-            if (filterGroup.values.includes('normal'))
-              if (service.error_rate < 1) return true;
-              
-            if (filterGroup.values.includes('elevated'))
-              if (service.error_rate >= 1 && service.error_rate < 5) return true;
-              
-            if (filterGroup.values.includes('critical'))
-              if (service.error_rate >= 5) return true;
-              
-            return false;
-            
-          case 'status':
-            return filterGroup.values.includes(service.status.toLowerCase());
+            const errorRate = service.error_rate;
+            return (
+              (filter.values.includes('normal') && errorRate < 1) ||
+              (filter.values.includes('elevated') && errorRate >= 1 && errorRate < 5) ||
+              (filter.values.includes('critical') && errorRate >= 5)
+            );
             
           default:
             return true;
         }
       });
     });
-  };
-
-  // Filtrer les process groups selon les critères avancés
-  const getFilteredProcessGroups = () => {
+  }, [sortedServices, serviceFilters]);
+  
+  // Filtrer les process groups en fonction des filtres
+  const filteredProcessGroups = useMemo(() => {
     if (processFilters.length === 0) return processGroups;
     
     return processGroups.filter(process => {
-      // Pour chaque groupe de filtres (technology, process_type)
-      return processFilters.every(filterGroup => {
-        // Si aucune valeur n'est sélectionnée dans ce groupe, considérer comme "match"
-        if (filterGroup.values.length === 0) return true;
+      // Vérifier chaque type de filtre
+      return processFilters.every(filter => {
+        // Si aucune valeur sélectionnée, considérer comme match
+        if (filter.values.length === 0) return true;
         
-        switch (filterGroup.type) {
+        switch (filter.categoryId) {
           case 'technology':
-            return filterGroup.values.includes(process.technology);
+            return filter.values.includes(process.technology);
             
           case 'process_type':
-            return filterGroup.values.includes(process.type);
+            return filter.values.includes(process.type);
             
           default:
             return true;
         }
       });
     });
+  }, [processGroups, processFilters]);
+  
+  // Helper pour obtenir l'icône du système d'exploitation
+  const getOsIcon = (osVersion: string = '', small: boolean = false) => {
+    const size = small ? 14 : 18;
+    const os = osVersion.toLowerCase();
+    
+    if (os.includes('linux')) {
+      return <span className="text-orange-500">🐧</span>;
+    } else if (os.includes('windows')) {
+      return <span className="text-blue-500">🪟</span>;
+    } else if (os.includes('mac') || os.includes('darwin')) {
+      return <span className="text-gray-500">🍎</span>;
+    } else if (os.includes('unix') || os.includes('aix')) {
+      return <span className="text-purple-500">🖥️</span>;
+    }
+    
+    return <Monitor size={size} className="text-slate-400" />;
   };
   
-  // Définition des colonnes pour les tableaux (mémorisée)
+  // Helper pour obtenir l'icône d'une technologie
+  const getTechnologyIcon = (tech: string) => {
+    const techLower = tech.toLowerCase();
+    
+    if (techLower.includes('java')) {
+      return <span className="text-orange-500">☕</span>;
+    } else if (techLower.includes('python')) {
+      return <span className="text-green-500">🐍</span>;
+    } else if (techLower.includes('node') || techLower.includes('javascript')) {
+      return <span className="text-yellow-500">⚡</span>;
+    } else if (techLower.includes('.net') || techLower.includes('dotnet')) {
+      return <span className="text-blue-500">🔷</span>;
+    } else if (techLower.includes('go')) {
+      return <span className="text-blue-500">🐹</span>;
+    } else if (techLower.includes('php')) {
+      return <span className="text-indigo-500">🐘</span>;
+    } else if (techLower.includes('ruby')) {
+      return <span className="text-red-500">💎</span>;
+    } else if (techLower.includes('database') || techLower.includes('sql')) {
+      return <Database size={14} className="text-blue-500" />;
+    }
+    
+    return <Activity size={14} className="text-slate-400" />;
+  };
+  
+  // Définition des colonnes pour les tableaux
   const processColumns = useMemo<Column<ProcessGroup>[]>(() => [
     {
       key: 'name',
@@ -805,27 +963,91 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
     },
   ], [sortConfig]);
 
-  // Helper pour obtenir l'icône du système d'exploitation
-  const getOsIcon = (osVersion: string = '') => {
-    const os = osVersion.toLowerCase();
-    
-    if (os.includes('linux')) {
-      return <span className="text-orange-500">🐧</span>;
-    } else if (os.includes('windows')) {
-      return <span className="text-blue-500">🪟</span>;
-    } else if (os.includes('mac') || os.includes('darwin')) {
-      return <span className="text-gray-500">🍎</span>;
-    } else if (os.includes('unix') || os.includes('aix')) {
-      return <span className="text-purple-500">🖥️</span>;
-    }
-    
-    return <Monitor size={14} className="text-slate-400" />;
-  };
-
   // Optimiser le gestionnaire d'événements avec useCallback
   const handleTabClick = useCallback((tab: string) => {
     onTabChange(tab);
   }, [onTabChange]);
+  
+  // Gérer la suppression d'un filtre OS
+  const handleRemoveOsFilter = useCallback((categoryId: string, value?: string) => {
+    setOsFilters(prev => {
+      const newFilters = [...prev];
+      const filterIndex = newFilters.findIndex(f => f.categoryId === categoryId);
+      
+      if (filterIndex === -1) return prev;
+      
+      if (!value) {
+        // Supprimer tout le filtre
+        return newFilters.filter(f => f.categoryId !== categoryId);
+      }
+      
+      // Supprimer une valeur spécifique
+      const filter = {...newFilters[filterIndex]};
+      filter.values = filter.values.filter(v => v !== value);
+      
+      if (filter.values.length === 0) {
+        // Si plus aucune valeur, supprimer le filtre
+        return newFilters.filter(f => f.categoryId !== categoryId);
+      }
+      
+      newFilters[filterIndex] = filter;
+      return newFilters;
+    });
+  }, []);
+  
+  // Gérer la suppression d'un filtre de service
+  const handleRemoveServiceFilter = useCallback((categoryId: string, value?: string) => {
+    setServiceFilters(prev => {
+      const newFilters = [...prev];
+      const filterIndex = newFilters.findIndex(f => f.categoryId === categoryId);
+      
+      if (filterIndex === -1) return prev;
+      
+      if (!value) {
+        // Supprimer tout le filtre
+        return newFilters.filter(f => f.categoryId !== categoryId);
+      }
+      
+      // Supprimer une valeur spécifique
+      const filter = {...newFilters[filterIndex]};
+      filter.values = filter.values.filter(v => v !== value);
+      
+      if (filter.values.length === 0) {
+        // Si plus aucune valeur, supprimer le filtre
+        return newFilters.filter(f => f.categoryId !== categoryId);
+      }
+      
+      newFilters[filterIndex] = filter;
+      return newFilters;
+    });
+  }, []);
+  
+  // Gérer la suppression d'un filtre de process
+  const handleRemoveProcessFilter = useCallback((categoryId: string, value?: string) => {
+    setProcessFilters(prev => {
+      const newFilters = [...prev];
+      const filterIndex = newFilters.findIndex(f => f.categoryId === categoryId);
+      
+      if (filterIndex === -1) return prev;
+      
+      if (!value) {
+        // Supprimer tout le filtre
+        return newFilters.filter(f => f.categoryId !== categoryId);
+      }
+      
+      // Supprimer une valeur spécifique
+      const filter = {...newFilters[filterIndex]};
+      filter.values = filter.values.filter(v => v !== value);
+      
+      if (filter.values.length === 0) {
+        // Si plus aucune valeur, supprimer le filtre
+        return newFilters.filter(f => f.categoryId !== categoryId);
+      }
+      
+      newFilters[filterIndex] = filter;
+      return newFilters;
+    });
+  }, []);
 
   // État de chargement pour les détails de la zone
   if (isLoading) {
@@ -951,7 +1173,7 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
         />
       )}
       
-      {/* Navigation par onglets - CHANGEMENT D'ORDRE DES ONGLETS */}
+      {/* Navigation par onglets */}
       <div className="flex border-b mb-5 overflow-x-auto no-scrollbar">
         <button 
           onClick={() => handleTabClick('hosts')}
@@ -1000,9 +1222,7 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
         </button>
       </div>
       
-      {/* Contenu des onglets - Utilisation du composant PaginatedTable */}
-      
-      {/* Onglet Hôtes */}
+      {/* Contenu des onglets - Hôtes */}
       {activeTab === 'hosts' && (
         <section className={`rounded-lg overflow-hidden ${
           isDarkTheme ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
@@ -1012,7 +1232,7 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
               <h2 className="font-semibold flex items-center gap-2">
                 <Server className={zoneColors.text} size={16} />
                 <span>Hôtes</span>
-                <span className="text-xs text-slate-400 ml-2">({sortedHosts.length})</span>
+                <span className="text-xs text-slate-400 ml-2">({filteredHosts.length})</span>
               </h2>
               
               {/* Barre de recherche et bouton de filtre pour les hôtes */}
@@ -1041,7 +1261,10 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
                 </div>
                 
                 <button 
-                  onClick={() => setShowAdvancedOsFilter(!showAdvancedOsFilter)}
+                  onClick={() => {
+                    setFilterType('os');
+                    setShowAdvancedFilter(true);
+                  }}
                   className={`flex items-center gap-1 px-3 py-1 rounded-md border text-sm ${
                     isDarkTheme 
                       ? osFilters.length > 0 
@@ -1053,7 +1276,7 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
                   }`}
                 >
                   <Filter size={14} />
-                  <span>Filtres avancés {osFilters.length > 0 && `(${getSelectedFiltersCount()})`}</span>
+                  <span>Filtres avancés {osFilters.length > 0 && `(${osFilters.length})`}</span>
                 </button>
               </div>
             </div>
@@ -1061,27 +1284,15 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
             {/* Afficher les badges de filtres actifs */}
             {osFilters.length > 0 && (
               <FilterBadges
-                filters={osFilters}
-                onRemoveFilter={handleRemoveFilter}
-                onClearAllFilters={() => setOsFilters([])}
+                badges={getOsFilterBadges}
+                onRemoveBadge={handleRemoveOsFilter}
+                onClearAllBadges={() => setOsFilters([])}
               />
-            )}
-            
-            {/* Popup du filtre avancé des OS */}
-            {showAdvancedOsFilter && (
-              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                <AdvancedOsFilter
-                  hosts={normalizedHosts}
-                  selectedFilters={osFilters}
-                  onFilterChange={setOsFilters}
-                  onClose={() => setShowAdvancedOsFilter(false)}
-                />
-              </div>
             )}
             
             {/* Section principale du tableau */}
             <PaginatedTable 
-              data={sortedHosts}
+              data={filteredHosts}
               columns={hostColumns}
               pageSize={20}
               emptyMessage={
@@ -1094,7 +1305,7 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
         </section>
       )}
       
-      {/* Onglet Services */}
+      {/* Contenu des onglets - Services */}
       {activeTab === 'services' && (
         <section className={`rounded-lg overflow-hidden ${
           isDarkTheme ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
@@ -1103,7 +1314,7 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
             <h2 className="font-semibold flex items-center gap-2">
               <Activity className={zoneColors.text} size={16} />
               <span>Services</span>
-              <span className="text-xs text-slate-400 ml-2">({getFilteredServices().length})</span>
+              <span className="text-xs text-slate-400 ml-2">({filteredServices.length})</span>
             </h2>
             
             {/* Barre de recherche pour les services */}
@@ -1132,7 +1343,10 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
               </div>
               
               <button 
-                onClick={() => setShowAdvancedServiceFilter(!showAdvancedServiceFilter)}
+                onClick={() => {
+                  setFilterType('service');
+                  setShowAdvancedFilter(true);
+                }}
                 className={`flex items-center gap-1 px-3 py-1 rounded-md border text-sm ${
                   isDarkTheme 
                     ? serviceFilters.length > 0 
@@ -1144,34 +1358,22 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
                 }`}
               >
                 <Filter size={14} />
-                <span>Filtres avancés {getServiceFiltersCount() > 0 && `(${getServiceFiltersCount()})`}</span>
+                <span>Filtres avancés {serviceFilters.length > 0 && `(${serviceFilters.length})`}</span>
               </button>
             </div>
           </div>
 
           {/* Afficher les badges de filtres actifs */}
           {serviceFilters.length > 0 && (
-            <ServiceFilterBadges
-              filters={serviceFilters}
-              onRemoveFilter={handleRemoveServiceFilter}
-              onClearAllFilters={() => setServiceFilters([])}
+            <FilterBadges
+              badges={getServiceFilterBadges}
+              onRemoveBadge={handleRemoveServiceFilter}
+              onClearAllBadges={() => setServiceFilters([])}
             />
-          )}
-          
-          {/* Popup du filtre avancé pour les services */}
-          {showAdvancedServiceFilter && (
-            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-              <AdvancedServiceFilter
-                services={services}
-                selectedFilters={serviceFilters}
-                onFilterChange={setServiceFilters}
-                onClose={() => setShowAdvancedServiceFilter(false)}
-              />
-            </div>
           )}
 
           <PaginatedTable 
-            data={getFilteredServices()}
+            data={filteredServices}
             columns={serviceColumns}
             pageSize={20}
             emptyMessage={
@@ -1183,7 +1385,7 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
         </section>
       )}
       
-      {/* Onglet Process Groups */}
+      {/* Contenu des onglets - Process Groups */}
       {activeTab === 'process-groups' && (
         <section className={`rounded-lg overflow-hidden ${
           isDarkTheme ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
@@ -1192,10 +1394,13 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
             <h2 className="font-semibold flex items-center gap-2">
               <Cpu className={zoneColors.text} size={16} />
               <span>Process Groups</span>
-              <span className="text-xs text-slate-400 ml-2">({getFilteredProcessGroups().length})</span>
+              <span className="text-xs text-slate-400 ml-2">({filteredProcessGroups.length})</span>
             </h2>
             <button 
-              onClick={() => setShowAdvancedProcessFilter(!showAdvancedProcessFilter)}
+              onClick={() => {
+                setFilterType('process');
+                setShowAdvancedFilter(true);
+              }}
               className={`flex items-center gap-1 px-3 py-1 rounded-md border text-sm ${
                 isDarkTheme 
                   ? processFilters.length > 0 
@@ -1207,33 +1412,21 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
               }`}
             >
               <Filter size={14} />
-              <span>Filtres avancés {getProcessFiltersCount() > 0 && `(${getProcessFiltersCount()})`}</span>
+              <span>Filtres avancés {processFilters.length > 0 && `(${processFilters.length})`}</span>
             </button>
           </div>
 
           {/* Afficher les badges de filtres actifs */}
           {processFilters.length > 0 && (
-            <ProcessFilterBadges
-              filters={processFilters}
-              onRemoveFilter={handleRemoveProcessFilter}
-              onClearAllFilters={() => setProcessFilters([])}
+            <FilterBadges
+              badges={getProcessFilterBadges}
+              onRemoveBadge={handleRemoveProcessFilter}
+              onClearAllBadges={() => setProcessFilters([])}
             />
-          )}
-          
-          {/* Popup du filtre avancé pour les process groups */}
-          {showAdvancedProcessFilter && (
-            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-              <AdvancedProcessGroupFilter
-                processGroups={processGroups}
-                selectedFilters={processFilters}
-                onFilterChange={setProcessFilters}
-                onClose={() => setShowAdvancedProcessFilter(false)}
-              />
-            </div>
           )}
 
           <PaginatedTable 
-            data={getFilteredProcessGroups()}
+            data={filteredProcessGroups}
             columns={processColumns}
             pageSize={20}
             emptyMessage={
@@ -1243,6 +1436,44 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
             }
           />
         </section>
+      )}
+      
+      {/* Popup du filtre avancé */}
+      {showAdvancedFilter && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          {filterType === 'os' && (
+            <AdvancedFilter
+              title="Filtrer par système d'exploitation"
+              description="Sélectionnez un type d'OS pour voir toutes ses versions, ou cliquez sur une version spécifique."
+              categories={osFilterCategories}
+              selectedFilters={osFilters}
+              onFilterChange={setOsFilters}
+              onClose={() => setShowAdvancedFilter(false)}
+            />
+          )}
+          
+          {filterType === 'service' && (
+            <AdvancedFilter
+              title="Filtrer les services"
+              description="Filtrez les services par technologie, performance ou statut. Vous pouvez combiner plusieurs filtres."
+              categories={serviceFilterCategories}
+              selectedFilters={serviceFilters}
+              onFilterChange={setServiceFilters}
+              onClose={() => setShowAdvancedFilter(false)}
+            />
+          )}
+          
+          {filterType === 'process' && (
+            <AdvancedFilter
+              title="Filtrer les process groups"
+              description="Filtrez les process groups par technologie ou type de processus. Vous pouvez combiner plusieurs filtres."
+              categories={processFilterCategories}
+              selectedFilters={processFilters}
+              onFilterChange={setProcessFilters}
+              onClose={() => setShowAdvancedFilter(false)}
+            />
+          )}
+        </div>
       )}
     </div>
   );
