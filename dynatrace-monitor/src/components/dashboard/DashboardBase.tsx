@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Layout from '../layout/Layout';
 import ProblemsList from './ProblemsList';
 import ManagementZoneList from './ManagementZoneList';
@@ -42,6 +42,52 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
     performanceMetrics,
     refreshData
   } = context;
+  
+  // État pour suivre la progression du chargement
+  const [loadingProgress, setLoadingProgress] = useState(0);
+  
+  // Effet pour simuler la progression du chargement
+  useEffect(() => {
+    // Seulement exécuter si le chargement des détails de zone est en cours
+    if (isLoading.zoneDetails && selectedZone) {
+      let timer: NodeJS.Timeout;
+      
+      // Démarrer à 0 et progresser jusqu'à 98%
+      if (loadingProgress < 98) {
+        timer = setTimeout(() => {
+          // Calculer la vitesse de progression en fonction de la progression actuelle
+          let increment = 1;
+          
+          // Progression plus rapide au début
+          if (loadingProgress < 30) {
+            increment = 2;
+          } 
+          // Ralentissement au milieu (simulation de traitement)
+          else if (loadingProgress < 60) {
+            increment = 0.8;
+          } 
+          // Très lent autour de 60-80% (simuler un travail intensif)
+          else if (loadingProgress < 80) {
+            increment = 0.5;
+          } 
+          // Accélération finale
+          else {
+            increment = 1;
+          }
+          
+          setLoadingProgress(prev => Math.min(prev + increment, 98));
+        }, 50); // Ajuster ce délai pour contrôler la vitesse globale
+      }
+      
+      // Nettoyer le timer lorsque le composant est démonté ou lorsque l'état change
+      return () => {
+        if (timer) clearTimeout(timer);
+      };
+    } else {
+      // Réinitialiser la progression à 0 quand le chargement est terminé
+      setLoadingProgress(0);
+    }
+  }, [isLoading.zoneDetails, selectedZone, loadingProgress]);
   
   // Déterminer les zones à afficher selon la variante
   const zones = variant === 'vfg' ? vitalForGroupMZs : vitalForEntrepriseMZs;
@@ -178,111 +224,94 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
   }
   
   // Afficher l'écran de chargement des détails de zone
-// Afficher l'écran de chargement des détails de zone
-// Remplacez le bloc de chargement dans DashboardBase.tsx par cette version plus informative
-
-// Afficher l'écran de chargement des détails de zone
-// Remplacez le bloc de chargement dans DashboardBase.tsx par cette version corrigée
-// Assurez-vous d'abord que ces icônes sont importées en haut du fichier:
-// import { Shield, Loader, AlertOctagon, RefreshCw, Clock, BarChart, ChevronLeft, Check, Server } from 'lucide-react';
-
-// Afficher l'écran de chargement des détails de zone
-    if (isLoading.zoneDetails && selectedZone) {
-        return (
-        <Layout title={title} subtitle={currentZone?.name}>
-            <button 
-            onClick={handleBackClick}
-            className="mb-5 flex items-center gap-2 px-4 py-1.5 rounded-lg border border-slate-600 text-slate-300 hover:bg-slate-700"
-            >
-            <ChevronLeft size={14} />
-            <span>Retour aux Management Zones</span>
-            </button>
-            
-            <div className="flex flex-col items-center justify-center max-w-md mx-auto p-8">
-            {/* En-tête avec icône */}
-            <div className="flex items-center mb-6">
-                <div className={`p-3 rounded-full ${cssClasses.bgLightOpacity} ${cssClasses.accent}`}>
-                {currentZone?.icon || <Shield size={24} />}
-                </div>
-                <div className="ml-4">
-                <h3 className="font-bold text-lg">Chargement en cours</h3>
-                <p className="text-slate-400 text-sm">Préparation des données de la zone</p>
-                </div>
+  if (isLoading.zoneDetails && selectedZone) {
+    return (
+      <Layout title={title} subtitle={currentZone?.name}>
+        <button 
+          onClick={handleBackClick}
+          className="mb-5 flex items-center gap-2 px-4 py-1.5 rounded-lg border border-slate-600 text-slate-300 hover:bg-slate-700"
+        >
+          <ChevronLeft size={14} />
+          <span>Retour aux Management Zones</span>
+        </button>
+        
+        <div className="flex flex-col items-center justify-center max-w-md mx-auto p-8">
+          {/* En-tête avec icône */}
+          <div className="flex items-center mb-6">
+            <div className={`p-3 rounded-full ${cssClasses.bgLightOpacity} ${cssClasses.accent}`}>
+              {currentZone?.icon || <Shield size={24} />}
+            </div>
+            <div className="ml-4">
+              <h3 className="font-bold text-lg">Chargement en cours</h3>
+              <p className="text-slate-400 text-sm">Préparation des données de la zone</p>
+            </div>
+          </div>
+          
+          {/* Simulateur d'étapes de chargement */}
+          <div className="w-full space-y-4 mb-8">
+            {/* Étape 1 - simulée comme complétée */}
+            <div className="flex items-center">
+              <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center">
+                <Check className="text-green-500" size={16} />
+              </div>
+              <div className="ml-3">
+                <p className="text-sm font-medium">Connexion à la zone</p>
+                <p className="text-xs text-slate-400">Authentification réussie</p>
+              </div>
             </div>
             
-            {/* Simulateur d'étapes de chargement */}
-            <div className="w-full space-y-4 mb-8">
-                {/* Étape 1 - simulée comme complétée */}
+            {/* Étape 2 - avec animation de chargement */}
+            <div className="flex items-center">
+              <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center relative">
+                <div className={`absolute inset-0 rounded-full border-2 border-transparent ${cssClasses.accent.replace('text', 'border')} animate-spin`} 
+                  style={{ borderTopColor: 'transparent', borderLeftColor: 'transparent' }}></div>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm font-medium">Récupération des métriques</p>
                 <div className="flex items-center">
-                <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center">
-                    <Check className="text-green-500" size={16} />
+                  <div className="h-1.5 w-24 bg-slate-700 rounded-full overflow-hidden">
+                    <div 
+                      className={`h-full ${cssClasses.accentBg} rounded-full`}
+                      style={{ width: `${loadingProgress}%`, transition: 'width 0.3s ease-out' }}
+                    ></div>
+                  </div>
+                  <span className="ml-2 text-xs text-slate-400">{Math.round(loadingProgress)}%</span>
                 </div>
-                <div className="ml-3">
-                    <p className="text-sm font-medium">Connexion à la zone</p>
-                    <p className="text-xs text-slate-400">Authentification réussie</p>
-                </div>
-                </div>
-                
-                {/* Étape 2 - avec animation de chargement */}
-                <div className="flex items-center">
-                <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center relative">
-                    <div className={`absolute inset-0 rounded-full border-2 border-transparent ${cssClasses.accent.replace('text', 'border')} animate-spin`} 
-                    style={{ borderTopColor: 'transparent', borderLeftColor: 'transparent' }}></div>
-                </div>
-                <div className="ml-3">
-                    <p className="text-sm font-medium">Récupération des métriques</p>
-                    <div className="flex items-center">
-                    <div className="h-1.5 w-24 bg-slate-700 rounded-full overflow-hidden">
-                        <div className={`h-full ${cssClasses.accentBg} rounded-full animate-pulse`} style={{ width: '65%' }}></div>
-                    </div>
-                    <span className="ml-2 text-xs text-slate-400">65%</span>
-                    </div>
-                </div>
-                </div>
-                
-                {/* Étape 3 - en attente */}
-                <div className="flex items-center opacity-60">
-                <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center">
-                    <Server size={14} className="text-slate-500" />
-                </div>
-                <div className="ml-3">
-                    <p className="text-sm font-medium">Préparation des données</p>
-                    <p className="text-xs text-slate-400">En attente...</p>
-                </div>
-                </div>
+              </div>
             </div>
             
-            {/* Ligne de progression globale avec animation CSS*/}
-            <div className="w-full bg-slate-700 h-1 rounded-full overflow-hidden mb-4">
-                <div 
-                className={`h-full ${cssClasses.accentBg}`} 
-                style={{ 
-                    width: '40%', 
-                    animation: 'progress-animation 2s ease-in-out infinite'
-                }}
-                ></div>
+            {/* Étape 3 - en attente */}
+            <div className="flex items-center opacity-60">
+              <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center">
+                <Server size={14} className="text-slate-500" />
+              </div>
+              <div className="ml-3">
+                <p className="text-sm font-medium">Préparation des données</p>
+                <p className="text-xs text-slate-400">En attente...</p>
+              </div>
             </div>
-            
-            {/* Message explicatif */}
-            <p className="text-sm text-slate-400 text-center">
-                Préparation des informations détaillées pour <span className={cssClasses.text}>{currentZone?.name}</span>.
-                <br/>Cette opération peut prendre quelques instants...
-            </p>
-            </div>
-    
-            {/* Ajout du style global directement ici */}
-            <style>
-            {`
-                @keyframes progress-animation {
-                0% { width: 10%; }
-                50% { width: 40%; }
-                100% { width: 10%; }
-                }
-            `}
-            </style>
-        </Layout>
-        );
-    }
+          </div>
+          
+          {/* Ligne de progression globale avec animation */}
+          <div className="w-full bg-slate-700 h-1 rounded-full overflow-hidden mb-4">
+            <div 
+              className={`h-full ${cssClasses.accentBg}`} 
+              style={{ 
+                width: `${loadingProgress}%`,
+                transition: 'width 0.3s ease-out'
+              }}
+            ></div>
+          </div>
+          
+          {/* Message explicatif */}
+          <p className="text-sm text-slate-400 text-center">
+            Préparation des informations détaillées pour <span className={cssClasses.text}>{currentZone?.name}</span>.
+            <br/>Cette opération peut prendre quelques instants...
+          </p>
+        </div>
+      </Layout>
+    );
+  }
   
   return (
     <Layout
