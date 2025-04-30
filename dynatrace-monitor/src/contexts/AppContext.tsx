@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo, useRef } from 'react';
 import { api, CACHE_TYPES } from '../api';
 import { 
   Problem, 
@@ -177,6 +177,9 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
     }
   });
 
+  // Référence pour éviter les chargements en boucle
+  const initialLoadRef = useRef(false);
+
   // Fonction optimisée pour charger les données d'une zone
   const loadZoneData = useCallback(async (zoneId: string) => {
     setState(prev => ({ ...prev, isLoading: { ...prev.isLoading, zoneDetails: true } }));
@@ -303,6 +306,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
 
   // Fonction pour charger toutes les données
   const loadAllData = useCallback(async () => {
+    console.log("Loading all data...");
     const startTime = performance.now();
     
     setState(prev => ({ 
@@ -444,39 +448,48 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
           // Mettre à jour les compteurs de problèmes pour les MZs
           // Version corrigée qui respecte les types:
           
-          if (state.vitalForGroupMZs.length > 0) {
+          // Mise à jour des compteurs de problèmes pour les MZs VFG et VFE en une seule opération
+          setState(prev => {
+            if (prev.vitalForGroupMZs.length === 0 && prev.vitalForEntrepriseMZs.length === 0) {
+              return prev; // Rien à mettre à jour
+            }
+            
+            // Créer les copies des tableaux
+            const updatedVfgMZs = [...prev.vitalForGroupMZs];
+            const updatedVfeMZs = [...prev.vitalForEntrepriseMZs];
+            
             // Mettre à jour VFG
-            const updatedVfgMZs = state.vitalForGroupMZs.map(zone => {
-              const zoneProblems = problems.filter(p => p.zone.includes(zone.name));
-              return {
-                ...zone,
-                problemCount: zoneProblems.length,
-                status: (zoneProblems.length > 0 ? "warning" : "healthy") as "warning" | "healthy"
-              };
-            });
+            if (prev.vitalForGroupMZs.length > 0) {
+              for (let i = 0; i < updatedVfgMZs.length; i++) {
+                const zone = updatedVfgMZs[i];
+                const zoneProblems = problems.filter(p => p.zone.includes(zone.name));
+                updatedVfgMZs[i] = {
+                  ...zone,
+                  problemCount: zoneProblems.length,
+                  status: (zoneProblems.length > 0 ? "warning" : "healthy") as "warning" | "healthy"
+                };
+              }
+            }
             
-            setState(prev => ({
-              ...prev,
-              vitalForGroupMZs: updatedVfgMZs
-            }));
-          }
-          
-          if (state.vitalForEntrepriseMZs.length > 0) {
-            // Mettre à jour VFE
-            const updatedVfeMZs = state.vitalForEntrepriseMZs.map(zone => {
-              const zoneProblems = problems.filter(p => p.zone.includes(zone.name));
-              return {
-                ...zone,
-                problemCount: zoneProblems.length,
-                status: (zoneProblems.length > 0 ? "warning" : "healthy") as "warning" | "healthy"
-              };
-            });
+            // Mettre à jour VFE  
+            if (prev.vitalForEntrepriseMZs.length > 0) {
+              for (let i = 0; i < updatedVfeMZs.length; i++) {
+                const zone = updatedVfeMZs[i];
+                const zoneProblems = problems.filter(p => p.zone.includes(zone.name));
+                updatedVfeMZs[i] = {
+                  ...zone,
+                  problemCount: zoneProblems.length,
+                  status: (zoneProblems.length > 0 ? "warning" : "healthy") as "warning" | "healthy"
+                };
+              }
+            }
             
-            setState(prev => ({
+            return {
               ...prev,
+              vitalForGroupMZs: updatedVfgMZs,
               vitalForEntrepriseMZs: updatedVfeMZs
-            }));
-          }
+            };
+          });
         }
       }
       
@@ -515,12 +528,16 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
         } 
       }));
     }
-  }, [state.selectedZone, state.vitalForGroupMZs, state.vitalForEntrepriseMZs, loadZoneData, optimized]);
+  }, [state.selectedZone, loadZoneData, optimized]); // Retiré state.vitalForGroupMZs et state.vitalForEntrepriseMZs
 
-  // Charger les données initiales
+  // Charger les données initiales - CORRIGÉ POUR ÉVITER LA BOUCLE INFINIE
   useEffect(() => {
-    loadAllData();
-  }, [loadAllData]);
+    if (!initialLoadRef.current) {
+      console.log("Initial data load");
+      initialLoadRef.current = true;
+      loadAllData();
+    }
+  }, []); // Suppression de la dépendance loadAllData pour éviter les boucles infinies
 
   // Fonction pour définir la zone sélectionnée et charger ses données
   const setSelectedZoneAndLoadData = useCallback((zoneId: string | null) => {
@@ -532,6 +549,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
 
   // Fonction pour rafraîchir les données
   const refreshData = useCallback(async () => {
+    console.log("Refreshing data...");
     setState(prev => ({ ...prev, error: null }));
     
     // Recharger toutes les données
