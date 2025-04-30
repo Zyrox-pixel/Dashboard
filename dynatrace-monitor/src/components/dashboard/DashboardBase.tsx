@@ -225,6 +225,15 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
   
   // Afficher l'écran de chargement des détails de zone
   if (isLoading.zoneDetails && selectedZone) {
+    // Déterminez le pourcentage de progression à afficher
+    // basé sur l'état de chargement réel des données
+    const progressStage = 
+      // Vous pouvez ajuster cette logique en fonction de vos états de chargement réels
+      !isLoading.hosts && !isLoading.services && !isLoading.processGroups ? 90 :
+      !isLoading.hosts && !isLoading.services ? 75 :
+      !isLoading.hosts ? 50 :
+      25; // Début du chargement
+  
     return (
       <Layout title={title} subtitle={currentZone?.name}>
         <button 
@@ -271,11 +280,11 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
                 <div className="flex items-center">
                   <div className="h-1.5 w-24 bg-slate-700 rounded-full overflow-hidden">
                     <div 
-                      className={`h-full ${cssClasses.accentBg} rounded-full`}
-                      style={{ width: `${loadingProgress}%`, transition: 'width 0.3s ease-out' }}
+                      className={`h-full ${cssClasses.accentBg}`}
+                      style={{ width: `${progressStage}%` }}
                     ></div>
                   </div>
-                  <span className="ml-2 text-xs text-slate-400">{Math.round(loadingProgress)}%</span>
+                  <span className="ml-2 text-xs text-slate-400">{progressStage}%</span>
                 </div>
               </div>
             </div>
@@ -296,10 +305,7 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
           <div className="w-full bg-slate-700 h-1 rounded-full overflow-hidden mb-4">
             <div 
               className={`h-full ${cssClasses.accentBg}`} 
-              style={{ 
-                width: `${loadingProgress}%`,
-                transition: 'width 0.3s ease-out'
-              }}
+              style={{ width: `${progressStage}%` }}
             ></div>
           </div>
           
