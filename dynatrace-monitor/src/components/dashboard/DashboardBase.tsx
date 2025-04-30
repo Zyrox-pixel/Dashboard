@@ -178,6 +178,9 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
   
   // Afficher l'écran de chargement des détails de zone
 // Afficher l'écran de chargement des détails de zone
+// Remplacez le bloc de chargement dans DashboardBase.tsx par cette version plus informative
+
+// Afficher l'écran de chargement des détails de zone
     if (isLoading.zoneDetails && selectedZone) {
         return (
         <Layout title={title} subtitle={currentZone?.name}>
@@ -189,39 +192,81 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
             <span>Retour aux Management Zones</span>
             </button>
             
-            <div className="flex flex-col items-center justify-center p-12">
-            {/* Indicateur de chargement élégant */}
-            <div className="relative">
-                {/* Cercle extérieur pulsant */}
-                <div className={`absolute -inset-4 ${cssClasses.bgLightOpacity} rounded-full opacity-30 animate-pulse`}></div>
+            <div className="flex flex-col items-center justify-center max-w-md mx-auto p-8">
+            {/* En-tête avec icône */}
+            <div className="flex items-center mb-6">
+                <div className={`p-3 rounded-full ${cssClasses.bgLightOpacity} ${cssClasses.accent}`}>
+                {currentZone?.icon || <Shield size={24} />}
+                </div>
+                <div className="ml-4">
+                <h3 className="font-bold text-lg">Chargement en cours</h3>
+                <p className="text-slate-400 text-sm">Préparation des données de la zone</p>
+                </div>
+            </div>
+            
+            {/* Simulateur d'étapes de chargement */}
+            <div className="w-full space-y-4 mb-8">
+                {/* Étape 1 - simulée comme complétée */}
+                <div className="flex items-center">
+                <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center">
+                    <Check className="text-green-500" size={16} />
+                </div>
+                <div className="ml-3">
+                    <p className="text-sm font-medium">Connexion à la zone</p>
+                    <p className="text-xs text-slate-400">Authentification réussie</p>
+                </div>
+                </div>
                 
-                {/* Cercle principal qui tourne */}
-                <div className="w-16 h-16 rounded-full bg-slate-800 shadow-lg flex items-center justify-center relative">
+                {/* Étape 2 - avec animation de chargement */}
+                <div className="flex items-center">
+                <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center relative">
+                    <div className={`absolute inset-0 rounded-full border-2 border-transparent ${cssClasses.accent.replace('text', 'border')} animate-spin`} 
+                    style={{ borderTopColor: 'transparent', borderLeftColor: 'transparent' }}></div>
+                </div>
+                <div className="ml-3">
+                    <p className="text-sm font-medium">Récupération des métriques</p>
+                    <div className="flex items-center">
+                    <div className="h-1.5 w-24 bg-slate-700 rounded-full overflow-hidden">
+                        <div className={`h-full ${cssClasses.accentBg} rounded-full animate-pulse`} style={{ width: '65%' }}></div>
+                    </div>
+                    <span className="ml-2 text-xs text-slate-400">65%</span>
+                    </div>
+                </div>
+                </div>
                 
-                {/* Anneau animé */}
-                <div className={`absolute inset-0.5 rounded-full border-2 border-transparent ${cssClasses.accent.replace('text', 'border')} 
-                    animate-spin opacity-70`} style={{ borderTopColor: 'transparent', borderLeftColor: 'transparent' }}></div>
-                
-                {/* Deuxième anneau animé en sens inverse avec délai */}
-                <div className={`absolute inset-2 rounded-full border border-transparent ${cssClasses.accent.replace('text', 'border')} 
-                    animate-spin opacity-40`} style={{ borderTopColor: 'transparent', borderRightColor: 'transparent', animationDirection: 'reverse', animationDuration: '1.5s' }}></div>
-                
-                {/* Icône au centre - utiliser l'icône de la zone si disponible */}
-                <div className={`${cssClasses.accent} z-10`}>
-                    {currentZone?.icon || <Shield size={18} />}
+                {/* Étape 3 - en attente */}
+                <div className="flex items-center opacity-60">
+                <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center">
+                    <Server size={14} className="text-slate-500" />
+                </div>
+                <div className="ml-3">
+                    <p className="text-sm font-medium">Préparation des données</p>
+                    <p className="text-xs text-slate-400">En attente...</p>
                 </div>
                 </div>
             </div>
             
-            {/* Texte de chargement avec animation de points */}
-            <div className="mt-6 text-slate-400 font-medium flex items-center">
-                <span>Chargement des détails</span>
-                <span className="ml-1 inline-flex">
-                <span className="animate-pulse" style={{ animationDelay: '0s' }}>.</span>
-                <span className="animate-pulse" style={{ animationDelay: '0.2s' }}>.</span>
-                <span className="animate-pulse" style={{ animationDelay: '0.4s' }}>.</span>
-                </span>
+            {/* Ligne de progression globale */}
+            <div className="w-full bg-slate-700 h-1 rounded-full overflow-hidden mb-4">
+                <div className={`h-full ${cssClasses.accentBg}`} style={{ 
+                width: '40%', 
+                animation: 'progressAnimation 2s ease-in-out infinite',
+                }}></div>
             </div>
+            
+            <style jsx>{`
+                @keyframes progressAnimation {
+                0% { width: 10%; }
+                50% { width: 40%; }
+                100% { width: 10%; }
+                }
+            `}</style>
+            
+            {/* Message explicatif */}
+            <p className="text-sm text-slate-400 text-center">
+                Préparation des informations détaillées pour <span className={cssClasses.text}>{currentZone?.name}</span>.
+                <br/>Cette opération peut prendre quelques instants...
+            </p>
             </div>
         </Layout>
         );
