@@ -190,6 +190,49 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
     });
   };
   
+  // Helper pour obtenir l'icône du système d'exploitation - DÉPLACÉ ICI AVANT SON UTILISATION
+  const getOsIcon = (osVersion: string = '', small: boolean = false) => {
+    const size = small ? 14 : 18;
+    const os = osVersion.toLowerCase();
+    
+    if (os.includes('linux')) {
+      return <span className="text-orange-500">🐧</span>;
+    } else if (os.includes('windows')) {
+      return <span className="text-blue-500">🪟</span>;
+    } else if (os.includes('mac') || os.includes('darwin')) {
+      return <span className="text-gray-500">🍎</span>;
+    } else if (os.includes('unix') || os.includes('aix')) {
+      return <span className="text-purple-500">🖥️</span>;
+    }
+    
+    return <Monitor size={size} className="text-slate-400" />;
+  };
+  
+  // Helper pour obtenir l'icône d'une technologie - DÉPLACÉ ICI AVANT SON UTILISATION
+  const getTechnologyIcon = (tech: string) => {
+    const techLower = tech.toLowerCase();
+    
+    if (techLower.includes('java')) {
+      return <span className="text-orange-500">☕</span>;
+    } else if (techLower.includes('python')) {
+      return <span className="text-green-500">🐍</span>;
+    } else if (techLower.includes('node') || techLower.includes('javascript')) {
+      return <span className="text-yellow-500">⚡</span>;
+    } else if (techLower.includes('.net') || techLower.includes('dotnet')) {
+      return <span className="text-blue-500">🔷</span>;
+    } else if (techLower.includes('go')) {
+      return <span className="text-blue-500">🐹</span>;
+    } else if (techLower.includes('php')) {
+      return <span className="text-indigo-500">🐘</span>;
+    } else if (techLower.includes('ruby')) {
+      return <span className="text-red-500">💎</span>;
+    } else if (techLower.includes('database') || techLower.includes('sql')) {
+      return <Database size={14} className="text-blue-500" />;
+    }
+    
+    return <Activity size={14} className="text-slate-400" />;
+  };
+  
   // Extraire la liste des OS uniques des hôtes
   const uniqueOperatingSystems = useMemo(() => {
     if (!normalizedHosts || normalizedHosts.length === 0) return [];
@@ -619,49 +662,6 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
       });
     });
   }, [processGroups, processFilters]);
-  
-  // Helper pour obtenir l'icône du système d'exploitation
-  const getOsIcon = (osVersion: string = '', small: boolean = false) => {
-    const size = small ? 14 : 18;
-    const os = osVersion.toLowerCase();
-    
-    if (os.includes('linux')) {
-      return <span className="text-orange-500">🐧</span>;
-    } else if (os.includes('windows')) {
-      return <span className="text-blue-500">🪟</span>;
-    } else if (os.includes('mac') || os.includes('darwin')) {
-      return <span className="text-gray-500">🍎</span>;
-    } else if (os.includes('unix') || os.includes('aix')) {
-      return <span className="text-purple-500">🖥️</span>;
-    }
-    
-    return <Monitor size={size} className="text-slate-400" />;
-  };
-  
-  // Helper pour obtenir l'icône d'une technologie
-  const getTechnologyIcon = (tech: string) => {
-    const techLower = tech.toLowerCase();
-    
-    if (techLower.includes('java')) {
-      return <span className="text-orange-500">☕</span>;
-    } else if (techLower.includes('python')) {
-      return <span className="text-green-500">🐍</span>;
-    } else if (techLower.includes('node') || techLower.includes('javascript')) {
-      return <span className="text-yellow-500">⚡</span>;
-    } else if (techLower.includes('.net') || techLower.includes('dotnet')) {
-      return <span className="text-blue-500">🔷</span>;
-    } else if (techLower.includes('go')) {
-      return <span className="text-blue-500">🐹</span>;
-    } else if (techLower.includes('php')) {
-      return <span className="text-indigo-500">🐘</span>;
-    } else if (techLower.includes('ruby')) {
-      return <span className="text-red-500">💎</span>;
-    } else if (techLower.includes('database') || techLower.includes('sql')) {
-      return <Database size={14} className="text-blue-500" />;
-    }
-    
-    return <Activity size={14} className="text-slate-400" />;
-  };
   
   // Définition des colonnes pour les tableaux
   const processColumns = useMemo<Column<ProcessGroup>[]>(() => [
