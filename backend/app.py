@@ -281,7 +281,7 @@ def get_hosts():
 def get_services():
     try:
         now = datetime.now()
-        from_time = int((now - timedelta(hours=2)).timestamp() * 1000)  # Récupération des 2 dernières heures
+        from_time = int((now - timedelta(minutes=30)).timestamp() * 1000)  # Récupération des 30 dernières minutes
         to_time = int(now.timestamp() * 1000)
         
         # Récupérer la Management Zone actuelle

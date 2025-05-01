@@ -569,42 +569,42 @@ class OptimizedAPIClient:
         # Préparer les requêtes d'historique avec clés explicites
         history_queries = []
         for service_id in history_service_ids:
-            # Historique du temps de réponse avec résolution plus fine (5min pour 2h de données)
+            # Historique du temps de réponse avec résolution très fine (1min pour 30min de données)
             history_queries.append((
                 "metrics/query",
                 {
                     "metricSelector": "builtin:service.response.time",
                     "from": from_time,
                     "to": to_time,
-                    "resolution": "5m",  # Résolution plus fine : 5 minutes au lieu d'1 heure
+                    "resolution": "1m",  # Résolution plus fine : 1 minute pour 30 minutes de données
                     "entitySelector": f"entityId({service_id})"
                 },
                 True,
                 f"rt_history:{service_id}:{from_time}:{to_time}"  # Clé explicite avec ID
             ))
             
-            # Historique du taux d'erreur avec résolution plus fine
+            # Historique du taux d'erreur avec résolution très fine
             history_queries.append((
                 "metrics/query",
                 {
                     "metricSelector": "builtin:service.errors.total.rate",
                     "from": from_time,
                     "to": to_time,
-                    "resolution": "5m",  # Résolution plus fine : 5 minutes au lieu d'1 heure
+                    "resolution": "1m",  # Résolution plus fine : 1 minute pour 30 minutes de données
                     "entitySelector": f"entityId({service_id})"
                 },
                 True,
                 f"er_history:{service_id}:{from_time}:{to_time}"  # Clé explicite avec ID
             ))
             
-            # Historique du nombre de requêtes avec résolution plus fine
+            # Historique du nombre de requêtes avec résolution très fine
             history_queries.append((
                 "metrics/query",
                 {
                     "metricSelector": "builtin:service.requestCount.total",
                     "from": from_time,
                     "to": to_time,
-                    "resolution": "5m",  # Résolution plus fine : 5 minutes au lieu d'1 heure
+                    "resolution": "1m",  # Résolution plus fine : 1 minute pour 30 minutes de données
                     "entitySelector": f"entityId({service_id})"
                 },
                 True,
@@ -656,15 +656,15 @@ class OptimizedAPIClient:
                 if 'data' in result and result['data']:
                     values = result['data'][0].get('values', [])
                     if values and values[0] is not None:
-                        # Dynatrace retourne parfois les valeurs en secondes (donc x1000 pour ms) 
-                        # On vérifie si la valeur est déjà en ms
+                        # Conversion en secondes comme demandé
                         raw_value = values[0]
-                        if raw_value < 10:  # Probablement en secondes (< 10 sec)
-                            response_time = int(raw_value * 1000)
-                            logger.info(f"Service {service_id}: Temps de réponse converti de {raw_value}s à {response_time}ms")
+                        if raw_value < 10:  # Déjà en secondes
+                            response_time = round(raw_value, 2)
+                            logger.info(f"Service {service_id}: Temps de réponse en secondes: {response_time}s")
                         else:
-                            response_time = int(raw_value)
-                            logger.info(f"Service {service_id}: Temps de réponse en ms: {response_time}")
+                            # Convertir de millisecondes à secondes
+                            response_time = round(raw_value / 1000, 2)
+                            logger.info(f"Service {service_id}: Temps de réponse converti de {raw_value}ms à {response_time}s")
             
             # Extraire le taux d'erreur
             if error_rate_data and 'result' in error_rate_data and error_rate_data['result']:
@@ -701,12 +701,13 @@ class OptimizedAPIClient:
                         if values and timestamps:
                             for i in range(len(values)):
                                 if values[i] is not None:
-                                    # Traitement similaire pour les valeurs historiques
+                                    # Conversion en secondes pour les valeurs historiques
                                     raw_value = values[i]
-                                    if raw_value < 10:  # Probablement en secondes
-                                        adjusted_value = int(raw_value * 1000)
+                                    if raw_value < 10:  # Déjà en secondes
+                                        adjusted_value = round(raw_value, 2)
                                     else:
-                                        adjusted_value = int(raw_value)
+                                        # Convertir de millisecondes à secondes
+                                        adjusted_value = round(raw_value / 1000, 2)
                                         
                                     response_time_history.append({
                                         'timestamp': timestamps[i],
