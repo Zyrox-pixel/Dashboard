@@ -1138,9 +1138,9 @@ class OptimizedAPIClient:
             self.set_cache(cache_key, active_problems)
             return active_problems
         
-    except Exception as e:
-        logger.error(f"Erreur lors de la récupération des problèmes: {e}")
-        return []
+        except Exception as e:
+            logger.error(f"Erreur lors de la récupération des problèmes: {e}")
+            return []
     
     def _format_problem(self, problem, zone=None):
         """Formate un problème pour la réponse API"""
