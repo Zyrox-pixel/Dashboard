@@ -433,7 +433,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
         if (vfgResponse && !vfgResponse.error && vfgResponse.data?.mzs) {
           // Modifier pour effectuer les requêtes de données pour chaque management zone
           const loadMzData = async () => {
-            const mzDataPromises = vfgResponse.data.mzs.map(async (mzName) => {
+            const mzDataPromises = (vfgResponse?.data?.mzs || []).map(async (mzName) => {
               try {
                 // Définir temporairement la zone courante pour récupérer ses stats
                 console.log(`Fetching data for zone: ${mzName}`);
@@ -489,7 +489,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
           };
           
           // Démarrer le chargement des données pour VFG
-          vfgMZs = vfgResponse.data.mzs.map(mzName => ({
+          vfgMZs = (vfgResponse?.data?.mzs || []).map(mzName => ({
             id: `env-${mzName.replace(/\s+/g, '-')}`,
             name: mzName,
             code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
@@ -517,7 +517,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
         if (vfeResponse && !vfeResponse.error && vfeResponse.data?.mzs) {
           // Modifier pour effectuer les requêtes de données pour chaque management zone
           const loadMzData = async () => {
-            const mzDataPromises = vfeResponse.data.mzs.map(async (mzName) => {
+            const mzDataPromises = (vfeResponse?.data?.mzs || []).map(async (mzName) => {
               try {
                 // Définir temporairement la zone courante pour récupérer ses stats
                 console.log(`Fetching data for zone: ${mzName}`);
@@ -573,7 +573,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
           };
           
           // Démarrer les mzs avec des valeurs initiales
-          vfeMZs = vfeResponse.data.mzs.map(mzName => ({
+          vfeMZs = (vfeResponse?.data?.mzs || []).map(mzName => ({
             id: `env-${mzName.replace(/\s+/g, '-')}`,
             name: mzName,
             code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
