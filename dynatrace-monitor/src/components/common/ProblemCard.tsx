@@ -19,84 +19,99 @@ const ProblemCard: React.FC<ProblemCardProps> = ({ problem }) => {
   // Extraire les informations sur la machine/hôte
   // Extraire le nom de l'hôte impacté à partir des informations disponibles
   const getHostInfo = () => {
-    // 1. Vérifier si nous avons un champ impactedEntities direct dans le problème
+    // Fonction pour extraire le nom de l'hôte commençant par "s"
+    const extractHostname = (str: string) => {
+      // Rechercher les noms de machines commençant par "s" et se terminant par .fr.net.intra
+      const serverMatch = str.match(/\b(s[a-z0-9_-]+\.fr\.net\.intra)\b/i);
+      if (serverMatch && serverMatch[1]) {
+        return serverMatch[1];
+      }
+      
+      // Rechercher les noms de machines commençant par "s" si le format complet n'est pas trouvé
+      const serverShortMatch = str.match(/\b(s[a-z0-9_-]+)\b/i);
+      if (serverShortMatch && serverShortMatch[1] && 
+          serverShortMatch[1].length > 3 && // Éviter les faux positifs comme "sur", "sont", etc.
+          !/\bstatus\b/i.test(serverShortMatch[1])) { // Éviter "status"
+        return serverShortMatch[1];
+      }
+      
+      return null;
+    };
+    
+    // 1. Recherche spécifique dans le sous-titre après "impacted:"
+    if (problem.subtitle && problem.subtitle.toLowerCase().includes('impacted')) {
+      const impactParts = problem.subtitle.split(/impacted:?\s*/i);
+      if (impactParts.length > 1) {
+        const impactText = impactParts[1].trim();
+        // Extraire jusqu'au prochain séparateur
+        const impactValue = impactText.split(/[,;:\s]/)[0];
+        // Vérifier si ce qu'on a extrait commence par s
+        if (impactValue.length > 2 && impactValue.toLowerCase().startsWith('s')) {
+          return impactValue;
+        }
+      }
+    }
+    
+    // 2. Vérifier dans le champ impacted direct
+    if (problem.impacted && typeof problem.impacted === 'string') {
+      const hostname = extractHostname(problem.impacted);
+      if (hostname) {
+        return hostname;
+      }
+    }
+    
+    // 3. Vérifier dans les entités impactées 
     if (problem.impactedEntities && Array.isArray(problem.impactedEntities)) {
-      // Chercher la première entité de type HOST
-      const hostEntity = problem.impactedEntities.find(entity => 
-        entity.type === 'HOST' || entity.entityType === 'HOST'
-      );
-      
-      if (hostEntity) {
-        return hostEntity.name || hostEntity.displayName || hostEntity.entityName || hostEntity.id;
-      }
-    }
-
-    // 2. Vérifier le champ impacted qui pourrait contenir directement le nom d'hôte
-    if (problem.impacted && typeof problem.impacted === 'string' && problem.impacted.length > 3) {
-      return problem.impacted;
-    }
-
-    // 3. Vérifier si le champ host est directement disponible
-    if (problem.host && problem.host !== "Non spécifié") {
-      return problem.host;
-    }
-    
-    // 4. Examiner le sous-titre qui contient souvent une représentation textuelle des entités impactées
-    if (problem.subtitle) {
-      // Chercher directement la clé "impacted:"
-      const impactedPattern = /impacted:\s*([^\s,:;]+)/i;
-      const impactedMatch = problem.subtitle.match(impactedPattern);
-      if (impactedMatch && impactedMatch[1]) {
-        return impactedMatch[1];
-      }
-      
-      // Chercher une séquence HOST ou PRODSEC suivie d'un nom d'hôte
-      const hostPatterns = [
-        // Formats courants dans Dynatrace
-        /HOST\s+([A-Z0-9][A-Z0-9_\.-]+)/i,
-        /PRODSEC-([A-Z0-9][A-Z0-9_\.-]+)/i,
-        /PRODSEC_([A-Z0-9][A-Z0-9_\.-]+)/i,
-        /PRODSEC\.([A-Z0-9][A-Z0-9_\.-]+)/i,
-        /PRODSEC\s+([A-Z0-9][A-Z0-9_\.-]+)/i
-      ];
-      
-      for (const pattern of hostPatterns) {
-        const match = problem.subtitle.match(pattern);
-        if (match && match[1]) {
-          return match[1];
+      for (const entity of problem.impactedEntities) {
+        // Vérifier chaque attribut de l'entité
+        const entityFields = [
+          entity.name,
+          entity.displayName,
+          entity.entityName,
+          entity.id
+        ];
+        
+        for (const field of entityFields) {
+          if (field && typeof field === 'string') {
+            const hostname = extractHostname(field);
+            if (hostname) {
+              return hostname;
+            }
+          }
         }
       }
     }
     
-    // 5. Rechercher dans le titre (moins fiable mais utile en dernier recours)
-    if (problem.title) {
-      // Chercher les mêmes patterns dans le titre
-      const hostPatterns = [
-        /HOST\s+([A-Z0-9][A-Z0-9_\.-]+)/i,
-        /PRODSEC-([A-Z0-9][A-Z0-9_\.-]+)/i,
-        /PRODSEC_([A-Z0-9][A-Z0-9_\.-]+)/i,
-        /PRODSEC\.([A-Z0-9][A-Z0-9_\.-]+)/i,
-        /PRODSEC\s+([A-Z0-9][A-Z0-9_\.-]+)/i
-      ];
-      
-      for (const pattern of hostPatterns) {
-        const match = problem.title.match(pattern);
-        if (match && match[1]) {
-          return match[1];
-        }
-      }
-      
-      // Pour les problèmes d'infrastructure, chercher les noms qui ressemblent à des serveurs
-      if (problem.type && problem.type.toLowerCase().includes('infrastructure')) {
-        const serverPattern = /\b([A-Z0-9]+-[A-Z0-9]+)\b/i;
-        const serverMatch = problem.title.match(serverPattern);
-        if (serverMatch && serverMatch[1]) {
-          return serverMatch[1];
+    // 4. Vérifier les autres champs textuels (sous-titre, titre, host)
+    const fieldsToCheck = [
+      problem.subtitle,               // Sous-titre du problème
+      problem.title,                  // Titre du problème
+      problem.host                    // Hôte explicite
+    ];
+    
+    // Parcourir tous les champs à la recherche du format d'hôte
+    for (const field of fieldsToCheck) {
+      if (field && typeof field === 'string') {
+        const hostname = extractHostname(field);
+        if (hostname) {
+          return hostname;
         }
       }
     }
     
-    // Par défaut, retourner la zone comme contexte ou "Non spécifié"
+    // 5. Chercher dans le texte d'entité des problèmes Dynatrace
+    if (problem.subtitle && problem.subtitle.includes('entity:')) {
+      const entityParts = problem.subtitle.split(/entity:?\s*/i);
+      if (entityParts.length > 1) {
+        const entityText = entityParts[1].trim();
+        const entityValue = entityText.split(/[,;:\s]/)[0];
+        if (entityValue.length > 2 && entityValue.toLowerCase().startsWith('s')) {
+          return entityValue;
+        }
+      }
+    }
+    
+    // Par défaut, retourner la zone ou "Non spécifié"
     return problem.zone || "Non spécifié";
   };
   
