@@ -1,22 +1,19 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo, useRef } from 'react';
-import { api, optimizedApi, CACHE_TYPES } from '../api';
+import { api, optimizedApi } from '../api';
 import { 
   Problem, 
   ManagementZone, 
   ProcessGroup, 
   Host,
   Service,
-  SummaryData,
-  ApiResponse,
-  VitalForGroupMZsResponse,
-  ProblemResponse
+  SummaryData
 } from '../api/types';
 import { Database, Shield, Key, Globe, Server, Grid, Building, CreditCard } from 'lucide-react';
 
 // Types unifiés pour les contextes
 export interface AppStateType {
   activeProblems: Problem[];
-  problemsLast72h: Problem[]; // Nouveau état pour les problèmes des 72 dernières heures
+  problemsLast72h: Problem[]; 
   vitalForGroupMZs: ManagementZone[];
   vitalForEntrepriseMZs: ManagementZone[];
   selectedZone: string | null;
@@ -52,7 +49,7 @@ export interface AppActionsType {
   setSelectedZone: (zoneId: string | null) => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
   setActiveTab: (tab: string) => void;
-  refreshData: (dashboardType?: 'vfg' | 'vfe', refreshProblemsOnly?: boolean) => Promise<void>; // Mis à jour pour accepter le type de dashboard et le rafraîchissement des problèmes uniquement
+  refreshData: (dashboardType?: 'vfg' | 'vfe', refreshProblemsOnly?: boolean) => Promise<void>;
   loadZoneData?: (zoneId: string) => Promise<void>;
 }
 
@@ -113,7 +110,7 @@ export const getZoneColor = (zoneName: string): 'red' | 'amber' | 'orange' | 'bl
 // Initialiser le contexte avec des valeurs par défaut
 const initialAppState: AppStateType = {
   activeProblems: [],
-  problemsLast72h: [], // Initialisation du nouvel état
+  problemsLast72h: [],
   vitalForGroupMZs: [],
   vitalForEntrepriseMZs: [],
   selectedZone: null,
@@ -316,7 +313,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
         
         // Traiter les données des services
         if (!servicesResponse.error && servicesResponse.data) {
-          servicesData = Array.isArray(servicesResponse.data) ? servicesData.data : [];
+          servicesData = Array.isArray(servicesResponse.data) ? servicesResponse.data : [];
           setState(prev => ({ ...prev, services: servicesData }));
         }
       }
@@ -353,10 +350,10 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
       isLoading: { 
         ...prev.isLoading, 
         problems: true, 
-        vitalForGroupMZs: refreshProblemsOnly ? prev.isLoading.vitalForGroupMZs : true,
-        vitalForEntrepriseMZs: refreshProblemsOnly ? prev.isLoading.vitalForEntrepriseMZs : true,
-        initialLoadComplete: refreshProblemsOnly ? prev.isLoading.initialLoadComplete : false,
-        dashboardData: refreshProblemsOnly ? prev.isLoading.dashboardData : true
+        vitalForGroupMZs: !refreshProblemsOnly,
+        vitalForEntrepriseMZs: !refreshProblemsOnly,
+        initialLoadComplete: false,
+        dashboardData: !refreshProblemsOnly
       },
       error: null 
     }));
@@ -385,33 +382,90 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
       // Exécuter plusieurs requêtes en parallèle
       console.log(`Loading data for dashboard type: ${dashboardType}`);
       
-      // Initialiser les variables de réponse
-      let summaryResponse: ApiResponse<SummaryData> = { data: {} as SummaryData };
-      let vfgResponse: ApiResponse<VitalForGroupMZsResponse> = { data: { mzs: [] } };
-      let vfeResponse: ApiResponse<VitalForGroupMZsResponse> = { data: { mzs: [] } };
-      let problemsResponse: ApiResponse<ProblemResponse[]> = { data: [] };
-      let problemsLast72hResponse: ApiResponse<ProblemResponse[]> = { data: [] };
+      let summaryResponse, vfgResponse, vfeResponse, problemsResponse, problemsLast72hResponse;
       
       // Si on ne rafraîchit que les problèmes, ne récupérer que les données de problèmes
       if (refreshProblemsOnly) {
-        [problemsResponse, problemsLast72hResponse] = await Promise.all([
+        const responses = await Promise.all([
           apiClient.getProblems("OPEN", "-24h", dashboardType, true),  // Force le rafraîchissement
           apiClient.getProblems("ALL", "-72h", dashboardType)
         ]);
+        problemsResponse = responses[0];
+        problemsLast72hResponse = responses[1];
         console.log('Rafraîchissement des problèmes uniquement terminé');
       } else {
         // Chargement complet de toutes les données
-        [summaryResponse, vfgResponse, vfeResponse, problemsResponse, problemsLast72hResponse] = await Promise.all([
+        const responses = await Promise.all([
           apiClient.getSummary(),
           apiClient.getVitalForGroupMZs(),
           apiClient.getVitalForEntrepriseMZs(),
           apiClient.getProblems("OPEN", "-24h", dashboardType, true),  // Force le rafraîchissement
           apiClient.getProblems("ALL", "-72h", dashboardType)
         ]);
+        summaryResponse = responses[0];
+        vfgResponse = responses[1];
+        vfeResponse = responses[2];
+        problemsResponse = responses[3];
+        problemsLast72hResponse = responses[4];
+      }
+      console.log('Réponse problèmes 72h (dashboard type):', dashboardType, problemsLast72hResponse);
+      console.log('Réponse problèmes 72h:', problemsLast72hResponse);
+
+      // Traiter les données du résumé si disponibles et si ce n'est pas un rafraîchissement des problèmes uniquement
+      if (!refreshProblemsOnly && summaryResponse && !summaryResponse.error && summaryResponse.data) {
+        setState(prev => ({ ...prev, summaryData: summaryResponse.data as SummaryData }));
+      }
+      
+      // Traiter les données des MZs VFG et VFE si ce n'est pas un rafraîchissement des problèmes uniquement
+      let vfgMZs: ManagementZone[] = [];
+      let vfeMZs: ManagementZone[] = [];
+      
+      if (!refreshProblemsOnly) {
+        if (vfgResponse && !vfgResponse.error && vfgResponse.data?.mzs) {
+          vfgMZs = vfgResponse.data.mzs.map(mzName => ({
+            id: `env-${mzName.replace(/\s+/g, '-')}`,
+            name: mzName,
+            code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
+            icon: getZoneIcon(mzName),
+            problemCount: 0,
+            apps: Math.floor(Math.random() * 15) + 1,
+            services: Math.floor(Math.random() * 30) + 5,
+            hosts: Math.floor(Math.random() * 20) + 2,
+            availability: `${(99 + (Math.random() * 1)).toFixed(2)}%`,
+            status: "healthy" as "healthy" | "warning",
+            color: getZoneColor(mzName),
+            dt_url: "#"
+          }));
+          
+          setState(prev => ({ ...prev, vitalForGroupMZs: vfgMZs }));
+        }
+        
+        if (vfeResponse && !vfeResponse.error && vfeResponse.data?.mzs) {
+          vfeMZs = vfeResponse.data.mzs.map(mzName => ({
+            id: `env-${mzName.replace(/\s+/g, '-')}`,
+            name: mzName,
+            code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
+            icon: getZoneIcon(mzName),
+            problemCount: 0,
+            apps: Math.floor(Math.random() * 15) + 1,
+            services: Math.floor(Math.random() * 30) + 5,
+            hosts: Math.floor(Math.random() * 20) + 2,
+            availability: `${(99 + (Math.random() * 1)).toFixed(2)}%`,
+            status: "healthy" as "healthy" | "warning",
+            color: getZoneColor(mzName),
+            dt_url: "#"
+          }));
+          
+          setState(prev => ({ ...prev, vitalForEntrepriseMZs: vfeMZs }));
+        }
+      } else {
+        // En cas de rafraîchissement des problèmes uniquement, réutiliser les MZs existantes
+        vfgMZs = state.vitalForGroupMZs;
+        vfeMZs = state.vitalForEntrepriseMZs;
       }
       
       // Traiter les données des problèmes actifs
-      if (!problemsResponse.error && problemsResponse.data) {
+      if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
         const problemsData = problemsResponse.data;
         
         if (Array.isArray(problemsData)) {
@@ -442,36 +496,34 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
           }
           
           // Mettre à jour les compteurs de problèmes pour les MZs
-          setState(prev => {
-            const updatedVfgMZs = prev.vitalForGroupMZs.map(zone => {
-              const zoneProblems = problems.filter(p => p.zone.includes(zone.name));
-              return {
-                ...zone,
-                problemCount: zoneProblems.length,
-                status: (zoneProblems.length > 0 ? "warning" : "healthy") as "warning" | "healthy"
-              };
-            });
-            
-            const updatedVfeMZs = prev.vitalForEntrepriseMZs.map(zone => {
-              const zoneProblems = problems.filter(p => p.zone.includes(zone.name));
-              return {
-                ...zone,
-                problemCount: zoneProblems.length,
-                status: (zoneProblems.length > 0 ? "warning" : "healthy") as "warning" | "healthy"
-              };
-            });
-            
+          const updatedVfgMZs = vfgMZs.map(zone => {
+            const zoneProblems = problems.filter(p => p.zone && p.zone.includes(zone.name));
             return {
-              ...prev,
-              vitalForGroupMZs: updatedVfgMZs,
-              vitalForEntrepriseMZs: updatedVfeMZs
+              ...zone,
+              problemCount: zoneProblems.length,
+              status: (zoneProblems.length > 0 ? "warning" : "healthy") as "warning" | "healthy"
             };
           });
+          
+          const updatedVfeMZs = vfeMZs.map(zone => {
+            const zoneProblems = problems.filter(p => p.zone && p.zone.includes(zone.name));
+            return {
+              ...zone,
+              problemCount: zoneProblems.length,
+              status: (zoneProblems.length > 0 ? "warning" : "healthy") as "warning" | "healthy"
+            };
+          });
+          
+          setState(prev => ({
+            ...prev,
+            vitalForGroupMZs: updatedVfgMZs,
+            vitalForEntrepriseMZs: updatedVfeMZs
+          }));
         }
       }
       
       // Traiter les données des problèmes des 72 dernières heures
-      if (!problemsLast72hResponse.error && problemsLast72hResponse.data) {
+      if (problemsLast72hResponse && !problemsLast72hResponse.error && problemsLast72hResponse.data) {
         const problemsData = problemsLast72hResponse.data;
         
         if (Array.isArray(problemsData)) {
@@ -494,59 +546,19 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
           
           console.log(`Problèmes 72h transformés: ${problems.length}`);
           setState(prev => ({ ...prev, problemsLast72h: problems }));
+        } else {
+          console.error("Données de problèmes 72h non valides:", problemsData);
         }
+      } else {
+        console.error("Erreur lors de la récupération des problèmes 72h:", problemsLast72hResponse?.error);
       }
       
-      // Si on a chargé toutes les données, traiter aussi les données résumées et MZs
-      if (!refreshProblemsOnly) {
-        // Traiter les données du résumé
-        if (!summaryResponse.error && summaryResponse.data) {
-          setState(prev => ({ ...prev, summaryData: summaryResponse.data as SummaryData }));
-        }
-        
-        // Traiter les données des MZs VFG et VFE
-        let vfgMZs: ManagementZone[] = [];
-        let vfeMZs: ManagementZone[] = [];
-        
-        if (!vfgResponse.error && vfgResponse.data?.mzs) {
-          vfgMZs = vfgResponse.data.mzs.map(mzName => ({
-            id: `env-${mzName.replace(/\s+/g, '-')}`,
-            name: mzName,
-            code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
-            icon: getZoneIcon(mzName),
-            problemCount: 0,
-            apps: Math.floor(Math.random() * 15) + 1,
-            services: Math.floor(Math.random() * 30) + 5,
-            hosts: Math.floor(Math.random() * 20) + 2,
-            availability: `${(99 + (Math.random() * 1)).toFixed(2)}%`,
-            status: "healthy" as "healthy" | "warning",
-            color: getZoneColor(mzName),
-            dt_url: "#"
-          }));
-          
-          setState(prev => ({ ...prev, vitalForGroupMZs: vfgMZs }));
-        }
-        
-        if (!vfeResponse.error && vfeResponse.data?.mzs) {
-          vfeMZs = vfeResponse.data.mzs.map(mzName => ({
-            id: `env-${mzName.replace(/\s+/g, '-')}`,
-            name: mzName,
-            code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
-            icon: getZoneIcon(mzName),
-            problemCount: 0,
-            apps: Math.floor(Math.random() * 15) + 1,
-            services: Math.floor(Math.random() * 30) + 5,
-            hosts: Math.floor(Math.random() * 20) + 2,
-            availability: `${(99 + (Math.random() * 1)).toFixed(2)}%`,
-            status: "healthy" as "healthy" | "warning",
-            color: getZoneColor(mzName),
-            dt_url: "#"
-          }));
-          
-          setState(prev => ({ ...prev, vitalForEntrepriseMZs: vfeMZs }));
-        }
+      // Si une zone est sélectionnée, charger ses données
+      if (state.selectedZone) {
+        await loadZoneData(state.selectedZone);
       }
       
+      // Mettre à jour les performances
       if (optimized) {
         setPerformanceMetrics(prev => ({
           ...prev,
@@ -567,23 +579,23 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
         isLoading: { 
           ...prev.isLoading, 
           problems: false, 
-          vitalForGroupMZs: refreshProblemsOnly ? prev.isLoading.vitalForGroupMZs : false,
-          vitalForEntrepriseMZs: refreshProblemsOnly ? prev.isLoading.vitalForEntrepriseMZs : false,
-          initialLoadComplete: refreshProblemsOnly ? prev.isLoading.initialLoadComplete : true,
+          vitalForGroupMZs: !refreshProblemsOnly ? false : prev.isLoading.vitalForGroupMZs,
+          vitalForEntrepriseMZs: !refreshProblemsOnly ? false : prev.isLoading.vitalForEntrepriseMZs,
+          initialLoadComplete: !refreshProblemsOnly ? true : prev.isLoading.initialLoadComplete,
           dashboardData: false
         } 
       }));
     }
-  }, [apiClient, optimized, getZoneIcon, getZoneColor]);
+  }, [state.selectedZone, state.vitalForGroupMZs, state.vitalForEntrepriseMZs, loadZoneData, apiClient, optimized]);
 
-  // Fonction pour rafraîchir les données
+  // Fonction pour rafraîchir les données - version simplifiée
   const refreshData = useCallback(async (dashboardType?: 'vfg' | 'vfe', refreshProblemsOnly?: boolean) => {
     console.log(`Refreshing data for dashboard type: ${dashboardType || 'none'} ${refreshProblemsOnly ? '(problèmes uniquement)' : ''}`);
     setState(prev => ({ ...prev, error: null }));
-    await loadAllData(dashboardType, refreshProblemsOnly);
+    await loadAllData(dashboardType, refreshProblemsOnly || false);
   }, [loadAllData]);
 
-  // Charger les données initiales et configurer le rafraîchissement périodique
+  // Charger les données initiales
   useEffect(() => {
     if (!initialLoadRef.current) {
       console.log("Initial data load");
@@ -634,9 +646,9 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
     setSidebarCollapsed,
     setActiveTab,
     refreshData,
+    performanceMetrics,
     ...(optimized ? {
-      loadZoneData,
-      performanceMetrics
+      loadZoneData
     } : {})
   }), [
     state,
