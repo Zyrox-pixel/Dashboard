@@ -19,9 +19,13 @@ const ProblemCard: React.FC<ProblemCardProps> = ({ problem }) => {
   // Extraire les informations sur la machine/hôte
   // Déterminer intelligemment l'hôte à partir des informations disponibles
   const getHostInfo = () => {
+    let hostInfo = "";
+    
     // Si le champ host est explicitement défini
     if (problem.host) {
-      return problem.host;
+      // Supprimer le préfixe "HOST:" s'il existe
+      hostInfo = problem.host.replace(/^HOST:\s*/, '');
+      return hostInfo;
     }
     
     // Extraire l'hôte du titre si possible
@@ -170,7 +174,7 @@ const ProblemCard: React.FC<ProblemCardProps> = ({ problem }) => {
               </div>
               <div className="text-sm text-slate-300">
                 {problem.host ? (
-                  <span className="font-medium text-blue-300">{problem.host}</span>
+                  <span className="font-medium text-blue-300">{problem.host.replace(/^HOST:\s*/, '')}</span>
                 ) : (
                   <span className="text-slate-400">Non spécifié</span>
                 )}
