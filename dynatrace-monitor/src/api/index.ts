@@ -101,7 +101,16 @@ class ApiClient {
       }
     );
   }
+  
+  public getZoneMetadataCache() {
+    return this.get<Record<string, { hosts: number; services: number; apps: number; }>>(
+      ENDPOINTS.ZONE_METADATA_CACHE
+    );
+  }
 
+  public setZoneMetadataCache(zoneName: string, data: { hosts: number; services: number; apps: number; }) {
+    return this.post(ENDPOINTS.SET_ZONE_METADATA_CACHE, { zoneName, data });
+  }
   /**
    * Récupère une valeur du cache si elle est encore valide
    */

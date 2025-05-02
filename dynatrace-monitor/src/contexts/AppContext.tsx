@@ -155,6 +155,56 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
   // État unifié pour tous les contextes
   const [state, setState] = useState<AppStateType>(initialAppState);
   
+  // NOUVEAU: Ajout de l'état pour les métadonnées des zones
+  const [zoneMeta, setZoneMeta] = useState<Record<string, {
+    hosts: number;
+    services: number;
+    apps: number;
+    timestamp: number;
+  }>>(() => {
+    // Initialiser avec les données en cache si disponibles
+    try {
+      const cached = localStorage.getItem('zoneMeta');
+      return cached ? JSON.parse(cached) : {};
+    } catch (e) {
+      console.error('Erreur lors du chargement du cache zoneMeta:', e);
+      return {};
+    }
+  });
+  
+  // NOUVEAU: Fonction pour sauvegarder les métadonnées
+  const saveZoneMeta = useCallback(() => {
+    try {
+      localStorage.setItem('zoneMeta', JSON.stringify(zoneMeta));
+    } catch (e) {
+      console.error('Erreur lors de la sauvegarde des métadonnées:', e);
+    }
+  }, [zoneMeta]);
+  
+  // NOUVEAU: Effet pour sauvegarder les métadonnées lorsqu'elles changent
+  useEffect(() => {
+    saveZoneMeta();
+  }, [zoneMeta, saveZoneMeta]);
+  
+  // NOUVEAU: Fonction pour mettre à jour les métadonnées d'une zone
+  const updateZoneMetaData = useCallback((zoneName: string, hostsCount: number, servicesCount: number) => {
+    setZoneMeta(prevMeta => {
+      // Calculer le nombre d'applications approximatif
+      const appsCount = Math.max(1, Math.floor(servicesCount / 5));
+      
+      // Mettre à jour les métadonnées pour cette zone
+      return {
+        ...prevMeta,
+        [zoneName]: {
+          hosts: hostsCount,
+          services: servicesCount,
+          apps: appsCount,
+          timestamp: Date.now()
+        }
+      };
+    });
+  }, []);
+  
   // État de performance uniquement pour la version optimisée
   const [performanceMetrics, setPerformanceMetrics] = useState({
     loadTime: 0,
@@ -187,6 +237,87 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
     
     return <span className="text-blue-500">⚙️</span>;
   }, []);
+
+  // NOUVEAU: Fonction pour charger les métadonnées en arrière-plan
+  const loadZoneMetaDataInBackground = useCallback(async (mzNames: string[]) => {
+    // Créer une copie pour éviter de modifier l'original pendant le traitement
+    const mzList = [...mzNames];
+    
+    // Traiter les MZs une par une pour éviter de surcharger l'API
+    while (mzList.length > 0) {
+      const mzName = mzList.shift();
+      if (!mzName) continue;
+      
+      // Vérifier si nous avons déjà des données récentes (moins de 24h)
+      const existingMeta = zoneMeta[mzName];
+      const isRecent = existingMeta && (Date.now() - existingMeta.timestamp < 24 * 60 * 60 * 1000);
+      
+      if (isRecent) {
+        console.log(`Métadonnées récentes déjà disponibles pour ${mzName}`);
+        continue;
+      }
+      
+      try {
+        console.log(`Chargement en arrière-plan des métadonnées pour ${mzName}`);
+        
+        // Définir la MZ courante
+        await apiClient.setManagementZone(mzName);
+        
+        // Récupérer les données
+        const [hostsResponse, servicesResponse] = await Promise.all([
+          apiClient.getHosts(),
+          apiClient.getServices()
+        ]);
+        
+        const hostsCount = Array.isArray(hostsResponse.data) ? hostsResponse.data.length : 0;
+        const servicesCount = Array.isArray(servicesResponse.data) ? servicesResponse.data.length : 0;
+        
+        // Mettre à jour les métadonnées
+        updateZoneMetaData(mzName, hostsCount, servicesCount);
+        
+        // Mettre à jour les MZs avec ces nouvelles données
+        setState(prev => {
+          // Mise à jour des VFG MZs
+          const updatedVfgMZs = prev.vitalForGroupMZs.map(mz => 
+            mz.name === mzName 
+              ? {
+                  ...mz,
+                  hosts: hostsCount,
+                  services: servicesCount,
+                  apps: Math.max(1, Math.floor(servicesCount / 5))
+                }
+              : mz
+          );
+          
+          // Mise à jour des VFE MZs
+          const updatedVfeMZs = prev.vitalForEntrepriseMZs.map(mz => 
+            mz.name === mzName 
+              ? {
+                  ...mz,
+                  hosts: hostsCount,
+                  services: servicesCount,
+                  apps: Math.max(1, Math.floor(servicesCount / 5))
+                }
+              : mz
+          );
+          
+          return {
+            ...prev,
+            vitalForGroupMZs: updatedVfgMZs,
+            vitalForEntrepriseMZs: updatedVfeMZs
+          };
+        });
+        
+        // Pause pour éviter de surcharger l'API
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      } catch (error) {
+        console.error(`Erreur lors du chargement des métadonnées pour ${mzName}:`, error);
+        // Continue avec la MZ suivante même en cas d'erreur
+      }
+    }
+    
+    console.log('Chargement en arrière-plan des métadonnées terminé');
+  }, [apiClient, updateZoneMetaData, zoneMeta]);
 
   // Fonction optimisée pour charger les données d'une zone
   const loadZoneData = useCallback(async (zoneId: string) => {
@@ -263,6 +394,13 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
               ...prev,
               dataSizes: { ...prev.dataSizes, hosts: dashboardData.hosts.data.length }
             }));
+            
+            // NOUVEAU: Mettre à jour les métadonnées
+            updateZoneMetaData(
+              selectedZoneObj.name,
+              dashboardData.hosts.data.length,
+              dashboardData.services.data ? dashboardData.services.data.length : 0
+            );
           }
           
           // Mettre à jour les services
@@ -319,6 +457,15 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
           servicesData = Array.isArray(servicesResponse.data) ? servicesResponse.data : [];
           setState(prev => ({ ...prev, services: servicesData }));
         }
+        
+        // NOUVEAU: Mettre à jour les métadonnées
+        if (hostsData.length > 0 || servicesData.length > 0) {
+          updateZoneMetaData(
+            selectedZoneObj.name,
+            hostsData.length,
+            servicesData.length
+          );
+        }
       }
       
       const endTime = performance.now();
@@ -341,7 +488,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
     } finally {
       setState(prev => ({ ...prev, isLoading: { ...prev.isLoading, zoneDetails: false } }));
     }
-  }, [state.vitalForGroupMZs, state.vitalForEntrepriseMZs, apiClient, optimized, getProcessIcon]);
+  }, [state.vitalForGroupMZs, state.vitalForEntrepriseMZs, apiClient, optimized, getProcessIcon, updateZoneMetaData]);
 
   // Fonction pour charger toutes les données
   const loadAllData = useCallback(async (dashboardType?: 'vfg' | 'vfe', refreshProblemsOnly?: boolean) => {
@@ -430,16 +577,28 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
       let vfeMZs: ManagementZone[] = [];
       
       if (!refreshProblemsOnly) {
+        // MODIFIÉ: Utiliser le zoneMeta pour les valeurs réelles
         if (vfgResponse && !vfgResponse.error && vfgResponse.data?.mzs) {
-          // Créer les Management Zones avec des valeurs réalistes directement
           vfgMZs = (vfgResponse?.data?.mzs || []).map(mzName => {
-            // Générer des nombres réalistes pour tests (à remplacer par des données réelles)
-            // Ces valeurs seront cohérentes (les mêmes valeurs pour une même MZ)
-            const mzNameSum = mzName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-            const hostCount = 5 + (mzNameSum % 15); // Entre 5 et 20 hôtes
-            const servicesCount = 10 + (mzNameSum % 20); // Entre 10 et 30 services
-            const appsCount = 2 + (mzNameSum % 8); // Entre 2 et 10 applications
+            // Récupérer les métadonnées en cache si disponibles
+            const meta = zoneMeta[mzName];
             
+            // Variables pour stocker les compteurs
+            let hostCount, servicesCount, appsCount;
+            const mzNameSum = mzName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+            
+            if (meta) {
+              // Utiliser les valeurs en cache
+              hostCount = meta.hosts;
+              servicesCount = meta.services;
+              appsCount = meta.apps;
+            } else {
+              // Fallback aux valeurs générées
+              hostCount = 5 + (mzNameSum % 15);
+              servicesCount = 10 + (mzNameSum % 20);
+              appsCount = 2 + (mzNameSum % 8);
+            }
+          
             return {
               id: `env-${mzName.replace(/\s+/g, '-')}`,
               name: mzName,
@@ -462,16 +621,28 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
           setState(prev => ({ ...prev, vitalForGroupMZs: vfgMZs }));
         }
         
+        // MODIFIÉ: Faire de même pour VFE
         if (vfeResponse && !vfeResponse.error && vfeResponse.data?.mzs) {
-          // Créer les Management Zones avec des valeurs réalistes directement
           vfeMZs = (vfeResponse?.data?.mzs || []).map(mzName => {
-            // Générer des nombres réalistes pour tests (à remplacer par des données réelles)
-            // Ces valeurs seront cohérentes (les mêmes valeurs pour une même MZ)
-            const mzNameSum = mzName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-            const hostCount = 5 + (mzNameSum % 15); // Entre 5 et 20 hôtes
-            const servicesCount = 10 + (mzNameSum % 20); // Entre 10 et 30 services
-            const appsCount = 2 + (mzNameSum % 8); // Entre 2 et 10 applications
+            // Récupérer les métadonnées en cache si disponibles
+            const meta = zoneMeta[mzName];
             
+            // Variables pour stocker les compteurs
+            let hostCount, servicesCount, appsCount;
+            const mzNameSum = mzName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+            
+            if (meta) {
+              // Utiliser les valeurs en cache
+              hostCount = meta.hosts;
+              servicesCount = meta.services;
+              appsCount = meta.apps;
+            } else {
+              // Fallback aux valeurs générées
+              hostCount = 5 + (mzNameSum % 15);
+              servicesCount = 10 + (mzNameSum % 20);
+              appsCount = 2 + (mzNameSum % 8);
+            }
+          
             return {
               id: `env-${mzName.replace(/\s+/g, '-')}`,
               name: mzName,
@@ -500,91 +671,90 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
       }
       
       // Traiter les données des problèmes actifs
-// Traiter les données des problèmes actifs
-if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
-  const problemsData = problemsResponse.data;
-  
-  if (Array.isArray(problemsData)) {
-    // Transformer les données
-    const problems: Problem[] = problemsData.map((problem) => {
-      // Extraire le nom de l'hôte à partir des entités impactées (priorité)
-      let hostName = '';
-      
-      // PRIORITÉ 1: Utiliser directement impactedEntities
-      if (problem.impactedEntities && Array.isArray(problem.impactedEntities)) {
-        const hostEntity = problem.impactedEntities.find(entity => 
-          entity.entityId && entity.entityId.type === 'HOST' && entity.name);
-        if (hostEntity) {
-          hostName = hostEntity.name;
-          console.log(`Nom d'hôte extrait de impactedEntities pour le problème ${problem.id}: ${hostName}`);
+      if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
+        const problemsData = problemsResponse.data;
+        
+        if (Array.isArray(problemsData)) {
+          // Transformer les données
+          const problems: Problem[] = problemsData.map((problem) => {
+            // Extraire le nom de l'hôte à partir des entités impactées (priorité)
+            let hostName = '';
+            
+            // PRIORITÉ 1: Utiliser directement impactedEntities
+            if (problem.impactedEntities && Array.isArray(problem.impactedEntities)) {
+              const hostEntity = problem.impactedEntities.find(entity => 
+                entity.entityId && entity.entityId.type === 'HOST' && entity.name);
+              if (hostEntity) {
+                hostName = hostEntity.name;
+                console.log(`Nom d'hôte extrait de impactedEntities pour le problème ${problem.id}: ${hostName}`);
+              }
+            }
+            
+            // PRIORITÉ 2: Si pas trouvé, utiliser le champ host ou impacted s'ils existent
+            if (!hostName) {
+              if (problem.host && problem.host !== "Non spécifié") {
+                hostName = problem.host;
+              } else if (problem.impacted && problem.impacted !== "Non spécifié") {
+                hostName = problem.impacted;
+              }
+            }
+            
+            return {
+              id: problem.id || `PROB-${Math.random().toString(36).substr(2, 9)}`,
+              title: problem.title || "Problème inconnu",
+              code: problem.id ? problem.id.substring(0, 7) : "UNKNOWN",
+              subtitle: `${problem.zone || "Non spécifié"} - Impact: ${problem.impact || "INCONNU"}`,
+              time: problem.start_time ? `Depuis ${problem.start_time}` : "Récent",
+              type: problem.impact === "INFRASTRUCTURE" ? "Problème d'Infrastructure" : "Problème de Service",
+              status: problem.status === "OPEN" ? "critical" : "warning",
+              impact: problem.impact === "INFRASTRUCTURE" ? "ÉLEVÉ" : problem.impact === "SERVICE" ? "MOYEN" : "FAIBLE",
+              zone: problem.zone || "Non spécifié",
+              servicesImpacted: problem.affected_entities ? problem.affected_entities.toString() : "0",
+              dt_url: problem.dt_url || "#",
+              duration: problem.duration || "",
+              resolved: problem.resolved || false,
+              host: hostName, // Utiliser le nom d'hôte extrait
+              impacted: hostName, // Pour compatibilité
+              impactedEntities: problem.impactedEntities, // Transférer les entités impactées pour utilisation dans ProblemCard
+              rootCauseEntity: problem.rootCauseEntity // Transférer aussi la cause racine si disponible
+            };
+          });
+          
+          setState(prev => ({ ...prev, activeProblems: problems }));
+          
+          if (optimized) {
+            setPerformanceMetrics(prev => ({
+              ...prev,
+              dataSizes: { ...prev.dataSizes, problems: problems.length }
+            }));
+          }
+          
+          // Mettre à jour les compteurs de problèmes pour les MZs
+          const updatedVfgMZs = vfgMZs.map(zone => {
+            const zoneProblems = problems.filter(p => p.zone && p.zone.includes(zone.name));
+            return {
+              ...zone,
+              problemCount: zoneProblems.length,
+              status: (zoneProblems.length > 0 ? "warning" : "healthy") as "warning" | "healthy"
+            };
+          });
+          
+          const updatedVfeMZs = vfeMZs.map(zone => {
+            const zoneProblems = problems.filter(p => p.zone && p.zone.includes(zone.name));
+            return {
+              ...zone,
+              problemCount: zoneProblems.length,
+              status: (zoneProblems.length > 0 ? "warning" : "healthy") as "warning" | "healthy"
+            };
+          });
+          
+          setState(prev => ({
+            ...prev,
+            vitalForGroupMZs: updatedVfgMZs,
+            vitalForEntrepriseMZs: updatedVfeMZs
+          }));
         }
       }
-      
-      // PRIORITÉ 2: Si pas trouvé, utiliser le champ host ou impacted s'ils existent
-      if (!hostName) {
-        if (problem.host && problem.host !== "Non spécifié") {
-          hostName = problem.host;
-        } else if (problem.impacted && problem.impacted !== "Non spécifié") {
-          hostName = problem.impacted;
-        }
-      }
-      
-      return {
-        id: problem.id || `PROB-${Math.random().toString(36).substr(2, 9)}`,
-        title: problem.title || "Problème inconnu",
-        code: problem.id ? problem.id.substring(0, 7) : "UNKNOWN",
-        subtitle: `${problem.zone || "Non spécifié"} - Impact: ${problem.impact || "INCONNU"}`,
-        time: problem.start_time ? `Depuis ${problem.start_time}` : "Récent",
-        type: problem.impact === "INFRASTRUCTURE" ? "Problème d'Infrastructure" : "Problème de Service",
-        status: problem.status === "OPEN" ? "critical" : "warning",
-        impact: problem.impact === "INFRASTRUCTURE" ? "ÉLEVÉ" : problem.impact === "SERVICE" ? "MOYEN" : "FAIBLE",
-        zone: problem.zone || "Non spécifié",
-        servicesImpacted: problem.affected_entities ? problem.affected_entities.toString() : "0",
-        dt_url: problem.dt_url || "#",
-        duration: problem.duration || "",
-        resolved: problem.resolved || false,
-        host: hostName, // Utiliser le nom d'hôte extrait
-        impacted: hostName, // Pour compatibilité
-        impactedEntities: problem.impactedEntities, // Transférer les entités impactées pour utilisation dans ProblemCard
-        rootCauseEntity: problem.rootCauseEntity // Transférer aussi la cause racine si disponible
-      };
-    });
-    
-    setState(prev => ({ ...prev, activeProblems: problems }));
-    
-    if (optimized) {
-      setPerformanceMetrics(prev => ({
-        ...prev,
-        dataSizes: { ...prev.dataSizes, problems: problems.length }
-      }));
-    }
-    
-    // Mettre à jour les compteurs de problèmes pour les MZs
-    const updatedVfgMZs = vfgMZs.map(zone => {
-      const zoneProblems = problems.filter(p => p.zone && p.zone.includes(zone.name));
-      return {
-        ...zone,
-        problemCount: zoneProblems.length,
-        status: (zoneProblems.length > 0 ? "warning" : "healthy") as "warning" | "healthy"
-      };
-    });
-    
-    const updatedVfeMZs = vfeMZs.map(zone => {
-      const zoneProblems = problems.filter(p => p.zone && p.zone.includes(zone.name));
-      return {
-        ...zone,
-        problemCount: zoneProblems.length,
-        status: (zoneProblems.length > 0 ? "warning" : "healthy") as "warning" | "healthy"
-      };
-    });
-    
-    setState(prev => ({
-      ...prev,
-      vitalForGroupMZs: updatedVfgMZs,
-      vitalForEntrepriseMZs: updatedVfeMZs
-    }));
-  }
-}
       
       // Traiter les données des problèmes des 72 dernières heures
       if (problemsLast72hResponse && !problemsLast72hResponse.error && problemsLast72hResponse.data) {
@@ -645,6 +815,19 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
         }));
       }
       
+      // NOUVEAU: Déclencher le chargement en arrière-plan
+      if (!refreshProblemsOnly) {
+        const allMzNames = [
+          ...(vfgResponse?.data?.mzs || []),
+          ...(vfeResponse?.data?.mzs || [])
+        ];
+        
+        // Déclencher le chargement en arrière-plan après une courte pause
+        setTimeout(() => {
+          loadZoneMetaDataInBackground(allMzNames);
+        }, 3000); // Attendre 3 secondes après le chargement initial
+      }
+      
     } catch (error: any) {
       console.error('Erreur lors du chargement des données:', error);
       setState(prev => ({ 
@@ -664,7 +847,7 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
         } 
       }));
     }
-  }, [state.selectedZone, state.vitalForGroupMZs, state.vitalForEntrepriseMZs, loadZoneData, apiClient, optimized, getZoneIcon, getZoneColor]);
+  }, [state.selectedZone, state.vitalForGroupMZs, state.vitalForEntrepriseMZs, loadZoneData, apiClient, optimized, getZoneIcon, getZoneColor, loadZoneMetaDataInBackground, zoneMeta]);
 
   // Fonction pour rafraîchir les données - version simplifiée
   const refreshData = useCallback(async (dashboardType?: 'vfg' | 'vfe', refreshProblemsOnly?: boolean) => {

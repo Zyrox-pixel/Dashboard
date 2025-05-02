@@ -13,6 +13,9 @@ export const ENDPOINTS = {
   HOSTS: '/hosts',
   SERVICES: '/services',
   PROCESSES: '/processes',
+  ZONE_METADATA_CACHE: '/zone-metadata-cache',
+  SET_ZONE_METADATA_CACHE: '/set-zone-metadata-cache',
+
   
   // Endpoints relatifs aux problèmes
   PROBLEMS: '/problems',
