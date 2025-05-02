@@ -1214,92 +1214,126 @@ class OptimizedAPIClient:
             return []
     
     def _format_problem(self, problem, zone=None):
-    """Formate un problème pour la réponse API et extrait l'information sur l'hôte impacté"""
-    # Code existant pour déterminer si le problème est résolu
-    is_resolved = (
-        problem.get('status') != 'OPEN' or 
-        problem.get('endTime', 0) > 0 or
-        problem.get('resolutionState') == 'RESOLVED' or
-        problem.get('resolved', False)
-    )
+        """Formate un problème pour la réponse API et extrait l'information sur l'hôte impacté"""
+        # Code existant pour déterminer si le problème est résolu
+        is_resolved = (
+            problem.get('status') != 'OPEN' or 
+            problem.get('endTime', 0) > 0 or
+            problem.get('resolutionState') == 'RESOLVED' or
+            problem.get('resolved', False)
+        )
     
-    # Autres calculs existants (durée, dates, etc.)
-    # ...
+        # Autres calculs existants (durée, dates, etc.)
+        # ...
+        
+        # Extraction des entités impactées
+        impacted_entities = []
+        impacted_hostname = None
+        
+        # MÉTHODE 1: Chercher dans les entités affectées
+        if 'affectedEntities' in problem:
+            for entity in problem.get('affectedEntities', []):
+                entity_type = None
+                
+                # Déterminer le type d'entité de manière robuste
+                if isinstance(entity.get('entityType'), dict):
+                    entity_type = entity.get('entityType', {}).get('type')
+                else:
+                    entity_type = entity.get('entityType')
+                
+                # Ajouter l'entité à la liste
+                impacted_entity = {
+                    'id': entity.get('entityId', 'Unknown'),
+                    'type': entity_type or 'Unknown'
+                }
+                
+                # Ajouter le nom s'il existe
+                if 'name' in entity:
+                    impacted_entity['name'] = entity['name']
+                elif 'displayName' in entity:
+                    impacted_entity['displayName'] = entity['displayName']
+                
+                # Si c'est un hôte et qu'on n'a pas encore trouvé le nom principal
+                if (entity_type and entity_type.upper() == 'HOST' and not impacted_hostname):
+                    impacted_hostname = impacted_entity.get('name', impacted_entity.get('displayName'))
+                
+                impacted_entities.append(impacted_entity)
     
-    # Extraction des entités impactées
-    impacted_entities = []
-    impacted_hostname = None
-    
-    # MÉTHODE 1: Chercher dans les entités affectées
-    if 'affectedEntities' in problem:
-        for entity in problem.get('affectedEntities', []):
-            entity_type = None
-            
-            # Déterminer le type d'entité de manière robuste
-            if isinstance(entity.get('entityType'), dict):
-                entity_type = entity.get('entityType', {}).get('type')
-            else:
-                entity_type = entity.get('entityType')
-            
-            # Ajouter l'entité à la liste
-            impacted_entity = {
-                'id': entity.get('entityId', 'Unknown'),
-                'type': entity_type or 'Unknown'
-            }
-            
-            # Ajouter le nom s'il existe
-            if 'name' in entity:
-                impacted_entity['name'] = entity['name']
-            elif 'displayName' in entity:
-                impacted_entity['displayName'] = entity['displayName']
-            
-            # Si c'est un hôte et qu'on n'a pas encore trouvé le nom principal
-            if (entity_type and entity_type.upper() == 'HOST' and not impacted_hostname):
-                impacted_hostname = impacted_entity.get('name', impacted_entity.get('displayName'))
-            
-            impacted_entities.append(impacted_entity)
-    
-    # MÉTHODE 2: Si aucun hôte trouvé, chercher dans les événements rankés
-    if not impacted_hostname and 'rankedEvents' in problem:
-        for event in problem.get('rankedEvents', []):
-            if 'entityName' in event and 'entityType' in event:
-                if event['entityType'].upper() == 'HOST':
-                    impacted_hostname = event['entityName']
-                    logger.info(f"Hôte trouvé dans rankedEvents: {impacted_hostname}")
+        # MÉTHODE 2: Si aucun hôte trouvé, chercher dans les événements rankés
+        if not impacted_hostname and 'rankedEvents' in problem:
+            for event in problem.get('rankedEvents', []):
+                if 'entityName' in event and 'entityType' in event:
+                    if event['entityType'].upper() == 'HOST':
+                        impacted_hostname = event['entityName']
+                        logger.info(f"Hôte trouvé dans rankedEvents: {impacted_hostname}")
+                        break
+        
+        # MÉTHODE 3: Si toujours pas d'hôte, chercher dans les preuves
+        if not impacted_hostname and 'evidenceDetails' in problem:
+            for evidence in problem.get('evidenceDetails', {}).get('details', []):
+                if evidence.get('entity', {}).get('type', '').upper() == 'HOST':
+                    impacted_hostname = evidence.get('entity', {}).get('name')
+                    logger.info(f"Hôte trouvé dans evidenceDetails: {impacted_hostname}")
                     break
     
-    # MÉTHODE 3: Si toujours pas d'hôte, chercher dans les preuves
-    if not impacted_hostname and 'evidenceDetails' in problem:
-        for evidence in problem.get('evidenceDetails', {}).get('details', []):
-            if evidence.get('entity', {}).get('type', '').upper() == 'HOST':
-                impacted_hostname = evidence.get('entity', {}).get('name')
-                logger.info(f"Hôte trouvé dans evidenceDetails: {impacted_hostname}")
-                break
-    
-    # MÉTHODE 4: Rechercher dans le titre du problème
-    if not impacted_hostname and problem.get('title'):
-        title = problem.get('title')
-        host_match = re.search(r'HOST:\s*(\S+)', title, re.IGNORECASE)
-        if host_match:
-            impacted_hostname = host_match.group(1)
-            logger.info(f"Hôte extrait du titre: {impacted_hostname}")
-    
-    # Création de l'objet problème comme dans votre fonction existante
-    return {
-        'id': problem.get('problemId', 'Unknown'),
-        'title': problem.get('title', 'Problème inconnu'),
-        'impact': problem.get('impactLevel', 'UNKNOWN'),
-        'status': 'RESOLVED' if is_resolved else problem.get('status', 'OPEN'),
-        'affected_entities': len(problem.get('affectedEntities', [])),
-        'start_time': start_time_str, # Supposé calculé avant
-        'end_time': end_time_str,
-        'duration': duration_display,
-        'dt_url': f"{self.env_url}/#problems/problemdetails;pid={problem.get('problemId', 'Unknown')}",
-        'zone': zone or self._extract_problem_zone(problem),
-        'resolved': is_resolved,
-        'impactedEntities': impacted_entities,
-        'impacted': impacted_hostname  # Ajout du nom de l'hôte impacté principal
-    }
+        # MÉTHODE 4: Rechercher dans le titre du problème
+        if not impacted_hostname and problem.get('title'):
+            title = problem.get('title')
+            # Import re module for regex
+            import re
+            host_match = re.search(r'HOST:\s*(\S+)', title, re.IGNORECASE)
+            if host_match:
+                impacted_hostname = host_match.group(1)
+                logger.info(f"Hôte extrait du titre: {impacted_hostname}")
+        
+        # On récupère les variables existantes utilisées dans la fonction originale
+        start_time_str = "N/A"  # À remplacer par la variable réelle
+        end_time_str = None
+        duration_display = "N/A"  # À remplacer par la variable réelle
+        
+        # Si le problème a les champs de timestamps, on les calcule
+        if 'startTime' in problem:
+            start_time_ms = problem.get('startTime', 0)
+            start_time_utc = datetime.utcfromtimestamp(start_time_ms/1000)
+            start_time_local = start_time_utc + timedelta(hours=2)
+            start_time_str = start_time_local.strftime('%Y-%m-%d %H:%M')
+            
+            # Si le problème a un temps de fin
+            end_time_ms = problem.get('endTime', 0)
+            if end_time_ms > 0:
+                end_time_utc = datetime.utcfromtimestamp(end_time_ms/1000)
+                end_time_local = end_time_utc + timedelta(hours=2)
+                end_time_str = end_time_local.strftime('%Y-%m-%d %H:%M')
+                
+                # Calculer la durée
+                duration_sec = (end_time_ms - start_time_ms) / 1000
+                if duration_sec < 60:
+                    duration_display = f"{int(duration_sec)}s"
+                elif duration_sec < 3600:
+                    duration_display = f"{int(duration_sec / 60)}m"
+                elif duration_sec < 86400:  # Moins d'un jour
+                    duration_display = f"{int(duration_sec / 3600)}h {int((duration_sec % 3600) / 60)}m"
+                else:  # Plus d'un jour
+                    days = int(duration_sec / 86400)
+                    hours = int((duration_sec % 86400) / 3600)
+                    duration_display = f"{days}j {hours}h"
+        
+        # Création de l'objet problème 
+        return {
+            'id': problem.get('problemId', 'Unknown'),
+            'title': problem.get('title', 'Problème inconnu'),
+            'impact': problem.get('impactLevel', 'UNKNOWN'),
+            'status': 'RESOLVED' if is_resolved else problem.get('status', 'OPEN'),
+            'affected_entities': len(problem.get('affectedEntities', [])),
+            'start_time': start_time_str,
+            'end_time': end_time_str,
+            'duration': duration_display,
+            'dt_url': f"{self.env_url}/#problems/problemdetails;pid={problem.get('problemId', 'Unknown')}",
+            'zone': zone or self._extract_problem_zone(problem),
+            'resolved': is_resolved,
+            'impactedEntities': impacted_entities,
+            'impacted': impacted_hostname  # Ajout du nom de l'hôte impacté principal
+        }
         
     def _extract_problem_zone(self, problem):
         """Extrait la zone principale d'un problème"""
