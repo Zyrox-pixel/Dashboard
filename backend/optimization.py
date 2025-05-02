@@ -1269,7 +1269,39 @@ class OptimizedAPIClient:
             days = int(duration_sec / 86400)
             hours = int((duration_sec % 86400) / 3600)
             duration_display = f"{days}j {hours}h"
-            
+        
+        # NOUVELLE PARTIE: Extraire les véritables noms de machines
+        real_host_name = None
+        
+        # Méthode 1: Rechercher dans les entités affectées pour identifier les véritables machines (hosts)
+        if 'affectedEntities' in problem:
+            for entity in problem.get('affectedEntities', []):
+                # Vérifier si l'entité est un host (machine physique)
+                if entity.get('entityType', '').lower() == 'host':
+                    real_host_name = entity.get('name', '')
+                    logger.info(f"Machine trouvée dans affectedEntities: {real_host_name}")
+                    break
+        
+        # Méthode 2: Si aucune machine n'est trouvée, examiner les détails du problème
+        if not real_host_name and 'rankedEvents' in problem:
+            for event in problem.get('rankedEvents', []):
+                if event.get('entityType', '').lower() == 'host':
+                    real_host_name = event.get('entityName', '')
+                    logger.info(f"Machine trouvée dans rankedEvents: {real_host_name}")
+                    break
+        
+        # Méthode 3: Si toujours rien, extraire d'autres informations pertinentes qui pourraient indiquer une machine
+        if not real_host_name and 'evidenceDetails' in problem:
+            for evidence in problem.get('evidenceDetails', []):
+                if evidence.get('entityType', '').lower() == 'host':
+                    real_host_name = evidence.get('displayName', '')
+                    logger.info(f"Machine trouvée dans evidenceDetails: {real_host_name}")
+                    break
+        
+        # Si aucune machine réelle n'est trouvée, on peut essayer d'identifier les cas particuliers
+        if not real_host_name:
+            logger.info(f"Aucune machine réelle trouvée pour le problème {problem.get('problemId')}")
+        
         return {
             'id': problem.get('problemId', 'Unknown'),
             'title': problem.get('title', 'Problème inconnu'),
@@ -1281,8 +1313,9 @@ class OptimizedAPIClient:
             'duration': duration_display,  # Ajout de la durée du problème
             'dt_url': f"{self.env_url}/#problems/problemdetails;pid={problem.get('problemId', 'Unknown')}",
             'zone': zone or self._extract_problem_zone(problem),
-            'resolved': is_resolved
-    }
+            'resolved': is_resolved,
+            'real_host': real_host_name  # Nouveau champ avec le vrai nom de la machine
+        }
         
     def _extract_problem_zone(self, problem):
         """Extrait la zone principale d'un problème"""
