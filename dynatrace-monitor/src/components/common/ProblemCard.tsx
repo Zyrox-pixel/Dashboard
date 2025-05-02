@@ -117,7 +117,9 @@ const ProblemCard: React.FC<ProblemCardProps> = ({ problem }) => {
           </span>
         </div>
         <a 
-          href="#" 
+          href={problem.dt_url || "#"} 
+          target="_blank"
+          rel="noopener noreferrer"
           className={`flex items-center gap-1 text-xs ${
             isResolved
               ? 'text-green-400 hover:text-green-300 dark:text-green-400 dark:hover:text-green-300'
