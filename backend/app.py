@@ -231,6 +231,7 @@ def get_problems():
             
             # Logs pour debug
             logger.info(f"Variable MZ utilisée: {mz_list_var}, Valeur: {mz_string}")
+            logger.info(f"Requête pour le type de dashboard {dashboard_type} avec status={status}, convertit en use_status={use_status}")
             
             if mz_string:
                 mz_list = [mz.strip() for mz in mz_string.split(',')]
@@ -247,7 +248,7 @@ def get_problems():
                     if use_status is not None:
                         params["status"] = use_status
                         
-                    logger.info(f"Tentative de récupération de tous les problèmes avec params: {params}")
+                    logger.info(f"Tentative de récupération de tous les problèmes avec params: {params}, dashboard_type: {dashboard_type}, mz_list: {mz_list}")
                     
                     all_problems_data = api_client.query_api(
                         endpoint="problems",

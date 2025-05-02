@@ -20,12 +20,13 @@ const RecentProblemsPage: React.FC = () => {
   useEffect(() => {
     // Utiliser un flag pour éviter les boucles infinies
     const loadOnce = async () => {
+      console.log(`Loading recent problems with dashboard type: ${dashboardType}`);
       await refreshData(dashboardType as 'vfg' | 'vfe');
     };
     
     loadOnce();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [dashboardType]);
   
   // Navigation retour vers le bon tableau de bord
   const handleBackClick = () => {

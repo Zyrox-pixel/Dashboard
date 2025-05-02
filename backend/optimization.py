@@ -1049,7 +1049,7 @@ class OptimizedAPIClient:
                 params["status"] = status
                 
             # Déboguer les paramètres
-            logger.info(f"Requête problèmes avec paramètres: {params}")
+            logger.info(f"Requête problèmes avec paramètres: {params}, mz_name: {mz_name}")
             
             problems_data = self.query_api(
                 endpoint="problems",

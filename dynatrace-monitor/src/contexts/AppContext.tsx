@@ -380,6 +380,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
       }
       
       // Exécuter plusieurs requêtes en parallèle
+      console.log(`Loading data for dashboard type: ${dashboardType}`);
       const [summaryResponse, vfgResponse, vfeResponse, problemsResponse, problemsLast72hResponse] = await Promise.all([
         apiClient.getSummary(),
         apiClient.getVitalForGroupMZs(),
@@ -387,6 +388,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
         apiClient.getProblems("OPEN", "-24h", dashboardType),  // Problèmes actifs
         apiClient.getProblems("ALL", "-72h", dashboardType)   // TOUS les problèmes des 72 dernières heures sans filtrage de statut
       ]);
+      console.log('Réponse problèmes 72h (dashboard type):', dashboardType, problemsLast72hResponse);
       console.log('Réponse problèmes 72h:', problemsLast72hResponse);
 
       
