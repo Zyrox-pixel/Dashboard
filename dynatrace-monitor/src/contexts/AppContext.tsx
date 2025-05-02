@@ -421,7 +421,8 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
 
       // Traiter les données du résumé si disponibles et si ce n'est pas un rafraîchissement des problèmes uniquement
       if (!refreshProblemsOnly && summaryResponse && !summaryResponse.error && summaryResponse.data) {
-        setState(prev => ({ ...prev, summaryData: summaryResponse.data as SummaryData }));
+        const data = summaryResponse.data;
+        setState(prev => ({ ...prev, summaryData: data as SummaryData }));
       }
       
       // Traiter les données des MZs VFG et VFE si ce n'est pas un rafraîchissement des problèmes uniquement
