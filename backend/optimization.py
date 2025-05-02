@@ -1257,14 +1257,18 @@ class OptimizedAPIClient:
             end_time_str = end_time_local.strftime('%Y-%m-%d %H:%M')
             logger.info(f"Problème {problem.get('problemId')}: fin_timestamp={end_time_ms}, fin_formatée={end_time_str}")
         
-        # Déterminer la durée au format lisible
+        # Déterminer la durée au format lisible (en jours plutôt qu'en heures)
         duration_display = ""
         if duration_sec < 60:
             duration_display = f"{int(duration_sec)}s"
         elif duration_sec < 3600:
             duration_display = f"{int(duration_sec / 60)}m"
-        else:
+        elif duration_sec < 86400:  # Moins d'un jour
             duration_display = f"{int(duration_sec / 3600)}h {int((duration_sec % 3600) / 60)}m"
+        else:  # Plus d'un jour
+            days = int(duration_sec / 86400)
+            hours = int((duration_sec % 86400) / 3600)
+            duration_display = f"{days}j {hours}h"
             
         return {
             'id': problem.get('problemId', 'Unknown'),
