@@ -17,7 +17,39 @@ const ProblemCard: React.FC<ProblemCardProps> = ({ problem }) => {
   const isResolved = problem.resolved || false;
 
   // Extraire les informations sur la machine/hôte
-  const hostInfo = problem.host || problem.subtitle?.split('-')[0]?.trim() || 'Non spécifié';
+  // Déterminer intelligemment l'hôte à partir des informations disponibles
+  const getHostInfo = () => {
+    // Si le champ host est explicitement défini
+    if (problem.host) {
+      return `HOST: ${problem.host}`;
+    }
+    
+    // Extraire l'hôte du titre si possible
+    if (problem.title && problem.title.toLowerCase().includes('host')) {
+      const words = problem.title.split(' ');
+      const hostIndex = words.findIndex(word => word.toLowerCase() === 'host');
+      if (hostIndex !== -1 && hostIndex < words.length - 1) {
+        return `HOST: ${words[hostIndex + 1]}`;
+      }
+    }
+    
+    // Analyser si le type de problème est lié à l'infrastructure
+    if (problem.type && problem.type.toLowerCase().includes('infrastructure')) {
+      // Essayer d'extraire l'information de l'hôte depuis le titre
+      const titleParts = problem.title.split(' ');
+      const lastPart = titleParts[titleParts.length - 1];
+      
+      // Si la dernière partie ressemble à un nom d'hôte (contient des caractères spéciaux typiques)
+      if (lastPart && (lastPart.includes('-') || lastPart.includes('.'))) {
+        return `HOST: ${lastPart}`;
+      }
+    }
+    
+    // Par défaut, afficher la zone/environnement comme information de contexte
+    return `Environnement: ${problem.zone}`;
+  };
+  
+  const hostInfo = getHostInfo();
   
   // Extraire la date du problème pour l'affichage
   const startDate = problem.time?.replace('Depuis ', '') || '';
@@ -128,6 +160,21 @@ const ProblemCard: React.FC<ProblemCardProps> = ({ problem }) => {
                 <div className="text-xs uppercase text-slate-400">TYPE DE PROBLÈME</div>
               </div>
               <div className="text-sm text-slate-300">{problem.type}</div>
+            </div>
+            
+            {/* Hôte/Machine affecté */}
+            <div className="bg-slate-800/80 rounded p-2 border border-slate-700">
+              <div className="flex items-center gap-1 mb-1">
+                <Server size={14} className="text-blue-400" />
+                <div className="text-xs uppercase text-slate-400">MACHINE AFFECTÉE</div>
+              </div>
+              <div className="text-sm text-slate-300">
+                {problem.host ? (
+                  <span className="font-medium text-blue-300">{problem.host}</span>
+                ) : (
+                  <span className="text-slate-400">Non spécifié</span>
+                )}
+              </div>
             </div>
             
             {/* Zone affectée */}

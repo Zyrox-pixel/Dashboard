@@ -479,21 +479,35 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
         
         if (Array.isArray(problemsData)) {
           // Transformer les données
-          const problems: Problem[] = problemsData.map((problem) => ({
-            id: problem.id || `PROB-${Math.random().toString(36).substr(2, 9)}`,
-            title: problem.title || "Problème inconnu",
-            code: problem.id ? problem.id.substring(0, 7) : "UNKNOWN",
-            subtitle: `${problem.zone || "Non spécifié"} - Impact: ${problem.impact || "INCONNU"}`,
-            time: problem.start_time ? `Depuis ${problem.start_time}` : "Récent",
-            type: "Problème Dynatrace",
-            status: problem.status === "OPEN" ? "critical" : "warning",
-            impact: problem.impact === "INFRASTRUCTURE" ? "ÉLEVÉ" : problem.impact === "SERVICE" ? "MOYEN" : "FAIBLE",
-            zone: problem.zone || "Non spécifié",
-            servicesImpacted: problem.affected_entities ? problem.affected_entities.toString() : "0",
-            dt_url: problem.dt_url || "#",
-            duration: problem.duration || "",
-            resolved: problem.resolved || false
-          }));
+          const problems: Problem[] = problemsData.map((problem) => {
+            // Extraire le nom de l'hôte à partir du titre si possible
+            let hostName = '';
+            if (problem.title && problem.title.toLowerCase().includes('host')) {
+              const words = problem.title.split(' ');
+              // On prend le mot après "host" s'il existe
+              const hostIndex = words.findIndex(word => word.toLowerCase() === 'host');
+              if (hostIndex !== -1 && hostIndex < words.length - 1) {
+                hostName = words[hostIndex + 1];
+              }
+            }
+            
+            return {
+              id: problem.id || `PROB-${Math.random().toString(36).substr(2, 9)}`,
+              title: problem.title || "Problème inconnu",
+              code: problem.id ? problem.id.substring(0, 7) : "UNKNOWN",
+              subtitle: `${problem.zone || "Non spécifié"} - Impact: ${problem.impact || "INCONNU"}`,
+              time: problem.start_time ? `Depuis ${problem.start_time}` : "Récent",
+              type: problem.impact === "INFRASTRUCTURE" ? "Problème d'Infrastructure" : "Problème de Service",
+              status: problem.status === "OPEN" ? "critical" : "warning",
+              impact: problem.impact === "INFRASTRUCTURE" ? "ÉLEVÉ" : problem.impact === "SERVICE" ? "MOYEN" : "FAIBLE",
+              zone: problem.zone || "Non spécifié",
+              servicesImpacted: problem.affected_entities ? problem.affected_entities.toString() : "0",
+              dt_url: problem.dt_url || "#",
+              duration: problem.duration || "",
+              resolved: problem.resolved || false,
+              host: hostName // Ajouter le nom de l'hôte extrait
+            };
+          });
           
           setState(prev => ({ ...prev, activeProblems: problems }));
           
@@ -537,21 +551,35 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
         
         if (Array.isArray(problemsData)) {
           // Transformer les données
-          const problems: Problem[] = problemsData.map((problem) => ({
-            id: problem.id || `PROB-${Math.random().toString(36).substr(2, 9)}`,
-            title: problem.title || "Problème résolu",
-            code: problem.id ? problem.id.substring(0, 7) : "UNKNOWN",
-            subtitle: `${problem.zone || "Non spécifié"} - Impact: ${problem.impact || "INCONNU"}`,
-            time: problem.start_time ? `Détecté le ${problem.start_time}` : "Récent",
-            type: "Problème Dynatrace",
-            status: "warning", // Tous les problèmes sur 72h ont un statut visuel warning
-            impact: problem.impact === "INFRASTRUCTURE" ? "ÉLEVÉ" : problem.impact === "SERVICE" ? "MOYEN" : "FAIBLE",
-            zone: problem.zone || "Non spécifié",
-            servicesImpacted: problem.affected_entities ? problem.affected_entities.toString() : "0",
-            dt_url: problem.dt_url || "#",
-            duration: problem.duration || "",
-            resolved: problem.resolved || false
-          }));
+          const problems: Problem[] = problemsData.map((problem) => {
+            // Extraire le nom de l'hôte à partir du titre si possible
+            let hostName = '';
+            if (problem.title && problem.title.toLowerCase().includes('host')) {
+              const words = problem.title.split(' ');
+              // On prend le mot après "host" s'il existe
+              const hostIndex = words.findIndex(word => word.toLowerCase() === 'host');
+              if (hostIndex !== -1 && hostIndex < words.length - 1) {
+                hostName = words[hostIndex + 1];
+              }
+            }
+            
+            return {
+              id: problem.id || `PROB-${Math.random().toString(36).substr(2, 9)}`,
+              title: problem.title || "Problème résolu",
+              code: problem.id ? problem.id.substring(0, 7) : "UNKNOWN",
+              subtitle: `${problem.zone || "Non spécifié"} - Impact: ${problem.impact || "INCONNU"}`,
+              time: problem.start_time ? `Détecté le ${problem.start_time}` : "Récent",
+              type: problem.impact === "INFRASTRUCTURE" ? "Problème d'Infrastructure" : "Problème de Service",
+              status: "warning", // Tous les problèmes sur 72h ont un statut visuel warning
+              impact: problem.impact === "INFRASTRUCTURE" ? "ÉLEVÉ" : problem.impact === "SERVICE" ? "MOYEN" : "FAIBLE",
+              zone: problem.zone || "Non spécifié",
+              servicesImpacted: problem.affected_entities ? problem.affected_entities.toString() : "0",
+              dt_url: problem.dt_url || "#",
+              duration: problem.duration || "",
+              resolved: problem.resolved || false,
+              host: hostName // Ajouter le nom de l'hôte extrait
+            };
+          });
           
           console.log(`Problèmes 72h transformés: ${problems.length}`);
           setState(prev => ({ ...prev, problemsLast72h: problems }));
