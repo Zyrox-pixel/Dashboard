@@ -217,19 +217,27 @@ def get_problems():
         time_from = request.args.get('from', '-24h')  # Par défaut "-24h"
         dashboard_type = request.args.get('type', '')  # Pour identifier VFG ou VFE
         
+        # Débogage approfondi - à activer temporairement
+        debug_mode = request.args.get('debug', 'false').lower() == 'true'
+        
         # Créer une clé de cache unique qui inclut tous les paramètres
         specific_cache_key = f"problems:{get_current_mz()}:{time_from}:{status}:{dashboard_type}"
         
-        # Si nous avons déjà cette requête en cache, retourner les données
-        cached_data = api_client.get_cached(specific_cache_key)
-        if cached_data is not None:
-            return cached_data
+        # Si le mode debug est activé, vider le cache pour cette requête
+        if debug_mode:
+            api_client.cache.pop(specific_cache_key, None)
+            logger.info(f"Mode debug activé, cache vidé pour la clé: {specific_cache_key}")
+        else:
+            # Si nous avons déjà cette requête en cache, retourner les données
+            cached_data = api_client.get_cached(specific_cache_key)
+            if cached_data is not None:
+                return cached_data
             
         # Déterminer le statut à utiliser (NULL si ALL)
         use_status = None if status == 'ALL' else status
         
         # Log pour debug
-        logger.info(f"Requête problèmes: status={status}, time_from={time_from}, dashboard_type={dashboard_type}")
+        logger.info(f"Requête problèmes: status={status}, time_from={time_from}, dashboard_type={dashboard_type}, debug={debug_mode}")
         
         # Si un type de dashboard est spécifié (vfg ou vfe)
         if dashboard_type in ['vfg', 'vfe']:
@@ -254,6 +262,11 @@ def get_problems():
                     mz_problems = api_client.get_problems_filtered(mz_name, time_from, use_status)
                     logger.info(f"MZ {mz_name}: {len(mz_problems)} problèmes trouvés")
                     
+                    # Ajouter le champ 'resolved' pour les requêtes ALL
+                    for problem in mz_problems:
+                        if status == 'ALL' and 'resolved' not in problem:
+                            problem['resolved'] = problem.get('status') != 'OPEN'
+                    
                     all_problems.extend(mz_problems)
                 except Exception as mz_error:
                     logger.error(f"Erreur lors de la récupération des problèmes pour MZ {mz_name}: {mz_error}")
@@ -264,12 +277,14 @@ def get_problems():
             for problem in all_problems:
                 if problem['id'] not in problem_ids:
                     problem_ids.add(problem['id'])
-                    # Ajouter le champ 'resolved' pour les requêtes ALL
-                    if status == 'ALL' and 'resolved' not in problem:
-                        problem['resolved'] = problem.get('status') != 'OPEN'
                     unique_problems.append(problem)
             
             logger.info(f"Récupéré {len(unique_problems)} problèmes uniques pour {dashboard_type.upper()} (timeframe: {time_from}, status: {status})")
+            
+            # En mode debug, afficher les problèmes pour investigation
+            if debug_mode:
+                for i, prob in enumerate(unique_problems):
+                    logger.info(f"Problème {i+1}: {prob['id']} - {prob['title']} - Status: {prob['status']} - Resolved: {prob.get('resolved', False)}")
             
             # Mettre en cache le résultat avec la clé spécifique
             api_client.set_cache(specific_cache_key, unique_problems)
@@ -283,6 +298,11 @@ def get_problems():
             
             # Utiliser la méthode optimisée pour récupérer les problèmes filtrés
             problems = api_client.get_problems_filtered(current_mz, time_from, use_status)
+            
+            # En mode debug, afficher les problèmes pour investigation
+            if debug_mode:
+                for i, prob in enumerate(problems):
+                    logger.info(f"Problème {i+1}: {prob['id']} - {prob['title']} - Status: {prob['status']} - Resolved: {prob.get('resolved', False)}")
             
             # Mettre en cache le résultat avec la clé spécifique
             api_client.set_cache(specific_cache_key, problems)
@@ -552,7 +572,7 @@ def get_status():
         'version': '1.1.0',
         'optimized': True
     })
-    
+
 @app.route('/api/refresh/<cache_type>', methods=['POST'])
 def refresh_cache(cache_type):
     if cache_type not in ['services', 'hosts', 'process_groups', 'problems', 'summary', 'all', 'purge']:
