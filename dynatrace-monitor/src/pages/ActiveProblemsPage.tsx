@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../contexts/AppContext';
 import Layout from '../components/layout/Layout';
@@ -10,7 +10,13 @@ import { ChevronLeft, AlertTriangle } from 'lucide-react';
  */
 const ActiveProblemsPage: React.FC = () => {
   const navigate = useNavigate();
-  const { activeProblems, isLoading } = useApp();
+  const { activeProblems, isLoading, refreshData } = useApp();
+  
+  // Forcer le rafraîchissement des problèmes actifs lors du chargement de la page
+  useEffect(() => {
+    console.log("Active Problems Page: Refreshing data...");
+    refreshData();
+  }, [refreshData]);
   
   // Navigation retour vers le tableau de bord
   const handleBackClick = () => {
