@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertTriangle, ExternalLink } from 'lucide-react';
+import { AlertTriangle, ExternalLink, CheckCircle } from 'lucide-react';
 import { Problem } from '../../api/types';
 
 interface ProblemCardProps {
@@ -7,17 +7,30 @@ interface ProblemCardProps {
 }
 
 const ProblemCard: React.FC<ProblemCardProps> = ({ problem }) => {
+  // Vérifier si le problème est résolu (nouveau champ ajouté)
+  const isResolved = problem.resolved || false;
+  
   return (
     <div className="relative mb-3 rounded-md overflow-hidden border border-slate-700 bg-slate-800 dark:bg-slate-800 dark:border-slate-700">
-      <div className="absolute top-0 left-0 w-1 h-full bg-red-500"></div>
+      <div className={`absolute top-0 left-0 w-1 h-full ${isResolved ? 'bg-green-500' : 'bg-red-500'}`}></div>
       
       <div className="flex justify-between items-center py-3 px-4 border-b border-slate-700 dark:border-slate-700">
         <div className="flex items-center gap-3">
-          <AlertTriangle className="text-red-500" size={18} />
+          {isResolved ? (
+            <CheckCircle className="text-green-500" size={18} />
+          ) : (
+            <AlertTriangle className="text-red-500" size={18} />
+          )}
           <div>
             <div className="font-medium text-white flex items-center gap-2 dark:text-white">
               {problem.title}
-              <span className="text-xs px-2 py-0.5 rounded bg-red-900/50 text-red-400 border border-red-500/30 dark:bg-red-900/50 dark:text-red-400 dark:border-red-500/30">{problem.code}</span>
+              <span className={`text-xs px-2 py-0.5 rounded ${
+                isResolved 
+                  ? 'bg-green-900/50 text-green-400 border border-green-500/30' 
+                  : 'bg-red-900/50 text-red-400 border border-red-500/30'
+              } dark:${isResolved ? 'bg-green-900/50 text-green-400 border-green-500/30' : 'bg-red-900/50 text-red-400 border-red-500/30'}`}>
+                {problem.code}
+              </span>
             </div>
             <div className="text-xs text-slate-400 dark:text-slate-400">{problem.subtitle}</div>
           </div>
@@ -105,7 +118,11 @@ const ProblemCard: React.FC<ProblemCardProps> = ({ problem }) => {
         </div>
         <a 
           href="#" 
-          className="flex items-center gap-1 text-xs text-red-400 hover:text-red-300 dark:text-red-400 dark:hover:text-red-300"
+          className={`flex items-center gap-1 text-xs ${
+            isResolved
+              ? 'text-green-400 hover:text-green-300 dark:text-green-400 dark:hover:text-green-300'
+              : 'text-red-400 hover:text-red-300 dark:text-red-400 dark:hover:text-red-300'
+          }`}
         >
           <ExternalLink size={12} />
           Détails du problème

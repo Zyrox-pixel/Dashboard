@@ -1022,85 +1022,90 @@ class OptimizedAPIClient:
         
         return host_metrics
 
-    def get_problems_filtered(self, mz_name=None, time_from="-24h", status="OPEN"):
-        """
-        Récupère et filtre les problèmes pour une management zone spécifique
+def get_problems_filtered(self, mz_name=None, time_from="-24h", status="OPEN"):
+    """
+    Récupère et filtre les problèmes pour une management zone spécifique
+    
+    Args:
+        mz_name (str): Nom de la Management Zone (None pour toutes)
+        time_from (str): Période de temps (ex: "-24h")
+        status (str): Statut des problèmes ("OPEN", "CLOSED", etc.)
         
-        Args:
-            mz_name (str): Nom de la Management Zone (None pour toutes)
-            time_from (str): Période de temps (ex: "-24h")
-            status (str): Statut des problèmes ("OPEN", "CLOSED", etc.)
-            
-        Returns:
-            list: Liste des problèmes filtrés
-        """
-        cache_key = f"problems:{mz_name}:{time_from}:{status}"
-        cached_data = self.get_cached(cache_key)
-        if cached_data is not None:
-            return cached_data
+    Returns:
+        list: Liste des problèmes filtrés
+    """
+    cache_key = f"problems:{mz_name}:{time_from}:{status}"
+    cached_data = self.get_cached(cache_key)
+    if cached_data is not None:
+        return cached_data
+    
+    try:
+        # Récupérer tous les problèmes sans filtrer par MZ via l'API
+        params = {"from": time_from}
         
-        try:
-            # Récupérer tous les problèmes sans filtrer par MZ via l'API
-            params = {"from": time_from}
+        # Ajouter le statut seulement s'il est spécifié
+        if status is not None:
+            params["status"] = status
             
-            # Ajouter le statut seulement s'il est spécifié
-            if status is not None:
-                params["status"] = status
-                
-            problems_data = self.query_api(
-                endpoint="problems",
-                params=params,
-                use_cache=False
-            )
+        problems_data = self.query_api(
+            endpoint="problems",
+            params=params,
+            use_cache=False
+        )
+        
+        active_problems = []
+        if 'problems' in problems_data:
+            total_problems = len(problems_data['problems'])
+            logger.info(f"Nombre total de problèmes récupérés: {total_problems}")
             
-            active_problems = []
-            if 'problems' in problems_data:
-                total_problems = len(problems_data['problems'])
-                logger.info(f"Nombre total de problèmes récupérés: {total_problems}")
+            # On va filtrer manuellement les problèmes liés à notre Management Zone
+            mz_problems = 0
+            for problem in problems_data['problems']:
+                # Si status est None (ALL), on accepte tous les problèmes
+                # Si status est spécifié, on ne garde que les problèmes ayant ce statut
+                if status is not None and problem.get('status') != status:
+                    continue
+                    
+                # Si aucune MZ n'est spécifiée, inclure tous les problèmes
+                if mz_name is None:
+                    active_problems.append(self._format_problem(problem))
+                    continue
                 
-                # On va filtrer manuellement les problèmes liés à notre Management Zone
-                mz_problems = 0
-                for problem in problems_data['problems']:
-                    # Si aucune MZ n'est spécifiée, inclure tous les problèmes
-                    if mz_name is None:
-                        active_problems.append(self._format_problem(problem))
-                        continue
-                    
-                    # Vérifier si le problème est lié à notre Management Zone
-                    is_in_mz = False
-                    
-                    # Rechercher dans les management zones directement attachées au problème
-                    if 'managementZones' in problem:
-                        for mz in problem.get('managementZones', []):
+                # Vérifier si le problème est lié à notre Management Zone
+                is_in_mz = False
+                
+                # Rechercher dans les management zones directement attachées au problème
+                if 'managementZones' in problem:
+                    for mz in problem.get('managementZones', []):
+                        if mz.get('name') == mz_name:
+                            is_in_mz = True
+                            break
+                
+                # Rechercher aussi dans les entités affectées
+                if not is_in_mz:
+                    for entity in problem.get('affectedEntities', []):
+                        # Vérifier les management zones de chaque entité affectée
+                        for mz in entity.get('managementZones', []):
                             if mz.get('name') == mz_name:
                                 is_in_mz = True
                                 break
-                    
-                    # Rechercher aussi dans les entités affectées
-                    if not is_in_mz:
-                        for entity in problem.get('affectedEntities', []):
-                            # Vérifier les management zones de chaque entité affectée
-                            for mz in entity.get('managementZones', []):
-                                if mz.get('name') == mz_name:
-                                    is_in_mz = True
-                                    break
-                            if is_in_mz:
-                                break
-                    
-                    # Si le problème est dans notre MZ, l'ajouter à notre liste
-                    if is_in_mz:
-                        mz_problems += 1
-                        active_problems.append(self._format_problem(problem, mz_name))
+                        if is_in_mz:
+                            break
                 
-                if mz_name:
-                    logger.info(f"Problèmes filtrés appartenant à {mz_name}: {mz_problems}/{total_problems}")
+                # Si le problème est dans notre MZ, l'ajouter à notre liste
+                if is_in_mz:
+                    mz_problems += 1
+                    active_problems.append(self._format_problem(problem, mz_name))
             
-            self.set_cache(cache_key, active_problems)
-            return active_problems
-            
-        except Exception as e:
-            logger.error(f"Erreur lors de la récupération des problèmes: {e}")
-            return []
+            if mz_name:
+                logger.info(f"Problèmes filtrés appartenant à {mz_name}: {mz_problems}/{total_problems}")
+        
+        self.set_cache(cache_key, active_problems)
+        return active_problems
+        
+    except Exception as e:
+        logger.error(f"Erreur lors de la récupération des problèmes: {e}")
+        return []
     
     def _format_problem(self, problem, zone=None):
         """Formate un problème pour la réponse API"""

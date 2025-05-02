@@ -20,6 +20,7 @@ export interface Problem {
   status: 'low' | 'warning' | 'critical';
   zone: string;
   dt_url?: string;
+  resolved?: boolean; // Nouveau champ pour distinguer les problèmes résolus
 }
 
 // Types pour les management zones

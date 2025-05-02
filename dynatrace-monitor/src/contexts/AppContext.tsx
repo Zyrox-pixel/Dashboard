@@ -384,8 +384,8 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
         apiClient.getSummary(),
         apiClient.getVitalForGroupMZs(),
         apiClient.getVitalForEntrepriseMZs(),
-        apiClient.getProblems("OPEN", "-24h", dashboardType),  // Problèmes actifs
-        apiClient.getProblems("ALL", "-72h", dashboardType) // Tous les problèmes des 72 dernières heures
+        apiClient.getProblems("OPEN", "-24h", dashboardType),  // Problèmes actifs uniquement
+        apiClient.getProblems("CLOSED", "-72h", dashboardType) // Problèmes fermés des 72 dernières heures
       ]);
       
       // Traiter les données du résumé
@@ -504,11 +504,12 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
             subtitle: `${problem.zone || "Non spécifié"} - Impact: ${problem.impact || "INCONNU"}`,
             time: problem.start_time ? `Résolu le ${problem.start_time}` : "Récent",
             type: "Problème Dynatrace",
-            status: "warning", // Différent des problèmes actifs qui sont "critical"
+            status: "warning", // Tous les problèmes fermés sont en warning
             impact: problem.impact === "INFRASTRUCTURE" ? "ÉLEVÉ" : problem.impact === "SERVICE" ? "MOYEN" : "FAIBLE",
             zone: problem.zone || "Non spécifié",
             servicesImpacted: problem.affected_entities ? problem.affected_entities.toString() : "0",
-            dt_url: problem.dt_url || "#"
+            dt_url: problem.dt_url || "#",
+            resolved: true // Nouveau champ pour distinguer les problèmes résolus
           }));
           
           setState(prev => ({ ...prev, problemsLast72h: problems }));
