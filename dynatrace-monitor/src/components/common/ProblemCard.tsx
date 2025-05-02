@@ -16,7 +16,7 @@ const ProblemCard: React.FC<ProblemCardProps> = ({ problem }) => {
   // Vérifier si le problème est résolu
   const isResolved = problem.resolved || false;
 
-  // Extraire les informations sur la machine/hôte avec une méthode plus restrictive
+  // Extraire les informations sur l'entité impactée (hôte, service, etc.) 
   const getHostInfo = (problem: Problem): string => {
     console.log('Debugging problem data for host extraction:', problem.id);
     
@@ -108,12 +108,20 @@ const ProblemCard: React.FC<ProblemCardProps> = ({ problem }) => {
       return problem.host;
     }
     
-    // PRIORITÉ 3: Utiliser impactedEntities s'il existe et contient des entités HOST
+    // PRIORITÉ 3: Utiliser impactedEntities s'il existe et contient des entités
     if (problem.impactedEntities && Array.isArray(problem.impactedEntities)) {
       for (const entity of problem.impactedEntities) {
-        // Vérifier si c'est une entité de type HOST
+        // Vérifier d'abord si c'est un HOST (priorité la plus élevée)
         if (entity.entityId && entity.entityId.type === 'HOST' && entity.name) {
-          console.log('Found host in impactedEntities:', entity.name);
+          console.log('Found HOST in impactedEntities:', entity.name);
+          return entity.name;
+        }
+      }
+      
+      // Si aucun HOST n'est trouvé, chercher d'autres types d'entités (SERVICE, PROCESS_GROUP, etc.)
+      for (const entity of problem.impactedEntities) {
+        if (entity.entityId && entity.name) {
+          console.log(`Found ${entity.entityId.type} in impactedEntities:`, entity.name);
           return entity.name;
         }
       }
@@ -254,11 +262,11 @@ const ProblemCard: React.FC<ProblemCardProps> = ({ problem }) => {
       
       {/* Deuxième ligne: informations sur la machine et la durée - Toujours visible */}
       <div className="flex flex-wrap items-center justify-between py-2 px-4 bg-slate-800/60 border-b border-slate-700">
-        {/* Informations sur la machine */}
+        {/* Informations sur l'entité impactée */}
         <div className="flex items-center gap-1 text-sm">
           <Server size={14} className="text-blue-400" />
-          <span className="text-blue-300 font-medium mr-1">Machine:</span>
-          <span className="text-slate-300">{hostInfo}</span>
+          <span className="text-blue-300 font-medium mr-1">Entité impactée:</span>
+          <span className="text-slate-300">{hostInfo !== "Non spécifié" ? hostInfo : "Non spécifiée"}</span>
         </div>
         
         {/* Durée du problème */}
@@ -289,7 +297,7 @@ const ProblemCard: React.FC<ProblemCardProps> = ({ problem }) => {
             <div className="bg-slate-800/80 rounded p-2 border border-slate-700">
               <div className="flex items-center gap-1 mb-1">
                 <Server size={14} className="text-blue-400" />
-                <div className="text-xs uppercase text-slate-400">MACHINE AFFECTÉE</div>
+                <div className="text-xs uppercase text-slate-400">ENTITÉ IMPACTÉE</div>
               </div>
               <div className="text-sm text-slate-300">
                 {hostInfo ? (
