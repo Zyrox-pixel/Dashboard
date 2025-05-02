@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useApp } from '../contexts/AppContext';
 import Layout from '../components/layout/Layout';
 import ProblemsList from '../components/dashboard/ProblemsList';
-import { ChevronLeft, Clock, CheckCircle } from 'lucide-react';
+import { ChevronLeft, Clock } from 'lucide-react';
 
 /**
  * Page dédiée à l'affichage des problèmes des dernières 72 heures
@@ -34,8 +34,8 @@ const RecentProblemsPage: React.FC = () => {
 
   // Déterminer le titre en fonction du type de dashboard
   const title = dashboardType === 'vfg' 
-    ? "Problèmes Résolus (72h) - Vital for Group" 
-    : "Problèmes Résolus (72h) - Vital for Entreprise";
+    ? "Tous les problèmes (72h) - Vital for Group" 
+    : "Tous les problèmes (72h) - Vital for Entreprise";
   
   return (
     <Layout title={title}>
@@ -50,18 +50,18 @@ const RecentProblemsPage: React.FC = () => {
         </button>
 
         {/* En-tête de la page */}
-        <div className="p-4 bg-green-900/20 border border-green-800 rounded-lg mb-6">
+        <div className="p-4 bg-amber-900/20 border border-amber-800 rounded-lg mb-6">
           <div className="flex items-start gap-4">
-            <CheckCircle className="text-green-500" size={24} />
+            <Clock className="text-amber-500" size={24} />
             <div>
               <h2 className="text-lg font-semibold text-white mb-1">
-                Problèmes Résolus des 72 dernières heures
+                Tous les problèmes des 72 dernières heures
               </h2>
               <p className="text-slate-300">
-                Liste des incidents résolus survenus au cours des 72 dernières heures
+                Liste complète de tous les incidents survenus au cours des 72 dernières heures
               </p>
             </div>
-            <div className="ml-auto flex items-center justify-center w-10 h-10 rounded-full bg-green-950 text-white font-bold">
+            <div className="ml-auto flex items-center justify-center w-10 h-10 rounded-full bg-amber-950 text-white font-bold">
               {problemsLast72h ? problemsLast72h.length : 0}
             </div>
           </div>
@@ -70,14 +70,22 @@ const RecentProblemsPage: React.FC = () => {
         {/* Section des problèmes */}
         {isLoading.problems ? (
           <div className="flex items-center justify-center h-64">
-            <div className="w-12 h-12 border-t-4 border-b-4 border-green-500 rounded-full animate-spin"></div>
-            <span className="ml-3 text-slate-400">Chargement des problèmes résolus...</span>
+            <div className="w-12 h-12 border-t-4 border-b-4 border-amber-500 rounded-full animate-spin"></div>
+            <span className="ml-3 text-slate-400">Chargement des problèmes...</span>
           </div>
-        ) : (
+        ) : problemsLast72h && problemsLast72h.length > 0 ? (
           <ProblemsList 
-            problems={problemsLast72h || []} 
-            title="Problèmes résolus des dernières 72h"
+            problems={problemsLast72h} 
+            title="Tous les problèmes des dernières 72h"
           />
+        ) : (
+          <div className="p-6 rounded-lg bg-slate-800 border border-slate-700 text-center">
+            <Clock className="w-12 h-12 text-amber-500 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold mb-2">Aucun problème sur les 72 dernières heures</h3>
+            <p className="text-slate-400">
+              Aucun incident n'a été détecté pour cette période. Tout fonctionne normalement.
+            </p>
+          </div>
         )}
       </div>
     </Layout>

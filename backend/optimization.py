@@ -1022,6 +1022,7 @@ class OptimizedAPIClient:
         
         return host_metrics
 
+
 def get_problems_filtered(self, mz_name=None, time_from="-24h", status="OPEN"):
     """
     Récupère et filtre les problèmes pour une management zone spécifique
@@ -1043,29 +1044,28 @@ def get_problems_filtered(self, mz_name=None, time_from="-24h", status="OPEN"):
         # Récupérer tous les problèmes sans filtrer par MZ via l'API
         params = {"from": time_from}
         
-        # Ajouter le statut seulement s'il est spécifié
-        if status is not None:
+        # Ajouter le statut seulement s'il est spécifié ET n'est pas ALL
+        if status is not None and status != "ALL":
             params["status"] = status
             
+        # Déboguer les paramètres
+        logger.info(f"Requête problèmes avec paramètres: {params}")
+        
         problems_data = self.query_api(
             endpoint="problems",
             params=params,
             use_cache=False
         )
         
+        # Déboguer les résultats
+        total_problems = len(problems_data.get('problems', [])) if 'problems' in problems_data else 0
+        logger.info(f"Nombre total de problèmes récupérés: {total_problems} (statut:{status}, période:{time_from})")
+        
         active_problems = []
         if 'problems' in problems_data:
-            total_problems = len(problems_data['problems'])
-            logger.info(f"Nombre total de problèmes récupérés: {total_problems}")
-            
             # On va filtrer manuellement les problèmes liés à notre Management Zone
             mz_problems = 0
             for problem in problems_data['problems']:
-                # Si status est None (ALL), on accepte tous les problèmes
-                # Si status est spécifié, on ne garde que les problèmes ayant ce statut
-                if status is not None and problem.get('status') != status:
-                    continue
-                    
                 # Si aucune MZ n'est spécifiée, inclure tous les problèmes
                 if mz_name is None:
                     active_problems.append(self._format_problem(problem))
