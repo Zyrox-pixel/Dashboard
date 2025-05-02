@@ -220,109 +220,88 @@ def get_problems():
         # Si le statut est ALL, on récupère tous les problèmes sans filtre de statut
         use_status = None if status == 'ALL' else status
         
-        # Log pour debug
+        # Log détaillé pour debug
         logger.info(f"Requête problèmes: status={status}, time_from={time_from}, dashboard_type={dashboard_type}")
         
-        # Si un type de dashboard est spécifié
-        if dashboard_type == 'vfg' or dashboard_type == 'vfe':
-            # Récupérer toutes les MZs de ce type
+        # Si un type de dashboard est spécifié (vfg ou vfe)
+        if dashboard_type in ['vfg', 'vfe']:
+            # Récupérer toutes les MZs selon le type de dashboard
             mz_list_var = 'VFG_MZ_LIST' if dashboard_type == 'vfg' else 'VFE_MZ_LIST'
             mz_string = os.environ.get(mz_list_var, '')
             
-            # Logs pour debug
-            logger.info(f"Variable MZ utilisée: {mz_list_var}, Valeur: {mz_string}")
-            logger.info(f"Requête pour le type de dashboard {dashboard_type} avec status={status}, convertit en use_status={use_status}")
+            # Logs détaillés pour debug
+            logger.info(f"Variable {mz_list_var}: {mz_string}")
+            logger.info(f"Requête {dashboard_type.upper()} avec status={status}, convertit en use_status={use_status}, timeframe={time_from}")
             
-            if mz_string:
-                mz_list = [mz.strip() for mz in mz_string.split(',')]
-                logger.info(f"Liste des MZs: {mz_list}")
-                
-                # Récupérer les problèmes pour toutes ces MZs
-                all_problems = []
-                
-                # Essayons d'abord une approche directe sans filtrer par MZ
-                try:
-                    # Récupérer tous les problèmes sans filtrage MZ
-                    # si on a spécifié un type de dashboard, on veut tous les problèmes
-                    params = {"from": time_from}
-                    if use_status is not None:
-                        params["status"] = use_status
-                        
-                    logger.info(f"Tentative de récupération de tous les problèmes avec params: {params}, dashboard_type: {dashboard_type}, mz_list: {mz_list}")
-                    
-                    all_problems_data = api_client.query_api(
-                        endpoint="problems",
-                        params=params,
-                        use_cache=False
-                    )
-                    
-                    if 'problems' in all_problems_data:
-                        logger.info(f"Nombre total de problèmes récupérés sans filtre MZ: {len(all_problems_data['problems'])}")
-                        
-                        # Filtrer manuellement les problèmes pour nos MZs
-                        for problem in all_problems_data['problems']:
-                            problem_in_our_mzs = False
-                            problem_mzs = []
-                            
-                            # Vérifier dans les management zones du problème
-                            if 'managementZones' in problem:
-                                for mz in problem.get('managementZones', []):
-                                    mz_name = mz.get('name', '')
-                                    problem_mzs.append(mz_name)
-                                    if mz_name in mz_list:
-                                        problem_in_our_mzs = True
-                            
-                            # Vérifier dans les entités affectées
-                            if 'affectedEntities' in problem:
-                                for entity in problem.get('affectedEntities', []):
-                                    for mz in entity.get('managementZones', []):
-                                        mz_name = mz.get('name', '')
-                                        if mz_name not in problem_mzs:
-                                            problem_mzs.append(mz_name)
-                                        if mz_name in mz_list:
-                                            problem_in_our_mzs = True
-                            
-                            # Si le problème est dans au moins une de nos MZs, l'ajouter
-                            if problem_in_our_mzs:
-                                # CORRECTION: Ajouter un champ pour indiquer si le problème est résolu
-                                formatted_problem = api_client._format_problem(problem)
-                                # S'il s'agit d'une requête 'ALL', identifier les problèmes résolus
-                                if status == 'ALL':
-                                    formatted_problem['resolved'] = problem.get('status') != 'OPEN'
-                                all_problems.append(formatted_problem)
-                            else:
-                                logger.info(f"Problème {problem.get('id')} ignoré, MZs: {problem_mzs}")
-                        
-                        logger.info(f"Après filtrage MZ: {len(all_problems)} problèmes dans nos MZs")
-                    else:
-                        logger.warning("Aucun problème récupéré dans la réponse API")
-                        
-                except Exception as e:
-                    logger.error(f"Erreur lors de la récupération directe des problèmes: {e}")
-                    
-                    # Méthode de secours: parcourir chaque MZ individuellement
-                    for mz_name in mz_list:
-                        try:
-                            logger.info(f"Récupération des problèmes pour MZ: {mz_name}")
-                            mz_problems = api_client.get_problems_filtered(mz_name, time_from, use_status)
-                            logger.info(f"MZ {mz_name}: {len(mz_problems)} problèmes trouvés")
-                            all_problems.extend(mz_problems)
-                        except Exception as mz_error:
-                            logger.error(f"Erreur lors de la récupération des problèmes pour MZ {mz_name}: {mz_error}")
-                
-                # Dédupliquer les problèmes (un même problème peut affecter plusieurs MZs)
-                unique_problems = []
-                problem_ids = set()
-                for problem in all_problems:
-                    if problem['id'] not in problem_ids:
-                        problem_ids.add(problem['id'])
-                        unique_problems.append(problem)
-                
-                logger.info(f"Récupéré {len(unique_problems)} problèmes uniques pour {dashboard_type.upper()}")
-                return unique_problems
-            else:
-                logger.warning(f"Liste de MZ {mz_list_var} vide")
+            if not mz_string:
+                logger.warning(f"{mz_list_var} est vide ou non définie dans .env")
                 return []
+                
+            mz_list = [mz.strip() for mz in mz_string.split(',')]
+            logger.info(f"Liste des MZs {dashboard_type.upper()}: {mz_list}")
+            
+            # Récupérer tous les problèmes sans filtrage MZ
+            params = {"from": time_from}
+            if use_status is not None:
+                params["status"] = use_status
+                
+            logger.info(f"Paramètres API: {params}")
+            
+            all_problems_data = api_client.query_api(
+                endpoint="problems",
+                params=params,
+                use_cache=False
+            )
+            
+            if 'problems' not in all_problems_data:
+                logger.warning("Aucun problème dans la réponse API")
+                return []
+                
+            total_problems = len(all_problems_data['problems'])
+            logger.info(f"Nombre total de problèmes récupérés: {total_problems}")
+            
+            # Filtrer manuellement les problèmes pour nos MZs
+            all_problems = []
+            for problem in all_problems_data['problems']:
+                problem_id = problem.get('problemId', 'unknown')
+                problem_mzs = []
+                problem_in_our_mzs = False
+                
+                # Vérifier dans les management zones du problème
+                if 'managementZones' in problem:
+                    for mz in problem.get('managementZones', []):
+                        mz_name = mz.get('name', '')
+                        problem_mzs.append(mz_name)
+                        # Vérifier si cette MZ est dans notre liste
+                        if mz_name in mz_list:
+                            problem_in_our_mzs = True
+                            logger.debug(f"Problème {problem_id} trouvé dans MZ '{mz_name}'")
+                
+                # Vérifier dans les entités affectées si nécessaire
+                if not problem_in_our_mzs and 'affectedEntities' in problem:
+                    for entity in problem.get('affectedEntities', []):
+                        for mz in entity.get('managementZones', []):
+                            mz_name = mz.get('name', '')
+                            if mz_name not in problem_mzs:
+                                problem_mzs.append(mz_name)
+                            # Vérifier si cette MZ est dans notre liste
+                            if mz_name in mz_list:
+                                problem_in_our_mzs = True
+                                logger.debug(f"Problème {problem_id} affecte une entité dans MZ '{mz_name}'")
+                
+                # Si le problème est dans au moins une de nos MZs, l'ajouter
+                if problem_in_our_mzs:
+                    formatted_problem = api_client._format_problem(problem)
+                    # Marquer les problèmes résolus si statut ALL
+                    if status == 'ALL':
+                        formatted_problem['resolved'] = problem.get('status') != 'OPEN'
+                    all_problems.append(formatted_problem)
+                else:
+                    logger.debug(f"Problème {problem_id} ignoré, MZs: {problem_mzs}")
+            
+            filtered_count = len(all_problems)
+            logger.info(f"Après filtrage {dashboard_type.upper()}: {filtered_count}/{total_problems} problèmes")
+            return all_problems
         else:
             # Comportement pour une MZ spécifique
             current_mz = get_current_mz()
@@ -337,6 +316,7 @@ def get_problems():
         logger.error(f"Erreur lors de la récupération des problèmes: {e}")
         return {'error': str(e)}
 
+        
 @app.route('/api/current-management-zone', methods=['GET'])
 def get_current_management_zone():
     try:
