@@ -839,8 +839,8 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
       if (!refreshProblemsOnly) {
         // Extraire uniquement les noms des management zones
         const allMzNames = [
-          ...(vfgResponse?.data?.mzs || []).map(mz => mz.name),
-          ...(vfeResponse?.data?.mzs || []).map(mz => mz.name)
+          ...(vfgResponse?.data?.mzs || []).map(mz => typeof mz === 'string' ? mz : mz.name),
+          ...(vfeResponse?.data?.mzs || []).map(mz => typeof mz === 'string' ? mz : mz.name)
         ];
         
         // Déclencher le chargement en arrière-plan après une courte pause

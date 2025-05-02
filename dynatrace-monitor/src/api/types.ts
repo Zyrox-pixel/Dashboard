@@ -71,9 +71,9 @@ export interface ManagementZone {
   code: string;
   icon: React.ReactNode;
   problemCount: number;
-  apps: number;
-  services: number;
-  hosts: number;
+  apps: number | null;
+  services: number | null;
+  hosts: number | null;
   availability: string;
   status: 'healthy' | 'warning';
   color: 'red' | 'amber' | 'orange' | 'blue' | 'emerald' | 'purple' | 'green';

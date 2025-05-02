@@ -117,6 +117,11 @@ def get_vital_for_entreprise_mzs_endpoint():
         # Log des données pour debug
         logger.info(f"Données VFE MZs envoyées: {vfe_mzs}")
         
+        # Vérifier que tous les éléments de la liste sont bien des objets
+        for item in vfe_mzs:
+            if not isinstance(item, dict) or 'name' not in item or 'stats' not in item:
+                logger.error(f"Format invalide détecté dans vfe_mzs: {item}")
+        
         # Format de réponse amélioré avec statistiques
         return jsonify({
             'mzs': vfe_mzs,
@@ -181,6 +186,11 @@ def get_vital_for_group_mzs_endpoint():
         
         # Log des données pour debug
         logger.info(f"Données VFG MZs envoyées: {vfg_mzs}")
+        
+        # Vérifier que tous les éléments de la liste sont bien des objets
+        for item in vfg_mzs:
+            if not isinstance(item, dict) or 'name' not in item or 'stats' not in item:
+                logger.error(f"Format invalide détecté dans vfg_mzs: {item}")
         
         # Format de réponse amélioré avec statistiques
         return jsonify({
