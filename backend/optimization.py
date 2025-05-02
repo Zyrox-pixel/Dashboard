@@ -1023,92 +1023,103 @@ class OptimizedAPIClient:
         return host_metrics
 
 
-def get_problems_filtered(self, mz_name=None, time_from="-24h", status="OPEN"):
-    """
-    Récupère et filtre les problèmes pour une management zone spécifique
-    
-    Args:
-        mz_name (str): Nom de la Management Zone (None pour toutes)
-        time_from (str): Période de temps (ex: "-24h")
-        status (str): Statut des problèmes ("OPEN", "CLOSED", etc.)
+    def get_problems_filtered(self, mz_name=None, time_from="-24h", status="OPEN"):
+        """
+        Récupère et filtre les problèmes pour une management zone spécifique
         
-    Returns:
-        list: Liste des problèmes filtrés
-    """
-    cache_key = f"problems:{mz_name}:{time_from}:{status}"
-    cached_data = self.get_cached(cache_key)
-    if cached_data is not None:
-        return cached_data
-    
-    try:
-        # Récupérer tous les problèmes sans filtrer par MZ via l'API
-        params = {"from": time_from}
-        
-        # Ajouter le statut seulement s'il est spécifié ET n'est pas ALL
-        if status is not None and status != "ALL":
-            params["status"] = status
+        Args:
+            mz_name (str): Nom de la Management Zone (None pour toutes)
+            time_from (str): Période de temps (ex: "-24h")
+            status (str): Statut des problèmes ("OPEN", "CLOSED", etc.)
             
-        # Déboguer les paramètres
-        logger.info(f"Requête problèmes avec paramètres: {params}")
+        Returns:
+            list: Liste des problèmes filtrés
+        """
+        cache_key = f"problems:{mz_name}:{time_from}:{status}"
+        cached_data = self.get_cached(cache_key)
+        if cached_data is not None:
+            return cached_data
         
-        problems_data = self.query_api(
-            endpoint="problems",
-            params=params,
-            use_cache=False
-        )
-        
-        # Déboguer les résultats
-        total_problems = len(problems_data.get('problems', [])) if 'problems' in problems_data else 0
-        logger.info(f"Nombre total de problèmes récupérés: {total_problems} (statut:{status}, période:{time_from})")
-        
-        active_problems = []
-        if 'problems' in problems_data:
-            # On va filtrer manuellement les problèmes liés à notre Management Zone
-            mz_problems = 0
-            for problem in problems_data['problems']:
-                # Si aucune MZ n'est spécifiée, inclure tous les problèmes
-                if mz_name is None:
-                    active_problems.append(self._format_problem(problem))
-                    continue
+        try:
+            # Récupérer tous les problèmes sans filtrer par MZ via l'API
+            params = {"from": time_from}
+            
+            # Ajouter le statut seulement s'il est spécifié ET n'est pas ALL
+            if status is not None and status != "ALL":
+                params["status"] = status
                 
-                # Vérifier si le problème est lié à notre Management Zone
-                is_in_mz = False
-                
-                # Rechercher dans les management zones directement attachées au problème
-                if 'managementZones' in problem:
-                    for mz in problem.get('managementZones', []):
-                        if mz.get('name') == mz_name:
-                            is_in_mz = True
-                            break
-                
-                # Rechercher aussi dans les entités affectées
-                if not is_in_mz:
-                    for entity in problem.get('affectedEntities', []):
-                        # Vérifier les management zones de chaque entité affectée
-                        for mz in entity.get('managementZones', []):
+            # Déboguer les paramètres
+            logger.info(f"Requête problèmes avec paramètres: {params}")
+            
+            problems_data = self.query_api(
+                endpoint="problems",
+                params=params,
+                use_cache=False
+            )
+            
+            # Déboguer les résultats
+            total_problems = len(problems_data.get('problems', [])) if 'problems' in problems_data else 0
+            logger.info(f"Nombre total de problèmes récupérés: {total_problems} (statut:{status}, période:{time_from})")
+            
+            active_problems = []
+            if 'problems' in problems_data:
+                # On va filtrer manuellement les problèmes liés à notre Management Zone
+                mz_problems = 0
+                for problem in problems_data['problems']:
+                    # Si aucune MZ n'est spécifiée, inclure tous les problèmes
+                    if mz_name is None:
+                        # Pour les requêtes avec statut "ALL", ajouter l'info resolved
+                        formatted_problem = self._format_problem(problem)
+                        if status == "ALL":
+                            formatted_problem['resolved'] = problem.get('status') != 'OPEN'
+                        active_problems.append(formatted_problem)
+                        continue
+                    
+                    # Vérifier si le problème est lié à notre Management Zone
+                    is_in_mz = False
+                    
+                    # Rechercher dans les management zones directement attachées au problème
+                    if 'managementZones' in problem:
+                        for mz in problem.get('managementZones', []):
                             if mz.get('name') == mz_name:
                                 is_in_mz = True
                                 break
-                        if is_in_mz:
-                            break
+                    
+                    # Rechercher aussi dans les entités affectées
+                    if not is_in_mz:
+                        for entity in problem.get('affectedEntities', []):
+                            # Vérifier les management zones de chaque entité affectée
+                            for mz in entity.get('managementZones', []):
+                                if mz.get('name') == mz_name:
+                                    is_in_mz = True
+                                    break
+                            if is_in_mz:
+                                break
+                    
+                    # Si le problème est dans notre MZ, l'ajouter à notre liste
+                    if is_in_mz:
+                        mz_problems += 1
+                        formatted_problem = self._format_problem(problem, mz_name)
+                        # Pour les requêtes avec statut "ALL", ajouter l'info resolved
+                        if status == "ALL":
+                            formatted_problem['resolved'] = problem.get('status') != 'OPEN'
+                        active_problems.append(formatted_problem)
                 
-                # Si le problème est dans notre MZ, l'ajouter à notre liste
-                if is_in_mz:
-                    mz_problems += 1
-                    active_problems.append(self._format_problem(problem, mz_name))
+                if mz_name:
+                    logger.info(f"Problèmes filtrés appartenant à {mz_name}: {mz_problems}/{total_problems}")
             
-            if mz_name:
-                logger.info(f"Problèmes filtrés appartenant à {mz_name}: {mz_problems}/{total_problems}")
-        
-        self.set_cache(cache_key, active_problems)
-        return active_problems
-        
-    except Exception as e:
-        logger.error(f"Erreur lors de la récupération des problèmes: {e}")
-        return []
+            self.set_cache(cache_key, active_problems)
+            return active_problems
+            
+        except Exception as e:
+            logger.error(f"Erreur lors de la récupération des problèmes: {e}")
+            return []
     
     def _format_problem(self, problem, zone=None):
         """Formate un problème pour la réponse API"""
+        # Déterminer si le problème est résolu
+        is_resolved = problem.get('status') != 'OPEN'
+        
         return {
             'id': problem.get('problemId', 'Unknown'),
             'title': problem.get('title', 'Problème inconnu'),
@@ -1117,9 +1128,10 @@ def get_problems_filtered(self, mz_name=None, time_from="-24h", status="OPEN"):
             'affected_entities': len(problem.get('affectedEntities', [])),
             'start_time': datetime.fromtimestamp(problem.get('startTime', 0)/1000).strftime('%Y-%m-%d %H:%M'),
             'dt_url': f"{self.env_url}/#problems/problemdetails;pid={problem.get('problemId', 'Unknown')}",
-            'zone': zone or self._extract_problem_zone(problem)
+            'zone': zone or self._extract_problem_zone(problem),
+            'resolved': is_resolved  # Ajouter ce champ pour indiquer si le problème est résolu
         }
-    
+        
     def _extract_problem_zone(self, problem):
         """Extrait la zone principale d'un problème"""
         if 'managementZones' in problem and problem['managementZones']:

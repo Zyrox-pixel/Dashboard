@@ -283,7 +283,11 @@ def get_problems():
                             
                             # Si le problème est dans au moins une de nos MZs, l'ajouter
                             if problem_in_our_mzs:
+                                # CORRECTION: Ajouter un champ pour indiquer si le problème est résolu
                                 formatted_problem = api_client._format_problem(problem)
+                                # S'il s'agit d'une requête 'ALL', identifier les problèmes résolus
+                                if status == 'ALL':
+                                    formatted_problem['resolved'] = problem.get('status') != 'OPEN'
                                 all_problems.append(formatted_problem)
                             else:
                                 logger.info(f"Problème {problem.get('id')} ignoré, MZs: {problem_mzs}")
