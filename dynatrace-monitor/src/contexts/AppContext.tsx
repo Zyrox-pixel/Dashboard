@@ -793,9 +793,10 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
       
       // NOUVEAU: Déclencher le chargement en arrière-plan
       if (!refreshProblemsOnly) {
+        // Extraire uniquement les noms des management zones
         const allMzNames = [
-          ...(vfgResponse?.data?.mzs || []),
-          ...(vfeResponse?.data?.mzs || [])
+          ...(vfgResponse?.data?.mzs || []).map(mz => mz.name),
+          ...(vfeResponse?.data?.mzs || []).map(mz => mz.name)
         ];
         
         // Déclencher le chargement en arrière-plan après une courte pause
