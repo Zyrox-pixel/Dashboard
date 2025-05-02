@@ -1,10 +1,12 @@
 import React, { useMemo, useCallback, useState, useEffect } from 'react';
-import { ChevronLeft, Clock, AlertTriangle, ExternalLink, RefreshCw, Cpu, Activity, Server, Filter, Loader, Database, Search, ArrowUp, ArrowDown } from 'lucide-react';
+import { ChevronLeft, Clock, AlertTriangle, ExternalLink, RefreshCw, Cpu, Activity, Server, Filter, Loader, Database, Search, ArrowUp, ArrowDown, X, Check, Monitor, Sliders } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { ManagementZone, Problem, ProcessGroup, Host, Service } from '../../api/types';
 import ProblemsList from './ProblemsList';
 import PaginatedTable, { Column } from '../common/PaginatedTable';
 import { useApp } from '../../contexts/AppContext';
+import AdvancedFilter, { FilterCategory, FilterValue, FilterItem } from '../common/AdvancedFilter';
+import FilterBadges, { FilterBadge } from '../common/FilterBadges';
 
 interface ZoneDetailsProps {
   zone: ManagementZone;
@@ -32,24 +34,24 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
   const { isDarkTheme } = useTheme();
   const { refreshData } = useApp();
   
-  // Ajouter du debug pour voir ce qui se passe avec les données hosts
-  useEffect(() => {
-    console.log("Hosts reçus dans ZoneDetails:", hosts);
-    console.log("Hosts est un tableau?", Array.isArray(hosts));
-    if (Array.isArray(hosts)) {
-      console.log("Nombre d'hôtes:", hosts.length);
-      if (hosts.length > 0) {
-        console.log("Premier hôte:", hosts[0]);
-      }
-    }
-  }, [hosts]);
-  
   // États pour le tri et la recherche
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'ascending' | 'descending' | null }>({
     key: '',
     direction: null
   });
+  
+  // États pour la recherche
   const [hostSearchTerm, setHostSearchTerm] = useState<string>('');
+  const [serviceSearchTerm, setServiceSearchTerm] = useState<string>('');
+  
+  // États pour les filtres avancés
+  const [showAdvancedFilter, setShowAdvancedFilter] = useState<boolean>(false);
+  const [filterType, setFilterType] = useState<'os' | 'service' | 'process' | null>(null);
+  
+  // États pour les filtres
+  const [osFilters, setOsFilters] = useState<FilterValue[]>([]);
+  const [serviceFilters, setServiceFilters] = useState<FilterValue[]>([]);
+  const [processFilters, setProcessFilters] = useState<FilterValue[]>([]);
   
   // Filtrer les problèmes pour la zone courante (mémorisé)
   const zoneProblems = useMemo(() => 
@@ -125,7 +127,6 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
   // Fonction pour normaliser les données d'hôte au format attendu
   const normalizeHostData = (hostData: any): Host[] => {
     if (!hostData || !Array.isArray(hostData)) {
-      console.log("normalizeHostData: Les données ne sont pas un tableau", hostData);
       return [];
     }
     
@@ -142,7 +143,6 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
   
   // Normaliser les données d'hôte
   const normalizedHosts = useMemo(() => {
-    console.log("Normalisation des hôtes...");
     return normalizeHostData(hosts);
   }, [hosts]);
   
@@ -190,13 +190,480 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
     });
   };
   
-  // Obtenir les données triées et filtrées pour les hôtes
-  const sortedHosts = useMemo(() => {
-    console.log("Calcul des hôtes triés, avec", normalizedHosts.length, "hôtes");
-    return getSortedData(normalizedHosts, hostSearchTerm);
-  }, [normalizedHosts, sortConfig, hostSearchTerm]);
+  // Helper pour obtenir l'icône du système d'exploitation - DÉPLACÉ ICI AVANT SON UTILISATION
+  const getOsIcon = (osVersion: string = '', small: boolean = false) => {
+    const size = small ? 14 : 18;
+    const os = osVersion.toLowerCase();
+    
+    if (os.includes('linux')) {
+      return <span className="text-orange-500">🐧</span>;
+    } else if (os.includes('windows')) {
+      return <span className="text-blue-500">🪟</span>;
+    } else if (os.includes('mac') || os.includes('darwin')) {
+      return <span className="text-gray-500">🍎</span>;
+    } else if (os.includes('unix') || os.includes('aix')) {
+      return <span className="text-purple-500">🖥️</span>;
+    }
+    
+    return <Monitor size={size} className="text-slate-400" />;
+  };
   
-  // Définition des colonnes pour les tableaux (mémorisée)
+  // Helper pour obtenir l'icône d'une technologie - DÉPLACÉ ICI AVANT SON UTILISATION
+  const getTechnologyIcon = (tech: string) => {
+    const techLower = tech.toLowerCase();
+    
+    if (techLower.includes('java')) {
+      return <span className="text-orange-500">☕</span>;
+    } else if (techLower.includes('python')) {
+      return <span className="text-green-500">🐍</span>;
+    } else if (techLower.includes('node') || techLower.includes('javascript')) {
+      return <span className="text-yellow-500">⚡</span>;
+    } else if (techLower.includes('.net') || techLower.includes('dotnet')) {
+      return <span className="text-blue-500">🔷</span>;
+    } else if (techLower.includes('go')) {
+      return <span className="text-blue-500">🐹</span>;
+    } else if (techLower.includes('php')) {
+      return <span className="text-indigo-500">🐘</span>;
+    } else if (techLower.includes('ruby')) {
+      return <span className="text-red-500">💎</span>;
+    } else if (techLower.includes('database') || techLower.includes('sql')) {
+      return <Database size={14} className="text-blue-500" />;
+    }
+    
+    return <Activity size={14} className="text-slate-400" />;
+  };
+  
+  // Extraire la liste des OS uniques des hôtes
+  const uniqueOperatingSystems = useMemo(() => {
+    if (!normalizedHosts || normalizedHosts.length === 0) return [];
+    
+    const osSet = new Set<string>();
+    
+    normalizedHosts.forEach(host => {
+      if (host.os_version) {
+        // Simplifions la détection des OS pour le filtrage
+        let osType = "Autre";
+        
+        if (host.os_version.toLowerCase().includes('linux')) {
+          osType = "Linux";
+        } else if (host.os_version.toLowerCase().includes('windows')) {
+          osType = "Windows";
+        } else if (host.os_version.toLowerCase().includes('unix')) {
+          osType = "Unix";
+        } else if (host.os_version.toLowerCase().includes('aix')) {
+          osType = "AIX";
+        } else if (host.os_version.toLowerCase().includes('mac') || host.os_version.toLowerCase().includes('darwin')) {
+          osType = "MacOS";
+        }
+        
+        osSet.add(osType);
+      }
+    });
+    
+    return Array.from(osSet);
+  }, [normalizedHosts]);
+  
+  // Obtenir les données triées pour les hôtes
+  const sortedHosts = useMemo(() => getSortedData(normalizedHosts, hostSearchTerm), 
+    [normalizedHosts, sortConfig, hostSearchTerm]);
+  
+  // Obtenir les données triées pour les services
+  const sortedServices = useMemo(() => getSortedData(services, serviceSearchTerm), 
+    [services, sortConfig, serviceSearchTerm]);
+
+  // Préparer les catégories de filtres pour les OS
+  const osFilterCategories = useMemo((): FilterCategory[] => {
+    // Calculer toutes les versions OS par type
+    const osVersionsByType = new Map<string, {version: string, count: number}[]>();
+    
+    normalizedHosts.forEach(host => {
+      if (!host.os_version) return;
+      
+      // Déterminer le type d'OS
+      let osType = "Autre";
+      if (host.os_version.toLowerCase().includes('linux')) {
+        osType = "Linux";
+      } else if (host.os_version.toLowerCase().includes('windows')) {
+        osType = "Windows";
+      } else if (host.os_version.toLowerCase().includes('unix')) {
+        osType = "Unix";
+      } else if (host.os_version.toLowerCase().includes('aix')) {
+        osType = "AIX";
+      } else if (host.os_version.toLowerCase().includes('mac') || host.os_version.toLowerCase().includes('darwin')) {
+        osType = "MacOS";
+      }
+      
+      // Récupérer les versions existantes pour ce type d'OS
+      const versions = osVersionsByType.get(osType) || [];
+      
+      // Trouver si cette version existe déjà
+      const existingVersion = versions.find(v => v.version === host.os_version);
+      
+      if (existingVersion) {
+        existingVersion.count++;
+      } else {
+        versions.push({ version: host.os_version, count: 1 });
+      }
+      
+      osVersionsByType.set(osType, versions);
+    });
+    
+    // Convertir la map en catégories de filtres
+    return Array.from(osVersionsByType.entries()).map(([osType, versions]) => ({
+      id: osType,
+      label: osType,
+      icon: getOsIcon(osType),
+      items: versions.map(v => ({
+        id: v.version,
+        label: v.version,
+        value: v.version,
+        count: v.count,
+        icon: getOsIcon(osType, true)
+      }))
+    }));
+  }, [normalizedHosts]);
+  
+  // Préparer les catégories de filtres pour les services
+  const serviceFilterCategories = useMemo((): FilterCategory[] => {
+    // Technologies
+    const technologies = new Map<string, number>();
+    services.forEach(service => {
+      if (service.technology) {
+        const count = technologies.get(service.technology) || 0;
+        technologies.set(service.technology, count + 1);
+      }
+    });
+    
+    const technologyCategory: FilterCategory = {
+      id: 'technology',
+      label: 'Technologies',
+      icon: <Activity size={18} />,
+      items: Array.from(technologies.entries()).map(([tech, count]) => ({
+        id: tech,
+        label: tech,
+        value: tech,
+        count,
+        icon: getTechnologyIcon(tech)
+      }))
+    };
+    
+    // Temps de réponse (en secondes)
+    const responseTimeBuckets = [
+      { id: 'fast', label: 'Rapide (<0.5s)', range: [0, 0.5] },
+      { id: 'medium', label: 'Moyen (0.5-2s)', range: [0.5, 2] },
+      { id: 'slow', label: 'Lent (>2s)', range: [2, Infinity] }
+    ];
+    
+    const responseTimeCategory: FilterCategory = {
+      id: 'response_time',
+      label: 'Temps de réponse',
+      icon: <Clock size={18} />,
+      items: responseTimeBuckets.map(bucket => ({
+        id: bucket.id,
+        label: bucket.label,
+        value: bucket.id,
+        count: services.filter(s => 
+          s.response_time !== null && 
+          s.response_time >= bucket.range[0] && 
+          s.response_time < bucket.range[1]
+        ).length,
+        icon: bucket.id === 'fast' ? <span className="text-green-500">⚡</span> :
+              bucket.id === 'medium' ? <span className="text-yellow-500">⏱</span> :
+              <span className="text-red-500">🐢</span>
+      }))
+    };
+    
+    // Taux d'erreur
+    const errorRateBuckets = [
+      { id: 'normal', label: 'Normal (<1%)', range: [0, 1] },
+      { id: 'elevated', label: 'Élevé (1-5%)', range: [1, 5] },
+      { id: 'critical', label: 'Critique (>5%)', range: [5, Infinity] }
+    ];
+    
+    const errorRateCategory: FilterCategory = {
+      id: 'error_rate',
+      label: 'Taux d\'erreur',
+      icon: <AlertTriangle size={18} />,
+      items: errorRateBuckets.map(bucket => ({
+        id: bucket.id,
+        label: bucket.label,
+        value: bucket.id,
+        count: services.filter(s => 
+          s.error_rate !== null && 
+          s.error_rate >= bucket.range[0] && 
+          s.error_rate < bucket.range[1]
+        ).length,
+        icon: bucket.id === 'normal' ? <span className="text-green-500">✓</span> :
+              bucket.id === 'elevated' ? <span className="text-yellow-500">⚠</span> :
+              <span className="text-red-500">⛔</span>
+      }))
+    };
+    
+    return [technologyCategory, responseTimeCategory, errorRateCategory];
+  }, [services]);
+  
+  // Préparer les catégories de filtres pour les process groups
+  const processFilterCategories = useMemo((): FilterCategory[] => {
+    // Technologies
+    const technologies = new Map<string, number>();
+    processGroups.forEach(process => {
+      if (process.technology) {
+        const count = technologies.get(process.technology) || 0;
+        technologies.set(process.technology, count + 1);
+      }
+    });
+    
+    const technologyCategory: FilterCategory = {
+      id: 'technology',
+      label: 'Technologies',
+      icon: <Activity size={18} />,
+      items: Array.from(technologies.entries()).map(([tech, count]) => ({
+        id: tech,
+        label: tech,
+        value: tech,
+        count,
+        icon: getTechnologyIcon(tech)
+      }))
+    };
+    
+    // Types de process
+    const processTypes = [
+      { id: 'technology', label: 'Technologie', icon: <Cpu size={14} /> },
+      { id: 'database', label: 'Base de données', icon: <Database size={14} /> },
+      { id: 'server', label: 'Serveur', icon: <Server size={14} /> }
+    ];
+    
+    const processTypeCategory: FilterCategory = {
+      id: 'process_type',
+      label: 'Types de processus',
+      icon: <Cpu size={18} />,
+      items: processTypes.map(type => ({
+        id: type.id,
+        label: type.label,
+        value: type.id,
+        count: processGroups.filter(p => p.type === type.id).length,
+        icon: type.icon
+      }))
+    };
+    
+    return [technologyCategory, processTypeCategory];
+  }, [processGroups]);
+  
+  // Convertir les filtres en badges pour l'affichage
+  const getOsFilterBadges = useMemo((): FilterBadge[] => {
+    const badges: FilterBadge[] = [];
+    
+    osFilters.forEach(filter => {
+      const category = osFilterCategories.find(c => c.id === filter.categoryId);
+      if (!category) return;
+      
+      if (filter.values.length === 0) {
+        // Tous les éléments sont sélectionnés
+        badges.push({
+          id: `${filter.categoryId}-all`,
+          categoryId: filter.categoryId,
+          categoryLabel: category.label,
+          value: '',
+          label: 'Tous',
+          icon: category.icon
+        });
+      } else {
+        // Éléments spécifiques sélectionnés
+        filter.values.forEach(value => {
+          const item = category.items.find(i => i.value === value);
+          if (!item) return;
+          
+          badges.push({
+            id: `${filter.categoryId}-${value}`,
+            categoryId: filter.categoryId,
+            categoryLabel: category.label,
+            value,
+            label: item.label,
+            icon: item.icon
+          });
+        });
+      }
+    });
+    
+    return badges;
+  }, [osFilters, osFilterCategories]);
+  
+  const getServiceFilterBadges = useMemo((): FilterBadge[] => {
+    const badges: FilterBadge[] = [];
+    
+    serviceFilters.forEach(filter => {
+      const category = serviceFilterCategories.find(c => c.id === filter.categoryId);
+      if (!category) return;
+      
+      if (filter.values.length === 0) {
+        // Tous les éléments sont sélectionnés
+        badges.push({
+          id: `${filter.categoryId}-all`,
+          categoryId: filter.categoryId,
+          categoryLabel: category.label,
+          value: '',
+          label: 'Tous',
+          icon: category.icon
+        });
+      } else {
+        // Éléments spécifiques sélectionnés
+        filter.values.forEach(value => {
+          const item = category.items.find(i => i.value === value);
+          if (!item) return;
+          
+          badges.push({
+            id: `${filter.categoryId}-${value}`,
+            categoryId: filter.categoryId,
+            categoryLabel: category.label,
+            value,
+            label: item.label,
+            icon: item.icon
+          });
+        });
+      }
+    });
+    
+    return badges;
+  }, [serviceFilters, serviceFilterCategories]);
+  
+  const getProcessFilterBadges = useMemo((): FilterBadge[] => {
+    const badges: FilterBadge[] = [];
+    
+    processFilters.forEach(filter => {
+      const category = processFilterCategories.find(c => c.id === filter.categoryId);
+      if (!category) return;
+      
+      if (filter.values.length === 0) {
+        // Tous les éléments sont sélectionnés
+        badges.push({
+          id: `${filter.categoryId}-all`,
+          categoryId: filter.categoryId,
+          categoryLabel: category.label,
+          value: '',
+          label: 'Tous',
+          icon: category.icon
+        });
+      } else {
+        // Éléments spécifiques sélectionnés
+        filter.values.forEach(value => {
+          const item = category.items.find(i => i.value === value);
+          if (!item) return;
+          
+          badges.push({
+            id: `${filter.categoryId}-${value}`,
+            categoryId: filter.categoryId,
+            categoryLabel: category.label,
+            value,
+            label: item.label,
+            icon: item.icon
+          });
+        });
+      }
+    });
+    
+    return badges;
+  }, [processFilters, processFilterCategories]);
+  
+  // Filtrer les hôtes en fonction des filtres OS
+  const filteredHosts = useMemo(() => {
+    if (osFilters.length === 0) return sortedHosts;
+    
+    return sortedHosts.filter(host => {
+      const osVersion = host.os_version || '';
+      
+      // Déterminer le type d'OS
+      let hostOsType = "Autre";
+      if (osVersion.toLowerCase().includes('linux')) {
+        hostOsType = "Linux";
+      } else if (osVersion.toLowerCase().includes('windows')) {
+        hostOsType = "Windows";
+      } else if (osVersion.toLowerCase().includes('unix')) {
+        hostOsType = "Unix";
+      } else if (osVersion.toLowerCase().includes('aix')) {
+        hostOsType = "AIX";
+      } else if (osVersion.toLowerCase().includes('mac') || osVersion.toLowerCase().includes('darwin')) {
+        hostOsType = "MacOS";
+      }
+      
+      // Vérifier si ce type d'OS est sélectionné
+      const osTypeFilter = osFilters.find(f => f.categoryId === hostOsType);
+      
+      if (!osTypeFilter) return false;
+      
+      // Si values est vide, toutes les versions sont sélectionnées
+      if (osTypeFilter.values.length === 0) return true;
+      
+      // Sinon, vérifier si cette version spécifique est sélectionnée
+      return osTypeFilter.values.includes(osVersion);
+    });
+  }, [sortedHosts, osFilters]);
+  
+  // Filtrer les services en fonction des filtres
+  const filteredServices = useMemo(() => {
+    if (serviceFilters.length === 0) return sortedServices;
+    
+    return sortedServices.filter(service => {
+      // Vérifier chaque type de filtre
+      return serviceFilters.every(filter => {
+        // Si aucune valeur sélectionnée, considérer comme match
+        if (filter.values.length === 0) return true;
+        
+        switch (filter.categoryId) {
+          case 'technology':
+            return filter.values.includes(service.technology);
+            
+          case 'response_time':
+            if (service.response_time === null) return false;
+            
+            const responseTime = service.response_time;
+            return (
+              (filter.values.includes('fast') && responseTime < 100) ||
+              (filter.values.includes('medium') && responseTime >= 100 && responseTime < 500) ||
+              (filter.values.includes('slow') && responseTime >= 500)
+            );
+            
+          case 'error_rate':
+            if (service.error_rate === null) return false;
+            
+            const errorRate = service.error_rate;
+            return (
+              (filter.values.includes('normal') && errorRate < 1) ||
+              (filter.values.includes('elevated') && errorRate >= 1 && errorRate < 5) ||
+              (filter.values.includes('critical') && errorRate >= 5)
+            );
+            
+          default:
+            return true;
+        }
+      });
+    });
+  }, [sortedServices, serviceFilters]);
+  
+  // Filtrer les process groups en fonction des filtres
+  const filteredProcessGroups = useMemo(() => {
+    if (processFilters.length === 0) return processGroups;
+    
+    return processGroups.filter(process => {
+      // Vérifier chaque type de filtre
+      return processFilters.every(filter => {
+        // Si aucune valeur sélectionnée, considérer comme match
+        if (filter.values.length === 0) return true;
+        
+        switch (filter.categoryId) {
+          case 'technology':
+            return filter.values.includes(process.technology);
+            
+          case 'process_type':
+            return filter.values.includes(process.type);
+            
+          default:
+            return true;
+        }
+      });
+    });
+  }, [processGroups, processFilters]);
+  
+  // Définition des colonnes pour les tableaux
   const processColumns = useMemo<Column<ProcessGroup>[]>(() => [
     {
       key: 'name',
@@ -235,7 +702,20 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
   const serviceColumns = useMemo(() => [
     {
       key: 'name',
-      label: 'Nom',
+      label: (
+        <div className="flex items-center cursor-pointer" onClick={() => requestSort('name')}>
+          Nom
+          {sortConfig.key === 'name' && (
+            <span className="ml-1">
+              {sortConfig.direction === 'ascending' ? (
+                <ArrowUp size={14} />
+              ) : sortConfig.direction === 'descending' ? (
+                <ArrowDown size={14} />
+              ) : null}
+            </span>
+          )}
+        </div>
+      ),
       cellClassName: 'font-medium text-sm',
       render: (service: Service) => (
         <div className="flex items-center gap-2">
@@ -246,7 +726,20 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
     },
     {
       key: 'technology',
-      label: 'Technologie',
+      label: (
+        <div className="flex items-center cursor-pointer" onClick={() => requestSort('technology')}>
+          Technologie
+          {sortConfig.key === 'technology' && (
+            <span className="ml-1">
+              {sortConfig.direction === 'ascending' ? (
+                <ArrowUp size={14} />
+              ) : sortConfig.direction === 'descending' ? (
+                <ArrowDown size={14} />
+              ) : null}
+            </span>
+          )}
+        </div>
+      ),
       cellClassName: 'text-sm',
       render: (service: Service) => (
         <div className="flex items-center gap-2">
@@ -256,31 +749,78 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
     },
     {
       key: 'response_time',
-      label: 'Temps de réponse',
+      label: (
+        <div className="flex items-center cursor-pointer" onClick={() => requestSort('response_time')}>
+          Temps de réponse
+          {sortConfig.key === 'response_time' && (
+            <span className="ml-1">
+              {sortConfig.direction === 'ascending' ? (
+                <ArrowUp size={14} />
+              ) : sortConfig.direction === 'descending' ? (
+                <ArrowDown size={14} />
+              ) : null}
+            </span>
+          )}
+        </div>
+      ),
       cellClassName: 'text-sm',
       render: (service: Service) => (
-        service.response_time ? `${service.response_time} ms` : 'N/A'
+        <span className={`${
+          service.response_time !== null ? 
+            (service.response_time > 2 ? 'text-red-500' : 
+            service.response_time > 1 ? 'text-yellow-500' : 
+            'text-green-500') : 
+            'text-slate-400'
+        }`}>
+          {service.response_time !== null ? `${service.response_time} s` : 'N/A'}
+        </span>
       ),
     },
     {
       key: 'error_rate',
-      label: 'Taux d\'erreur',
+      label: (
+        <div className="flex items-center cursor-pointer" onClick={() => requestSort('error_rate')}>
+          Taux d'erreur
+          {sortConfig.key === 'error_rate' && (
+            <span className="ml-1">
+              {sortConfig.direction === 'ascending' ? (
+                <ArrowUp size={14} />
+              ) : sortConfig.direction === 'descending' ? (
+                <ArrowDown size={14} />
+              ) : null}
+            </span>
+          )}
+        </div>
+      ),
       cellClassName: 'text-sm',
       render: (service: Service) => (
         <span className={`${
-          service.error_rate ? 
+          service.error_rate !== null ? 
             (service.error_rate > 5 ? 'text-red-500' : 
             service.error_rate > 1 ? 'text-yellow-500' : 
             'text-green-500') : 
             'text-green-500'
         }`}>
-          {service.error_rate ? `${service.error_rate}%` : '0%'}
+          {service.error_rate !== null ? `${service.error_rate}%` : '0%'}
         </span>
       ),
     },
     {
       key: 'requests',
-      label: 'Requêtes',
+      label: (
+        <div className="flex items-center cursor-pointer" onClick={() => requestSort('requests')}>
+          Requêtes
+          {sortConfig.key === 'requests' && (
+            <span className="ml-1">
+              {sortConfig.direction === 'ascending' ? (
+                <ArrowUp size={14} />
+              ) : sortConfig.direction === 'descending' ? (
+                <ArrowDown size={14} />
+              ) : null}
+            </span>
+          )}
+        </div>
+      ),
       cellClassName: 'text-sm',
       render: (service: Service) => (
         service.requests ? service.requests.toLocaleString() : 'N/A'
@@ -302,12 +842,25 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
         </a>
       ),
     },
-  ], []);
+  ], [sortConfig]);
 
   const hostColumns = useMemo(() => [
     {
       key: 'name',
-      label: 'Nom',
+      label: (
+        <div className="flex items-center cursor-pointer" onClick={() => requestSort('name')}>
+          Nom
+          {sortConfig.key === 'name' && (
+            <span className="ml-1">
+              {sortConfig.direction === 'ascending' ? (
+                <ArrowUp size={14} />
+              ) : sortConfig.direction === 'descending' ? (
+                <ArrowDown size={14} />
+              ) : null}
+            </span>
+          )}
+        </div>
+      ),
       cellClassName: 'font-medium text-sm',
     },
     {
@@ -328,9 +881,10 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
       ),
       cellClassName: 'text-sm',
       render: (host: Host) => (
-        <span>
-          {host.os_version || 'Non spécifié'}
-        </span>
+        <div className="flex items-center gap-2">
+          {getOsIcon(host.os_version)}
+          <span>{host.os_version || 'Non spécifié'}</span>
+        </div>
       ),
     },
     {
@@ -352,13 +906,13 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
       cellClassName: 'text-sm',
       render: (host: Host) => (
         <span className={`${
-          host.cpu ? 
+          host.cpu !== null ? 
             (host.cpu > 80 ? 'text-red-500' : 
             host.cpu > 60 ? 'text-yellow-500' : 
             'text-green-500') : 
             'text-slate-400'
         }`}>
-          {host.cpu ? `${host.cpu}%` : 'N/A'}
+          {host.cpu !== null ? `${host.cpu}%` : 'N/A'}
         </span>
       ),
     },
@@ -381,13 +935,13 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
       cellClassName: 'text-sm',
       render: (host: Host) => (
         <span className={`${
-          host.ram ? 
+          host.ram !== null ? 
             (host.ram > 80 ? 'text-red-500' : 
             host.ram > 60 ? 'text-yellow-500' : 
             'text-green-500') : 
             'text-slate-400'
         }`}>
-          {host.ram ? `${host.ram}%` : 'N/A'}
+          {host.ram !== null ? `${host.ram}%` : 'N/A'}
         </span>
       ),
     },
@@ -413,6 +967,87 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
   const handleTabClick = useCallback((tab: string) => {
     onTabChange(tab);
   }, [onTabChange]);
+  
+  // Gérer la suppression d'un filtre OS
+  const handleRemoveOsFilter = useCallback((categoryId: string, value?: string) => {
+    setOsFilters(prev => {
+      const newFilters = [...prev];
+      const filterIndex = newFilters.findIndex(f => f.categoryId === categoryId);
+      
+      if (filterIndex === -1) return prev;
+      
+      if (!value) {
+        // Supprimer tout le filtre
+        return newFilters.filter(f => f.categoryId !== categoryId);
+      }
+      
+      // Supprimer une valeur spécifique
+      const filter = {...newFilters[filterIndex]};
+      filter.values = filter.values.filter(v => v !== value);
+      
+      if (filter.values.length === 0) {
+        // Si plus aucune valeur, supprimer le filtre
+        return newFilters.filter(f => f.categoryId !== categoryId);
+      }
+      
+      newFilters[filterIndex] = filter;
+      return newFilters;
+    });
+  }, []);
+  
+  // Gérer la suppression d'un filtre de service
+  const handleRemoveServiceFilter = useCallback((categoryId: string, value?: string) => {
+    setServiceFilters(prev => {
+      const newFilters = [...prev];
+      const filterIndex = newFilters.findIndex(f => f.categoryId === categoryId);
+      
+      if (filterIndex === -1) return prev;
+      
+      if (!value) {
+        // Supprimer tout le filtre
+        return newFilters.filter(f => f.categoryId !== categoryId);
+      }
+      
+      // Supprimer une valeur spécifique
+      const filter = {...newFilters[filterIndex]};
+      filter.values = filter.values.filter(v => v !== value);
+      
+      if (filter.values.length === 0) {
+        // Si plus aucune valeur, supprimer le filtre
+        return newFilters.filter(f => f.categoryId !== categoryId);
+      }
+      
+      newFilters[filterIndex] = filter;
+      return newFilters;
+    });
+  }, []);
+  
+  // Gérer la suppression d'un filtre de process
+  const handleRemoveProcessFilter = useCallback((categoryId: string, value?: string) => {
+    setProcessFilters(prev => {
+      const newFilters = [...prev];
+      const filterIndex = newFilters.findIndex(f => f.categoryId === categoryId);
+      
+      if (filterIndex === -1) return prev;
+      
+      if (!value) {
+        // Supprimer tout le filtre
+        return newFilters.filter(f => f.categoryId !== categoryId);
+      }
+      
+      // Supprimer une valeur spécifique
+      const filter = {...newFilters[filterIndex]};
+      filter.values = filter.values.filter(v => v !== value);
+      
+      if (filter.values.length === 0) {
+        // Si plus aucune valeur, supprimer le filtre
+        return newFilters.filter(f => f.categoryId !== categoryId);
+      }
+      
+      newFilters[filterIndex] = filter;
+      return newFilters;
+    });
+  }, []);
 
   // État de chargement pour les détails de la zone
   if (isLoading) {
@@ -434,11 +1069,6 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
         </div>
       </div>
     );
-  }
-
-  // Message de débogage si pas d'hôtes
-  if (Array.isArray(hosts) && hosts.length === 0) {
-    console.log("Aucun hôte trouvé!");
   }
 
   return (
@@ -494,7 +1124,7 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
           </a>
           
           <button 
-            onClick={refreshData}
+            onClick={() => refreshData()}
             className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 text-sm"
           >
             <RefreshCw size={14} />
@@ -543,7 +1173,7 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
         />
       )}
       
-      {/* Navigation par onglets - CHANGEMENT D'ORDRE DES ONGLETS */}
+      {/* Navigation par onglets */}
       <div className="flex border-b mb-5 overflow-x-auto no-scrollbar">
         <button 
           onClick={() => handleTabClick('hosts')}
@@ -592,63 +1222,90 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
         </button>
       </div>
       
-      {/* Contenu des onglets - Utilisation du composant PaginatedTable */}
-      
-      {/* Onglet Hôtes */}
+      {/* Contenu des onglets - Hôtes */}
       {activeTab === 'hosts' && (
         <section className={`rounded-lg overflow-hidden ${
           isDarkTheme ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
         } border`}>
-          <div className="flex justify-between items-center p-3 border-b border-slate-700">
-            <h2 className="font-semibold flex items-center gap-2">
-              <Server className={zoneColors.text} size={16} />
-              <span>Hôtes</span>
-              <span className="text-xs text-slate-400 ml-2">({sortedHosts.length})</span>
-            </h2>
-            
-            {/* Barre de recherche pour les hôtes */}
-            <div className="flex items-center gap-3">
-              <div className="relative">
-                <input 
-                  type="text" 
-                  value={hostSearchTerm}
-                  onChange={(e) => setHostSearchTerm(e.target.value)}
-                  placeholder="Rechercher un hôte..."
-                  className={`w-64 h-8 pl-8 pr-4 rounded-md ${
-                    isDarkTheme 
-                      ? 'bg-slate-700 border-slate-600 text-white placeholder-slate-400' 
-                      : 'bg-slate-100 border-slate-200 text-slate-900 placeholder-slate-500'
-                  } border focus:outline-none focus:ring-1 focus:ring-indigo-500`}
-                />
-                <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 text-slate-400" size={14} />
-              </div>
+          <div className="flex flex-col gap-2">
+            <div className="flex justify-between items-center p-3 border-b border-slate-700">
+              <h2 className="font-semibold flex items-center gap-2">
+                <Server className={zoneColors.text} size={16} />
+                <span>Hôtes</span>
+                <span className="text-xs text-slate-400 ml-2">({filteredHosts.length})</span>
+              </h2>
               
-              <button className={`flex items-center gap-1 px-3 py-1 rounded-md border text-sm ${
-                isDarkTheme ? 'border-slate-600 text-slate-300 hover:bg-slate-700' : 'border-slate-300 text-slate-600 hover:bg-slate-100'
-              }`}>
-                <Filter size={12} />
-                <span>Filtrer</span>
-              </button>
+              {/* Barre de recherche et bouton de filtre pour les hôtes */}
+              <div className="flex items-center gap-3">
+                <div className="relative">
+                  <input 
+                    type="text" 
+                    value={hostSearchTerm}
+                    onChange={(e) => setHostSearchTerm(e.target.value)}
+                    placeholder="Rechercher un hôte..."
+                    className={`w-64 h-8 pl-8 pr-4 rounded-md ${
+                      isDarkTheme 
+                        ? 'bg-slate-700 border-slate-600 text-white placeholder-slate-400' 
+                        : 'bg-slate-100 border-slate-200 text-slate-900 placeholder-slate-500'
+                    } border focus:outline-none focus:ring-1 focus:ring-indigo-500`}
+                  />
+                  <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 text-slate-400" size={14} />
+                  {hostSearchTerm && (
+                    <button
+                      onClick={() => setHostSearchTerm('')}
+                      className="absolute right-2.5 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-500"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+                
+                <button 
+                  onClick={() => {
+                    setFilterType('os');
+                    setShowAdvancedFilter(true);
+                  }}
+                  className={`flex items-center gap-1 px-3 py-1 rounded-md border text-sm ${
+                    isDarkTheme 
+                      ? osFilters.length > 0 
+                        ? 'border-indigo-600 bg-indigo-700/30 text-indigo-400' 
+                        : 'border-slate-600 text-slate-300 hover:bg-slate-700' 
+                      : osFilters.length > 0 
+                        ? 'border-indigo-600 bg-indigo-100 text-indigo-600' 
+                        : 'border-slate-300 text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  <Filter size={14} />
+                  <span>Filtres avancés {osFilters.length > 0 && `(${osFilters.length})`}</span>
+                </button>
+              </div>
             </div>
+            
+            {/* Afficher les badges de filtres actifs */}
+            {osFilters.length > 0 && (
+              <FilterBadges
+                badges={getOsFilterBadges}
+                onRemoveBadge={handleRemoveOsFilter}
+                onClearAllBadges={() => setOsFilters([])}
+              />
+            )}
+            
+            {/* Section principale du tableau */}
+            <PaginatedTable 
+              data={filteredHosts}
+              columns={hostColumns}
+              pageSize={20}
+              emptyMessage={
+                osFilters.length > 0
+                  ? "Aucun hôte ne correspond aux filtres sélectionnés."
+                  : "Aucun hôte trouvé pour cette management zone."
+              }
+            />
           </div>
-
-          {/* Ajouter un message de debug si nécessaire */}
-          {sortedHosts.length === 0 && (
-            <div className="p-4 bg-yellow-100 border border-yellow-300 text-yellow-800 rounded m-4">
-              <strong>Débogage:</strong> Aucun hôte trouvé. Vérifiez la console pour plus de détails.
-            </div>
-          )}
-
-          <PaginatedTable 
-            data={sortedHosts}
-            columns={hostColumns}
-            pageSize={20}
-            emptyMessage="Aucun hôte trouvé pour cette management zone."
-          />
         </section>
       )}
       
-      {/* Onglet Services */}
+      {/* Contenu des onglets - Services */}
       {activeTab === 'services' && (
         <section className={`rounded-lg overflow-hidden ${
           isDarkTheme ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
@@ -657,26 +1314,89 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
             <h2 className="font-semibold flex items-center gap-2">
               <Activity className={zoneColors.text} size={16} />
               <span>Services</span>
-              <span className="text-xs text-slate-400 ml-2">({services.length})</span>
+              <span className="text-xs text-slate-400 ml-2">({filteredServices.length})</span>
+              <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full ml-2 dark:bg-blue-900 dark:text-blue-200">
+                Dernières 30 minutes
+              </span>
             </h2>
-            <button className={`flex items-center gap-1 px-3 py-1 rounded-md border text-sm ${
-              isDarkTheme ? 'border-slate-600 text-slate-300 hover:bg-slate-700' : 'border-slate-300 text-slate-600 hover:bg-slate-100'
-            }`}>
-              <Filter size={12} />
-              <span>Filtrer</span>
-            </button>
+            
+            {/* Barre de recherche pour les services */}
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <input 
+                  type="text" 
+                  value={serviceSearchTerm}
+                  onChange={(e) => setServiceSearchTerm(e.target.value)}
+                  placeholder="Rechercher un service..."
+                  className={`w-64 h-8 pl-8 pr-4 rounded-md ${
+                    isDarkTheme 
+                      ? 'bg-slate-700 border-slate-600 text-white placeholder-slate-400' 
+                      : 'bg-slate-100 border-slate-200 text-slate-900 placeholder-slate-500'
+                  } border focus:outline-none focus:ring-1 focus:ring-indigo-500`}
+                />
+                <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 text-slate-400" size={14} />
+                {serviceSearchTerm && (
+                  <button
+                    onClick={() => setServiceSearchTerm('')}
+                    className="absolute right-2.5 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-500"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+              
+              <button 
+                onClick={() => {
+                  setFilterType('service');
+                  setShowAdvancedFilter(true);
+                }}
+                className={`flex items-center gap-1 px-3 py-1 rounded-md border text-sm ${
+                  isDarkTheme 
+                    ? serviceFilters.length > 0 
+                      ? 'border-indigo-600 bg-indigo-700/30 text-indigo-400' 
+                      : 'border-slate-600 text-slate-300 hover:bg-slate-700' 
+                    : serviceFilters.length > 0 
+                      ? 'border-indigo-600 bg-indigo-100 text-indigo-600' 
+                      : 'border-slate-300 text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                <Filter size={14} />
+                <span>Filtres avancés {serviceFilters.length > 0 && `(${serviceFilters.length})`}</span>
+              </button>
+            </div>
           </div>
 
+          {/* Bannière d'information pour les métriques de service */}
+          <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 dark:bg-blue-900/30 text-sm border-b border-blue-100 dark:border-blue-800">
+            <Clock size={14} className="text-blue-500 dark:text-blue-400" />
+            <span className="text-blue-700 dark:text-blue-300">
+              Les métriques sont rafraîchies toutes les 30 minutes et les temps de réponse sont en secondes
+            </span>
+          </div>
+
+          {/* Afficher les badges de filtres actifs */}
+          {serviceFilters.length > 0 && (
+            <FilterBadges
+              badges={getServiceFilterBadges}
+              onRemoveBadge={handleRemoveServiceFilter}
+              onClearAllBadges={() => setServiceFilters([])}
+            />
+          )}
+
           <PaginatedTable 
-            data={services}
+            data={filteredServices}
             columns={serviceColumns}
             pageSize={20}
-            emptyMessage="Aucun service trouvé pour cette management zone."
+            emptyMessage={
+              serviceFilters.length > 0
+                ? "Aucun service ne correspond aux filtres sélectionnés."
+                : "Aucun service trouvé pour cette management zone."
+            }
           />
         </section>
       )}
       
-      {/* Onglet Process Groups */}
+      {/* Contenu des onglets - Process Groups */}
       {activeTab === 'process-groups' && (
         <section className={`rounded-lg overflow-hidden ${
           isDarkTheme ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
@@ -685,23 +1405,86 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
             <h2 className="font-semibold flex items-center gap-2">
               <Cpu className={zoneColors.text} size={16} />
               <span>Process Groups</span>
-              <span className="text-xs text-slate-400 ml-2">({processGroups.length})</span>
+              <span className="text-xs text-slate-400 ml-2">({filteredProcessGroups.length})</span>
             </h2>
-            <button className={`flex items-center gap-1 px-3 py-1 rounded-md border text-sm ${
-              isDarkTheme ? 'border-slate-600 text-slate-300 hover:bg-slate-700' : 'border-slate-300 text-slate-600 hover:bg-slate-100'
-            }`}>
-              <Filter size={12} />
-              <span>Filtrer</span>
+            <button 
+              onClick={() => {
+                setFilterType('process');
+                setShowAdvancedFilter(true);
+              }}
+              className={`flex items-center gap-1 px-3 py-1 rounded-md border text-sm ${
+                isDarkTheme 
+                  ? processFilters.length > 0 
+                    ? 'border-indigo-600 bg-indigo-700/30 text-indigo-400' 
+                    : 'border-slate-600 text-slate-300 hover:bg-slate-700' 
+                  : processFilters.length > 0 
+                    ? 'border-indigo-600 bg-indigo-100 text-indigo-600' 
+                    : 'border-slate-300 text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              <Filter size={14} />
+              <span>Filtres avancés {processFilters.length > 0 && `(${processFilters.length})`}</span>
             </button>
           </div>
 
+          {/* Afficher les badges de filtres actifs */}
+          {processFilters.length > 0 && (
+            <FilterBadges
+              badges={getProcessFilterBadges}
+              onRemoveBadge={handleRemoveProcessFilter}
+              onClearAllBadges={() => setProcessFilters([])}
+            />
+          )}
+
           <PaginatedTable 
-            data={processGroups}
+            data={filteredProcessGroups}
             columns={processColumns}
             pageSize={20}
-            emptyMessage="Aucun process group trouvé pour cette management zone."
+            emptyMessage={
+              processFilters.length > 0
+                ? "Aucun process group ne correspond aux filtres sélectionnés."
+                : "Aucun process group trouvé pour cette management zone."
+            }
           />
         </section>
+      )}
+      
+      {/* Popup du filtre avancé */}
+      {showAdvancedFilter && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          {filterType === 'os' && (
+            <AdvancedFilter
+              title="Filtrer par système d'exploitation"
+              description="Sélectionnez un type d'OS pour voir toutes ses versions, ou cliquez sur une version spécifique."
+              categories={osFilterCategories}
+              selectedFilters={osFilters}
+              onFilterChange={setOsFilters}
+              onClose={() => setShowAdvancedFilter(false)}
+            />
+          )}
+          
+          {filterType === 'service' && (
+            <AdvancedFilter
+              title="Filtrer les services"
+              description="Filtrez les services par technologie, performance ou statut. Vous pouvez combiner plusieurs filtres."
+              categories={serviceFilterCategories}
+              selectedFilters={serviceFilters}
+              onFilterChange={setServiceFilters}
+              onClose={() => setShowAdvancedFilter(false)}
+            />
+          )}
+          
+          {filterType === 'process' && (
+            <AdvancedFilter
+              title="Filtrer les process groups"
+              description="Filtrez les process groups par technologie ou type de processus. Vous pouvez combiner plusieurs filtres."
+              categories={processFilterCategories}
+              selectedFilters={processFilters}
+              onFilterChange={setProcessFilters}
+              onClose={() => setShowAdvancedFilter(false)}
+            />
+          )}
+        </div>
       )}
     </div>
   );

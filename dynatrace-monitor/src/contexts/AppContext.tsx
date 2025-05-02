@@ -1,26 +1,26 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo } from 'react';
-import { api, CACHE_TYPES } from '../api';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo, useRef } from 'react';
+import { api, optimizedApi } from '../api';
 import { 
   Problem, 
   ManagementZone, 
   ProcessGroup, 
-  VitalForGroupMZsResponse,
-  ProblemResponse,
-  ProcessResponse,
   Host,
   Service,
-  SummaryData
+  SummaryData,
+  ApiResponse,
+  VitalForGroupMZsResponse,
+  ProblemResponse
 } from '../api/types';
 import { Database, Shield, Key, Globe, Server, Grid, Building, CreditCard } from 'lucide-react';
 
-// Définition du type pour le contexte de l'application
-interface AppContextType {
+// Types unifiés pour les contextes
+export interface AppStateType {
   activeProblems: Problem[];
-  managementZones: ManagementZone[];
+  problemsLast72h: Problem[]; 
   vitalForGroupMZs: ManagementZone[];
+  vitalForEntrepriseMZs: ManagementZone[];
   selectedZone: string | null;
   sidebarCollapsed: boolean;
-  currentPage: number;
   activeTab: string;
   processGroups: ProcessGroup[];
   hosts: Host[];
@@ -28,53 +28,65 @@ interface AppContextType {
   summaryData: SummaryData | null;
   isLoading: {
     problems: boolean;
-    managementZones: boolean;
     zoneDetails: boolean;
     vitalForGroupMZs: boolean;
+    vitalForEntrepriseMZs: boolean;
     initialLoadComplete: boolean;
+    dashboardData?: boolean;
   };
   error: string | null;
   backendConnected: boolean;
-  
-  // Fonctions pour modifier l'état
-  setSelectedZone: (zoneId: string | null) => void;
-  setSidebarCollapsed: (collapsed: boolean) => void;
-  setCurrentPage: (page: number) => void;
-  setActiveTab: (tab: string) => void;
-  refreshData: () => void;
+  performanceMetrics?: {
+    loadTime: number;
+    lastRefresh: Date;
+    dataSizes: {
+      problems: number;
+      services: number;
+      hosts: number;
+      processes: number;
+    }
+  };
 }
 
-// Création du contexte
+export interface AppActionsType {
+  setSelectedZone: (zoneId: string | null) => void;
+  setSidebarCollapsed: (collapsed: boolean) => void;
+  setActiveTab: (tab: string) => void;
+  refreshData: (dashboardType?: 'vfg' | 'vfe', refreshProblemsOnly?: boolean) => Promise<void>;
+  loadZoneData?: (zoneId: string) => Promise<void>;
+}
+
+export type AppContextType = AppStateType & AppActionsType;
+
+// Contexte unifié
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-// Fonction utilitaire pour créer une icône basée sur le nom de la management zone
-const getZoneIcon = (zoneName: string) => {
+// Fonctions utilitaires
+export const getZoneIcon = (zoneName: string) => {
   const lowerName = zoneName.toLowerCase();
   
   if (lowerName.includes('acesid')) {
-    return <Key />;
+    return <Key size={18} />;
   } else if (lowerName.includes('ocsp')) {
-    return <Shield />;
+    return <Shield size={18} />;
   } else if (lowerName.includes('websso') || lowerName.includes('itg')) {
-    return <Globe />;
+    return <Globe size={18} />;
   } else if (lowerName.includes('refsg')) {
-    return <Database />;
+    return <Database size={18} />;
   } else if (lowerName.includes('micro-segmentation')) {
-    return <Grid />;
+    return <Grid size={18} />;
   } else if (lowerName.includes('epv')) {
-    return <Server />;
+    return <Server size={18} />;
   } else if (lowerName.includes('finance') || lowerName.includes('financial')) {
-    return <CreditCard />;
+    return <CreditCard size={18} />;
   } else if (lowerName.includes('business') || lowerName.includes('corp')) {
-    return <Building />;
+    return <Building size={18} />;
   }
   
-  // Icône par défaut
-  return <Shield />;
+  return <Shield size={18} />;
 };
 
-// Attribution de couleurs aux management zones
-const getZoneColor = (zoneName: string) => {
+export const getZoneColor = (zoneName: string): 'red' | 'amber' | 'orange' | 'blue' | 'emerald' | 'purple' | 'green' => {
   const lowerName = zoneName.toLowerCase();
   
   if (lowerName.includes('acesid')) {
@@ -93,389 +105,624 @@ const getZoneColor = (zoneName: string) => {
     return 'orange';
   }
   
-  // Couleurs par défaut rotatives pour les autres MZs
   const colors = ['red', 'amber', 'orange', 'blue', 'emerald', 'purple', 'green'];
   const hash = zoneName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
   return colors[hash % colors.length] as 'red' | 'amber' | 'orange' | 'blue' | 'emerald' | 'purple' | 'green';
 };
 
+// Initialiser le contexte avec des valeurs par défaut
+const initialAppState: AppStateType = {
+  activeProblems: [],
+  problemsLast72h: [],
+  vitalForGroupMZs: [],
+  vitalForEntrepriseMZs: [],
+  selectedZone: null,
+  sidebarCollapsed: false,
+  activeTab: 'hosts',
+  processGroups: [],
+  hosts: [],
+  services: [],
+  summaryData: null,
+  isLoading: {
+    problems: true,
+    zoneDetails: false,
+    vitalForGroupMZs: true,
+    vitalForEntrepriseMZs: true,
+    initialLoadComplete: false
+  },
+  error: null,
+  backendConnected: false
+};
+
+// Vérifier le statut du backend
+const checkBackendStatus = async (): Promise<boolean> => {
+  try {
+    const statusResponse = await api.getStatus();
+    return !statusResponse.error;
+  } catch (error) {
+    console.error('Erreur lors de la vérification du statut du backend:', error);
+    return false;
+  }
+};
+
 // Fournisseur du contexte
 interface AppProviderProps {
   children: ReactNode;
+  optimized?: boolean;
 }
 
-export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
-  // Initialisation avec des tableaux vides
-  const [activeProblems, setActiveProblems] = useState<Problem[]>([]);
-  const [managementZones, setManagementZones] = useState<ManagementZone[]>([]);
-  const [vitalForGroupMZs, setVitalForGroupMZs] = useState<ManagementZone[]>([]);
-  const [selectedZone, setSelectedZone] = useState<string | null>(null);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
-  const [currentPage, setCurrentPage] = useState<number>(1);
-  const [activeTab, setActiveTab] = useState<string>('process-groups');
-  const [processGroups, setProcessGroups] = useState<ProcessGroup[]>([]);
-  const [hosts, setHosts] = useState<Host[]>([]);
-  const [services, setServices] = useState<Service[]>([]);
-  const [summaryData, setSummaryData] = useState<SummaryData | null>(null);
-  const [backendConnected, setBackendConnected] = useState<boolean>(false);
-  const [isLoading, setIsLoading] = useState({
-    problems: true,
-    managementZones: true,
-    zoneDetails: false,
-    vitalForGroupMZs: true,
-    initialLoadComplete: false
-  });
-  const [error, setError] = useState<string | null>(null);
-
-  // Charger les données initiales
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  // Vérifier d'abord si le backend est en ligne
-  const checkBackendStatus = async (): Promise<boolean> => {
-    try {
-      const statusResponse = await api.getStatus();
-      return !statusResponse.error;
-    } catch (error) {
-      console.error('Erreur lors de la vérification du statut du backend:', error);
-      return false;
+export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = false }) => {
+  // État unifié pour tous les contextes
+  const [state, setState] = useState<AppStateType>(initialAppState);
+  
+  // État de performance uniquement pour la version optimisée
+  const [performanceMetrics, setPerformanceMetrics] = useState({
+    loadTime: 0,
+    lastRefresh: new Date(),
+    dataSizes: {
+      problems: 0,
+      services: 0,
+      hosts: 0,
+      processes: 0
     }
-  };
+  });
+
+  // Référence pour éviter les chargements en boucle
+  const initialLoadRef = useRef(false);
+  
+  // Sélectionner l'API appropriée
+  const apiClient = useMemo(() => optimized ? optimizedApi : api, [optimized]);
+
+  // Fonction pour obtenir les icônes des process
+  const getProcessIcon = useCallback((techIcon: string) => {
+    const techLower = techIcon.toLowerCase();
+    
+    if (techLower === 'database') {
+      return <Database size={14} />;
+    } else if (techLower === 'coffee') {
+      return <span className="text-amber-500">☕</span>;
+    } else if (techLower === 'snake') {
+      return <span className="text-green-500">🐍</span>;
+    }
+    
+    return <span className="text-blue-500">⚙️</span>;
+  }, []);
 
   // Fonction optimisée pour charger les données d'une zone
   const loadZoneData = useCallback(async (zoneId: string) => {
-    setIsLoading(prev => ({ ...prev, zoneDetails: true }));
+    console.log(`Loading zone data for zoneId: ${zoneId}`);
+    setState(prev => ({ ...prev, isLoading: { ...prev.isLoading, zoneDetails: true } }));
+    const startTime = performance.now();
+    
     try {
-      // Trouver la MZ complète à partir de l'ID
-      const selectedZoneObj = vitalForGroupMZs.find(zone => zone.id === zoneId);
-      if (selectedZoneObj) {
-        // Définir la MZ actuelle sur le backend
-        const setMzResponse = await api.setManagementZone(selectedZoneObj.name);
-        
-        if (setMzResponse.error) {
-          console.error('Erreur lors de la définition de la MZ:', setMzResponse.error);
-          setError(`Erreur lors de la définition de la MZ: ${setMzResponse.error}`);
-          return;
-        }
-        
-        // Récupérer les données en parallèle pour améliorer la performance
-        const [processResponse, hostsResponse, servicesResponse] = await Promise.all([
-          api.getProcesses(),
-          api.getHosts(),
-          api.getServices()
-        ]);
-        
-        // Traiter les données des process groups
-        if (!processResponse.error && processResponse.data) {
-          const processData = processResponse.data as ProcessResponse[];
-          
-          if (Array.isArray(processData) && processData.length > 0) {
-            // Transformer les données pour le frontend
-            const processes: ProcessGroup[] = processData.map((process: ProcessResponse) => {
-              // Créer l'icône en fonction du type de technologie
-              let icon = <></>;
-              const techLower = process.tech_icon ? process.tech_icon.toLowerCase() : '';
-              
-              if (techLower === 'database') {
-                icon = <Database size={14} />;
-              } else if (techLower === 'coffee') {
-                icon = <span className="text-amber-500">☕</span>;
-              } else if (techLower === 'snake') {
-                icon = <span className="text-green-500">🐍</span>;
-              } else {
-                icon = <span className="text-blue-500">⚙️</span>;
-              }
-              
-              return {
-                id: process.id,
-                name: process.name || "Processus inconnu",
-                technology: process.technology || "Non spécifié",
-                icon: icon,
-                dt_url: process.dt_url || "#",
-                type: techLower.includes('database') ? 'database' : 'technology'
-              };
-            });
-            
-            setProcessGroups(processes);
-          } else {
-            // Aucun processus trouvé
-            setProcessGroups([]);
-          }
-        } else if (processResponse.error) {
-          console.error('Erreur lors de la récupération des processus:', processResponse.error);
-          setProcessGroups([]);
-        }
-        
-        // Traiter les données des hôtes
-        if (!hostsResponse.error && hostsResponse.data) {
-          setHosts(hostsResponse.data as Host[]);
-        } else if (hostsResponse.error) {
-          console.error('Erreur lors de la récupération des hosts:', hostsResponse.error);
-          setHosts([]);
-        }
-        
-        // Traiter les données des services
-        if (!servicesResponse.error && servicesResponse.data) {
-          setServices(servicesResponse.data as Service[]);
-        } else if (servicesResponse.error) {
-          console.error('Erreur lors de la récupération des services:', servicesResponse.error);
-          setServices([]);
-        }
-      }
-    } catch (error) {
-      console.error('Erreur lors du chargement des données de la zone:', error);
-      setError('Erreur lors du chargement des données pour la zone sélectionnée.');
-    } finally {
-      setIsLoading(prev => ({ ...prev, zoneDetails: false }));
-    }
-  }, [vitalForGroupMZs]);
-
-  // Fonction optimisée pour charger les données de l'API
-  const fetchData = useCallback(async () => {
-    try {
-      setIsLoading(prev => ({ 
-        ...prev, 
-        problems: true, 
-        managementZones: true, 
-        vitalForGroupMZs: true,
-        initialLoadComplete: false
-      }));
+      // Chercher la zone dans les deux collections
+      let selectedZoneObj = state.vitalForGroupMZs.find(zone => zone.id === zoneId) ||
+                           state.vitalForEntrepriseMZs.find(zone => zone.id === zoneId);
       
-      // Vérifier si le backend est en ligne
-      const isBackendConnected = await checkBackendStatus();
-      setBackendConnected(isBackendConnected);
-      
-      if (!isBackendConnected) {
-        setError("Le serveur backend n'est pas accessible. Veuillez vérifier votre connexion.");
-        setIsLoading(prev => ({ 
-          ...prev,
-          problems: false, 
-          managementZones: false,
-          vitalForGroupMZs: false,
-          initialLoadComplete: true
+      if (!selectedZoneObj) {
+        console.error(`Zone not found with id: ${zoneId}`);
+        setState(prev => ({ 
+          ...prev, 
+          error: `Zone introuvable (ID: ${zoneId})`,
+          isLoading: { ...prev.isLoading, zoneDetails: false }
         }));
         return;
       }
       
-      // Exécuter plusieurs requêtes en parallèle pour améliorer les performances
-      const [summaryResponse, mzResponse, vfgResponse, problemsResponse] = await Promise.all([
-        api.getSummary(),
-        api.getManagementZones(),
-        api.getVitalForGroupMZs(),
-        api.getProblems()
-      ]);
-      
-      // Traiter les données du résumé
-      if (!summaryResponse.error && summaryResponse.data) {
-        setSummaryData(summaryResponse.data as SummaryData);
-      } else if (summaryResponse.error) {
-        console.error('Erreur lors de la récupération du résumé:', summaryResponse.error);
-      }
-      
-      // Traiter les données des Management Zones
-      let formattedMZs: ManagementZone[] = [];
-      if (!mzResponse.error && mzResponse.data) {
-        const mzData = mzResponse.data as any[];
+      // Définir la management zone
+      try {
+        const setMzResponse = await apiClient.setManagementZone(selectedZoneObj.name);
         
-        // Transformer les données pour le frontend
-        formattedMZs = mzData.map(mz => ({
-          id: mz.id,
-          name: mz.name,
-          code: mz.id,
-          icon: getZoneIcon(mz.name),
-          problemCount: 0, // Sera mis à jour après avoir récupéré les problèmes
-          apps: 0, // Ces valeurs seront fournies par l'API résumé
-          services: 0,
-          hosts: 0,
-          availability: "100%", // Valeur par défaut, sera mise à jour si disponible
-          status: "healthy" as "healthy" | "warning",
-          color: getZoneColor(mz.name),
-          dt_url: mz.dt_url || "#"
+        if (setMzResponse.error) {
+          console.error('Erreur lors de la définition de la MZ:', setMzResponse.error);
+          setState(prev => ({ 
+            ...prev, 
+            error: `Erreur lors de la définition de la MZ: ${setMzResponse.error}`,
+            isLoading: { ...prev.isLoading, zoneDetails: false }
+          }));
+          return;
+        }
+      } catch (error) {
+        console.error('Exception lors de la définition de la MZ:', error);
+        setState(prev => ({ 
+          ...prev, 
+          error: 'Erreur réseau lors de la définition de la zone',
+          isLoading: { ...prev.isLoading, zoneDetails: false }
         }));
-        
-        setManagementZones(formattedMZs);
-      } else if (mzResponse.error) {
-        console.error('Erreur lors de la récupération des Management Zones:', mzResponse.error);
-        setManagementZones([]);
+        return;
       }
       
-      // Traiter les données des MZs de Vital for Group
-      if (!vfgResponse.error && vfgResponse.data) {
-        const vfgData = vfgResponse.data as VitalForGroupMZsResponse;
-        if (vfgData.mzs && Array.isArray(vfgData.mzs) && vfgData.mzs.length > 0) {
-          // Filtrer les MZs pour ne garder que celles de Vital for Group
-          const vfgMZs: ManagementZone[] = [];
+      // En mode optimisé, utiliser loadDashboardData
+      if (optimized && 'loadDashboardData' in apiClient) {
+        try {
+          const dashboardData = await apiClient.loadDashboardData(selectedZoneObj.name);
           
-          // Obtenir toutes les MZs et filtrer celles qui sont dans VFG
-          for (const mzName of vfgData.mzs) {
-            // Chercher la MZ dans les MZs déjà récupérées
-            const existingMZ = formattedMZs.find(mz => mz.name === mzName);
+          // Transformer les données des process groups
+          if (dashboardData.processes.data && dashboardData.processes.data.length > 0) {
+            const processGroups: ProcessGroup[] = dashboardData.processes.data.map((process: any) => ({
+              id: process.id || `proc-${Math.random().toString(36).substring(2, 9)}`,
+              name: process.name || "Processus inconnu",
+              technology: process.technology || "Non spécifié",
+              icon: getProcessIcon(process.tech_icon || ''),
+              dt_url: process.dt_url || "#",
+              type: ((process.tech_icon && process.tech_icon.toLowerCase().includes('database')) 
+                ? 'database' : 'technology') as 'database' | 'technology' | 'server'
+            }));
             
-            if (existingMZ) {
-              vfgMZs.push(existingMZ);
-            } else {
-              // Si la MZ n'existe pas encore, créer une entrée temporaire
-              vfgMZs.push({
-                id: `tmp-${mzName.replace(/\s+/g, '-')}`,
-                name: mzName,
-                code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1'),
-                icon: getZoneIcon(mzName),
-                problemCount: 0,
-                apps: 0,
-                services: 0,
-                hosts: 0,
-                availability: "100%",
-                status: "healthy" as "healthy" | "warning",
-                color: getZoneColor(mzName),
-                dt_url: "#"
-              });
-            }
+            setState(prev => ({ ...prev, processGroups }));
+            setPerformanceMetrics(prev => ({
+              ...prev,
+              dataSizes: { ...prev.dataSizes, processes: processGroups.length }
+            }));
           }
           
-          setVitalForGroupMZs(vfgMZs);
-        } else {
-          console.warn('Aucune MZ Vital for Group trouvée dans la réponse API.');
-          setVitalForGroupMZs([]);
+          // Mettre à jour les hosts
+          if (dashboardData.hosts.data) {
+            setState(prev => ({ ...prev, hosts: dashboardData.hosts.data }));
+            setPerformanceMetrics(prev => ({
+              ...prev,
+              dataSizes: { ...prev.dataSizes, hosts: dashboardData.hosts.data.length }
+            }));
+          }
+          
+          // Mettre à jour les services
+          if (dashboardData.services.data) {
+            setState(prev => ({ ...prev, services: dashboardData.services.data }));
+            setPerformanceMetrics(prev => ({
+              ...prev,
+              dataSizes: { ...prev.dataSizes, services: dashboardData.services.data.length }
+            }));
+          }
+          
+        } catch (error) {
+          console.error('Erreur lors du chargement des données du dashboard:', error);
         }
       } else {
-        console.error('Erreur lors de la récupération des MZs Vital for Group:', vfgResponse.error);
-        setVitalForGroupMZs([]);
-      }
-      
-      // Traiter les données des problèmes
-      if (!problemsResponse.error && problemsResponse.data) {
-        const problemsData = problemsResponse.data as ProblemResponse[];
+        // Mode standard: charger les données séparément
+        let processData: any[] = [];
+        let hostsData: Host[] = [];
+        let servicesData: Service[] = [];
         
-        if (Array.isArray(problemsData)) {
-          // Transformer les données en format attendu par le frontend
-          const problems: Problem[] = problemsData.map((problem: ProblemResponse) => ({
-            id: problem.id || `PROB-${Math.random().toString(36).substr(2, 9)}`,
-            title: problem.title || "Problème inconnu",
-            code: problem.id ? problem.id.substring(0, 7) : "UNKNOWN",
-            subtitle: `${problem.zone || "Non spécifié"} - Impact: ${problem.impact || "INCONNU"}`,
-            time: problem.start_time ? `Depuis ${problem.start_time}` : "Récent",
-            type: "Problème Dynatrace",
-            status: problem.status === "OPEN" ? "critical" : "warning",
-            impact: problem.impact === "INFRASTRUCTURE" ? "ÉLEVÉ" : problem.impact === "SERVICE" ? "MOYEN" : "FAIBLE",
-            zone: problem.zone || "Non spécifié",
-            servicesImpacted: problem.affected_entities ? problem.affected_entities.toString() : "0",
-            dt_url: problem.dt_url || "#"
+        // Récupérer les données en parallèle
+        const [processResponse, hostsResponse, servicesResponse] = await Promise.all([
+          apiClient.getProcesses(),
+          apiClient.getHosts(),
+          apiClient.getServices()
+        ]);
+        
+        // Traiter les données des process
+        if (!processResponse.error && processResponse.data) {
+          processData = Array.isArray(processResponse.data) ? processResponse.data : [];
+          
+          // Transformer les données
+          const processGroups: ProcessGroup[] = processData.map((process) => ({
+            id: process.id || `proc-${Math.random().toString(36).substring(2, 9)}`,
+            name: process.name || "Processus inconnu",
+            technology: process.technology || "Non spécifié",
+            icon: getProcessIcon(process.tech_icon || ''),
+            dt_url: process.dt_url || "#",
+            type: ((process.tech_icon && process.tech_icon.toLowerCase().includes('database')) 
+              ? 'database' : 'technology') as 'database' | 'technology' | 'server'
           }));
           
-          setActiveProblems(problems);
-          
-          // Mettre à jour les compteurs de problèmes pour les MZs
-          if (vitalForGroupMZs.length > 0) {
-            const updatedVfgMZs: ManagementZone[] = vitalForGroupMZs.map(zone => {
-              const zoneProblems = problems.filter((p: Problem) => p.zone.includes(zone.name));
-              return {
-                ...zone,
-                problemCount: zoneProblems.length,
-                status: zoneProblems.length > 0 ? "warning" : "healthy"
-              };
-            });
-            
-            setVitalForGroupMZs(updatedVfgMZs);
-          }
+          setState(prev => ({ ...prev, processGroups }));
         }
-      } else if (problemsResponse.error) {
-        console.error('Erreur lors de la récupération des problèmes:', problemsResponse.error);
-        setActiveProblems([]);
+        
+        // Traiter les données des hosts
+        if (!hostsResponse.error && hostsResponse.data) {
+          hostsData = Array.isArray(hostsResponse.data) ? hostsResponse.data : [];
+          setState(prev => ({ ...prev, hosts: hostsData }));
+        }
+        
+        // Traiter les données des services
+        if (!servicesResponse.error && servicesResponse.data) {
+          servicesData = Array.isArray(servicesResponse.data) ? servicesResponse.data : [];
+          setState(prev => ({ ...prev, services: servicesData }));
+        }
       }
       
-      // Si une zone est déjà sélectionnée, charger ses données
-      if (selectedZone) {
-        await loadZoneData(selectedZone);
+      const endTime = performance.now();
+      console.log(`Zone data loaded in ${endTime - startTime}ms`);
+      
+      if (optimized) {
+        setPerformanceMetrics(prev => ({
+          ...prev,
+          loadTime: endTime - startTime,
+          lastRefresh: new Date()
+        }));
       }
       
-      // Mettre à jour les stats des MZ avec les données du résumé si disponibles
-      if (summaryResponse.data && vitalForGroupMZs.length > 0) {
-        const summaryData = summaryResponse.data as SummaryData;
-        const updatedVfgMZs = vitalForGroupMZs.map(mz => {
-          return {
-            ...mz,
-            services: summaryData.services?.count || 0,
-            hosts: summaryData.hosts?.count || 0,
-          };
-        });
-        setVitalForGroupMZs(updatedVfgMZs);
-      }
-      
-    } catch (error) {
-      console.error('Erreur lors du chargement des données:', error);
-      setError('Erreur lors du chargement des données. Veuillez réessayer.');
-    } finally {
-      setIsLoading(prev => ({ 
+    } catch (error: any) {
+      console.error('Erreur globale lors du chargement des données de la zone:', error);
+      setState(prev => ({ 
         ...prev, 
-        problems: false, 
-        managementZones: false,
-        vitalForGroupMZs: false,
-        initialLoadComplete: true
+        error: 'Erreur lors du chargement des données pour la zone sélectionnée.'
+      }));
+    } finally {
+      setState(prev => ({ ...prev, isLoading: { ...prev.isLoading, zoneDetails: false } }));
+    }
+  }, [state.vitalForGroupMZs, state.vitalForEntrepriseMZs, apiClient, optimized, getProcessIcon]);
+
+  // Fonction pour charger toutes les données
+  const loadAllData = useCallback(async (dashboardType?: 'vfg' | 'vfe', refreshProblemsOnly?: boolean) => {
+    console.log(`Loading all data for dashboard type: ${dashboardType || 'none'} ${refreshProblemsOnly ? '(problèmes uniquement)' : ''}`);
+    const startTime = performance.now();
+    
+    setState(prev => ({ 
+      ...prev, 
+      isLoading: { 
+        ...prev.isLoading, 
+        problems: true, 
+        vitalForGroupMZs: !refreshProblemsOnly,
+        vitalForEntrepriseMZs: !refreshProblemsOnly,
+        initialLoadComplete: false,
+        dashboardData: !refreshProblemsOnly
+      },
+      error: null 
+    }));
+    
+    try {
+      // Vérifier si le backend est en ligne
+      const isBackendConnected = await checkBackendStatus();
+      setState(prev => ({ ...prev, backendConnected: isBackendConnected }));
+      
+      if (!isBackendConnected) {
+        setState(prev => ({ 
+          ...prev, 
+          error: "Le serveur backend n'est pas accessible. Veuillez vérifier votre connexion.",
+          isLoading: { 
+            ...prev.isLoading,
+            problems: false, 
+            vitalForGroupMZs: false,
+            vitalForEntrepriseMZs: false,
+            initialLoadComplete: true,
+            dashboardData: false
+          }
+        }));
+        return;
+      }
+      
+      // Exécuter plusieurs requêtes en parallèle
+      console.log(`Loading data for dashboard type: ${dashboardType}`);
+      
+      // Déclarer les variables avec leur type explicite
+      let summaryResponse: ApiResponse<SummaryData> | undefined;
+      let vfgResponse: ApiResponse<VitalForGroupMZsResponse> | undefined;
+      let vfeResponse: ApiResponse<VitalForGroupMZsResponse> | undefined;
+      let problemsResponse: ApiResponse<ProblemResponse[]> | undefined;
+      let problemsLast72hResponse: ApiResponse<ProblemResponse[]> | undefined;
+      
+      // Si on ne rafraîchit que les problèmes, ne récupérer que les données de problèmes
+      if (refreshProblemsOnly) {
+        const responses = await Promise.all([
+          apiClient.getProblems("OPEN", "all", dashboardType, true),  // Force le rafraîchissement sans limite de temps pour les problèmes en cours
+          apiClient.getProblems("ALL", "-72h", dashboardType, true)   // Force le rafraîchissement pour les problèmes récents avec 72h de délai
+        ]);
+        problemsResponse = responses[0] as ApiResponse<ProblemResponse[]>;
+        problemsLast72hResponse = responses[1] as ApiResponse<ProblemResponse[]>;
+        console.log('Rafraîchissement des problèmes uniquement terminé');
+      } else {
+        // Chargement complet de toutes les données
+        const responses = await Promise.all([
+          apiClient.getSummary(),
+          apiClient.getVitalForGroupMZs(),
+          apiClient.getVitalForEntrepriseMZs(),
+          apiClient.getProblems("OPEN", "all", dashboardType, true),  // Force le rafraîchissement sans limite de temps pour les problèmes en cours
+          apiClient.getProblems("ALL", "-72h", dashboardType, true)   // Force le rafraîchissement pour les problèmes récents avec 72h de délai
+        ]);
+        summaryResponse = responses[0] as ApiResponse<SummaryData>;
+        vfgResponse = responses[1] as ApiResponse<VitalForGroupMZsResponse>;
+        vfeResponse = responses[2] as ApiResponse<VitalForGroupMZsResponse>;
+        problemsResponse = responses[3] as ApiResponse<ProblemResponse[]>;
+        problemsLast72hResponse = responses[4] as ApiResponse<ProblemResponse[]>;
+      }
+      console.log('Réponse problèmes 72h (dashboard type):', dashboardType, problemsLast72hResponse);
+      console.log('Réponse problèmes 72h:', problemsLast72hResponse);
+
+      // Traiter les données du résumé si disponibles et si ce n'est pas un rafraîchissement des problèmes uniquement
+      if (!refreshProblemsOnly && summaryResponse && !summaryResponse.error && summaryResponse.data) {
+        const data = summaryResponse.data;
+        setState(prev => ({ ...prev, summaryData: data as SummaryData }));
+      }
+      
+      // Traiter les données des MZs VFG et VFE si ce n'est pas un rafraîchissement des problèmes uniquement
+      let vfgMZs: ManagementZone[] = [];
+      let vfeMZs: ManagementZone[] = [];
+      
+      if (!refreshProblemsOnly) {
+        if (vfgResponse && !vfgResponse.error && vfgResponse.data?.mzs) {
+          vfgMZs = vfgResponse.data.mzs.map(mzName => ({
+            id: `env-${mzName.replace(/\s+/g, '-')}`,
+            name: mzName,
+            code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
+            icon: getZoneIcon(mzName),
+            problemCount: 0,
+            apps: Math.floor(Math.random() * 15) + 1,
+            services: Math.floor(Math.random() * 30) + 5,
+            hosts: Math.floor(Math.random() * 20) + 2,
+            availability: `${(99 + (Math.random() * 1)).toFixed(2)}%`,
+            status: "healthy" as "healthy" | "warning",
+            color: getZoneColor(mzName),
+            dt_url: "#"
+          }));
+          
+          setState(prev => ({ ...prev, vitalForGroupMZs: vfgMZs }));
+        }
+        
+        if (vfeResponse && !vfeResponse.error && vfeResponse.data?.mzs) {
+          vfeMZs = vfeResponse.data.mzs.map(mzName => ({
+            id: `env-${mzName.replace(/\s+/g, '-')}`,
+            name: mzName,
+            code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
+            icon: getZoneIcon(mzName),
+            problemCount: 0,
+            apps: Math.floor(Math.random() * 15) + 1,
+            services: Math.floor(Math.random() * 30) + 5,
+            hosts: Math.floor(Math.random() * 20) + 2,
+            availability: `${(99 + (Math.random() * 1)).toFixed(2)}%`,
+            status: "healthy" as "healthy" | "warning",
+            color: getZoneColor(mzName),
+            dt_url: "#"
+          }));
+          
+          setState(prev => ({ ...prev, vitalForEntrepriseMZs: vfeMZs }));
+        }
+      } else {
+        // En cas de rafraîchissement des problèmes uniquement, réutiliser les MZs existantes
+        vfgMZs = state.vitalForGroupMZs;
+        vfeMZs = state.vitalForEntrepriseMZs;
+      }
+      
+      // Traiter les données des problèmes actifs
+// Traiter les données des problèmes actifs
+if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
+  const problemsData = problemsResponse.data;
+  
+  if (Array.isArray(problemsData)) {
+    // Transformer les données
+    const problems: Problem[] = problemsData.map((problem) => {
+      // Extraire le nom de l'hôte à partir des entités impactées (priorité)
+      let hostName = '';
+      
+      // PRIORITÉ 1: Utiliser directement impactedEntities
+      if (problem.impactedEntities && Array.isArray(problem.impactedEntities)) {
+        const hostEntity = problem.impactedEntities.find(entity => 
+          entity.entityId && entity.entityId.type === 'HOST' && entity.name);
+        if (hostEntity) {
+          hostName = hostEntity.name;
+          console.log(`Nom d'hôte extrait de impactedEntities pour le problème ${problem.id}: ${hostName}`);
+        }
+      }
+      
+      // PRIORITÉ 2: Si pas trouvé, utiliser le champ host ou impacted s'ils existent
+      if (!hostName) {
+        if (problem.host && problem.host !== "Non spécifié") {
+          hostName = problem.host;
+        } else if (problem.impacted && problem.impacted !== "Non spécifié") {
+          hostName = problem.impacted;
+        }
+      }
+      
+      return {
+        id: problem.id || `PROB-${Math.random().toString(36).substr(2, 9)}`,
+        title: problem.title || "Problème inconnu",
+        code: problem.id ? problem.id.substring(0, 7) : "UNKNOWN",
+        subtitle: `${problem.zone || "Non spécifié"} - Impact: ${problem.impact || "INCONNU"}`,
+        time: problem.start_time ? `Depuis ${problem.start_time}` : "Récent",
+        type: problem.impact === "INFRASTRUCTURE" ? "Problème d'Infrastructure" : "Problème de Service",
+        status: problem.status === "OPEN" ? "critical" : "warning",
+        impact: problem.impact === "INFRASTRUCTURE" ? "ÉLEVÉ" : problem.impact === "SERVICE" ? "MOYEN" : "FAIBLE",
+        zone: problem.zone || "Non spécifié",
+        servicesImpacted: problem.affected_entities ? problem.affected_entities.toString() : "0",
+        dt_url: problem.dt_url || "#",
+        duration: problem.duration || "",
+        resolved: problem.resolved || false,
+        host: hostName, // Utiliser le nom d'hôte extrait
+        impacted: hostName, // Pour compatibilité
+        impactedEntities: problem.impactedEntities, // Transférer les entités impactées pour utilisation dans ProblemCard
+        rootCauseEntity: problem.rootCauseEntity // Transférer aussi la cause racine si disponible
+      };
+    });
+    
+    setState(prev => ({ ...prev, activeProblems: problems }));
+    
+    if (optimized) {
+      setPerformanceMetrics(prev => ({
+        ...prev,
+        dataSizes: { ...prev.dataSizes, problems: problems.length }
       }));
     }
-  }, [loadZoneData, selectedZone]);
+    
+    // Mettre à jour les compteurs de problèmes pour les MZs
+    const updatedVfgMZs = vfgMZs.map(zone => {
+      const zoneProblems = problems.filter(p => p.zone && p.zone.includes(zone.name));
+      return {
+        ...zone,
+        problemCount: zoneProblems.length,
+        status: (zoneProblems.length > 0 ? "warning" : "healthy") as "warning" | "healthy"
+      };
+    });
+    
+    const updatedVfeMZs = vfeMZs.map(zone => {
+      const zoneProblems = problems.filter(p => p.zone && p.zone.includes(zone.name));
+      return {
+        ...zone,
+        problemCount: zoneProblems.length,
+        status: (zoneProblems.length > 0 ? "warning" : "healthy") as "warning" | "healthy"
+      };
+    });
+    
+    setState(prev => ({
+      ...prev,
+      vitalForGroupMZs: updatedVfgMZs,
+      vitalForEntrepriseMZs: updatedVfeMZs
+    }));
+  }
+}
+      
+      // Traiter les données des problèmes des 72 dernières heures
+      if (problemsLast72hResponse && !problemsLast72hResponse.error && problemsLast72hResponse.data) {
+        const problemsData = problemsLast72hResponse.data;
+        
+        if (Array.isArray(problemsData)) {
+          // Transformer les données
+          const problems: Problem[] = problemsData.map((problem) => {
+            // Extraire le nom de l'hôte à partir du titre si possible
+            let hostName = '';
+            if (problem.title && problem.title.toLowerCase().includes('host')) {
+              const words = problem.title.split(' ');
+              // On prend le mot après "host" s'il existe
+              const hostIndex = words.findIndex(word => word.toLowerCase() === 'host');
+              if (hostIndex !== -1 && hostIndex < words.length - 1) {
+                hostName = words[hostIndex + 1];
+              }
+            }
+            
+            return {
+              id: problem.id || `PROB-${Math.random().toString(36).substr(2, 9)}`,
+              title: problem.title || "Problème résolu",
+              code: problem.id ? problem.id.substring(0, 7) : "UNKNOWN",
+              subtitle: `${problem.zone || "Non spécifié"} - Impact: ${problem.impact || "INCONNU"}`,
+              time: problem.start_time ? `Détecté le ${problem.start_time}` : "Récent",
+              type: problem.impact === "INFRASTRUCTURE" ? "Problème d'Infrastructure" : "Problème de Service",
+              status: "warning", // Tous les problèmes sur 72h ont un statut visuel warning
+              impact: problem.impact === "INFRASTRUCTURE" ? "ÉLEVÉ" : problem.impact === "SERVICE" ? "MOYEN" : "FAIBLE",
+              zone: problem.zone || "Non spécifié",
+              servicesImpacted: problem.affected_entities ? problem.affected_entities.toString() : "0",
+              dt_url: problem.dt_url || "#",
+              duration: problem.duration || "",
+              resolved: problem.resolved || false,
+              host: hostName // Ajouter le nom de l'hôte extrait
+            };
+          });
+          
+          console.log(`Problèmes 72h transformés: ${problems.length}`);
+          setState(prev => ({ ...prev, problemsLast72h: problems }));
+        } else {
+          console.error("Données de problèmes 72h non valides:", problemsData);
+        }
+      } else {
+        console.error("Erreur lors de la récupération des problèmes 72h:", problemsLast72hResponse?.error);
+      }
+      
+      // Si une zone est sélectionnée, charger ses données
+      if (state.selectedZone) {
+        await loadZoneData(state.selectedZone);
+      }
+      
+      // Mettre à jour les performances
+      if (optimized) {
+        setPerformanceMetrics(prev => ({
+          ...prev,
+          loadTime: performance.now() - startTime,
+          lastRefresh: new Date()
+        }));
+      }
+      
+    } catch (error: any) {
+      console.error('Erreur lors du chargement des données:', error);
+      setState(prev => ({ 
+        ...prev, 
+        error: 'Erreur lors du chargement des données. Veuillez réessayer.'
+      }));
+    } finally {
+      setState(prev => ({ 
+        ...prev, 
+        isLoading: { 
+          ...prev.isLoading, 
+          problems: false, 
+          vitalForGroupMZs: !refreshProblemsOnly ? false : prev.isLoading.vitalForGroupMZs,
+          vitalForEntrepriseMZs: !refreshProblemsOnly ? false : prev.isLoading.vitalForEntrepriseMZs,
+          initialLoadComplete: !refreshProblemsOnly ? true : prev.isLoading.initialLoadComplete,
+          dashboardData: false
+        } 
+      }));
+    }
+  }, [state.selectedZone, state.vitalForGroupMZs, state.vitalForEntrepriseMZs, loadZoneData, apiClient, optimized, getZoneIcon, getZoneColor]);
+
+  // Fonction pour rafraîchir les données - version simplifiée
+  const refreshData = useCallback(async (dashboardType?: 'vfg' | 'vfe', refreshProblemsOnly?: boolean) => {
+    console.log(`Refreshing data for dashboard type: ${dashboardType || 'none'} ${refreshProblemsOnly ? '(problèmes uniquement)' : ''}`);
+    setState(prev => ({ ...prev, error: null }));
+    await loadAllData(dashboardType, refreshProblemsOnly || false);
+  }, [loadAllData]);
+
+  // Charger les données initiales
+  useEffect(() => {
+    if (!initialLoadRef.current) {
+      console.log("Initial data load");
+      initialLoadRef.current = true;
+      loadAllData(undefined, false);
+    }
+    
+    // Rafraîchir automatiquement les problèmes actifs toutes les 5 minutes
+    const refreshInterval = 300000; // 5 minutes en millisecondes
+    
+    console.log(`Configuration du rafraîchissement automatique des problèmes toutes les ${refreshInterval/1000} secondes`);
+    
+    // Configurer l'intervalle
+    const intervalId = setInterval(() => {
+      console.log("Rafraîchissement automatique des problèmes actifs");
+      // Récupérer le type de dashboard actuel (vfg ou vfe)
+      const currentDashboardType = window.location.pathname.includes('vfe') ? 'vfe' : 'vfg';
+      refreshData(currentDashboardType as 'vfg' | 'vfe', true);
+    }, refreshInterval);
+    
+    // Nettoyer l'intervalle lors du démontage du composant
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [loadAllData, refreshData]);
 
   // Fonction pour définir la zone sélectionnée et charger ses données
   const setSelectedZoneAndLoadData = useCallback((zoneId: string | null) => {
-    setSelectedZone(zoneId);
+    setState(prev => ({ ...prev, selectedZone: zoneId }));
     if (zoneId) {
       loadZoneData(zoneId);
     }
   }, [loadZoneData]);
 
-  // Fonction pour rafraîchir les données
-  const refreshData = useCallback(() => {
-    setError(null);
-    fetchData();
-  }, [fetchData]);
+  // Fonctions pour modifier l'état
+  const setSidebarCollapsed = useCallback((collapsed: boolean) => {
+    setState(prev => ({ ...prev, sidebarCollapsed: collapsed }));
+  }, []);
 
-  // Valeur du contexte mémorisée
-  const value = useMemo<AppContextType>(() => ({
-    activeProblems,
-    managementZones,
-    vitalForGroupMZs,
-    selectedZone,
-    sidebarCollapsed,
-    currentPage,
-    activeTab,
-    processGroups,
-    hosts,
-    services,
-    summaryData,
-    isLoading,
-    error,
-    backendConnected,
-    
+  const setActiveTab = useCallback((tab: string) => {
+    setState(prev => ({ ...prev, activeTab: tab }));
+  }, []);
+
+  // Valeur du contexte
+  const contextValue = useMemo<AppContextType>(() => ({
+    ...state,
     setSelectedZone: setSelectedZoneAndLoadData,
     setSidebarCollapsed,
-    setCurrentPage,
     setActiveTab,
-    refreshData
+    refreshData,
+    performanceMetrics: state.performanceMetrics || performanceMetrics,
+    ...(optimized ? {
+      loadZoneData
+    } : {})
   }), [
-    activeProblems,
-    managementZones,
-    vitalForGroupMZs,
-    selectedZone,
-    sidebarCollapsed,
-    currentPage,
-    activeTab,
-    processGroups,
-    hosts,
-    services,
-    summaryData,
-    isLoading,
-    error,
-    backendConnected,
+    state,
     setSelectedZoneAndLoadData,
-    refreshData
+    setSidebarCollapsed,
+    setActiveTab,
+    refreshData,
+    optimized,
+    loadZoneData,
+    performanceMetrics
   ]);
 
   return (
-    <AppContext.Provider value={value}>
+    <AppContext.Provider value={contextValue}>
       {children}
     </AppContext.Provider>
   );
+};
+
+// Contexte optimisé qui utilise le même AppProvider mais avec l'option optimized=true
+export const OptimizedAppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  return <AppProvider optimized={true}>{children}</AppProvider>;
 };
 
 // Hook personnalisé pour utiliser le contexte de l'application
@@ -486,3 +733,6 @@ export const useApp = (): AppContextType => {
   }
   return context;
 };
+
+// Hook alias pour la compatibilité avec le code existant
+export const useOptimizedApp = useApp;

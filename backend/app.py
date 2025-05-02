@@ -25,7 +25,12 @@ load_dotenv()
 # Récupérer les variables d'environnement
 DT_ENV_URL = os.environ.get('DT_ENV_URL')
 API_TOKEN = os.environ.get('API_TOKEN')
-CACHE_DURATION = int(os.environ.get('CACHE_DURATION', 300))  # 5 minutes en secondes
+# Durée du cache général
+CACHE_DURATION = int(os.environ.get('CACHE_DURATION', 300))
+# Durée du cache pour les problèmes (plus courte)
+PROBLEMS_CACHE_DURATION = int(os.environ.get('PROBLEMS_CACHE_DURATION', 60))
+MAX_WORKERS = int(os.environ.get('MAX_WORKERS', 20))
+MAX_CONNECTIONS = int(os.environ.get('MAX_CONNECTIONS', 50))
 
 # Créer l'application Flask
 app = Flask(__name__)
@@ -36,7 +41,8 @@ api_client = OptimizedAPIClient(
     env_url=DT_ENV_URL,
     api_token=API_TOKEN,
     verify_ssl=os.environ.get('VERIFY_SSL', 'False').lower() in ('true', '1', 't'),
-    max_workers=10,
+    max_workers=MAX_WORKERS,
+    max_connections=MAX_CONNECTIONS,
     cache_duration=CACHE_DURATION
 )
 
@@ -60,6 +66,38 @@ def get_vital_for_group_mzs():
     return [mz.strip() for mz in vfg_mz_string.split(',')]
 
 # Nouvel endpoint pour obtenir les Management Zones de Vital for Group
+@app.route('/api/vital-for-entreprise-mzs', methods=['GET'])
+def get_vital_for_entreprise_mzs_endpoint():
+    try:
+        # Récupérer directement la liste depuis la variable d'environnement
+        vfe_mz_string = os.environ.get('VFE_MZ_LIST', '')
+        
+        # Logging pour debug
+        logger.info(f"VFE_MZ_LIST from .env: {vfe_mz_string}")
+        
+        # Si la variable n'est pas définie, retourner une liste vide
+        if not vfe_mz_string:
+            logger.warning("VFE_MZ_LIST is empty or not defined in .env file")
+            return jsonify({'mzs': [], 'source': 'env_file'})
+        
+        # Diviser la chaîne en liste de MZs
+        vfe_mzs = [mz.strip() for mz in vfe_mz_string.split(',')]
+        logger.info(f"Parsed VFE MZs: {vfe_mzs}")
+        
+        # Format de réponse simple
+        return jsonify({
+            'mzs': vfe_mzs,
+            'source': 'env_file'  # Indique que les données viennent du fichier .env
+        })
+    except Exception as e:
+        logger.error(f"Erreur lors de la récupération des MZs Vital for Entreprise: {e}")
+        # Retourner une réponse même en cas d'erreur
+        return jsonify({
+            'mzs': [],
+            'source': 'env_file',
+            'error': str(e)
+        }), 500
+        
 @app.route('/api/vital-for-group-mzs', methods=['GET'])
 def get_vital_for_group_mzs_endpoint():
     try:
@@ -172,6 +210,127 @@ def set_management_zone():
         logger.error(f"Erreur lors de la définition de la MZ: {e}")
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/problems', methods=['GET'])
+# Retiré le décorateur de cache pour les problèmes pour garantir des données en temps réel
+@time_execution
+def get_problems():
+    try:
+        # Récupérer les paramètres de requête
+        status = request.args.get('status', 'OPEN')  # Par défaut "OPEN"
+        time_from = request.args.get('from', '-30d')  # Par défaut "-30d" pour inclure les problèmes plus anciens
+        # Nous n'avons plus besoin de ce paramètre, car nous voulons toujours filtrer par les management zones spécifiées
+        # disable_mz_filter = request.args.get('disable_mz_filter', 'false').lower() == 'true'
+        dashboard_type = request.args.get('type', '')  # Pour identifier VFG ou VFE
+        
+        # Débogage approfondi - à activer temporairement
+        debug_mode = request.args.get('debug', 'false').lower() == 'true'
+        
+        # Paramètre pour activer le cache (désactivé par défaut pour les problèmes OPEN)
+        use_cache = request.args.get('cache', 'false').lower() == 'true'
+        if status == 'OPEN':
+            use_cache = False  # Forcer les problèmes actifs à être toujours à jour
+        
+        # Créer une clé de cache unique qui inclut tous les paramètres
+        specific_cache_key = f"problems:{get_current_mz()}:{time_from}:{status}:{dashboard_type}"
+        
+        # Si le mode debug est activé, vider le cache pour cette requête
+        if debug_mode:
+            api_client.cache.pop(specific_cache_key, None)
+            logger.info(f"Mode debug activé, cache vidé pour la clé: {specific_cache_key}")
+        elif not use_cache:
+            # Vider systématiquement le cache pour les problèmes ouverts
+            api_client.cache.pop(specific_cache_key, None)
+            logger.info(f"Cache des problèmes désactivé pour les problèmes {status}, récupération en temps réel")
+        else:
+            # Si nous avons déjà cette requête en cache, retourner les données
+            cached_data = api_client.get_cached(specific_cache_key)
+            if cached_data is not None:
+                return cached_data
+            
+        # Déterminer le statut à utiliser (NULL si ALL)
+        use_status = None if status == 'ALL' else status
+        
+        # Log pour debug
+        logger.info(f"Requête problèmes: status={status}, time_from={time_from}, dashboard_type={dashboard_type}, debug={debug_mode}")
+        
+        # Si un type de dashboard est spécifié (vfg ou vfe)
+        if dashboard_type in ['vfg', 'vfe']:
+            # Récupérer la liste des MZ correspondantes
+            mz_list_var = 'VFG_MZ_LIST' if dashboard_type == 'vfg' else 'VFE_MZ_LIST'
+            mz_string = os.environ.get(mz_list_var, '')
+            
+            if not mz_string:
+                logger.warning(f"{mz_list_var} est vide ou non définie dans .env")
+                return []
+                
+            mz_list = [mz.strip() for mz in mz_string.split(',')]
+            logger.info(f"Liste des MZs {dashboard_type}: {mz_list}")
+            
+            # Récupérer les problèmes pour chaque MZ et les combiner
+            all_problems = []
+            
+            for mz_name in mz_list:
+                try:
+                    logger.info(f"Récupération des problèmes pour MZ: {mz_name} avec timeframe={time_from}, status={use_status}")
+                    # Utiliser la méthode éprouvée qui fonctionnait avant
+                    # Toujours utiliser le filtrage par MZ, en passant strictement le nom de la zone
+                    mz_problems = api_client.get_problems_filtered(mz_name, time_from, use_status)
+                    logger.info(f"MZ {mz_name}: {len(mz_problems)} problèmes trouvés")
+                    
+                    # Ajouter le champ 'resolved' pour les requêtes ALL
+                    for problem in mz_problems:
+                        if status == 'ALL' and 'resolved' not in problem:
+                            problem['resolved'] = problem.get('status') != 'OPEN'
+                    
+                    all_problems.extend(mz_problems)
+                except Exception as mz_error:
+                    logger.error(f"Erreur lors de la récupération des problèmes pour MZ {mz_name}: {mz_error}")
+            
+            # Dédupliquer les problèmes (un même problème peut affecter plusieurs MZs)
+            unique_problems = []
+            problem_ids = set()
+            for problem in all_problems:
+                if problem['id'] not in problem_ids:
+                    problem_ids.add(problem['id'])
+                    unique_problems.append(problem)
+            
+            logger.info(f"Récupéré {len(unique_problems)} problèmes uniques pour {dashboard_type.upper()} (timeframe: {time_from}, status: {status})")
+            
+            # En mode debug, afficher les problèmes pour investigation
+            if debug_mode:
+                for i, prob in enumerate(unique_problems):
+                    logger.info(f"Problème {i+1}: {prob['id']} - {prob['title']} - Status: {prob['status']} - Resolved: {prob.get('resolved', False)}")
+            
+            # Mettre en cache le résultat avec la clé spécifique
+            api_client.set_cache(specific_cache_key, unique_problems)
+            return unique_problems
+            
+        else:
+            # Comportement pour une MZ spécifique
+            current_mz = get_current_mz()
+            if not current_mz:
+                return {'error': 'Aucune Management Zone définie'}
+            
+            # Utiliser la méthode optimisée pour récupérer les problèmes filtrés
+            # Si on désactive le filtrage par MZ, on passe None pour mz_name
+            effective_mz = None if disable_mz_filter else current_mz
+            problems = api_client.get_problems_filtered(effective_mz, time_from, use_status)
+            
+            # En mode debug, afficher les problèmes pour investigation
+            if debug_mode:
+                for i, prob in enumerate(problems):
+                    logger.info(f"Problème {i+1}: {prob['id']} - {prob['title']} - Status: {prob['status']} - Resolved: {prob.get('resolved', False)}")
+            
+            # Mettre en cache le résultat avec la clé spécifique
+            api_client.set_cache(specific_cache_key, problems)
+            
+            logger.info(f"MZ {current_mz}: {len(problems)} problèmes récupérés (timeframe: {time_from}, status: {status})")
+            return problems
+    except Exception as e:
+        logger.error(f"Erreur lors de la récupération des problèmes: {e}")
+        return {'error': str(e)}
+
+
 @app.route('/api/current-management-zone', methods=['GET'])
 def get_current_management_zone():
     try:
@@ -246,7 +405,7 @@ def get_hosts():
 def get_services():
     try:
         now = datetime.now()
-        from_time = int((now - timedelta(hours=24)).timestamp() * 1000)
+        from_time = int((now - timedelta(minutes=30)).timestamp() * 1000)  # Récupération des 30 dernières minutes
         to_time = int(now.timestamp() * 1000)
         
         # Récupérer la Management Zone actuelle
@@ -330,24 +489,6 @@ def get_processes():
         logger.error(f"Erreur lors de la récupération des processus: {e}")
         return {'error': str(e)}
 
-@app.route('/api/problems', methods=['GET'])
-@cached('problems')
-@time_execution
-def get_problems():
-    try:
-        # Récupérer la Management Zone actuelle
-        current_mz = get_current_mz()
-        if not current_mz:
-            return {'error': 'Aucune Management Zone définie'}
-        
-        # Utiliser la méthode optimisée pour récupérer les problèmes filtrés
-        return api_client.get_problems_filtered(current_mz, "-24h", "OPEN")
-    except Exception as e:
-        logger.error(f"Erreur lors de la récupération des problèmes: {e}")
-        return {'error': str(e)}
-
-# Modifiez la fonction get_management_zones() dans app.py pour ajouter une récupération de secours
-# Cherchez cette fonction et remplacez-la par le code suivant:
 
 @app.route('/api/management-zones', methods=['GET'])
 @cached('management_zones')
@@ -451,10 +592,15 @@ def get_status():
 
 @app.route('/api/refresh/<cache_type>', methods=['POST'])
 def refresh_cache(cache_type):
-    if cache_type not in ['services', 'hosts', 'process_groups', 'problems', 'summary', 'all']:
+    if cache_type not in ['services', 'hosts', 'process_groups', 'problems', 'summary', 'all', 'purge']:
         return jsonify({'error': f'Type de cache {cache_type} non trouvé'}), 404
     
-    # Si 'all', effacer tous les caches
+    # Si 'purge', vider complètement le cache, y compris les clés personnalisées
+    if cache_type == 'purge':
+        api_client.cache.clear()
+        return jsonify({'success': True, 'message': 'Cache complètement purgé'})
+    
+    # Si 'all', effacer tous les caches standard
     if cache_type == 'all':
         api_client.clear_cache()
         return jsonify({'success': True, 'message': 'Tous les caches ont été effacés'})
