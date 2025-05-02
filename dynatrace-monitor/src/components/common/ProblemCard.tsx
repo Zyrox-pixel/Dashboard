@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { 
   AlertTriangle, ExternalLink, CheckCircle, ChevronDown, ChevronUp, 
-  Clock, Server, Database, Cpu, Users, BarChart3, Shield, RefreshCw, Monitor
+  Clock, Server, Database, Cpu, Users, BarChart3, Shield, RefreshCw, Monitor,
+  Zap, Layers, AlertCircle, Activity, ArrowUpRight, FileWarning
 } from 'lucide-react';
 import { Problem } from '../../api/types';
 
