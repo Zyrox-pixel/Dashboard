@@ -20,7 +20,7 @@ const ActiveProblemsPage: React.FC = () => {
   useEffect(() => {
     // Utiliser un flag pour éviter les boucles infinies
     const loadOnce = async () => {
-      await refreshData(dashboardType as 'vfg' | 'vfe');
+      await refreshData(dashboardType as 'vfg' | 'vfe', false);
     };
     
     loadOnce();

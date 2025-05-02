@@ -49,7 +49,7 @@ export interface AppActionsType {
   setSelectedZone: (zoneId: string | null) => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
   setActiveTab: (tab: string) => void;
-  refreshData: (dashboardType?: 'vfg' | 'vfe') => Promise<void>; // Mis à jour pour accepter le type de dashboard
+  refreshData: (dashboardType?: 'vfg' | 'vfe', refreshProblemsOnly?: boolean) => Promise<void>; // Mis à jour pour accepter le type de dashboard et le rafraîchissement des problèmes uniquement
   loadZoneData?: (zoneId: string) => Promise<void>;
 }
 
@@ -686,7 +686,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
     if (!initialLoadRef.current) {
       console.log("Initial data load");
       initialLoadRef.current = true;
-      loadAllData();
+      loadAllData(undefined, false);
     }
   }, [loadAllData]);
 

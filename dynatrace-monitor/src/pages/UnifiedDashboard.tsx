@@ -55,7 +55,7 @@ const UnifiedDashboard: React.FC = () => {
       // Vérifier si ce type de dashboard a déjà été initialisé
       if (!initializedRef.current[variant]) {
         console.log(`Initializing dashboard data for ${variant}`);
-        refreshData(variant);
+        refreshData(variant, false);
         initializedRef.current[variant] = true;
       }
     }, [dashboardProps.variant]); // refreshData est intentionnellement omis des dépendances
