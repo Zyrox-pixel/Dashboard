@@ -19,59 +19,67 @@ const ProblemCard: React.FC<ProblemCardProps> = ({ problem }) => {
   // Extraire les informations sur la machine/hôte
   // Extraire le nom de l'hôte impacté à partir des informations disponibles
   const getHostInfo = () => {
-    // 1. Vérifier d'abord dans les entités impactées (la source la plus fiable)
-    if (problem.impactedEntities && Array.isArray(problem.impactedEntities)) {
-      // Chercher une entité de type HOST
-      const hostEntity = problem.impactedEntities.find((entity) => 
-        entity.type === 'HOST'
-      );
+    // MÉTHODE 1: Extraction directe depuis le sous-titre - la plus fiable
+    if (problem.subtitle) {
+      // Extrait spécifiquement ce qui suit "impacted:" dans le sous-titre
+      if (problem.subtitle.toLowerCase().includes('impacted:')) {
+        const match = problem.subtitle.match(/impacted:\s*([^\s,.;]+)/i);
+        if (match && match[1]) {
+          const hostname = match[1].trim();
+          console.log('Hostname extrait après "impacted:":', hostname);
+          return hostname;
+        }
+      }
       
-      if (hostEntity && hostEntity.name) {
-        return hostEntity.name;
+      // Recherche un nom de serveur qui commence par S
+      const serverMatches = problem.subtitle.match(/\b(s\w+)\b/gi);
+      if (serverMatches && serverMatches.length > 0) {
+        // Filtrer pour exclure les mots communs
+        const filteredMatches = serverMatches.filter(word => 
+          word.length > 3 && 
+          !/^(status|service|such|still|some|system)/i.test(word)
+        );
+        
+        if (filteredMatches.length > 0) {
+          console.log('Noms serveur potentiels trouvés dans le sous-titre:', filteredMatches);
+          return filteredMatches[0];
+        }
       }
     }
     
-    // 2. Si disponible directement dans le rootCauseEntity
-    if (problem.rootCauseEntity && 
-        problem.rootCauseEntity.type === 'HOST' && 
-        problem.rootCauseEntity.name) {
-      return problem.rootCauseEntity.name;
-    }
-    
-    // 3. Vérifier dans le champ impacted direct
-    if (problem.impacted && typeof problem.impacted === 'string') {
-      return problem.impacted;
-    }
-    
-    // 4. Chercher la chaîne "impacted:" dans le sous-titre
-    if (problem.subtitle && problem.subtitle.toLowerCase().includes('impacted')) {
-      const impactedMatches = problem.subtitle.match(/impacted:?\s+([^,;.]+)/i);
-      if (impactedMatches && impactedMatches[1]) {
-        return impactedMatches[1].trim();
-      }
-    }
-    
-    // 5. Vérifier le champ host explicite
+    // MÉTHODE 2: Champ host explicite
     if (problem.host && problem.host !== "Non spécifié") {
+      console.log('Utilisation du champ host explicite:', problem.host);
       return problem.host;
     }
     
-    // 6. Chercher dans le titre ou sous-titre un nom qui commence par 's'
-    const textToSearch = `${problem.title || ''} ${problem.subtitle || ''}`;
+    // MÉTHODE 3: Champ impacted explicite
+    if (problem.impacted && typeof problem.impacted === 'string') {
+      console.log('Utilisation du champ impacted explicite:', problem.impacted);
+      return problem.impacted;
+    }
     
-    // Extraire les mots commençant par 's' qui pourraient être des noms d'hôte
-    const words = textToSearch.split(/\s+/);
-    const sNamePattern = /^s[a-z0-9][-a-z0-9]*/i;
-    
-    for (const word of words) {
-      if (sNamePattern.test(word) && 
+    // MÉTHODE 4: Recherche dans le titre
+    if (problem.title) {
+      const serverMatches = problem.title.match(/\b(s\w+)\b/gi);
+      if (serverMatches && serverMatches.length > 0) {
+        // Filtrer pour exclure les mots communs
+        const filteredMatches = serverMatches.filter(word => 
           word.length > 3 && 
-          !/^(status|service|such|still|some|system)/i.test(word)) {
-        return word;
+          !/^(status|service|such|still|some|system)/i.test(word)
+        );
+        
+        if (filteredMatches.length > 0) {
+          console.log('Noms serveur potentiels trouvés dans le titre:', filteredMatches);
+          return filteredMatches[0];
+        }
       }
     }
     
-    // Par défaut, retourner la zone comme contexte
+    // Debug: afficher le problème complet pour comprendre sa structure
+    console.log('Structure du problème:', JSON.stringify(problem, null, 2));
+    
+    // Par défaut, retourner la zone (souvent PRODSEC)
     return problem.zone || "Non spécifié";
   };
   
