@@ -1269,7 +1269,48 @@ class OptimizedAPIClient:
             days = int(duration_sec / 86400)
             hours = int((duration_sec % 86400) / 3600)
             duration_display = f"{days}j {hours}h"
-            
+        
+        # Extraction des entités impactées
+        impacted_entities = []
+        impacted_hostname = None
+        
+        if 'affectedEntities' in problem:
+            for entity in problem.get('affectedEntities', []):
+                # Créer un objet pour chaque entité impactée
+                impacted_entity = {
+                    'id': entity.get('entityId', 'Unknown'),
+                    'type': entity.get('entityType', {}).get('type', 'Unknown') if isinstance(entity.get('entityType'), dict) else entity.get('entityType', 'Unknown')
+                }
+                
+                # Ajouter le nom si disponible
+                if 'name' in entity:
+                    impacted_entity['name'] = entity['name']
+                elif 'displayName' in entity:
+                    impacted_entity['displayName'] = entity['displayName']
+                
+                # Si c'est un hôte, garder le nom pour le champ impacted
+                if (isinstance(impacted_entity['type'], str) and 
+                    impacted_entity['type'].upper() == 'HOST' and 
+                    not impacted_hostname):
+                    impacted_hostname = impacted_entity.get('name', impacted_entity.get('displayName', None))
+                
+                impacted_entities.append(impacted_entity)
+                
+        # Si nous n'avons pas trouvé de nom d'hôte, chercher dans les entités primaires
+        if not impacted_hostname and 'rankedEvents' in problem:
+            for event in problem.get('rankedEvents', []):
+                if 'entityName' in event and 'entityType' in event:
+                    if event['entityType'].upper() == 'HOST':
+                        impacted_hostname = event['entityName']
+                        break
+        
+        # Si toujours pas de nom d'hôte, regarder dans les sources d'événements
+        if not impacted_hostname and 'evidenceDetails' in problem:
+            for evidence in problem.get('evidenceDetails', {}).get('details', []):
+                if evidence.get('entity', {}).get('type', '').upper() == 'HOST':
+                    impacted_hostname = evidence.get('entity', {}).get('name')
+                    break
+                    
         return {
             'id': problem.get('problemId', 'Unknown'),
             'title': problem.get('title', 'Problème inconnu'),
@@ -1281,8 +1322,10 @@ class OptimizedAPIClient:
             'duration': duration_display,  # Ajout de la durée du problème
             'dt_url': f"{self.env_url}/#problems/problemdetails;pid={problem.get('problemId', 'Unknown')}",
             'zone': zone or self._extract_problem_zone(problem),
-            'resolved': is_resolved
-    }
+            'resolved': is_resolved,
+            'impactedEntities': impacted_entities,  # Ajout des entités impactées
+            'impacted': impacted_hostname  # Ajout du nom de l'hôte impacté principal
+        }
         
     def _extract_problem_zone(self, problem):
         """Extrait la zone principale d'un problème"""

@@ -19,120 +19,79 @@ const ProblemCard: React.FC<ProblemCardProps> = ({ problem }) => {
   // Extraire les informations sur la machine/hôte
   // Extraire le nom de l'hôte impacté à partir des informations disponibles
   const getHostInfo = () => {
-    // 1. Vérifier d'abord si le nom de l'hôte est explicitement disponible 
-    // dans la propriété host du problème
+    // 1. Vérifier si nous avons un champ impactedEntities direct dans le problème
+    if (problem.impactedEntities && Array.isArray(problem.impactedEntities)) {
+      // Chercher la première entité de type HOST
+      const hostEntity = problem.impactedEntities.find(entity => 
+        entity.type === 'HOST' || entity.entityType === 'HOST'
+      );
+      
+      if (hostEntity) {
+        return hostEntity.name || hostEntity.displayName || hostEntity.entityName || hostEntity.id;
+      }
+    }
+
+    // 2. Vérifier le champ impacted qui pourrait contenir directement le nom d'hôte
+    if (problem.impacted && typeof problem.impacted === 'string' && problem.impacted.length > 3) {
+      return problem.impacted;
+    }
+
+    // 3. Vérifier si le champ host est directement disponible
     if (problem.host && problem.host !== "Non spécifié") {
       return problem.host;
     }
     
-    // 2. Si le problème a un impact ou sous-titre mentionnant un hôte, l'extraire
+    // 4. Examiner le sous-titre qui contient souvent une représentation textuelle des entités impactées
     if (problem.subtitle) {
-      // Extraire des motifs d'hôte comme "HOST_NAME = quelquechose" ou similaire
-      const hostMatch = problem.subtitle.match(/HOST[_\s]?NAME[_\s]?=\s*([^,\s]+)/i);
-      if (hostMatch && hostMatch[1]) {
-        return hostMatch[1];
+      // Chercher directement la clé "impacted:"
+      const impactedPattern = /impacted:\s*([^\s,:;]+)/i;
+      const impactedMatch = problem.subtitle.match(impactedPattern);
+      if (impactedMatch && impactedMatch[1]) {
+        return impactedMatch[1];
       }
       
-      // Amélioration des patterns pour extraire des informations du champ "impacted" 
-      // 2.1 Chercher des motifs comme "impacted: HOST quelquechose"
-      const impactedPatterns = [
-        // Pattern standard: "impacted: HOSTNAME" ou "impacted HOSTNAME"
-        /impacted:?\s*([a-zA-Z0-9_\.-]+)/i,
-        // Pattern avec préfixe: "impacted: HOST-123ABC"
-        /impacted:?\s*([a-zA-Z0-9]+-[a-zA-Z0-9_\.]+)/i,
-        // Pattern plus générique: chercher après "impacted:" avec des caractères non-alphanumériques autour
-        /impacted:?\s*[^a-zA-Z0-9]*\s*([a-zA-Z0-9][a-zA-Z0-9_\.-]+)/i,
-        // Pattern avec le nom de l'hôte entre parenthèses ou crochets
-        /impacted:?\s*[\(\[\{]([a-zA-Z0-9][a-zA-Z0-9_\.-]+)[\)\]\}]/i,
-        // Pattern pour les cas où le nom est entre guillemets
-        /impacted:?\s*["']([^"']+)["']/i
+      // Chercher une séquence HOST ou PRODSEC suivie d'un nom d'hôte
+      const hostPatterns = [
+        // Formats courants dans Dynatrace
+        /HOST\s+([A-Z0-9][A-Z0-9_\.-]+)/i,
+        /PRODSEC-([A-Z0-9][A-Z0-9_\.-]+)/i,
+        /PRODSEC_([A-Z0-9][A-Z0-9_\.-]+)/i,
+        /PRODSEC\.([A-Z0-9][A-Z0-9_\.-]+)/i,
+        /PRODSEC\s+([A-Z0-9][A-Z0-9_\.-]+)/i
       ];
       
-      for (const pattern of impactedPatterns) {
+      for (const pattern of hostPatterns) {
         const match = problem.subtitle.match(pattern);
-        if (match && match[1] && match[1].length > 2) {
-          // Ignorer les valeurs qui ne ressemblent pas à des noms d'hôtes (comme des nombres seuls)
-          if (!/^\d+$/.test(match[1]) && match[1].toLowerCase() !== 'host') {
-            return match[1];
-          }
+        if (match && match[1]) {
+          return match[1];
         }
-      }
-      
-      // 2.2 Examiner également les formats spécifiques de Dynatrace
-      // Chercher des motifs comme "HOST PRODSEC-HOSTNAME is affected"
-      const hostAffectedMatch = problem.subtitle.match(/HOST\s+([a-zA-Z0-9][a-zA-Z0-9_\.-]+)\s+is\s+(affected|impacted)/i);
-      if (hostAffectedMatch && hostAffectedMatch[1]) {
-        return hostAffectedMatch[1];
-      }
-      
-      // 2.3 Chercher des patterns spécifiques pour PRODSEC suivi d'un nom d'hôte
-      const prodsecHostMatch = problem.subtitle.match(/PRODSEC[_\s\.-]+([a-zA-Z0-9][a-zA-Z0-9_\.-]+)/i);
-      if (prodsecHostMatch && prodsecHostMatch[1]) {
-        return prodsecHostMatch[1];
       }
     }
     
-    // 3. Extraire l'hôte du titre si possible
+    // 5. Rechercher dans le titre (moins fiable mais utile en dernier recours)
     if (problem.title) {
-      // 3.1 Rechercher les hôtes mentionnés explicitement
-      const hostRegex = /\b(host|hôte|server|machine|instance)\s+([a-zA-Z0-9_\.-]+)\b/i;
-      const hostMatch = problem.title.match(hostRegex);
-      if (hostMatch && hostMatch[2]) {
-        return hostMatch[2];
-      }
+      // Chercher les mêmes patterns dans le titre
+      const hostPatterns = [
+        /HOST\s+([A-Z0-9][A-Z0-9_\.-]+)/i,
+        /PRODSEC-([A-Z0-9][A-Z0-9_\.-]+)/i,
+        /PRODSEC_([A-Z0-9][A-Z0-9_\.-]+)/i,
+        /PRODSEC\.([A-Z0-9][A-Z0-9_\.-]+)/i,
+        /PRODSEC\s+([A-Z0-9][A-Z0-9_\.-]+)/i
+      ];
       
-      // 3.2 Si le titre mentionne un problème lié à l'infrastructure, chercher les noms de serveurs
-      if (problem.title.toLowerCase().includes('infrastructure') && 
-          problem.title.match(/[a-zA-Z0-9]+-[a-zA-Z0-9]+/)) {
-        // Extraire les motifs qui ressemblent à des noms de serveurs (ex: STG1-PROD, APP-DB001)
-        const serverMatch = problem.title.match(/\b([a-zA-Z0-9]+-[a-zA-Z0-9]+)\b/);
-        if (serverMatch && serverMatch[1]) {
-          return serverMatch[1];
-        }
-      }
-      
-      // 3.3 Rechercher l'expression "impacted" dans le titre avec les mêmes patterns
-      for (const pattern of [
-        /\bimpacted\s+([a-zA-Z0-9][a-zA-Z0-9_\.-]+)/i,
-        /\bimpacted:?\s*[^a-zA-Z0-9]*\s*([a-zA-Z0-9][a-zA-Z0-9_\.-]+)/i,
-        /\bimpacted:?\s*[\(\[\{]([a-zA-Z0-9][a-zA-Z0-9_\.-]+)[\)\]\}]/i
-      ]) {
+      for (const pattern of hostPatterns) {
         const match = problem.title.match(pattern);
-        if (match && match[1] && match[1].length > 2 && !/^\d+$/.test(match[1]) && match[1].toLowerCase() !== 'host') {
+        if (match && match[1]) {
           return match[1];
         }
       }
       
-      // 3.4 Chercher des indicateurs PRODSEC dans le titre également
-      const prodsecTitleMatch = problem.title.match(/PRODSEC[_\s\.-]+([a-zA-Z0-9][a-zA-Z0-9_\.-]+)/i);
-      if (prodsecTitleMatch && prodsecTitleMatch[1]) {
-        return prodsecTitleMatch[1];
-      }
-    }
-    
-    // 4. Si le type est lié à l'infrastructure, essayer d'extraire un nom de serveur
-    if (problem.type && problem.type.toLowerCase().includes('infrastructure')) {
-      const titleParts = problem.title.split(/\s+/);
-      // 4.1 Rechercher un mot qui ressemble à un nom de serveur (contient un tiret ou un point)
-      for (const part of titleParts) {
-        if ((part.includes('-') || part.includes('.')) && 
-            /^[a-zA-Z0-9_\.-]+$/.test(part) && 
-            part.length > 3) {
-          return part;
-        }
-      }
-      
-      // 4.2 Pour les problèmes d'infrastructure, chercher aussi dans le sous-titre
-      if (problem.subtitle) {
-        const subtitleParts = problem.subtitle.split(/\s+/);
-        for (const part of subtitleParts) {
-          if ((part.includes('-') || part.includes('.')) && 
-              /^[a-zA-Z0-9_\.-]+$/.test(part) && 
-              part.length > 3 && 
-              !/^\d+\.\d+\.\d+$/.test(part) && // Ne pas prendre les versions comme 1.2.3
-              !/^\d+\.?\d*[%]?$/.test(part)) { // Ne pas prendre les pourcentages
-            return part;
-          }
+      // Pour les problèmes d'infrastructure, chercher les noms qui ressemblent à des serveurs
+      if (problem.type && problem.type.toLowerCase().includes('infrastructure')) {
+        const serverPattern = /\b([A-Z0-9]+-[A-Z0-9]+)\b/i;
+        const serverMatch = problem.title.match(serverPattern);
+        if (serverMatch && serverMatch[1]) {
+          return serverMatch[1];
         }
       }
     }
@@ -261,8 +220,8 @@ const ProblemCard: React.FC<ProblemCardProps> = ({ problem }) => {
                 <div className="text-xs uppercase text-slate-400">MACHINE AFFECTÉE</div>
               </div>
               <div className="text-sm text-slate-300">
-                {problem.host ? (
-                  <span className="font-medium text-blue-300">{problem.host.replace(/^HOST:\s*/, '')}</span>
+                {hostInfo ? (
+                  <span className="font-medium text-blue-300">{hostInfo.replace(/^HOST:\s*/, '')}</span>
                 ) : (
                   <span className="text-slate-400">Non spécifié</span>
                 )}
