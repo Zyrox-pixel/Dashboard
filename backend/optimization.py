@@ -1054,10 +1054,7 @@ class OptimizedAPIClient:
         
         try:
             # Récupérer tous les problèmes sans filtrer par MZ via l'API
-            params = {
-                "from": time_from,
-                "fields": "+impactedEntities,+affectedEntities,+title,+displayId,+rootCause"
-            }
+            params = {"from": time_from}
             
             # Pour ALL, on veut tous les problèmes, y compris OPEN et CLOSED
             # Pour ce faire, nous ne spécifierons pas de statut à l'API Dynatrace,
@@ -1199,6 +1196,39 @@ class OptimizedAPIClient:
                 
                 if mz_name:
                     logger.info(f"Problèmes filtrés appartenant à {mz_name}: {mz_problems}/{total_problems}")
+                
+                # Enrichir chaque problème avec les données des entités impactées
+                enriched_problems = []
+                for formatted_problem in active_problems:
+                    problem_id = formatted_problem.get('id')
+                    if problem_id:
+                        try:
+                            # Récupérer les détails du problème pour obtenir les entités impactées
+                            problem_details = self.query_api(
+                                endpoint=f"problems/{problem_id}",
+                                params={"fields": "+impactedEntities"},
+                                use_cache=True
+                            )
+                            
+                            # Si nous avons les impactedEntities, les ajouter au problème formaté
+                            if problem_details and 'impactedEntities' in problem_details:
+                                formatted_problem['impactedEntities'] = problem_details.get('impactedEntities', [])
+                                
+                                # Vérifier s'il y a une entité hôte pour enrichir le champ 'host'
+                                for entity in problem_details.get('impactedEntities', []):
+                                    if entity.get('entityId', {}).get('type') == 'HOST':
+                                        host_name = entity.get('name')
+                                        if host_name:
+                                            formatted_problem['host'] = host_name
+                                            formatted_problem['impacted'] = host_name
+                                            break
+                        except Exception as e:
+                            logger.error(f"Erreur lors de l'enrichissement du problème {problem_id}: {e}")
+                    
+                    enriched_problems.append(formatted_problem)
+                
+                # Remplacer la liste des problèmes formatés par la liste enrichie
+                active_problems = enriched_problems
             
             # Pour les problèmes actifs (OPEN), utiliser une durée de cache réduite
             # pour les autres types, utiliser la durée standard
@@ -1274,9 +1304,11 @@ class OptimizedAPIClient:
             days = int(duration_sec / 86400)
             hours = int((duration_sec % 86400) / 3600)
             duration_display = f"{days}j {hours}h"
-        
-        # PRIORITÉ 0: Extraire directement des impactedEntities
+                
+        # FONCTION AMÉLIORÉE: Extraction plus précise du nom de machine
         host_name = "Non spécifié"
+        
+        # Vérifions d'abord si les impactedEntities sont déjà présentes dans le problème
         if 'impactedEntities' in problem:
             for entity in problem.get('impactedEntities', []):
                 if entity.get('entityId', {}).get('type') == 'HOST':
@@ -1284,213 +1316,157 @@ class OptimizedAPIClient:
                     logger.info(f"Hôte trouvé directement dans impactedEntities: {host_name}")
                     break
         
-        # PRIORITÉ 1: Si pas trouvé, chercher dans rootCauseEntity s'il existe et est de type HOST
-        if host_name == "Non spécifié" and problem.get('rootCauseEntity') and problem['rootCauseEntity'].get('type') == 'HOST':
-            candidate = problem['rootCauseEntity'].get('name', problem['rootCauseEntity'].get('displayName'))
-            if candidate:
-                host_name = candidate
-                logger.info(f"Hôte trouvé dans rootCauseEntity: {host_name}")
-        
-        # PRIORITÉ 2: Chercher dans les entités affectées de type HOST
-        if host_name == "Non spécifié" and 'affectedEntities' in problem:
-            for entity in problem.get('affectedEntities', []):
-                if entity.get('type') == 'HOST':
-                    candidate = entity.get('name', entity.get('displayName', "Non spécifié"))
-                    if candidate != "Non spécifié":
-                        host_name = candidate
-                        logger.info(f"Hôte trouvé dans affectedEntities: {host_name}")
-                        break
-        
-        # PRIORITÉ 3: Chercher dans le displayId ou entityId s'ils ressemblent à des noms d'hôtes
-        if host_name == "Non spécifié" and problem.get('displayId'):
-            display_id = problem.get('displayId')
-            # Vérifier si displayId contient un nom d'hôte
-            host_match = re.search(r'\b(s[a-z0-9]\d{2,}[a-z0-9]*(?:\.fr\.net\.intra)?)\b', display_id, re.IGNORECASE)
-            if host_match:
-                host_name = host_match.group(1)
-                logger.info(f"Hôte trouvé dans displayId: {host_name}")
-        
-        # PRIORITÉ 4: Rechercher dans le titre avec des patterns spécifiques
-        if host_name == "Non spécifié" and problem.get('title'):
-            title = problem.get('title', '')
-            
-            # Liste de patterns du plus spécifique au moins spécifique
-            patterns = [
-                r'HOST:\s*(\S+)',                                # HOST: hostname
-                r'host\s+(\S+)',                                 # host hostname
-                r'server\s+(\S+)',                               # server hostname
-                r'\bon\s+(\S+)',                                 # on hostname
-                r'\bat\s+(\S+)',                                 # at hostname
-                r'\b(s[a-z0-9]\d{2,}[a-z0-9]*\.fr\.net\.intra)\b',  # Format spécifique d'entreprise
-                r'\b(s[a-z0-9]\d{2,}[a-z0-9]*)\b',                  # Serveurs commençant par S avec chiffres
-                r'\b(srv\d+[a-z0-9]*)\b',                          # Format srv##
-                r'\b(win[a-z0-9]*\d+[a-z0-9]*)\b'                  # Serveurs Windows
-            ]
-            
-            for pattern in patterns:
-                host_match = re.search(pattern, title, re.IGNORECASE)
-                if host_match:
-                    # Récupérer le premier groupe non-None
-                    match_value = next((g for g in host_match.groups() if g), "Non spécifié")
-                    host_name = match_value
-                    logger.info(f"Hôte trouvé dans le titre via pattern {pattern}: {host_name}")
-                    break
-        
-        return {
-            'id': problem.get('problemId', 'Unknown'),
-            'title': problem.get('title', 'Problème inconnu'),
-            'impact': problem.get('impactLevel', 'UNKNOWN'),
-            'status': 'RESOLVED' if is_resolved else problem.get('status', 'OPEN'),
-            'affected_entities': len(problem.get('affectedEntities', [])),
-            'start_time': start_time_str,
-            'end_time': end_time_str,  # Ajout de l'heure de fermeture
-            'duration': duration_display,  # Ajout de la durée du problème
-            'dt_url': f"{self.env_url}/#problems/problemdetails;pid={problem.get('problemId', 'Unknown')}",
-            'zone': zone or self._extract_problem_zone(problem),
-            'resolved': is_resolved,
-            'host': host_name,  # Ajout du champ host explicite
-            'impacted': host_name,  # Ajout pour compatibilité avec le frontend actuel
-            'impactedEntities': problem.get('impactedEntities', []),  # Transférer les entités impactées au frontend
-        }
-        
-        # Fonction d'aide pour vérifier si un nom est un nom d'hôte valide
-        def is_valid_hostname(name):
-            if not name or len(name) < 3 or len(name) > 50:
-                return False
-                
-            # Convertir en minuscules pour la comparaison
-            name_lower = name.lower()
-            
-            # Vérifier si le nom est dans la liste d'exclusion
-            if name_lower in excluded_words:
-                return False
-                
-            # Pattern spécifique pour les serveurs de l'entreprise
-            if re.match(r'^s[a-z0-9]\d{2,}[a-z0-9]*\.fr\.net\.intra$', name, re.IGNORECASE):
-                logger.info(f"Hostname validation: Strong match with enterprise pattern: {name}")
-                return True
-                
-            # Pattern pour les serveurs commençant par s suivi de chiffres
-            if re.match(r'^s[a-z0-9]\d{2,}[a-z0-9]*$', name, re.IGNORECASE):
-                logger.info(f"Hostname validation: Good match with s-server pattern: {name}")
-                return True
-            
-            # Pattern pour les serveurs sv##, s### ou sv####
-            if re.match(r'^s[a-z]?\d{2,}[a-z0-9]*$', name, re.IGNORECASE):
-                logger.info(f"Hostname validation: Likely server with sv## pattern: {name}")
-                return True
-            
-            # Si le nom commence par win/srv suivi de chiffres
-            if re.match(r'^(win|srv)[a-z0-9]*\d+', name, re.IGNORECASE):
-                logger.info(f"Hostname validation: Likely Windows server: {name}")
-                return True
-            
-            # Vérifier les noms courts sans chiffres
-            if len(name) < 6 and not re.search(r'\d', name):
-                logger.info(f"Hostname validation: Too short without numbers: {name}")
-                return False
-            
-            # Filtrer les cas contenant des mots exclus
-            for word in excluded_words:
-                if word in name_lower and name_lower != word:
-                    logger.info(f"Hostname validation: Contains excluded word '{word}': {name}")
-                    return False
-            
-            # Vérifier si c'est un FQDN avec des chiffres
-            if re.match(r'^[a-z0-9][-a-z0-9]*\.[a-z0-9][-a-z0-9.]+$', name, re.IGNORECASE) and re.search(r'\d', name):
-                logger.info(f"Hostname validation: Valid FQDN with numbers: {name}")
-                return True
-            
-            # Critères généraux: commence par 's' ET contient au moins un chiffre
-            # OU contient des chiffres ET a une structure de nom d'hôte (points/tirets)
-            is_valid = (name_lower.startswith('s') and re.search(r'\d', name)) or \
-                      (re.search(r'\d', name) and ('.' in name or '-' in name))
-            
-            if is_valid:
-                logger.info(f"Hostname validation: General pattern match: {name}")
-            else:
-                logger.info(f"Hostname validation: Failed general patterns: {name}")
-                
-            return is_valid
-        
-        # PRIORITÉ 1: Chercher d'abord dans rootCauseEntity s'il existe et est de type HOST
-        if problem.get('rootCauseEntity') and problem['rootCauseEntity'].get('type') == 'HOST':
-            candidate = problem['rootCauseEntity'].get('name', problem['rootCauseEntity'].get('displayName'))
-            if candidate and is_valid_hostname(candidate):
-                host_name = candidate
-                logger.info(f"Hôte trouvé dans rootCauseEntity (priorité 1): {host_name}")
-        
-        # PRIORITÉ 2: Chercher dans les entités affectées de type HOST
-        if host_name == "Non spécifié" and 'affectedEntities' in problem:
-            for entity in problem.get('affectedEntities', []):
-                if entity.get('type') == 'HOST':
-                    candidate = entity.get('name', entity.get('displayName', "Non spécifié"))
-                    if candidate != "Non spécifié" and is_valid_hostname(candidate):
-                        host_name = candidate
-                        logger.info(f"Hôte trouvé dans affectedEntities (priorité 2): {host_name}")
-                        break
-        
-        # PRIORITÉ 3: Chercher dans le displayId ou entityId s'ils ressemblent à des noms d'hôtes
-        if host_name == "Non spécifié" and problem.get('displayId'):
-            display_id = problem.get('displayId')
-            # Vérifier si displayId contient un nom d'hôte
-            host_match = re.search(r'\b(s[a-z0-9]\d{2,}[a-z0-9]*(?:\.fr\.net\.intra)?)\b', display_id, re.IGNORECASE)
-            if host_match and is_valid_hostname(host_match.group(1)):
-                host_name = host_match.group(1)
-                logger.info(f"Hôte trouvé dans displayId (priorité 3): {host_name}")
-        
-        # PRIORITÉ 4: Rechercher dans le titre avec des patterns spécifiques
-        if host_name == "Non spécifié" and problem.get('title'):
-            title = problem.get('title', '')
-            
-            # Liste de patterns du plus spécifique au moins spécifique
-            patterns = [
-                r'HOST:\s*(\S+)',                                # HOST: hostname
-                r'host\s+(\S+)',                                 # host hostname
-                r'server\s+(\S+)',                               # server hostname
-                r'\bon\s+(\S+)',                                 # on hostname
-                r'\bat\s+(\S+)',                                 # at hostname
-                r'\b(s[a-z0-9]\d{2,}[a-z0-9]*\.fr\.net\.intra)\b',  # Format spécifique d'entreprise
-                r'\b(s[a-z0-9]\d{2,}[a-z0-9]*)\b',                  # Serveurs commençant par S avec chiffres
-                r'\b(srv\d+[a-z0-9]*)\b',                          # Format srv##
-                r'\b(win[a-z0-9]*\d+[a-z0-9]*)\b'                  # Serveurs Windows
-            ]
-            
-            for pattern in patterns:
-                host_match = re.search(pattern, title, re.IGNORECASE)
-                if host_match:
-                    # Récupérer le premier groupe non-None
-                    match_value = next((g for g in host_match.groups() if g), "Non spécifié")
-                    
-                    if is_valid_hostname(match_value):
-                        host_name = match_value
-                        logger.info(f"Hôte trouvé dans le titre via pattern {pattern} (priorité 4): {host_name}")
-                        break
-        
-        # PRIORITÉ 5: Rechercher dans la description ou le sous-titre
+        # Si nous n'avons pas trouvé l'hôte, continuer avec la méthode existante
         if host_name == "Non spécifié":
-            # Combiner la description et le sous-titre pour la recherche
-            combined_text = f"{problem.get('description', '')} {problem.get('subtitle', '')}"
+            # Liste des mots à exclure qui ne sont jamais des noms d'hôtes
+            excluded_words = [
+                "status", "service", "such", "still", "some", "system", "server",
+                "segmentation", "script", "extension", "memory", "application", 
+                "error", "timeout", "warning", "critical", "problem", "issue", 
+                "failure", "module", "process", "container", "function", "instance", 
+                "request", "being", "response", "health", "payload", "execution", 
+                "processing", "action", "object", "storage", "config", "socket",
+                "network", "security", "traffic", "information", "resource"
+            ]
             
-            if combined_text.strip():
-                # Pattern du plus spécifique au moins spécifique
+            # Fonction d'aide pour vérifier si un nom est un nom d'hôte valide
+            def is_valid_hostname(name):
+                if not name or len(name) < 3 or len(name) > 50:
+                    return False
+                    
+                # Convertir en minuscules pour la comparaison
+                name_lower = name.lower()
+                
+                # Vérifier si le nom est dans la liste d'exclusion
+                if name_lower in excluded_words:
+                    return False
+                    
+                # Pattern spécifique pour les serveurs de l'entreprise
+                if re.match(r'^s[a-z0-9]\d{2,}[a-z0-9]*\.fr\.net\.intra$', name, re.IGNORECASE):
+                    logger.info(f"Hostname validation: Strong match with enterprise pattern: {name}")
+                    return True
+                    
+                # Pattern pour les serveurs commençant par s suivi de chiffres
+                if re.match(r'^s[a-z0-9]\d{2,}[a-z0-9]*$', name, re.IGNORECASE):
+                    logger.info(f"Hostname validation: Good match with s-server pattern: {name}")
+                    return True
+                
+                # Pattern pour les serveurs sv##, s### ou sv####
+                if re.match(r'^s[a-z]?\d{2,}[a-z0-9]*$', name, re.IGNORECASE):
+                    logger.info(f"Hostname validation: Likely server with sv## pattern: {name}")
+                    return True
+                
+                # Si le nom commence par win/srv suivi de chiffres
+                if re.match(r'^(win|srv)[a-z0-9]*\d+', name, re.IGNORECASE):
+                    logger.info(f"Hostname validation: Likely Windows server: {name}")
+                    return True
+                
+                # Vérifier les noms courts sans chiffres
+                if len(name) < 6 and not re.search(r'\d', name):
+                    logger.info(f"Hostname validation: Too short without numbers: {name}")
+                    return False
+                
+                # Filtrer les cas contenant des mots exclus
+                for word in excluded_words:
+                    if word in name_lower and name_lower != word:
+                        logger.info(f"Hostname validation: Contains excluded word '{word}': {name}")
+                        return False
+                
+                # Vérifier si c'est un FQDN avec des chiffres
+                if re.match(r'^[a-z0-9][-a-z0-9]*\.[a-z0-9][-a-z0-9.]+$', name, re.IGNORECASE) and re.search(r'\d', name):
+                    logger.info(f"Hostname validation: Valid FQDN with numbers: {name}")
+                    return True
+                
+                # Critères généraux: commence par 's' ET contient au moins un chiffre
+                # OU contient des chiffres ET a une structure de nom d'hôte (points/tirets)
+                is_valid = (name_lower.startswith('s') and re.search(r'\d', name)) or \
+                        (re.search(r'\d', name) and ('.' in name or '-' in name))
+                
+                if is_valid:
+                    logger.info(f"Hostname validation: General pattern match: {name}")
+                else:
+                    logger.info(f"Hostname validation: Failed general patterns: {name}")
+                    
+                return is_valid
+            
+            # PRIORITÉ 1: Chercher d'abord dans rootCauseEntity s'il existe et est de type HOST
+            if problem.get('rootCauseEntity') and problem['rootCauseEntity'].get('type') == 'HOST':
+                candidate = problem['rootCauseEntity'].get('name', problem['rootCauseEntity'].get('displayName'))
+                if candidate and is_valid_hostname(candidate):
+                    host_name = candidate
+                    logger.info(f"Hôte trouvé dans rootCauseEntity (priorité 1): {host_name}")
+            
+            # PRIORITÉ 2: Chercher dans les entités affectées de type HOST
+            if host_name == "Non spécifié" and 'affectedEntities' in problem:
+                for entity in problem.get('affectedEntities', []):
+                    if entity.get('type') == 'HOST':
+                        candidate = entity.get('name', entity.get('displayName', "Non spécifié"))
+                        if candidate != "Non spécifié" and is_valid_hostname(candidate):
+                            host_name = candidate
+                            logger.info(f"Hôte trouvé dans affectedEntities (priorité 2): {host_name}")
+                            break
+            
+            # PRIORITÉ 3: Chercher dans le displayId ou entityId s'ils ressemblent à des noms d'hôtes
+            if host_name == "Non spécifié" and problem.get('displayId'):
+                display_id = problem.get('displayId')
+                # Vérifier si displayId contient un nom d'hôte
+                host_match = re.search(r'\b(s[a-z0-9]\d{2,}[a-z0-9]*(?:\.fr\.net\.intra)?)\b', display_id, re.IGNORECASE)
+                if host_match and is_valid_hostname(host_match.group(1)):
+                    host_name = host_match.group(1)
+                    logger.info(f"Hôte trouvé dans displayId (priorité 3): {host_name}")
+            
+            # PRIORITÉ 4: Rechercher dans le titre avec des patterns spécifiques
+            if host_name == "Non spécifié" and problem.get('title'):
+                title = problem.get('title', '')
+                
+                # Liste de patterns du plus spécifique au moins spécifique
                 patterns = [
-                    r'\b(s[a-z0-9]\d{2,}[a-z0-9]*\.fr\.net\.intra)\b',  # Format complet
-                    r'\b(s[a-z0-9]\d{2,}[a-z0-9]*)\b',                  # Format s##
-                    r'\b(srv\d+[a-z0-9]*)\b',                           # Format srv##
-                    r'\bhost\s+(\S+)',                                   # host name
-                    r'\bserver\s+(\S+)',                                 # server name
-                    r'\b(win[a-z0-9]*\d+[a-z0-9]*)\b'                    # Serveurs Windows
+                    r'HOST:\s*(\S+)',                                # HOST: hostname
+                    r'host\s+(\S+)',                                 # host hostname
+                    r'server\s+(\S+)',                               # server hostname
+                    r'\bon\s+(\S+)',                                 # on hostname
+                    r'\bat\s+(\S+)',                                 # at hostname
+                    r'\b(s[a-z0-9]\d{2,}[a-z0-9]*\.fr\.net\.intra)\b',  # Format spécifique d'entreprise
+                    r'\b(s[a-z0-9]\d{2,}[a-z0-9]*)\b',                  # Serveurs commençant par S avec chiffres
+                    r'\b(srv\d+[a-z0-9]*)\b',                          # Format srv##
+                    r'\b(win[a-z0-9]*\d+[a-z0-9]*)\b'                  # Serveurs Windows
                 ]
                 
                 for pattern in patterns:
-                    host_match = re.search(pattern, combined_text, re.IGNORECASE)
+                    host_match = re.search(pattern, title, re.IGNORECASE)
                     if host_match:
+                        # Récupérer le premier groupe non-None
                         match_value = next((g for g in host_match.groups() if g), "Non spécifié")
+                        
                         if is_valid_hostname(match_value):
                             host_name = match_value
-                            logger.info(f"Hôte trouvé dans la description/sous-titre (priorité 5): {host_name}")
+                            logger.info(f"Hôte trouvé dans le titre via pattern {pattern} (priorité 4): {host_name}")
                             break
+            
+            # PRIORITÉ 5: Rechercher dans la description ou le sous-titre
+            if host_name == "Non spécifié":
+                # Combiner la description et le sous-titre pour la recherche
+                combined_text = f"{problem.get('description', '')} {problem.get('subtitle', '')}"
+                
+                if combined_text.strip():
+                    # Pattern du plus spécifique au moins spécifique
+                    patterns = [
+                        r'\b(s[a-z0-9]\d{2,}[a-z0-9]*\.fr\.net\.intra)\b',  # Format complet
+                        r'\b(s[a-z0-9]\d{2,}[a-z0-9]*)\b',                  # Format s##
+                        r'\b(srv\d+[a-z0-9]*)\b',                           # Format srv##
+                        r'\bhost\s+(\S+)',                                   # host name
+                        r'\bserver\s+(\S+)',                                 # server name
+                        r'\b(win[a-z0-9]*\d+[a-z0-9]*)\b'                    # Serveurs Windows
+                    ]
+                    
+                    for pattern in patterns:
+                        host_match = re.search(pattern, combined_text, re.IGNORECASE)
+                        if host_match:
+                            match_value = next((g for g in host_match.groups() if g), "Non spécifié")
+                            if is_valid_hostname(match_value):
+                                host_name = match_value
+                                logger.info(f"Hôte trouvé dans la description/sous-titre (priorité 5): {host_name}")
+                                break
         
         # Log du résultat final
         if host_name != "Non spécifié":
@@ -1498,7 +1474,7 @@ class OptimizedAPIClient:
         else:
             logger.info(f"Aucun nom d'hôte valide trouvé pour le problème {problem.get('problemId', 'unknown')}")
         
-        return {
+        result = {
             'id': problem.get('problemId', 'Unknown'),
             'title': problem.get('title', 'Problème inconnu'),
             'impact': problem.get('impactLevel', 'UNKNOWN'),
@@ -1513,6 +1489,12 @@ class OptimizedAPIClient:
             'host': host_name,  # Ajout du champ host explicite
             'impacted': host_name  # Ajout pour compatibilité avec le frontend actuel
         }
+        
+        # N'ajouter impactedEntities que si elles sont disponibles
+        if 'impactedEntities' in problem:
+            result['impactedEntities'] = problem.get('impactedEntities', [])
+        
+        return result
         
     def _extract_problem_zone(self, problem):
         """Extrait la zone principale d'un problème"""

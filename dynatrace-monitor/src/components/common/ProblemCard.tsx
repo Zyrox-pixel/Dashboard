@@ -20,29 +20,6 @@ const ProblemCard: React.FC<ProblemCardProps> = ({ problem }) => {
   const getHostInfo = (problem: Problem): string => {
     console.log('Debugging problem data for host extraction:', problem.id);
     
-    // PRIORITÉ 1: Utiliser directement impactedEntities s'il existe
-    if (problem.impactedEntities && Array.isArray(problem.impactedEntities)) {
-      for (const entity of problem.impactedEntities) {
-        if (entity.entityId && entity.entityId.type === 'HOST' && entity.name) {
-          console.log('Utilisation directe de impactedEntities:', entity.name);
-          return entity.name;
-        }
-      }
-    }
-    
-    // PRIORITÉ 2: Utiliser le champ impacted s'il existe explicitement
-    // C'est le champ le plus fiable car il a été spécifiquement ajouté par notre backend
-    if (problem.impacted && typeof problem.impacted === 'string' && problem.impacted !== "Non spécifié") {
-      console.log('Using explicit impacted field:', problem.impacted);
-      return problem.impacted;
-    }
-    
-    // PRIORITÉ 3: Utiliser le champ host s'il existe
-    if (problem.host && problem.host !== "Non spécifié") {
-      console.log('Using explicit host field:', problem.host);
-      return problem.host;
-    }
-    
     // Liste des mots à exclure qui ne sont jamais des noms d'hôtes
     const excludedWords = [
       'segmentation', 'script', 'extension', 'status', 'service', 'such', 'still', 
@@ -117,6 +94,30 @@ const ProblemCard: React.FC<ProblemCardProps> = ({ problem }) => {
         (/\d/.test(lowerName) && (lowerName.includes('.') || lowerName.includes('-')))
       );
     };
+    
+    // PRIORITÉ 1: Utiliser le champ impacted car il a été rempli par le backend en priorité
+    // C'est le champ le plus fiable car il contient déjà le meilleur nom d'hôte trouvé par le backend
+    if (problem.impacted && problem.impacted !== "Non spécifié") {
+      console.log('Using explicit impacted field from backend:', problem.impacted);
+      return problem.impacted;
+    }
+    
+    // PRIORITÉ 2: Utiliser le champ host s'il existe
+    if (problem.host && problem.host !== "Non spécifié") {
+      console.log('Using explicit host field from backend:', problem.host);
+      return problem.host;
+    }
+    
+    // PRIORITÉ 3: Utiliser impactedEntities s'il existe et contient des entités HOST
+    if (problem.impactedEntities && Array.isArray(problem.impactedEntities)) {
+      for (const entity of problem.impactedEntities) {
+        // Vérifier si c'est une entité de type HOST
+        if (entity.entityId && entity.entityId.type === 'HOST' && entity.name) {
+          console.log('Found host in impactedEntities:', entity.name);
+          return entity.name;
+        }
+      }
+    }
     
     // PRIORITÉ 4: Rechercher dans rootCauseEntity
     if (problem.rootCauseEntity && problem.rootCauseEntity.name) {

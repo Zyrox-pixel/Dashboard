@@ -12,6 +12,7 @@ export interface EntityStub {
 
 // Types pour les problèmes
 // Types pour les problèmes
+// Types pour les problèmes
 export interface Problem {
   id: string;
   title: string;
@@ -40,6 +41,7 @@ export interface Problem {
       id?: string;
     };
     name: string;
+    displayName?: string;
     [key: string]: any;
   }>;
   
@@ -50,6 +52,10 @@ export interface Problem {
     type: string;
     name?: string;
     displayName?: string;
+    entityId?: {
+      type: string;
+      id?: string;
+    }
   };
   startTime?: number;             // Heure de début en ms
   endTime?: number;               // Heure de fin en ms
@@ -158,6 +164,7 @@ export interface VitalForGroupMZsResponse {
 }
 
 // Type pour la réponse d'un problème de l'API
+// Type pour la réponse d'un problème de l'API
 export interface ProblemResponse {
   id: string;
   title: string;
@@ -166,16 +173,21 @@ export interface ProblemResponse {
   zone?: string;
   affected_entities?: number;
   start_time?: string;
+  end_time?: string;
+  duration?: string;
   dt_url?: string;
   host?: string;       // Nom explicite de la machine hôte
   impacted?: string;   // Champ alternatif pour le nom d'hôte
   displayId?: string;  // ID d'affichage du problème qui pourrait contenir des infos sur l'hôte
-  duration?: string;   // Durée du problème
   resolved?: boolean;  // Indique si le problème est résolu
   rootCauseEntity?: {
     type: string;
     name?: string;
     displayName?: string;
+    entityId?: {
+      type: string;
+      id?: string;
+    }
   };
   // Nouveau champ pour les entités impactées directement depuis l'API Dynatrace
   impactedEntities?: Array<{
@@ -184,6 +196,7 @@ export interface ProblemResponse {
       id?: string;
     };
     name: string;
+    displayName?: string;
     [key: string]: any;
   }>;
   [key: string]: any; // Pour permettre d'autres propriétés
