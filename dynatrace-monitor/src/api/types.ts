@@ -1,7 +1,7 @@
 // Types pour les entités Dynatrace
 
-// Types pour les entités impactées
-export interface ImpactedEntity {
+// Types pour les entités dans Dynatrace
+export interface EntityStub {
   id: string;
   name?: string;
   displayName?: string;
@@ -31,8 +31,16 @@ export interface Problem {
   zone: string;
   dt_url?: string;
   resolved?: boolean; // Champ pour distinguer les problèmes résolus
-  impactedEntities?: ImpactedEntity[]; // Entités impactées par le problème
+  impactedEntities?: EntityStub[]; // Entités impactées par le problème
   impacted?: string; // Nom direct de la machine impactée (si disponible)
+  
+  // Champs additionnels de l'API Dynatrace (optionnels)
+  rootCauseEntity?: EntityStub;   // Entité cause racine du problème
+  startTime?: number;             // Heure de début en ms
+  endTime?: number;               // Heure de fin en ms
+  displayId?: string;             // ID d'affichage
+  severityLevel?: string;         // Niveau de sévérité
+  managementZones?: { name: string }[]; // Zones de gestion associées
 }
 
 // Types pour les management zones

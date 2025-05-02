@@ -22,7 +22,7 @@ const ProblemCard: React.FC<ProblemCardProps> = ({ problem }) => {
     // 1. Vérifier d'abord dans les entités impactées (la source la plus fiable)
     if (problem.impactedEntities && Array.isArray(problem.impactedEntities)) {
       // Chercher une entité de type HOST
-      const hostEntity = problem.impactedEntities.find(entity => 
+      const hostEntity = problem.impactedEntities.find((entity) => 
         entity.type === 'HOST'
       );
       
@@ -31,21 +31,16 @@ const ProblemCard: React.FC<ProblemCardProps> = ({ problem }) => {
       }
     }
     
-    // 2. Vérifier également dans les entités affectées
-    if (problem.affectedEntities && Array.isArray(problem.affectedEntities)) {
-      // Chercher une entité de type HOST
-      const hostEntity = problem.affectedEntities.find(entity => 
-        entity.type === 'HOST'
-      );
-      
-      if (hostEntity && hostEntity.name) {
-        return hostEntity.name;
-      }
-    }
-    
-    // 3. Si disponible directement dans le rootCauseEntity
-    if (problem.rootCauseEntity && problem.rootCauseEntity.type === 'HOST' && problem.rootCauseEntity.name) {
+    // 2. Si disponible directement dans le rootCauseEntity
+    if (problem.rootCauseEntity && 
+        problem.rootCauseEntity.type === 'HOST' && 
+        problem.rootCauseEntity.name) {
       return problem.rootCauseEntity.name;
+    }
+    
+    // 3. Vérifier dans le champ impacted direct
+    if (problem.impacted && typeof problem.impacted === 'string') {
+      return problem.impacted;
     }
     
     // 4. Chercher la chaîne "impacted:" dans le sous-titre
