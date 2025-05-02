@@ -577,37 +577,25 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
       let vfeMZs: ManagementZone[] = [];
       
       if (!refreshProblemsOnly) {
-        // MODIFIÉ: Utiliser le zoneMeta pour les valeurs réelles
+        // Utiliser le nouveau format d'API avec statistiques intégrées
         if (vfgResponse && !vfgResponse.error && vfgResponse.data?.mzs) {
-          vfgMZs = (vfgResponse?.data?.mzs || []).map(mzName => {
-            // Récupérer les métadonnées en cache si disponibles
-            const meta = zoneMeta[mzName];
+          vfgMZs = (vfgResponse?.data?.mzs || []).map(mz => {
+            // Récupérer le nom et les stats directement de la réponse API
+            const mzName = mz.name;
+            const stats = mz.stats || { hosts: null, services: null, applications: null };
             
-            // Variables pour stocker les compteurs
-            let hostCount, servicesCount, appsCount;
+            // Calculer uniquement le hash pour l'availability
             const mzNameSum = mzName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
             
-            if (meta) {
-              // Utiliser les valeurs en cache
-              hostCount = meta.hosts;
-              servicesCount = meta.services;
-              appsCount = meta.apps;
-            } else {
-              // Fallback aux valeurs générées
-              hostCount = 5 + (mzNameSum % 15);
-              servicesCount = 10 + (mzNameSum % 20);
-              appsCount = 2 + (mzNameSum % 8);
-            }
-          
             return {
               id: `env-${mzName.replace(/\s+/g, '-')}`,
               name: mzName,
               code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
               icon: getZoneIcon(mzName),
               problemCount: 0, // Sera mis à jour avec les problèmes actifs
-              apps: appsCount,
-              services: servicesCount,
-              hosts: hostCount,
+              apps: stats.applications,
+              services: stats.services,
+              hosts: stats.hosts,
               availability: `${99.7 + (mzNameSum % 10) / 30}%`, // Entre 99.7% et 100%
               status: "healthy" as "healthy" | "warning",
               color: getZoneColor(mzName),
@@ -621,37 +609,25 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
           setState(prev => ({ ...prev, vitalForGroupMZs: vfgMZs }));
         }
         
-        // MODIFIÉ: Faire de même pour VFE
+        // Utiliser le nouveau format d'API avec statistiques intégrées pour VFE
         if (vfeResponse && !vfeResponse.error && vfeResponse.data?.mzs) {
-          vfeMZs = (vfeResponse?.data?.mzs || []).map(mzName => {
-            // Récupérer les métadonnées en cache si disponibles
-            const meta = zoneMeta[mzName];
+          vfeMZs = (vfeResponse?.data?.mzs || []).map(mz => {
+            // Récupérer le nom et les stats directement de la réponse API
+            const mzName = mz.name;
+            const stats = mz.stats || { hosts: null, services: null, applications: null };
             
-            // Variables pour stocker les compteurs
-            let hostCount, servicesCount, appsCount;
+            // Calculer uniquement le hash pour l'availability
             const mzNameSum = mzName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
             
-            if (meta) {
-              // Utiliser les valeurs en cache
-              hostCount = meta.hosts;
-              servicesCount = meta.services;
-              appsCount = meta.apps;
-            } else {
-              // Fallback aux valeurs générées
-              hostCount = 5 + (mzNameSum % 15);
-              servicesCount = 10 + (mzNameSum % 20);
-              appsCount = 2 + (mzNameSum % 8);
-            }
-          
             return {
               id: `env-${mzName.replace(/\s+/g, '-')}`,
               name: mzName,
               code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
               icon: getZoneIcon(mzName),
               problemCount: 0, // Sera mis à jour avec les problèmes actifs
-              apps: appsCount,
-              services: servicesCount,
-              hosts: hostCount,
+              apps: stats.applications,
+              services: stats.services,
+              hosts: stats.hosts,
               availability: `${99.7 + (mzNameSum % 10) / 30}%`, // Entre 99.7% et 100%
               status: "healthy" as "healthy" | "warning",
               color: getZoneColor(mzName),

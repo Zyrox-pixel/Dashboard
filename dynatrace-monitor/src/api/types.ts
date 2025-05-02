@@ -168,7 +168,15 @@ export interface ApiResponse<T> {
 
 // Type pour la réponse de l'API VitalForGroupMZs
 export interface VitalForGroupMZsResponse {
-  mzs: string[];
+  mzs: {
+    name: string;
+    stats: {
+      hosts: number;
+      services: number;
+      applications: number;
+    }
+  }[];
+  source?: string;
 }
 
 // Type pour la réponse d'un problème de l'API
