@@ -1183,14 +1183,27 @@ class OptimizedAPIClient:
         end_time_ms = problem.get('endTime', 0) if problem.get('endTime', 0) > 0 else int(time.time() * 1000)
         duration_sec = (end_time_ms - start_time_ms) / 1000
         
-        # Formatage des dates pour l'affichage
-        start_time_str = datetime.fromtimestamp(start_time_ms/1000).strftime('%Y-%m-%d %H:%M')
+        # Formatage des dates pour l'affichage avec indication explicite qu'il s'agit d'UTC
+        # Les timestamps Dynatrace sont en millisecondes depuis epoch en UTC
+        # Ajouter des logs pour débogage des problèmes de timezone
+        logger.info(f"Problème {problem.get('problemId')}: timestamp={start_time_ms}, timestamp_sec={start_time_ms/1000}")
+        
+        # Utiliser datetime.utcfromtimestamp pour garantir la cohérence, puis convertir en heure locale
+        start_time_utc = datetime.utcfromtimestamp(start_time_ms/1000)
+        # On ajoute 2 heures pour prendre en compte le décalage horaire CEST (UTC+2)
+        start_time_local = start_time_utc + timedelta(hours=2)
+        start_time_str = start_time_local.strftime('%Y-%m-%d %H:%M')
         
         # Ajouter l'heure de fermeture si elle existe
         end_time_str = None
         if problem.get('endTime', 0) > 0:
             end_time_ms = problem.get('endTime', 0)
-            end_time_str = datetime.fromtimestamp(end_time_ms/1000).strftime('%Y-%m-%d %H:%M')
+            # Même ajustement pour l'heure de fin
+            end_time_utc = datetime.utcfromtimestamp(end_time_ms/1000)
+            # On ajoute 2 heures pour prendre en compte le décalage horaire CEST (UTC+2)
+            end_time_local = end_time_utc + timedelta(hours=2)
+            end_time_str = end_time_local.strftime('%Y-%m-%d %H:%M')
+            logger.info(f"Problème {problem.get('problemId')}: fin_timestamp={end_time_ms}, fin_formatée={end_time_str}")
         
         # Déterminer la durée au format lisible
         duration_display = ""
