@@ -16,10 +16,16 @@ const RecentProblemsPage: React.FC = () => {
   // Récupérer le paramètre de type de dashboard depuis l'URL
   const dashboardType = new URLSearchParams(location.search).get('dashboard') || 'vfg';
   
-  // Forcer un rafraîchissement des données au chargement avec le bon type de dashboard
+  // Forcer un rafraîchissement des données une seule fois au chargement
   useEffect(() => {
-    refreshData(dashboardType as 'vfg' | 'vfe');
-  }, [refreshData, dashboardType]);
+    // Utiliser un flag pour éviter les boucles infinies
+    const loadOnce = async () => {
+      await refreshData(dashboardType as 'vfg' | 'vfe');
+    };
+    
+    loadOnce();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   
   // Navigation retour vers le bon tableau de bord
   const handleBackClick = () => {
