@@ -384,9 +384,11 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
         apiClient.getSummary(),
         apiClient.getVitalForGroupMZs(),
         apiClient.getVitalForEntrepriseMZs(),
-        apiClient.getProblems("OPEN", "-24h", dashboardType),  // Problèmes actifs uniquement
-        apiClient.getProblems("CLOSED", "-72h", dashboardType) // Problèmes fermés des 72 dernières heures
+        apiClient.getProblems("OPEN", "-24h", dashboardType),  // Problèmes actifs
+        apiClient.getProblems("ALL", "-72h", dashboardType)   // TOUS les problèmes des 72 dernières heures sans filtrage de statut
       ]);
+      console.log('Réponse problèmes 72h:', problemsLast72hResponse);
+
       
       // Traiter les données du résumé
       if (!summaryResponse.error && summaryResponse.data) {
@@ -502,18 +504,22 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
             title: problem.title || "Problème résolu",
             code: problem.id ? problem.id.substring(0, 7) : "UNKNOWN",
             subtitle: `${problem.zone || "Non spécifié"} - Impact: ${problem.impact || "INCONNU"}`,
-            time: problem.start_time ? `Résolu le ${problem.start_time}` : "Récent",
+            time: problem.start_time ? `Détecté le ${problem.start_time}` : "Récent",
             type: "Problème Dynatrace",
-            status: "warning", // Tous les problèmes fermés sont en warning
+            status: "warning", // Tous les problèmes sur 72h ont un statut visuel warning
             impact: problem.impact === "INFRASTRUCTURE" ? "ÉLEVÉ" : problem.impact === "SERVICE" ? "MOYEN" : "FAIBLE",
             zone: problem.zone || "Non spécifié",
             servicesImpacted: problem.affected_entities ? problem.affected_entities.toString() : "0",
-            dt_url: problem.dt_url || "#",
-            resolved: true // Nouveau champ pour distinguer les problèmes résolus
+            dt_url: problem.dt_url || "#"
           }));
           
+          console.log(`Problèmes 72h transformés: ${problems.length}`);
           setState(prev => ({ ...prev, problemsLast72h: problems }));
+        } else {
+          console.error("Données de problèmes 72h non valides:", problemsData);
         }
+      } else {
+        console.error("Erreur lors de la récupération des problèmes 72h:", problemsLast72hResponse.error);
       }
       
       // Si une zone est sélectionnée, charger ses données
