@@ -414,24 +414,6 @@ def get_processes():
         logger.error(f"Erreur lors de la récupération des processus: {e}")
         return {'error': str(e)}
 
-@app.route('/api/problems', methods=['GET'])
-@cached('problems')
-@time_execution
-def get_problems():
-    try:
-        # Récupérer la Management Zone actuelle
-        current_mz = get_current_mz()
-        if not current_mz:
-            return {'error': 'Aucune Management Zone définie'}
-        
-        # Utiliser la méthode optimisée pour récupérer les problèmes filtrés
-        return api_client.get_problems_filtered(current_mz, "-24h", "OPEN")
-    except Exception as e:
-        logger.error(f"Erreur lors de la récupération des problèmes: {e}")
-        return {'error': str(e)}
-
-# Modifiez la fonction get_management_zones() dans app.py pour ajouter une récupération de secours
-# Cherchez cette fonction et remplacez-la par le code suivant:
 
 @app.route('/api/management-zones', methods=['GET'])
 @cached('management_zones')
