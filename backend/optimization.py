@@ -13,6 +13,7 @@ from functools import wraps
 from datetime import datetime, timedelta
 import logging
 import os
+import re
 
 # Configuration du logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -498,6 +499,7 @@ class OptimizedAPIClient:
         
         # Préparer les requêtes de métriques pour tous les services avec clés explicites
         metric_queries = []
+        
         for service_id in service_ids:
             # Requête pour le temps de réponse avec ID explicite
             metric_queries.append((
@@ -1214,7 +1216,7 @@ class OptimizedAPIClient:
             return []
     
     def _format_problem(self, problem, zone=None):
-        """Formate un problème pour la réponse API"""
+        """Formate un problème pour la réponse API avec extraction améliorée des informations de machine"""
         # Vérification améliorée pour détecter les problèmes résolus
         # Un problème est résolu s'il a une heure de fermeture, statut non-OPEN, 
         # ou si son statut de résolution est défini
@@ -1270,6 +1272,51 @@ class OptimizedAPIClient:
             hours = int((duration_sec % 86400) / 3600)
             duration_display = f"{days}j {hours}h"
             
+        # NOUVELLE FONCTIONNALITÉ: Extraction améliorée du nom de machine
+        host_name = "Non spécifié"
+        
+        # Chercher d'abord dans les entités affectées
+        if 'affectedEntities' in problem:
+            for entity in problem.get('affectedEntities', []):
+                if entity.get('type') == 'HOST':
+                    host_name = entity.get('name', entity.get('displayName', "Non spécifié"))
+                    logger.info(f"Hôte trouvé dans affectedEntities: {host_name}")
+                    break
+        
+        # Si aucun hôte n'est trouvé, essayer d'extraire depuis le titre
+        if host_name == "Non spécifié" and problem.get('title'):
+            title = problem.get('title', '')
+            
+            # Essayer plusieurs patterns de correspondance
+            patterns = [
+                r'HOST:\s*(\S+)',             # HOST: hostname
+                r'host\s+(\S+)',              # host hostname
+                r'\bon\s+(\S+)',              # on hostname
+                r'\bat\s+(\S+)',              # at hostname
+                r'\b([Ss][A-Za-z0-9]{5,})\b', # Serveurs commençant par S
+                r'\b(WIN\w+)\b'               # Serveurs Windows
+            ]
+            
+            for pattern in patterns:
+                host_match = re.search(pattern, title, re.IGNORECASE)
+                if host_match:
+                    # Récupérer le premier groupe non-None
+                    match_value = next((g for g in host_match.groups() if g), "Non spécifié")
+                    
+                    # Filtrer les faux positifs (mots courants qui ne sont pas des noms d'hôtes)
+                    if match_value.lower() not in ["status", "service", "such", "still", "some", "system", "server"]:
+                        host_name = match_value
+                        logger.info(f"Hôte trouvé dans le titre via pattern {pattern}: {host_name}")
+                        break
+        
+        # Si toujours pas d'hôte, essayer dans le sous-titre ou la description
+        if host_name == "Non spécifié" and problem.get('description'):
+            description = problem.get('description', '')
+            host_match = re.search(r'\b([Ss][A-Za-z0-9]{5,}|WIN\w+)\b', description)
+            if host_match and host_match.group(1).lower() not in ["status", "service", "such", "still", "some", "system", "server"]:
+                host_name = host_match.group(1)
+                logger.info(f"Hôte trouvé dans la description: {host_name}")
+        
         return {
             'id': problem.get('problemId', 'Unknown'),
             'title': problem.get('title', 'Problème inconnu'),
@@ -1281,8 +1328,10 @@ class OptimizedAPIClient:
             'duration': duration_display,  # Ajout de la durée du problème
             'dt_url': f"{self.env_url}/#problems/problemdetails;pid={problem.get('problemId', 'Unknown')}",
             'zone': zone or self._extract_problem_zone(problem),
-            'resolved': is_resolved
-    }
+            'resolved': is_resolved,
+            'host': host_name,  # Ajout du champ host explicite
+            'impacted': host_name  # Ajout pour compatibilité avec le frontend actuel
+        }
         
     def _extract_problem_zone(self, problem):
         """Extrait la zone principale d'un problème"""

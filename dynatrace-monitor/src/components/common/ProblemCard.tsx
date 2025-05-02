@@ -16,87 +16,129 @@ const ProblemCard: React.FC<ProblemCardProps> = ({ problem }) => {
   // Vérifier si le problème est résolu
   const isResolved = problem.resolved || false;
 
-  // Extraire les informations sur la machine/hôte
-  // Extraire le nom de l'hôte impacté à partir des informations disponibles
+  // Extraire les informations sur la machine/hôte avec une méthode améliorée
   const getHostInfo = (problem: Problem): string => {
-    // Vérifier d'abord dans les entités impactées explicites
+    console.log('Debugging problem data for host extraction:', problem.id);
+    
+    // APPROACH 1: Look for explicit host info in the problem object
+    if (problem.host) {
+      console.log('Found host in direct property:', problem.host);
+      return problem.host;
+    }
+    
+    // APPROACH 2: Look in impactedEntities if available
     if (problem.impactedEntities && Array.isArray(problem.impactedEntities)) {
-        const hostEntity = problem.impactedEntities.find((entity: any) => 
-            entity.type === 'HOST' && entity.name);
-        
-        if (hostEntity && hostEntity.name) {
-            console.log('Hôte trouvé dans impactedEntities:', hostEntity.name);
-            return hostEntity.name;
-        }
+      // First try exact HOST type match
+      const hostEntity = problem.impactedEntities.find((entity: any) => 
+        entity.type === 'HOST' && entity.name);
+      
+      if (hostEntity && hostEntity.name) {
+        console.log('Found host in impactedEntities:', hostEntity.name);
+        return hostEntity.name;
+      }
+      
+      // If not found, check for any entity that might be a host
+      const potentialHost = problem.impactedEntities.find((entity: any) => 
+        entity.name && 
+        (entity.type?.toLowerCase().includes('host') || 
+         entity.name.match(/^(s|win)\w+/i))
+      );
+      
+      if (potentialHost && potentialHost.name) {
+        console.log('Found potential host in entities:', potentialHost.name);
+        return potentialHost.name;
+      }
     }
     
-    // Vérifier si le nom d'hôte est directement associé au problème
+    // APPROACH 3: Check if impacted field exists and is a string
     if (problem.impacted && typeof problem.impacted === 'string') {
-        console.log('Utilisation du champ impacted explicite:', problem.impacted);
-        return problem.impacted;
+      console.log('Using explicit impacted field:', problem.impacted);
+      return problem.impacted;
     }
     
-    // MÉTHODE 1: Extraction depuis le titre - analyse les patterns "HOST:" ou "host"
+    // APPROACH 4: Check affectedEntities if available (another possible field from API)
+    if (problem.affectedEntities && Array.isArray(problem.affectedEntities)) {
+      const hostEntity = problem.affectedEntities.find((entity: any) => 
+        (entity.entityType === 'HOST' || entity.type === 'HOST') && 
+        (entity.name || entity.displayName)
+      );
+      
+      if (hostEntity) {
+        const hostName = hostEntity.name || hostEntity.displayName;
+        console.log('Found host in affectedEntities:', hostName);
+        return hostName;
+      }
+    }
+    
+    // APPROACH 5: Try parsing from the title with improved patterns
     if (problem.title) {
-        // Pattern 1: Recherche d'un hôte dans le format "HOST: nom_hôte"
-        const hostMatch = problem.title.match(/HOST:\s*(\S+)/i);
-        if (hostMatch && hostMatch[1]) {
-            console.log('Hôte extrait du titre avec pattern HOST:', hostMatch[1]);
-            return hostMatch[1];
+      // Try multiple patterns
+      const patterns = [
+        /HOST:\s*(\S+)/i,                    // HOST: hostname
+        /host\s+(\S+)/i,                     // host hostname
+        /\bon\s+(\S+)/i,                     // on hostname
+        /\bat\s+(\S+)/i,                     // at hostname
+        /\b([Ss][A-Za-z0-9]{5,})\b/,         // Server names starting with S
+        /\b(WIN\w+)\b/,                      // Windows servers
+        /\b([A-Za-z0-9]+[-_][A-Za-z0-9]+)\b/ // Names with hyphens or underscores
+      ];
+      
+      for (const pattern of patterns) {
+        const match = problem.title.match(pattern);
+        if (match && match[1]) {
+          // Filter out common words that might match but aren't hostnames
+          const commonWords = ['status', 'service', 'such', 'still', 'some', 'system', 'server'];
+          if (!commonWords.includes(match[1].toLowerCase())) {
+            console.log(`Found host in title using pattern ${pattern}:`, match[1]);
+            return match[1];
+          }
         }
-        
-        // Pattern 2: Recherche d'un hôte dans le format "host nom_hôte"
-        const hostWordMatch = problem.title.match(/host\s+(\S+)/i);
-        if (hostWordMatch && hostWordMatch[1]) {
-            console.log('Hôte extrait du titre avec pattern host:', hostWordMatch[1]);
-            return hostWordMatch[1];
-        }
-        
-        // Pattern 3: Recherche de noms de serveurs commençant par S ou WIN
-        const serverMatches = problem.title.match(/\b([Ss]\w{5,}|WIN\w+)\b/);
-        if (serverMatches && serverMatches[1]) {
-            const potentialServer = serverMatches[1];
-            // Exclure les mots communs qui ne sont pas des noms de serveurs
-            if (!/^(status|service|such|still|some|system|server)/i.test(potentialServer)) {
-                console.log('Nom serveur potentiel trouvé dans le titre:', potentialServer);
-                return potentialServer;
-            }
-        }
+      }
     }
     
-    // MÉTHODE 2: Extraction depuis le sous-titre ou autre champ descriptif
+    // APPROACH 6: Check in rootCauseEntity
+    if (problem.rootCauseEntity && problem.rootCauseEntity.name) {
+      console.log('Using rootCauseEntity:', problem.rootCauseEntity.name);
+      return problem.rootCauseEntity.name;
+    }
+    
+    // APPROACH 7: Check in subtitle and other descriptive fields
     if (problem.subtitle) {
-        // Recherche explicite de "impacted: nom_hôte"
-        const impactedMatch = problem.subtitle.match(/impacted:\s*([^\s,.;]+)/i);
-        if (impactedMatch && impactedMatch[1]) {
-            console.log('Hôte extrait du sous-titre après "impacted:":', impactedMatch[1]);
-            return impactedMatch[1];
-        }
-        
-        // Recherche de noms de serveurs dans le sous-titre
-        const serverMatches = problem.subtitle.match(/\b([Ss]\w{5,}|WIN\w+)\b/);
-        if (serverMatches && serverMatches[1]) {
-            const potentialServer = serverMatches[1];
-            if (!/^(status|service|such|still|some|system|server)/i.test(potentialServer)) {
-                console.log('Nom serveur potentiel trouvé dans le sous-titre:', potentialServer);
-                return potentialServer;
-            }
-        }
+      const match = problem.subtitle.match(/\b([Ss][A-Za-z0-9]{4,}|WIN\w+)\b/);
+      if (match && match[1]) {
+        console.log('Found host in subtitle:', match[1]);
+        return match[1];
+      }
+      
+      // Check for "impacted:" pattern in subtitle
+      const impactedMatch = problem.subtitle.match(/impacted:\s*([^\s,.;]+)/i);
+      if (impactedMatch && impactedMatch[1]) {
+        console.log('Found host in subtitle after "impacted:":', impactedMatch[1]);
+        return impactedMatch[1];
+      }
     }
     
-    // Si on arrive ici et qu'on a une zone, l'utiliser comme fallback
+    // APPROACH 8: Parse displayId if it follows a pattern with hostname
+    if (problem.displayId && problem.displayId.includes(':')) {
+      const parts = problem.displayId.split(':');
+      if (parts.length >= 2) {
+        console.log('Extracted from displayId:', parts[0]);
+        return parts[0];
+      }
+    }
+    
+    // FALLBACK: Use the zone as last resort
     if (problem.zone && problem.zone !== "Non spécifié") {
-        console.log('Utilisation de la zone comme fallback:', problem.zone);
-        return problem.zone;
+      console.log('Falling back to zone:', problem.zone);
+      return problem.zone;
     }
     
-    console.log('Aucun hôte trouvé pour le problème:', problem.id);
+    console.log('Could not determine host for problem:', problem.id);
     return "Non spécifié";
-};
+  };
   
-const hostInfo = getHostInfo(problem);
+  const hostInfo = getHostInfo(problem);
 
-  
   // Extraire la date du problème pour l'affichage
   const startDate = problem.time?.replace('Depuis ', '') || '';
   
