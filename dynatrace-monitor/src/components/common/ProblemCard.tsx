@@ -3,7 +3,7 @@ import {
   AlertTriangle, ExternalLink, CheckCircle, ChevronDown, ChevronUp, 
   Clock, Server, Database, Cpu, Users, BarChart3, Shield, RefreshCw, Monitor,
   Zap, Layers, AlertCircle, Activity, ArrowUpRight, FileWarning, 
-  Bell, Flame, Flask, Cloud, Laptop, Bug, AlertOctagon
+  Bell, AlertOctagon
 } from 'lucide-react';
 import { Problem } from '../../api/types';
 
@@ -265,7 +265,7 @@ const ProblemCard: React.FC<ProblemCardProps> = ({ problem }) => {
     } else if (type.includes('network')) {
       return <Activity size={16} className="text-blue-400" />;
     } else if (type.includes('error') || type.includes('exception')) {
-      return <Bug size={16} className="text-red-400" />;
+      return <AlertCircle size={16} className="text-red-400" />;
     } else if (type.includes('alert') || type.includes('warning')) {
       return <Bell size={16} className="text-amber-400" />;
     } else {
@@ -290,11 +290,11 @@ const ProblemCard: React.FC<ProblemCardProps> = ({ problem }) => {
       } else if (entityType.includes('database')) {
         return <Database size={16} className="text-amber-400" />;
       } else if (entityType.includes('custom')) {
-        return <Flask size={16} className="text-emerald-400" />;
+        return <Shield size={16} className="text-emerald-400" />;
       } else if (entityType.includes('kubernetes')) {
-        return <Cloud size={16} className="text-blue-400" />;
+        return <Shield size={16} className="text-blue-400" />;
       } else if (entityType.includes('browser')) {
-        return <Laptop size={16} className="text-purple-400" />;
+        return <Monitor size={16} className="text-purple-400" />;
       }
     }
     
