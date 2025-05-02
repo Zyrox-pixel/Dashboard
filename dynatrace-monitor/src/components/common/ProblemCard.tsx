@@ -56,18 +56,10 @@ const ProblemCard: React.FC<ProblemCardProps> = ({ problem }) => {
       return problem.impacted;
     }
     
-    // APPROACH 4: Check affectedEntities if available (another possible field from API)
-    if (problem.affectedEntities && Array.isArray(problem.affectedEntities)) {
-      const hostEntity = problem.affectedEntities.find((entity: any) => 
-        (entity.entityType === 'HOST' || entity.type === 'HOST') && 
-        (entity.name || entity.displayName)
-      );
-      
-      if (hostEntity) {
-        const hostName = hostEntity.name || hostEntity.displayName;
-        console.log('Found host in affectedEntities:', hostName);
-        return hostName;
-      }
+    // APPROACH 4: Check rootCauseEntity if available
+    if (problem.rootCauseEntity && problem.rootCauseEntity.name) {
+      console.log('Using rootCauseEntity:', problem.rootCauseEntity.name);
+      return problem.rootCauseEntity.name;
     }
     
     // APPROACH 5: Try parsing from the title with improved patterns
@@ -96,13 +88,7 @@ const ProblemCard: React.FC<ProblemCardProps> = ({ problem }) => {
       }
     }
     
-    // APPROACH 6: Check in rootCauseEntity
-    if (problem.rootCauseEntity && problem.rootCauseEntity.name) {
-      console.log('Using rootCauseEntity:', problem.rootCauseEntity.name);
-      return problem.rootCauseEntity.name;
-    }
-    
-    // APPROACH 7: Check in subtitle and other descriptive fields
+    // APPROACH 6: Check in subtitle and other descriptive fields
     if (problem.subtitle) {
       const match = problem.subtitle.match(/\b([Ss][A-Za-z0-9]{4,}|WIN\w+)\b/);
       if (match && match[1]) {
@@ -118,7 +104,7 @@ const ProblemCard: React.FC<ProblemCardProps> = ({ problem }) => {
       }
     }
     
-    // APPROACH 8: Parse displayId if it follows a pattern with hostname
+    // APPROACH 7: Parse displayId if it follows a pattern with hostname
     if (problem.displayId && problem.displayId.includes(':')) {
       const parts = problem.displayId.split(':');
       if (parts.length >= 2) {

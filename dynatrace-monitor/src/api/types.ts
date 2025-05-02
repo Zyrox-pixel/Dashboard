@@ -153,6 +153,10 @@ export interface ProblemResponse {
   start_time?: string;
   dt_url?: string;
   [key: string]: any; // Pour permettre d'autres propriétés
+  host?: string;       // Explicit host machine name
+  impacted?: string;   // Alternative field for host name
+  displayId?: string;  // Problem display ID that might contain hostname info
+  rootCauseEntity?: EntityStub; // Root cause entity that might be a host
 }
 
 // Type pour la réponse d'un processus de l'API
