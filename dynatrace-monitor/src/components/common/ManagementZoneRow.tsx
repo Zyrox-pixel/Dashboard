@@ -47,7 +47,7 @@ const ManagementZoneRow: React.FC<ManagementZoneRowProps> = ({ zone, onZoneClick
             onClick={(e) => { e.stopPropagation(); }}
             className="font-medium text-blue-400 hover:text-blue-300 dark:text-blue-400 dark:hover:text-blue-300 flex items-center gap-1"
           >
-            <span>{zone.apps !== null ? zone.apps : "N/A"}</span>
+            <span>{zone.apps !== null && zone.apps !== undefined ? String(zone.apps) : "N/A"}</span>
             <ExternalLink size={10} />
           </a>
         </div>
@@ -65,7 +65,7 @@ const ManagementZoneRow: React.FC<ManagementZoneRowProps> = ({ zone, onZoneClick
             onClick={(e) => { e.stopPropagation(); }}
             className="font-medium text-green-400 hover:text-green-300 dark:text-green-400 dark:hover:text-green-300 flex items-center gap-1"
           >
-            <span>{zone.services !== null ? zone.services : "N/A"}</span>
+            <span>{zone.services !== null && zone.services !== undefined ? String(zone.services) : "N/A"}</span>
             <ExternalLink size={10} />
           </a>
         </div>
@@ -83,7 +83,7 @@ const ManagementZoneRow: React.FC<ManagementZoneRowProps> = ({ zone, onZoneClick
             onClick={(e) => { e.stopPropagation(); }}
             className="font-medium text-purple-400 hover:text-purple-300 dark:text-purple-400 dark:hover:text-purple-300 flex items-center gap-1"
           >
-            <span>{zone.hosts !== null ? zone.hosts : "N/A"}</span>
+            <span>{zone.hosts !== null && zone.hosts !== undefined ? String(zone.hosts) : "N/A"}</span>
             <ExternalLink size={10} />
           </a>
         </div>

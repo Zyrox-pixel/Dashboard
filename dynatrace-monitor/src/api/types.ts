@@ -166,16 +166,16 @@ export interface ApiResponse<T> {
   error?: string;
 }
 
-// Type pour la réponse de l'API VitalForGroupMZs
+// Type pour la réponse de l'API VitalForGroupMZs - format flexible pour supporter la migration
 export interface VitalForGroupMZsResponse {
-  mzs: {
+  mzs: Array<string | {
     name: string;
     stats: {
-      hosts: number;
-      services: number;
-      applications: number;
+      hosts: number | null;
+      services: number | null;
+      applications: number | null;
     }
-  }[];
+  }>;
   source?: string;
 }
 

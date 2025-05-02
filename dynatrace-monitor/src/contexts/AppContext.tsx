@@ -577,12 +577,34 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
       let vfeMZs: ManagementZone[] = [];
       
       if (!refreshProblemsOnly) {
-        // Utiliser le nouveau format d'API avec statistiques intégrées
+        // Gérer de façon flexible le format de données (migration)
         if (vfgResponse && !vfgResponse.error && vfgResponse.data?.mzs) {
+          console.log("Données reçues VFG:", vfgResponse.data.mzs);
+          
+          // Déterminer le format des données
+          const firstItem = vfgResponse.data.mzs.length > 0 ? vfgResponse.data.mzs[0] : null;
+          console.log("Premier élément:", firstItem, "Type:", typeof firstItem);
+          
           vfgMZs = (vfgResponse?.data?.mzs || []).map(mz => {
-            // Récupérer le nom et les stats directement de la réponse API
-            const mzName = mz.name;
-            const stats = mz.stats || { hosts: null, services: null, applications: null };
+            // Adapter le traitement selon le format (chaîne ou objet)
+            let mzName, stats;
+            
+            if (typeof mz === 'string') {
+              // Format ancien: liste de chaînes
+              console.log("Format ancien détecté (chaîne):", mz);
+              mzName = mz;
+              stats = { hosts: null, services: null, applications: null };
+            } else if (typeof mz === 'object' && mz !== null) {
+              // Format nouveau: objets avec statistiques
+              console.log("Format nouveau détecté (objet):", mz);
+              mzName = mz.name;
+              stats = mz.stats || { hosts: null, services: null, applications: null };
+            } else {
+              // Format inattendu
+              console.error("Format inattendu pour MZ:", mz);
+              mzName = "Inconnu";
+              stats = { hosts: null, services: null, applications: null };
+            }
             
             // Calculer uniquement le hash pour l'availability
             const mzNameSum = mzName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
@@ -609,12 +631,34 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
           setState(prev => ({ ...prev, vitalForGroupMZs: vfgMZs }));
         }
         
-        // Utiliser le nouveau format d'API avec statistiques intégrées pour VFE
+        // Gérer de façon flexible le format de données (migration) pour VFE
         if (vfeResponse && !vfeResponse.error && vfeResponse.data?.mzs) {
+          console.log("Données reçues VFE:", vfeResponse.data.mzs);
+          
+          // Déterminer le format des données
+          const firstItem = vfeResponse.data.mzs.length > 0 ? vfeResponse.data.mzs[0] : null;
+          console.log("Premier élément VFE:", firstItem, "Type:", typeof firstItem);
+          
           vfeMZs = (vfeResponse?.data?.mzs || []).map(mz => {
-            // Récupérer le nom et les stats directement de la réponse API
-            const mzName = mz.name;
-            const stats = mz.stats || { hosts: null, services: null, applications: null };
+            // Adapter le traitement selon le format (chaîne ou objet)
+            let mzName, stats;
+            
+            if (typeof mz === 'string') {
+              // Format ancien: liste de chaînes
+              console.log("Format ancien détecté (chaîne):", mz);
+              mzName = mz;
+              stats = { hosts: null, services: null, applications: null };
+            } else if (typeof mz === 'object' && mz !== null) {
+              // Format nouveau: objets avec statistiques
+              console.log("Format nouveau détecté (objet):", mz);
+              mzName = mz.name;
+              stats = mz.stats || { hosts: null, services: null, applications: null };
+            } else {
+              // Format inattendu
+              console.error("Format inattendu pour MZ:", mz);
+              mzName = "Inconnu";
+              stats = { hosts: null, services: null, applications: null };
+            }
             
             // Calculer uniquement le hash pour l'availability
             const mzNameSum = mzName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);

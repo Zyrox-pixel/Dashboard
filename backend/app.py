@@ -114,6 +114,9 @@ def get_vital_for_entreprise_mzs_endpoint():
                     }
                 })
         
+        # Log des données pour debug
+        logger.info(f"Données VFE MZs envoyées: {vfe_mzs}")
+        
         # Format de réponse amélioré avec statistiques
         return jsonify({
             'mzs': vfe_mzs,
@@ -175,6 +178,9 @@ def get_vital_for_group_mzs_endpoint():
                         "applications": 5
                     }
                 })
+        
+        # Log des données pour debug
+        logger.info(f"Données VFG MZs envoyées: {vfg_mzs}")
         
         # Format de réponse amélioré avec statistiques
         return jsonify({

@@ -570,15 +570,21 @@ class ApiClient {
   /**
    * Récupérer les management zones de Vital for Group
    */
-  public getVitalForGroupMZs() {
-    return this.get<VitalForGroupMZsResponse>(ENDPOINTS.VITAL_FOR_GROUP_MZS);
+  public async getVitalForGroupMZs() {
+    console.log("Requesting VFG MZs...");
+    const response = await this.axiosInstance.get(ENDPOINTS.VITAL_FOR_GROUP_MZS);
+    console.log("Raw VFG response:", response.data);
+    return { data: response.data };
   }
 
   /**
    * Récupérer les management zones de Vital for Entreprise
    */
-  public getVitalForEntrepriseMZs() {
-    return this.get<VitalForGroupMZsResponse>(ENDPOINTS.VITAL_FOR_ENTREPRISE_MZS);
+  public async getVitalForEntrepriseMZs() {
+    console.log("Requesting VFE MZs...");
+    const response = await this.axiosInstance.get(ENDPOINTS.VITAL_FOR_ENTREPRISE_MZS);
+    console.log("Raw VFE response:", response.data);
+    return { data: response.data };
   }
 
   /**
