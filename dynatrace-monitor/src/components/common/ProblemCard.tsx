@@ -21,7 +21,7 @@ const ProblemCard: React.FC<ProblemCardProps> = ({ problem }) => {
   const getHostInfo = () => {
     // Si le champ host est explicitement défini
     if (problem.host) {
-      return `HOST: ${problem.host}`;
+      return problem.host;
     }
     
     // Extraire l'hôte du titre si possible
@@ -29,7 +29,7 @@ const ProblemCard: React.FC<ProblemCardProps> = ({ problem }) => {
       const words = problem.title.split(' ');
       const hostIndex = words.findIndex(word => word.toLowerCase() === 'host');
       if (hostIndex !== -1 && hostIndex < words.length - 1) {
-        return `HOST: ${words[hostIndex + 1]}`;
+        return words[hostIndex + 1];
       }
     }
     
@@ -41,12 +41,12 @@ const ProblemCard: React.FC<ProblemCardProps> = ({ problem }) => {
       
       // Si la dernière partie ressemble à un nom d'hôte (contient des caractères spéciaux typiques)
       if (lastPart && (lastPart.includes('-') || lastPart.includes('.'))) {
-        return `HOST: ${lastPart}`;
+        return lastPart;
       }
     }
     
     // Par défaut, afficher la zone/environnement comme information de contexte
-    return `Environnement: ${problem.zone}`;
+    return problem.zone;
   };
   
   const hostInfo = getHostInfo();
