@@ -217,6 +217,14 @@ def get_problems():
         time_from = request.args.get('from', '-24h')  # Par défaut "-24h"
         dashboard_type = request.args.get('type', '')  # Pour identifier VFG ou VFE
         
+        # Créer une clé de cache unique qui inclut tous les paramètres
+        specific_cache_key = f"problems:{get_current_mz()}:{time_from}:{status}:{dashboard_type}"
+        
+        # Si nous avons déjà cette requête en cache, retourner les données
+        cached_data = api_client.get_cached(specific_cache_key)
+        if cached_data is not None:
+            return cached_data
+            
         # Déterminer le statut à utiliser (NULL si ALL)
         use_status = None if status == 'ALL' else status
         
@@ -246,11 +254,6 @@ def get_problems():
                     mz_problems = api_client.get_problems_filtered(mz_name, time_from, use_status)
                     logger.info(f"MZ {mz_name}: {len(mz_problems)} problèmes trouvés")
                     
-                    # Ajouter le champ 'resolved' pour les requêtes ALL
-                    if status == 'ALL':
-                        for problem in mz_problems:
-                            problem['resolved'] = problem.get('status') != 'OPEN'
-                    
                     all_problems.extend(mz_problems)
                 except Exception as mz_error:
                     logger.error(f"Erreur lors de la récupération des problèmes pour MZ {mz_name}: {mz_error}")
@@ -261,9 +264,15 @@ def get_problems():
             for problem in all_problems:
                 if problem['id'] not in problem_ids:
                     problem_ids.add(problem['id'])
+                    # Ajouter le champ 'resolved' pour les requêtes ALL
+                    if status == 'ALL' and 'resolved' not in problem:
+                        problem['resolved'] = problem.get('status') != 'OPEN'
                     unique_problems.append(problem)
             
             logger.info(f"Récupéré {len(unique_problems)} problèmes uniques pour {dashboard_type.upper()} (timeframe: {time_from}, status: {status})")
+            
+            # Mettre en cache le résultat avec la clé spécifique
+            api_client.set_cache(specific_cache_key, unique_problems)
             return unique_problems
             
         else:
@@ -275,16 +284,33 @@ def get_problems():
             # Utiliser la méthode optimisée pour récupérer les problèmes filtrés
             problems = api_client.get_problems_filtered(current_mz, time_from, use_status)
             
-            # Ajouter le champ 'resolved' pour les requêtes ALL
-            if status == 'ALL':
-                for problem in problems:
-                    problem['resolved'] = problem.get('status') != 'OPEN'
-                    
+            # Mettre en cache le résultat avec la clé spécifique
+            api_client.set_cache(specific_cache_key, problems)
+            
             logger.info(f"MZ {current_mz}: {len(problems)} problèmes récupérés (timeframe: {time_from}, status: {status})")
             return problems
     except Exception as e:
         logger.error(f"Erreur lors de la récupération des problèmes: {e}")
         return {'error': str(e)}
+
+@app.route('/api/refresh/<cache_type>', methods=['POST'])
+def refresh_cache(cache_type):
+    if cache_type not in ['services', 'hosts', 'process_groups', 'problems', 'summary', 'all', 'purge']:
+        return jsonify({'error': f'Type de cache {cache_type} non trouvé'}), 404
+    
+    # Si 'purge', vider complètement le cache, y compris les clés personnalisées
+    if cache_type == 'purge':
+        api_client.cache.clear()
+        return jsonify({'success': True, 'message': 'Cache complètement purgé'})
+    
+    # Si 'all', effacer tous les caches standard
+    if cache_type == 'all':
+        api_client.clear_cache()
+        return jsonify({'success': True, 'message': 'Tous les caches ont été effacés'})
+    
+    # Sinon, effacer uniquement le cache spécifié
+    api_client.clear_cache(f"{cache_type}:")
+    return jsonify({'success': True, 'message': f'Cache {cache_type} effacé avec succès'})
 
 @app.route('/api/current-management-zone', methods=['GET'])
 def get_current_management_zone():
