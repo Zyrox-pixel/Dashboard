@@ -1084,12 +1084,15 @@ class OptimizedAPIClient:
                 current_time = int(time.time() * 1000)  # Convertir en millisecondes
                 time_limit = None
                 
+                # Traiter les différents formats de période
                 if time_from == "-24h":
                     time_limit = current_time - (24 * 60 * 60 * 1000)
-                elif time_from == "-72h":
+                elif time_from == "-72h" or time_from == "-3d":
                     time_limit = current_time - (72 * 60 * 60 * 1000)
+                    logger.info(f"Récupération des problèmes sur 72 heures")
                 elif time_from == "-30d":
                     time_limit = current_time - (30 * 24 * 60 * 60 * 1000)
+                    logger.info(f"Récupération des problèmes sur 30 jours")
                 elif time_from.startswith("-") and time_from.endswith("d"):
                     # Supporter des périodes personnalisées en jours (-Nd)
                     try:
@@ -1097,8 +1100,20 @@ class OptimizedAPIClient:
                         time_limit = current_time - (days * 24 * 60 * 60 * 1000)
                         logger.info(f"Période personnalisée de {days} jours appliquée")
                     except ValueError:
-                        logger.warning(f"Format de période non reconnu: {time_from}, utilisation des 30 derniers jours par défaut")
-                        time_limit = current_time - (30 * 24 * 60 * 60 * 1000)
+                        logger.warning(f"Format de période non reconnu: {time_from}, utilisation des 72h par défaut")
+                        time_limit = current_time - (72 * 60 * 60 * 1000)
+                elif time_from.startswith("-") and time_from.endswith("h"):
+                    # Supporter des périodes personnalisées en heures (-Nh)
+                    try:
+                        hours = int(time_from[1:-1])
+                        time_limit = current_time - (hours * 60 * 60 * 1000)
+                        logger.info(f"Période personnalisée de {hours} heures appliquée")
+                    except ValueError:
+                        logger.warning(f"Format de période non reconnu: {time_from}, utilisation des 72h par défaut")
+                        time_limit = current_time - (72 * 60 * 60 * 1000)
+                else:
+                    logger.warning(f"Format de période non reconnu: {time_from}, utilisation des 72h par défaut")
+                    time_limit = current_time - (72 * 60 * 60 * 1000)
                 
                 # On va filtrer manuellement les problèmes liés à notre Management Zone
                 mz_problems = 0
@@ -1149,59 +1164,24 @@ class OptimizedAPIClient:
                     # Vérifier si le problème est lié à notre Management Zone
                     is_in_mz = False
                     
-                    # Pour les requêtes de type ALL (historique), utiliser un filtrage plus souple
-                    if status == "ALL":
-                        # D'abord vérifier les MZ explicites
-                        if 'managementZones' in problem:
-                            for mz in problem.get('managementZones', []):
-                                if mz.get('name') == mz_name:
-                                    is_in_mz = True
-                                    break
-                        
-                        # Ensuite, vérifier les entités affectées
-                        if not is_in_mz:
-                            for entity in problem.get('affectedEntities', []):
-                                # Vérifier les management zones de chaque entité affectée
-                                if 'managementZones' in entity:
-                                    for mz in entity.get('managementZones', []):
-                                        if mz.get('name') == mz_name:
-                                            is_in_mz = True
-                                            break
-                                if is_in_mz:
-                                    break
-                        
-                        # Pour ALL, vérifier aussi si le titre ou la description mentionne la MZ
-                        if not is_in_mz and mz_name:
-                            # Vérifier le titre
-                            title = problem.get('title', '').lower()
-                            if mz_name.lower() in title:
+                    # Rechercher dans les management zones directement attachées au problème (méthode standard)
+                    if 'managementZones' in problem:
+                        for mz in problem.get('managementZones', []):
+                            if mz.get('name') == mz_name:
                                 is_in_mz = True
-                                logger.debug(f"Problème {problem.get('id')} inclus car son titre contient {mz_name}")
-                            
-                            # Vérifier d'autres champs pertinents
-                            for field in ['displayName', 'description']:
-                                if not is_in_mz and field in problem:
-                                    if mz_name.lower() in problem[field].lower():
-                                        is_in_mz = True
-                                        logger.debug(f"Problème {problem.get('id')} inclus car son champ {field} contient {mz_name}")
-                    else:
-                        # Pour les problèmes OPEN, utiliser le filtrage standard
-                        if 'managementZones' in problem:
-                            for mz in problem.get('managementZones', []):
-                                if mz.get('name') == mz_name:
-                                    is_in_mz = True
-                                    break
-                        
-                        # Rechercher aussi dans les entités affectées
-                        if not is_in_mz:
-                            for entity in problem.get('affectedEntities', []):
-                                # Vérifier les management zones de chaque entité affectée
+                                break
+                    
+                    # Rechercher aussi dans les entités affectées si pas trouvé
+                    if not is_in_mz:
+                        for entity in problem.get('affectedEntities', []):
+                            # Vérifier les management zones de chaque entité affectée
+                            if 'managementZones' in entity:
                                 for mz in entity.get('managementZones', []):
                                     if mz.get('name') == mz_name:
                                         is_in_mz = True
                                         break
-                                if is_in_mz:
-                                    break
+                            if is_in_mz:
+                                break
                     
                     # Si le problème est dans notre MZ, l'ajouter à notre liste
                     if is_in_mz:

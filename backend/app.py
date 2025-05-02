@@ -218,8 +218,8 @@ def get_problems():
         # Récupérer les paramètres de requête
         status = request.args.get('status', 'OPEN')  # Par défaut "OPEN"
         time_from = request.args.get('from', '-30d')  # Par défaut "-30d" pour inclure les problèmes plus anciens
-        # Paramètre pour désactiver le filtrage par management zone (pour debug ou pour voir tous les problèmes)
-        disable_mz_filter = request.args.get('disable_mz_filter', 'false').lower() == 'true'
+        # Nous n'avons plus besoin de ce paramètre, car nous voulons toujours filtrer par les management zones spécifiées
+        # disable_mz_filter = request.args.get('disable_mz_filter', 'false').lower() == 'true'
         dashboard_type = request.args.get('type', '')  # Pour identifier VFG ou VFE
         
         # Débogage approfondi - à activer temporairement
@@ -273,9 +273,8 @@ def get_problems():
                 try:
                     logger.info(f"Récupération des problèmes pour MZ: {mz_name} avec timeframe={time_from}, status={use_status}")
                     # Utiliser la méthode éprouvée qui fonctionnait avant
-                    # Si on désactive le filtrage par MZ, passer directement None
-                    effective_mz = None if disable_mz_filter else mz_name
-                    mz_problems = api_client.get_problems_filtered(effective_mz, time_from, use_status)
+                    # Toujours utiliser le filtrage par MZ, en passant strictement le nom de la zone
+                    mz_problems = api_client.get_problems_filtered(mz_name, time_from, use_status)
                     logger.info(f"MZ {mz_name}: {len(mz_problems)} problèmes trouvés")
                     
                     # Ajouter le champ 'resolved' pour les requêtes ALL

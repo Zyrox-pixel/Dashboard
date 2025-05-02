@@ -504,24 +504,17 @@ class ApiClient {
    * @param timeframe La période de temps (ex: "-24h")
    * @param dashboardType Le type de dashboard (vfg, vfe)
    * @param forceRefresh Si true, force le rafraîchissement (ignore le cache)
-   * @param disableMzFilter Si true, désactive le filtrage par management zone (pour les problèmes historiques)
    */
   public getProblems(
     status: string = "OPEN", 
     timeframe: string = "-24h", 
     dashboardType?: string, 
-    forceRefresh: boolean = false,
-    disableMzFilter: boolean = false
+    forceRefresh: boolean = false
   ) {
     const params: any = {
       status: status,
       from: timeframe
     };
-    
-    // Si statut est ALL et qu'on veut désactiver le filtrage MZ pour avoir plus de résultats
-    if (status === "ALL" && disableMzFilter) {
-      params.disable_mz_filter = 'true';
-    }
     
     // Ajouter le type de dashboard s'il est spécifié
     if (dashboardType) {

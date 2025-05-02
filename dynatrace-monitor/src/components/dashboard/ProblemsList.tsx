@@ -14,7 +14,7 @@ interface ProblemsListProps {
 const ProblemsList: React.FC<ProblemsListProps> = ({ 
   problems, 
   zoneFilter,
-  title = "Problèmes actifs sur les applications Vital for Group",
+  title = "Problèmes assignés aux Management Zones",
   showRefreshButton = true
 }) => {
   const { refreshData, isLoading } = useApp();
