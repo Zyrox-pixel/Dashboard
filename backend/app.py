@@ -207,6 +207,55 @@ def set_management_zone():
         logger.error(f"Erreur lors de la définition de la MZ: {e}")
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/problems', methods=['GET'])
+@cached('problems')
+@time_execution
+def get_problems():
+    try:
+        # Récupérer les paramètres de requête
+        status = request.args.get('status', 'OPEN')  # Par défaut "OPEN"
+        time_from = request.args.get('from', '-24h')  # Par défaut "-24h"
+        dashboard_type = request.args.get('type', '')  # Pour identifier VFG ou VFE
+
+        # Si un type de dashboard est spécifié
+        if dashboard_type == 'vfg' or dashboard_type == 'vfe':
+            # Récupérer toutes les MZs de ce type
+            mz_list_var = 'VFG_MZ_LIST' if dashboard_type == 'vfg' else 'VFE_MZ_LIST'
+            mz_string = os.environ.get(mz_list_var, '')
+            if mz_string:
+                mz_list = [mz.strip() for mz in mz_string.split(',')]
+                
+                # Récupérer les problèmes pour toutes ces MZs
+                all_problems = []
+                for mz_name in mz_list:
+                    mz_problems = api_client.get_problems_filtered(mz_name, time_from, status)
+                    all_problems.extend(mz_problems)
+                
+                # Dédupliquer les problèmes (un même problème peut affecter plusieurs MZs)
+                unique_problems = []
+                problem_ids = set()
+                for problem in all_problems:
+                    if problem['id'] not in problem_ids:
+                        problem_ids.add(problem['id'])
+                        unique_problems.append(problem)
+                
+                logger.info(f"Récupéré {len(unique_problems)} problèmes uniques pour {dashboard_type.upper()}")
+                return unique_problems
+            else:
+                logger.warning(f"Liste de MZ {mz_list_var} vide")
+                return []
+        else:
+            # Comportement pour une MZ spécifique
+            current_mz = get_current_mz()
+            if not current_mz:
+                return {'error': 'Aucune Management Zone définie'}
+            
+            # Utiliser la méthode optimisée pour récupérer les problèmes filtrés
+            return api_client.get_problems_filtered(current_mz, time_from, status)
+    except Exception as e:
+        logger.error(f"Erreur lors de la récupération des problèmes: {e}")
+        return {'error': str(e)}
+
 @app.route('/api/current-management-zone', methods=['GET'])
 def get_current_management_zone():
     try:
