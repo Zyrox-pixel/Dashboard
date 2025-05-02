@@ -29,8 +29,18 @@ const ProblemCard: React.FC<ProblemCardProps> = ({ problem }) => {
       // Chercher tous les patterns qui ressemblent à des noms d'hôtes
       const hostMatches = str.match(/\b[a-z][a-z0-9_-]{2,}\b/gi) || [];
       
-      // Combiner et dédupliquer
-      return [...new Set([...domainMatches, ...hostMatches])];
+      // Combiner les résultats
+      const combined = [...domainMatches, ...hostMatches];
+      
+      // Dédupliquer manuellement sans utiliser Set
+      const unique: string[] = [];
+      combined.forEach(item => {
+        if (!unique.includes(item)) {
+          unique.push(item);
+        }
+      });
+      
+      return unique;
     };
     
     // 1. Regarder direct dans le champ impacted
