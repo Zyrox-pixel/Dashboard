@@ -139,6 +139,7 @@ export interface SummaryData {
     count: number;
     with_errors: number;
     avg_error_rate: number;
+    availability?: number;
   };
   requests: {
     total: number;
@@ -146,6 +147,10 @@ export interface SummaryData {
   };
   problems: {
     count: number;
+  };
+  applications?: {
+    count: number;
+    with_errors?: number;
   };
   timestamp: number;
 }
