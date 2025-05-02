@@ -1081,6 +1081,17 @@ class OptimizedAPIClient:
                     time_limit = current_time - (24 * 60 * 60 * 1000)
                 elif time_from == "-72h":
                     time_limit = current_time - (72 * 60 * 60 * 1000)
+                elif time_from == "-30d":
+                    time_limit = current_time - (30 * 24 * 60 * 60 * 1000)
+                elif time_from.startswith("-") and time_from.endswith("d"):
+                    # Supporter des périodes personnalisées en jours (-Nd)
+                    try:
+                        days = int(time_from[1:-1])
+                        time_limit = current_time - (days * 24 * 60 * 60 * 1000)
+                        logger.info(f"Période personnalisée de {days} jours appliquée")
+                    except ValueError:
+                        logger.warning(f"Format de période non reconnu: {time_from}, utilisation des 30 derniers jours par défaut")
+                        time_limit = current_time - (30 * 24 * 60 * 60 * 1000)
                 
                 # On va filtrer manuellement les problèmes liés à notre Management Zone
                 mz_problems = 0

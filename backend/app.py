@@ -217,7 +217,7 @@ def get_problems():
     try:
         # Récupérer les paramètres de requête
         status = request.args.get('status', 'OPEN')  # Par défaut "OPEN"
-        time_from = request.args.get('from', '-24h')  # Par défaut "-24h"
+        time_from = request.args.get('from', '-30d')  # Par défaut "-30d" pour inclure les problèmes plus anciens
         dashboard_type = request.args.get('type', '')  # Pour identifier VFG ou VFE
         
         # Débogage approfondi - à activer temporairement
