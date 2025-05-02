@@ -3,7 +3,7 @@ import {
   AlertTriangle, ExternalLink, CheckCircle, ChevronDown, ChevronUp, 
   Clock, Server, Database, Cpu, Users, BarChart3, Shield, RefreshCw, Monitor,
   Zap, Layers, AlertCircle, Activity, ArrowUpRight, FileWarning, 
-  BellRing, Flame, FlaskConical, CloudCog, Laptop, Bug, CircleAlert, Hammer
+  Bell, Flame, Flask, Cloud, Laptop, Bug, AlertOctagon
 } from 'lucide-react';
 import { Problem } from '../../api/types';
 
@@ -267,7 +267,7 @@ const ProblemCard: React.FC<ProblemCardProps> = ({ problem }) => {
     } else if (type.includes('error') || type.includes('exception')) {
       return <Bug size={16} className="text-red-400" />;
     } else if (type.includes('alert') || type.includes('warning')) {
-      return <BellRing size={16} className="text-amber-400" />;
+      return <Bell size={16} className="text-amber-400" />;
     } else {
       return <Monitor size={16} className="text-blue-400" />;
     }
@@ -290,9 +290,9 @@ const ProblemCard: React.FC<ProblemCardProps> = ({ problem }) => {
       } else if (entityType.includes('database')) {
         return <Database size={16} className="text-amber-400" />;
       } else if (entityType.includes('custom')) {
-        return <FlaskConical size={16} className="text-emerald-400" />;
+        return <Flask size={16} className="text-emerald-400" />;
       } else if (entityType.includes('kubernetes')) {
-        return <CloudCog size={16} className="text-blue-400" />;
+        return <Cloud size={16} className="text-blue-400" />;
       } else if (entityType.includes('browser')) {
         return <Laptop size={16} className="text-purple-400" />;
       }
@@ -392,7 +392,7 @@ const ProblemCard: React.FC<ProblemCardProps> = ({ problem }) => {
       {/* Indicateur de problème critique - animation */}
       {isCritical && (
         <div className={`absolute top-0 right-0 p-1.5 transition-opacity duration-700 ${isPulsing ? 'opacity-100' : 'opacity-0'}`}>
-          <CircleAlert size={18} className="text-red-500" />
+          <AlertOctagon size={18} className="text-red-500" />
         </div>
       )}
       
