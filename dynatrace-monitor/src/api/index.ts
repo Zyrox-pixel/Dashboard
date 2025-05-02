@@ -512,10 +512,7 @@ class ApiClient {
       params.type = dashboardType;
     }
     
-    console.log(`Fetching problems with status=${status}, timeframe=${timeframe}, dashboardType=${dashboardType || 'none'}`);
-    
-    // Désactiver le cache pour les problèmes pour garantir les données à jour
-    return this.get<ProblemResponse[]>(ENDPOINTS.PROBLEMS, { params }, false);
+    return this.get<ProblemResponse[]>(ENDPOINTS.PROBLEMS, { params });
   }
 
   /**

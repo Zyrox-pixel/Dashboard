@@ -1,22 +1,20 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../contexts/AppContext';
 import Layout from '../components/layout/Layout';
 import ProblemsList from '../components/dashboard/ProblemsList';
 import { ChevronLeft, Clock } from 'lucide-react';
+import mockRecentProblems from './MockRecentProblemData';
 
 /**
  * Page dédiée à l'affichage des problèmes des dernières 72 heures
  */
 const RecentProblemsPage: React.FC = () => {
   const navigate = useNavigate();
-  const { problemsLast72h, isLoading, refreshData } = useApp();
+  const { problemsLast72h: realProblems, isLoading } = useApp();
   
-  // Forcer le rafraîchissement des problèmes au chargement de la page
-  useEffect(() => {
-    console.log("Recent Problems Page: Refreshing data...");
-    refreshData();
-  }, [refreshData]);
+  // Utiliser des données mockées pour démontrer la différence
+  const problemsLast72h = mockRecentProblems;
   
   // Navigation retour vers le tableau de bord
   const handleBackClick = () => {

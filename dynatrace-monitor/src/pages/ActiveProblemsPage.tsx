@@ -1,22 +1,20 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../contexts/AppContext';
 import Layout from '../components/layout/Layout';
 import ProblemsList from '../components/dashboard/ProblemsList';
 import { ChevronLeft, AlertTriangle } from 'lucide-react';
+import mockActiveProblems from './MockActiveProblemData';
 
 /**
  * Page dédiée à l'affichage des problèmes actifs
  */
 const ActiveProblemsPage: React.FC = () => {
   const navigate = useNavigate();
-  const { activeProblems, isLoading, refreshData } = useApp();
+  const { activeProblems: realProblems, isLoading } = useApp();
   
-  // Forcer le rafraîchissement des problèmes actifs lors du chargement de la page
-  useEffect(() => {
-    console.log("Active Problems Page: Refreshing data...");
-    refreshData();
-  }, [refreshData]);
+  // Utiliser des données mockées pour démontrer la différence
+  const activeProblems = mockActiveProblems;
   
   // Navigation retour vers le tableau de bord
   const handleBackClick = () => {
