@@ -1038,10 +1038,11 @@ class OptimizedAPIClient:
         # Utiliser une clé de cache unique pour chaque combinaison de paramètres
         cache_key = f"problems:{mz_name}:{time_from}:{status}"
         
-        # Pour les problèmes OPEN (actifs), ne pas utiliser le cache afin d'avoir des données en temps réel
+        # Pour les problèmes OPEN (actifs) et ALL, ne pas utiliser le cache afin d'avoir des données en temps réel
         # Cela garantit que les problèmes résolus sont immédiatement reflétés dans l'interface
-        if status == "OPEN":
-            logger.info(f"Récupération en temps réel des problèmes actifs pour {mz_name}")
+        # De même, pour status="ALL", on veut toujours des données à jour
+        if status == "OPEN" or status == "ALL":
+            logger.info(f"Récupération en temps réel des problèmes pour {mz_name} avec statut={status}, période={time_from}")
             # On continue sans consulter le cache
         else:
             # Pour les autres types de requêtes, on peut utiliser le cache mais avec une durée plus courte
@@ -1053,12 +1054,18 @@ class OptimizedAPIClient:
             # Récupérer tous les problèmes sans filtrer par MZ via l'API
             params = {"from": time_from}
             
-            # Ajouter le statut seulement s'il est spécifié ET n'est pas ALL
+            # Pour ALL, on veut tous les problèmes, y compris OPEN et CLOSED
+            # Pour ce faire, nous ne spécifierons pas de statut à l'API Dynatrace,
+            # ce qui retournera tous les problèmes, puis nous filtrerons selon les besoins
             if status is not None and status != "ALL":
                 params["status"] = status
                 
             # Déboguer les paramètres
             logger.info(f"Requête problèmes avec paramètres: {params}, mz_name: {mz_name}")
+            
+            # Pour les problèmes avec ALL sur une longue période, augmenter la taille max de page
+            if status == "ALL" and (time_from.startswith("-7") or time_from.startswith("-3")):
+                params["pageSize"] = 500  # Augmenter la taille maximale des résultats
             
             problems_data = self.query_api(
                 endpoint="problems",
@@ -1108,9 +1115,27 @@ class OptimizedAPIClient:
                     
                     # Filtrer par date si nécessaire
                     problem_start_time = problem.get('startTime', 0)
+                    
+                    # Pour le statut ALL, nous voulons inclure tous les problèmes qui étaient actifs pendant la période,
+                    # même s'ils ont commencé avant la limite de temps
                     if time_limit and problem_start_time < time_limit:
-                        logger.debug(f"Problème {problem.get('id')} ignoré car trop ancien: {problem_start_time} < {time_limit}")
-                        continue
+                        # Pour le statut ALL, on vérifie si le problème était toujours actif pendant la période demandée
+                        if status == "ALL":
+                            end_time = problem.get('endTime', 0)
+                            
+                            # Si le problème n'a pas de temps de fin ou s'il s'est terminé après notre limite de temps,
+                            # cela signifie qu'il était actif pendant la période demandée
+                            if end_time == 0 or end_time >= time_limit:
+                                # Inclure ce problème car il était actif pendant la période
+                                logger.debug(f"Problème {problem.get('id')} inclus car actif pendant la période demandée (début: {problem_start_time}, fin: {end_time})")
+                            else:
+                                # Le problème s'est terminé avant notre période
+                                logger.debug(f"Problème {problem.get('id')} ignoré car terminé avant la période: fin {end_time} < {time_limit}")
+                                continue
+                        else:
+                            # Pour les autres statuts, suivre le comportement existant
+                            logger.debug(f"Problème {problem.get('id')} ignoré car trop ancien: {problem_start_time} < {time_limit}")
+                            continue
                         
                     # Si aucune MZ n'est spécifiée, inclure tous les problèmes
                     if mz_name is None:
