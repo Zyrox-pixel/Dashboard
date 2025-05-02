@@ -16,110 +16,167 @@ const ProblemCard: React.FC<ProblemCardProps> = ({ problem }) => {
   // Vérifier si le problème est résolu
   const isResolved = problem.resolved || false;
 
-  // Extraire les informations sur la machine/hôte avec une méthode améliorée
+  // Extraire les informations sur la machine/hôte avec une méthode plus restrictive
   const getHostInfo = (problem: Problem): string => {
     console.log('Debugging problem data for host extraction:', problem.id);
     
-    // APPROACH 1: Look for explicit host info in the problem object
-    if (problem.host) {
-      console.log('Found host in direct property:', problem.host);
-      return problem.host;
+    // Liste des mots à exclure qui ne sont jamais des noms d'hôtes
+    const excludedWords = [
+      'segmentation', 'script', 'extension', 'status', 'service', 'such', 'still', 
+      'some', 'system', 'server', 'memory', 'application', 'error', 'timeout',
+      'warning', 'critical', 'problem', 'issue', 'failure', 'module', 'process',
+      'container', 'function', 'instance', 'request', 'being', 'response', 'health',
+      'payload', 'execution', 'processing', 'action', 'object', 'storage', 'config',
+      'socket', 'network', 'security', 'traffic', 'information', 'resource'
+    ];
+    
+    // Fonction d'aide pour vérifier si un nom potentiel d'hôte est valide
+    const isValidHostname = (name: string): boolean => {
+      if (!name || name.length < 3 || name.length > 50) return false;
+      
+      // Convertir en minuscules pour la comparaison
+      const lowerName = name.toLowerCase();
+      
+      // Vérifier si le nom est dans la liste d'exclusion
+      if (excludedWords.includes(lowerName)) return false;
+      
+      // Pattern spécifique pour les serveurs de l'entreprise (sv01XXXXX.fr.net.intra)
+      const enterpriseServerPattern = /^s[a-z0-9]\d{2,}[a-z0-9]*\.fr\.net\.intra$/i;
+      if (enterpriseServerPattern.test(name)) {
+        console.log("Strong match with enterprise server pattern:", name);
+        return true;
+      }
+      
+      // Pattern pour les serveurs commençant par s suivi de chiffres
+      const sServerPattern = /^s[a-z0-9]\d{2,}[a-z0-9]*$/i;
+      if (sServerPattern.test(name)) {
+        console.log("Good match with s-server pattern:", name);
+        return true;
+      }
+      
+      // Le pattern pour les serveurs avec format sv##, s### ou sv#### est fortement susceptible d'être un serveur
+      if (/^s[a-z]?\d{2,}[a-z0-9]*$/i.test(lowerName)) {
+        console.log("Likely a server with sv## or s### pattern:", name);
+        return true;
+      }
+      
+      // Si le nom commence par win/srv suivi de chiffres, c'est probablement un serveur windows
+      if (/^(win|srv)[a-z0-9]*\d+/i.test(lowerName)) {
+        console.log("Likely a Windows server:", name);
+        return true;
+      }
+      
+      // Si le nom contient des segments séparés par des points, ressemble à un FQDN et contient des chiffres
+      if (/^[a-z0-9][-a-z0-9]*\.[a-z0-9][-a-z0-9.]+$/i.test(lowerName) && /\d/.test(lowerName)) {
+        console.log("Likely a FQDN with numbers:", name);
+        return true;
+      }
+      
+      // Certains mots courts ou expressions génériques ne devraient jamais être considérés comme des hôtes
+      if (name.length < 6 && !/\d/.test(name)) {
+        console.log("Too short without numbers, not a hostname:", name);
+        return false;
+      }
+      
+      // Filtrer les cas où le nom contient des mots comme "error", "warning", "critical" 
+      // au milieu de la chaîne (par exemple "script error handling")
+      for (const word of excludedWords) {
+        if (lowerName.includes(word) && lowerName !== word) {
+          console.log(`Contains excluded word "${word}", not a hostname:`, name);
+          return false;
+        }
+      }
+      
+      // Vérifier que le nom contient au moins un chiffre - très souvent les serveurs ont des numéros
+      // ET commence par 's' ou a un format de nom d'hôte avec points ou tirets
+      return (
+        (lowerName.startsWith('s') && /\d/.test(lowerName)) ||
+        (/\d/.test(lowerName) && (lowerName.includes('.') || lowerName.includes('-')))
+      );
+    };
+    
+    // PRIORITÉ 1: Utiliser le champ impacted s'il existe explicitement
+    // C'est le champ le plus fiable car il a été spécifiquement ajouté par notre backend
+    if (problem.impacted && typeof problem.impacted === 'string') {
+      // Vérifier si le champ impacted est un nom d'hôte valide
+      if (isValidHostname(problem.impacted)) {
+        console.log('Using explicit impacted field (valid):', problem.impacted);
+        return problem.impacted;
+      }
+      console.log('Impacted field exists but invalid:', problem.impacted);
     }
     
-    // APPROACH 2: Look in impactedEntities if available
+    // PRIORITÉ 2: Utiliser le champ host s'il existe
+    if (problem.host && problem.host !== "Non spécifié") {
+      if (isValidHostname(problem.host)) {
+        console.log('Using explicit host field (valid):', problem.host);
+        return problem.host;
+      }
+      console.log('Host field exists but invalid:', problem.host);
+    }
+    
+    // PRIORITÉ 3: Rechercher dans les entités impactées
     if (problem.impactedEntities && Array.isArray(problem.impactedEntities)) {
-      // First try exact HOST type match
+      // Rechercher une entité de type HOST
       const hostEntity = problem.impactedEntities.find((entity: any) => 
-        entity.type === 'HOST' && entity.name);
+        entity.type === 'HOST' && entity.name && isValidHostname(entity.name));
       
       if (hostEntity && hostEntity.name) {
-        console.log('Found host in impactedEntities:', hostEntity.name);
+        console.log('Found valid host in impactedEntities:', hostEntity.name);
         return hostEntity.name;
       }
-      
-      // If not found, check for any entity that might be a host
-      const potentialHost = problem.impactedEntities.find((entity: any) => 
-        entity.name && 
-        (entity.type?.toLowerCase().includes('host') || 
-         entity.name.match(/^(s|win)\w+/i))
-      );
-      
-      if (potentialHost && potentialHost.name) {
-        console.log('Found potential host in entities:', potentialHost.name);
-        return potentialHost.name;
+    }
+    
+    // PRIORITÉ 4: Rechercher dans rootCauseEntity
+    if (problem.rootCauseEntity && problem.rootCauseEntity.name) {
+      if (isValidHostname(problem.rootCauseEntity.name)) {
+        console.log('Using valid rootCauseEntity:', problem.rootCauseEntity.name);
+        return problem.rootCauseEntity.name;
       }
     }
     
-    // APPROACH 3: Check if impacted field exists and is a string
-    if (problem.impacted && typeof problem.impacted === 'string') {
-      console.log('Using explicit impacted field:', problem.impacted);
-      return problem.impacted;
+    // PRIORITÉ 5: Rechercher après "impacted:" ou "host:" ou "server:" dans le sous-titre ou titre
+    const impactedTexts = `${problem.title || ''} ${problem.subtitle || ''}`;
+    const hostIndicators = [
+      /\bhost:\s*([^\s,.;]+)/i,
+      /\bserver:\s*([^\s,.;]+)/i,
+      /\bimpacted:\s*([^\s,.;]+)/i,
+      /\bon\s+([^\s,.;]+)/i,
+      /\bat\s+([^\s,.;]+)/i
+    ];
+    
+    for (const pattern of hostIndicators) {
+      const match = impactedTexts.match(pattern);
+      if (match && match[1] && isValidHostname(match[1])) {
+        console.log(`Found valid host after "${pattern}":`, match[1]);
+        return match[1];
+      }
     }
     
-    // APPROACH 4: Check rootCauseEntity if available
-    if (problem.rootCauseEntity && problem.rootCauseEntity.name) {
-      console.log('Using rootCauseEntity:', problem.rootCauseEntity.name);
-      return problem.rootCauseEntity.name;
-    }
+    // PRIORITÉ 6: Rechercher un nom d'hôte dans le titre ou sous-titre avec des patterns spécifiques
+    const textToSearch = `${problem.title || ''} ${problem.subtitle || ''}`;
     
-    // APPROACH 5: Try parsing from the title with improved patterns
-    if (problem.title) {
-      // Try multiple patterns
-      const patterns = [
-        /HOST:\s*(\S+)/i,                    // HOST: hostname
-        /host\s+(\S+)/i,                     // host hostname
-        /\bon\s+(\S+)/i,                     // on hostname
-        /\bat\s+(\S+)/i,                     // at hostname
-        /\b([Ss][A-Za-z0-9]{5,})\b/,         // Server names starting with S
-        /\b(WIN\w+)\b/,                      // Windows servers
-        /\b([A-Za-z0-9]+[-_][A-Za-z0-9]+)\b/ // Names with hyphens or underscores
-      ];
-      
-      for (const pattern of patterns) {
-        const match = problem.title.match(pattern);
-        if (match && match[1]) {
-          // Filter out common words that might match but aren't hostnames
-          const commonWords = ['status', 'service', 'such', 'still', 'some', 'system', 'server'];
-          if (!commonWords.includes(match[1].toLowerCase())) {
-            console.log(`Found host in title using pattern ${pattern}:`, match[1]);
-            return match[1];
-          }
+    // Patterns spécifiques pour les serveurs - ordre du plus spécifique au moins spécifique
+    const serverPatterns = [
+      /\b(s[a-z0-9]\d{2,}[a-z0-9]*\.fr\.net\.intra)\b/i,  // Format sv01XXXXX.fr.net.intra
+      /\b(s[a-z0-9]\d{2,}[a-z0-9]*)\b/i,                  // Format sX##... (ex: s001, sv01, etc.)
+      /\b(srv\d+[a-z0-9]*)\b/i,                           // Format srv## (serveurs standard)
+      /\b(win[a-z0-9]*\d+[a-z0-9]*)\b/i,                  // Serveurs Windows avec des chiffres
+      /\b([a-z][a-z0-9]{2,}-[a-z0-9]{2,})\b/i             // Serveurs avec format prefix-name (au moins 3 chars)
+    ];
+    
+    for (const pattern of serverPatterns) {
+      const matches = textToSearch.match(new RegExp(pattern, 'gi')) || [];
+      for (const match of matches) {
+        if (isValidHostname(match)) {
+          console.log(`Found valid host with server pattern:`, match);
+          return match;
         }
       }
     }
     
-    // APPROACH 6: Check in subtitle and other descriptive fields
-    if (problem.subtitle) {
-      const match = problem.subtitle.match(/\b([Ss][A-Za-z0-9]{4,}|WIN\w+)\b/);
-      if (match && match[1]) {
-        console.log('Found host in subtitle:', match[1]);
-        return match[1];
-      }
-      
-      // Check for "impacted:" pattern in subtitle
-      const impactedMatch = problem.subtitle.match(/impacted:\s*([^\s,.;]+)/i);
-      if (impactedMatch && impactedMatch[1]) {
-        console.log('Found host in subtitle after "impacted:":', impactedMatch[1]);
-        return impactedMatch[1];
-      }
-    }
-    
-    // APPROACH 7: Parse displayId if it follows a pattern with hostname
-    if (problem.displayId && problem.displayId.includes(':')) {
-      const parts = problem.displayId.split(':');
-      if (parts.length >= 2) {
-        console.log('Extracted from displayId:', parts[0]);
-        return parts[0];
-      }
-    }
-    
-    // FALLBACK: Use the zone as last resort
-    if (problem.zone && problem.zone !== "Non spécifié") {
-      console.log('Falling back to zone:', problem.zone);
-      return problem.zone;
-    }
-    
-    console.log('Could not determine host for problem:', problem.id);
+    // Si aucun nom d'hôte valide n'a été trouvé, retourner "Non spécifié"
+    console.log('No valid hostname found for problem:', problem.id);
     return "Non spécifié";
   };
   
