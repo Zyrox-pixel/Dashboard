@@ -395,8 +395,8 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
       // Si on ne rafraîchit que les problèmes, ne récupérer que les données de problèmes
       if (refreshProblemsOnly) {
         const responses = await Promise.all([
-          apiClient.getProblems("OPEN", "-30d", dashboardType, true),  // Force le rafraîchissement avec une période de 30 jours
-          apiClient.getProblems("ALL", "-30d", dashboardType, true)   // Force le rafraîchissement pour les problèmes historiques
+          apiClient.getProblems("OPEN", "all", dashboardType, true),  // Force le rafraîchissement sans limite de temps pour les problèmes en cours
+          apiClient.getProblems("ALL", "-72h", dashboardType, true)   // Force le rafraîchissement pour les problèmes récents avec 72h de délai
         ]);
         problemsResponse = responses[0] as ApiResponse<ProblemResponse[]>;
         problemsLast72hResponse = responses[1] as ApiResponse<ProblemResponse[]>;
@@ -407,8 +407,8 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
           apiClient.getSummary(),
           apiClient.getVitalForGroupMZs(),
           apiClient.getVitalForEntrepriseMZs(),
-          apiClient.getProblems("OPEN", "-30d", dashboardType, true),  // Force le rafraîchissement avec une période de 30 jours
-          apiClient.getProblems("ALL", "-30d", dashboardType, true)   // Force le rafraîchissement pour les problèmes historiques
+          apiClient.getProblems("OPEN", "all", dashboardType, true),  // Force le rafraîchissement sans limite de temps pour les problèmes en cours
+          apiClient.getProblems("ALL", "-72h", dashboardType, true)   // Force le rafraîchissement pour les problèmes récents avec 72h de délai
         ]);
         summaryResponse = responses[0] as ApiResponse<SummaryData>;
         vfgResponse = responses[1] as ApiResponse<VitalForGroupMZsResponse>;
@@ -612,8 +612,8 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
       loadAllData(undefined, false);
     }
     
-    // Rafraîchir automatiquement les problèmes actifs toutes les 30 secondes
-    const refreshInterval = 30000; // 30 secondes en millisecondes
+    // Rafraîchir automatiquement les problèmes actifs toutes les 5 minutes
+    const refreshInterval = 300000; // 5 minutes en millisecondes
     
     console.log(`Configuration du rafraîchissement automatique des problèmes toutes les ${refreshInterval/1000} secondes`);
     

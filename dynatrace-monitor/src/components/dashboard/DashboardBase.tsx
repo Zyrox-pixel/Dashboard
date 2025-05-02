@@ -400,10 +400,10 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
                 </div>
                 <div>
                   <h3 className="font-semibold text-md text-white">
-                    PROBLÈMES ACTIFS
+                    PROBLÈMES ACTIFS (TOUS)
                   </h3>
                   <p className="text-sm text-slate-400 mt-1">
-                    {activeProblems.length} problème{activeProblems.length !== 1 ? 's' : ''} en cours
+                    {activeProblems.length} problème{activeProblems.length !== 1 ? 's' : ''} en cours (sans limite de temps)
                   </p>
                 </div>
                 <div className="ml-auto flex items-center justify-center w-10 h-10 rounded-full bg-slate-700 font-bold">
@@ -423,7 +423,7 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
                 </div>
                 <div>
                   <h3 className="font-semibold text-md text-white">
-                    TOUS LES PROBLÈMES 72h
+                    PROBLÈMES RÉCENTS (72h)
                   </h3>
                   <p className="text-sm text-slate-400 mt-1">
                     {problemsLast72h ? problemsLast72h.length : 0} problème{(!problemsLast72h || problemsLast72h.length !== 1) ? 's' : ''} sur les 72 dernières heures

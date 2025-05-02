@@ -55,10 +55,10 @@ const ActiveProblemsPage: React.FC = () => {
             <AlertTriangle className="text-red-500" size={24} />
             <div>
               <h2 className="text-lg font-semibold text-white mb-1">
-                Problèmes Actifs
+                Problèmes Actifs - Tous
               </h2>
               <p className="text-slate-300">
-                Liste complète des problèmes Dynatrace actuellement actifs sur les systèmes supervisés
+                Liste complète de tous les problèmes actuellement actifs sur les systèmes supervisés (sans limite de temps)
               </p>
             </div>
             <div className="ml-auto flex items-center justify-center w-10 h-10 rounded-full bg-red-950 text-white font-bold">
@@ -76,7 +76,7 @@ const ActiveProblemsPage: React.FC = () => {
         ) : (
           <ProblemsList 
             problems={activeProblems} 
-            title="Tous les problèmes actifs"
+            title="Tous les problèmes actifs (sans limite de temps)"
           />
         )}
       </div>

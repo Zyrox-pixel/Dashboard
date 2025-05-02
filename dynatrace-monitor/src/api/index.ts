@@ -424,7 +424,13 @@ class ApiClient {
       // Charger toutes les données en parallèle
       const [summaryResponse, problemsResponse, hostsResponse, servicesResponse, processesResponse] = await Promise.all([
         this.get<SummaryData>(ENDPOINTS.SUMMARY),
-        this.get<ProblemResponse[]>(ENDPOINTS.PROBLEMS),
+        this.get<ProblemResponse[]>(ENDPOINTS.PROBLEMS, { 
+          params: { 
+            status: "OPEN", 
+            // Pas de paramètre "from" pour obtenir tous les problèmes sans limite de temps
+            debug: 'true' // Force le rafraîchissement
+          } 
+        }, false), // Ne pas utiliser le cache
         this.get<Host[]>(ENDPOINTS.HOSTS),
         this.get<Service[]>(ENDPOINTS.SERVICES),
         this.get<ProcessResponse[]>(ENDPOINTS.PROCESSES)
@@ -501,20 +507,24 @@ class ApiClient {
   /**
    * Récupérer les problèmes
    * @param status Le statut des problèmes à récupérer (OPEN, ALL, etc.)
-   * @param timeframe La période de temps (ex: "-24h")
+   * @param timeframe La période de temps (ex: "-24h", "-72h", "all" pour aucune limite)
    * @param dashboardType Le type de dashboard (vfg, vfe)
    * @param forceRefresh Si true, force le rafraîchissement (ignore le cache)
    */
   public getProblems(
     status: string = "OPEN", 
-    timeframe: string = "-24h", 
+    timeframe: string = "-72h", 
     dashboardType?: string, 
     forceRefresh: boolean = false
   ) {
     const params: any = {
-      status: status,
-      from: timeframe
+      status: status
     };
+    
+    // Ajouter le timeframe seulement s'il n'est pas "all"
+    if (timeframe !== "all") {
+      params.from = timeframe;
+    }
     
     // Ajouter le type de dashboard s'il est spécifié
     if (dashboardType) {
