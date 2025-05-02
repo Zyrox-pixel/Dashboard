@@ -47,7 +47,7 @@ const Header: React.FC<HeaderProps> = ({ title, subtitle }) => {
       
       <div className="flex items-center gap-3">
         <button 
-          onClick={refreshData}
+          onClick={() => refreshData()}
           className={`w-9 h-9 rounded-full flex items-center justify-center ${
             isDarkTheme 
               ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' 
