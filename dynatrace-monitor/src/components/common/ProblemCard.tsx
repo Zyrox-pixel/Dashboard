@@ -307,23 +307,58 @@ const ProblemCard: React.FC<ProblemCardProps> = ({ problem }) => {
     if (metricData.length === 0) return null;
     
     const maxValue = Math.max(...metricData.map(d => d.value));
-    const chartHeight = 30;
+    const chartHeight = 40;
+    
+    // Définir les couleurs en fonction de la sévérité et de l'état du problème
+    const strokeColor = isResolved 
+      ? "#22c55e" 
+      : problem.impact === 'ÉLEVÉ' 
+        ? "#f87171" 
+        : problem.impact === 'MOYEN' 
+          ? "#fbbf24" 
+          : "#60a5fa";
+          
+    const fillColor = isResolved 
+      ? "rgba(34, 197, 94, 0.2)" 
+      : problem.impact === 'ÉLEVÉ' 
+        ? "rgba(248, 113, 113, 0.2)" 
+        : problem.impact === 'MOYEN' 
+          ? "rgba(251, 191, 36, 0.2)" 
+          : "rgba(96, 165, 250, 0.2)";
+    
+    const glowColor = isResolved 
+      ? "rgba(34, 197, 94, 0.4)" 
+      : problem.impact === 'ÉLEVÉ' 
+        ? "rgba(248, 113, 113, 0.4)" 
+        : problem.impact === 'MOYEN' 
+          ? "rgba(251, 191, 36, 0.4)" 
+          : "rgba(96, 165, 250, 0.4)";
     
     return (
-      <div className="w-full h-[30px] mt-1 px-1">
+      <div className="w-full h-[40px]">
         <svg width="100%" height={chartHeight} viewBox={`0 0 ${metricData.length} ${chartHeight}`} preserveAspectRatio="none">
-          {/* Ligne de tendance */}
+          {/* Grille de fond subtile */}
+          <line x1="0" y1={chartHeight/2} x2={metricData.length} y2={chartHeight/2} stroke="#334155" strokeWidth="0.5" strokeDasharray="2,2" />
+          
+          {/* Effet de brillance */}
+          <filter id={`glow-${problem.id}`}>
+            <feGaussianBlur stdDeviation="1.5" result="blur" />
+            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+          </filter>
+          
+          {/* Ligne de tendance avec brillance */}
           <path
             d={`M 0 ${chartHeight - (metricData[0].value / maxValue) * chartHeight} ${metricData.map((d, i) => `L ${i} ${chartHeight - (d.value / maxValue) * chartHeight}`).join(' ')}`}
-            stroke={isResolved ? "#10b981" : problem.impact === 'ÉLEVÉ' ? "#ef4444" : problem.impact === 'MOYEN' ? "#f59e0b" : "#3b82f6"}
-            strokeWidth="1.5"
+            stroke={strokeColor}
+            strokeWidth="2"
             fill="none"
+            filter={`url(#glow-${problem.id})`}
           />
           
           {/* Aire sous la courbe */}
           <path
             d={`M 0 ${chartHeight - (metricData[0].value / maxValue) * chartHeight} ${metricData.map((d, i) => `L ${i} ${chartHeight - (d.value / maxValue) * chartHeight}`).join(' ')} L ${metricData.length - 1} ${chartHeight} L 0 ${chartHeight} Z`}
-            fill={isResolved ? "rgba(16, 185, 129, 0.1)" : problem.impact === 'ÉLEVÉ' ? "rgba(239, 68, 68, 0.1)" : problem.impact === 'MOYEN' ? "rgba(245, 158, 11, 0.1)" : "rgba(59, 130, 246, 0.1)"}
+            fill={fillColor}
           />
           
           {/* Points pour les données critiques */}
@@ -333,11 +368,20 @@ const ProblemCard: React.FC<ProblemCardProps> = ({ problem }) => {
                 key={i}
                 cx={i}
                 cy={chartHeight - (d.value / maxValue) * chartHeight}
-                r="1.5"
-                fill="#ef4444"
+                r="2"
+                fill="#f87171"
+                filter={`url(#glow-${problem.id})`}
               />
             ) : null
           ))}
+          
+          {/* Point final pour marquer le dernier état */}
+          <circle
+            cx={metricData.length - 1}
+            cy={chartHeight - (metricData[metricData.length - 1].value / maxValue) * chartHeight}
+            r="2.5"
+            fill={strokeColor}
+          />
         </svg>
       </div>
     );
@@ -345,47 +389,47 @@ const ProblemCard: React.FC<ProblemCardProps> = ({ problem }) => {
   
   // Classes de couleur pour la bordure principale en fonction de la sévérité
   const getBorderColorClass = () => {
-    if (isResolved) return 'border-green-500/40';
+    if (isResolved) return 'border-green-500/70';
     
     switch (problem.impact) {
-      case 'ÉLEVÉ': return isPulsing ? 'border-red-500/80' : 'border-red-500/40';
-      case 'MOYEN': return 'border-amber-500/40';
-      default: return 'border-blue-500/40';
+      case 'ÉLEVÉ': return isPulsing ? 'border-red-500' : 'border-red-500/70';
+      case 'MOYEN': return 'border-amber-500/70';
+      default: return 'border-blue-400/70';
     }
   };
   
   // Fond en fonction de la sévérité
   const getBackgroundClass = () => {
-    if (isResolved) return 'bg-slate-800/95 hover:bg-slate-800/80';
+    if (isResolved) return 'bg-slate-900 hover:bg-slate-800';
     
     switch (problem.impact) {
       case 'ÉLEVÉ': return isPulsing 
-        ? 'bg-gradient-to-r from-slate-800/95 via-red-900/10 to-slate-800/95 hover:bg-slate-800/80' 
-        : 'bg-slate-800/95 hover:bg-slate-800/80';
-      case 'MOYEN': return 'bg-slate-800/95 hover:bg-slate-800/80';
-      default: return 'bg-slate-800/95 hover:bg-slate-800/80';
+        ? 'bg-gradient-to-r from-slate-900 via-red-900/30 to-slate-900 hover:bg-slate-800' 
+        : 'bg-gradient-to-r from-slate-900 via-red-950/20 to-slate-900 hover:bg-slate-800';
+      case 'MOYEN': return 'bg-gradient-to-r from-slate-900 via-amber-950/20 to-slate-900 hover:bg-slate-800';
+      default: return 'bg-gradient-to-r from-slate-900 via-blue-950/20 to-slate-900 hover:bg-slate-800';
     }
   };
   
   return (
     <div 
-      className={`relative rounded-lg overflow-hidden border ${getBorderColorClass()} 
-                ${getBackgroundClass()} transition-all duration-700 shadow-lg
-                ${expanded ? 'shadow-xl' : 'shadow-md'} backdrop-blur-sm`}
+      className={`relative rounded-lg overflow-hidden border-2 ${getBorderColorClass()} 
+                ${getBackgroundClass()} transition-all duration-700 
+                ${expanded ? 'shadow-2xl shadow-black/50' : 'shadow-lg shadow-black/30'}`}
       style={{
         transition: 'all 0.7s ease-in-out',
       }}
     >
       {/* Indicateur de statut (barre colorée) */}
       <div 
-        className={`absolute top-0 left-0 w-1.5 h-full ${
+        className={`absolute top-0 left-0 w-2 h-full ${
           isResolved 
-            ? 'bg-green-500' 
+            ? 'bg-gradient-to-b from-green-400 to-green-600' 
             : problem.impact === 'ÉLEVÉ' 
-              ? isPulsing ? 'bg-red-400' : 'bg-red-500' 
+              ? isPulsing ? 'bg-gradient-to-b from-red-300 to-red-600' : 'bg-gradient-to-b from-red-400 to-red-700' 
               : problem.impact === 'MOYEN' 
-                ? 'bg-amber-500' 
-                : 'bg-blue-500'
+                ? 'bg-gradient-to-b from-amber-400 to-amber-600' 
+                : 'bg-gradient-to-b from-blue-400 to-blue-600'
         } transition-colors duration-700`}
       ></div>
       
@@ -400,26 +444,26 @@ const ProblemCard: React.FC<ProblemCardProps> = ({ problem }) => {
       <div 
         className={`flex justify-between items-center py-3 px-4 ${
           expanded 
-            ? 'border-b border-slate-700/70 bg-slate-800/80' 
-            : 'bg-transparent'
+            ? 'border-b border-slate-700 bg-slate-900/90' 
+            : 'bg-gradient-to-r from-slate-950 to-slate-900/95'
         } cursor-pointer transition-all`}
         onClick={toggleExpand}
       >
         <div className="flex items-center gap-3 flex-grow">
           {/* Icône de statut */}
-          <div className={`p-1.5 rounded-full ${
+          <div className={`p-2 rounded-full ${
             isResolved 
-              ? 'bg-green-500/10 text-green-500' 
+              ? 'bg-green-500/20 text-green-400 ring-1 ring-green-500/50' 
               : problem.impact === 'ÉLEVÉ' 
-                ? 'bg-red-500/10 text-red-500' 
+                ? 'bg-red-500/20 text-red-400 ring-1 ring-red-500/50' 
                 : problem.impact === 'MOYEN' 
-                  ? 'bg-amber-500/10 text-amber-500' 
-                  : 'bg-blue-500/10 text-blue-500'
-          } transition-colors duration-300`}>
+                  ? 'bg-amber-500/20 text-amber-400 ring-1 ring-amber-500/50' 
+                  : 'bg-blue-500/20 text-blue-400 ring-1 ring-blue-500/50'
+          } transition-colors duration-300 shadow-md`}>
             {isResolved ? (
-              <CheckCircle className="flex-shrink-0" size={20} />
+              <CheckCircle className="flex-shrink-0" size={18} />
             ) : (
-              <AlertTriangle className="flex-shrink-0" size={20} />
+              <AlertTriangle className="flex-shrink-0" size={18} />
             )}
           </div>
           
@@ -429,23 +473,23 @@ const ProblemCard: React.FC<ProblemCardProps> = ({ problem }) => {
               <span className="truncate">{problem.title}</span>
               <span className={`text-xs px-2 py-0.5 rounded-full whitespace-nowrap font-medium ${
                 isResolved 
-                  ? 'bg-green-900/50 text-green-400 border border-green-500/30' 
+                  ? 'bg-green-500/20 text-green-300 ring-1 ring-green-500/40' 
                   : problem.impact === 'ÉLEVÉ'
-                    ? 'bg-red-900/50 text-red-400 border border-red-500/30' 
+                    ? 'bg-red-500/20 text-red-300 ring-1 ring-red-500/40' 
                     : problem.impact === 'MOYEN'
-                      ? 'bg-amber-900/50 text-amber-400 border border-amber-500/30'
-                      : 'bg-blue-900/50 text-blue-400 border border-blue-500/30'
+                      ? 'bg-amber-500/20 text-amber-300 ring-1 ring-amber-500/40'
+                      : 'bg-blue-500/20 text-blue-300 ring-1 ring-blue-500/40'
               }`}>
                 {problem.code}
               </span>
             </div>
-            <div className="text-xs text-slate-400 truncate">{problem.subtitle}</div>
+            <div className="text-xs text-slate-300 truncate mt-1">{problem.subtitle}</div>
           </div>
         </div>
         
         {/* Côté droit: durée et bouton pour étendre/réduire */}
         <div className="flex items-center gap-3 ml-2">
-          <div className="text-xs text-slate-300 flex items-center gap-1 whitespace-nowrap">
+          <div className="text-xs text-slate-200 flex items-center gap-1 whitespace-nowrap bg-slate-800/50 py-1 px-2 rounded-full">
             <Clock size={14} className={`${
               isResolved 
                 ? 'text-green-400' 
@@ -457,44 +501,44 @@ const ProblemCard: React.FC<ProblemCardProps> = ({ problem }) => {
             }`} />
             <span>{problem.time}</span>
           </div>
-          <div className={`rounded-full p-1 ${
+          <div className={`rounded-full p-1.5 ${
             expanded 
-              ? 'bg-slate-700/30' 
-              : 'bg-slate-700/20'
-          }`}>
+              ? 'bg-slate-700/50 text-white ring-1 ring-slate-600' 
+              : 'bg-slate-800/50 text-slate-300 hover:bg-slate-700/50 hover:text-white'
+          } transition-colors`}>
             {expanded ? 
-              <ChevronUp size={16} className="text-slate-400" /> : 
-              <ChevronDown size={16} className="text-slate-400" />
+              <ChevronUp size={16} /> : 
+              <ChevronDown size={16} />
             }
           </div>
         </div>
       </div>
       
       {/* Section principale avec entité impactée et mini-graphique - Toujours visible */}
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between p-3 bg-slate-800/40">
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between p-4 bg-gradient-to-b from-slate-950 to-slate-900/95">
         {/* Entité impactée avec icône appropriée */}
-        <div className="flex flex-col w-full md:w-auto mb-2 md:mb-0">
-          <div className="text-xs uppercase text-slate-500 mb-1">Entité impactée</div>
-          <div className="flex items-center gap-2">
-            <div className={`p-1 rounded-md ${
+        <div className="flex flex-col w-full md:w-auto mb-3 md:mb-0">
+          <div className="text-xs uppercase text-slate-400 mb-1.5 font-medium tracking-wider">Entité impactée</div>
+          <div className="flex items-center gap-2 bg-slate-800/60 p-2 rounded-lg border border-slate-700">
+            <div className={`p-1.5 rounded-md ${
               isResolved 
-                ? 'bg-green-500/10' 
+                ? 'bg-green-500/20 ring-1 ring-green-500/50' 
                 : problem.impact === 'ÉLEVÉ' 
-                  ? 'bg-red-500/10' 
+                  ? 'bg-red-500/20 ring-1 ring-red-500/50' 
                   : problem.impact === 'MOYEN' 
-                    ? 'bg-amber-500/10' 
-                    : 'bg-blue-500/10'
-            }`}>
+                    ? 'bg-amber-500/20 ring-1 ring-amber-500/50' 
+                    : 'bg-blue-500/20 ring-1 ring-blue-500/50'
+            } shadow-sm`}>
               {getEntityTypeIcon()}
             </div>
             <span className={`text-sm font-medium ${
               isResolved 
-                ? 'text-green-300' 
+                ? 'text-green-200' 
                 : problem.impact === 'ÉLEVÉ' 
-                  ? 'text-red-300' 
+                  ? 'text-red-200' 
                   : problem.impact === 'MOYEN' 
-                    ? 'text-amber-300' 
-                    : 'text-blue-300'
+                    ? 'text-amber-200' 
+                    : 'text-blue-200'
             }`}>
               {hostInfo !== "Non spécifié" ? hostInfo : "Non spécifiée"}
             </span>
@@ -503,9 +547,13 @@ const ProblemCard: React.FC<ProblemCardProps> = ({ problem }) => {
         
         {/* Mini-graphique des métriques */}
         <div className="flex flex-col w-full md:w-auto">
-          <div className="text-xs uppercase text-slate-500 mb-1">Activité des 12 dernières heures</div>
-          <div className="w-full md:w-[150px] bg-slate-800/50 border border-slate-700/50 rounded-md p-1">
+          <div className="text-xs uppercase text-slate-400 mb-1.5 font-medium tracking-wider">Activité récente</div>
+          <div className="w-full md:w-[180px] bg-slate-800/60 border border-slate-700 rounded-lg p-2 shadow-inner">
             {renderMiniChart()}
+            <div className="flex justify-between mt-1 text-xs text-slate-500">
+              <span>-12h</span>
+              <span>Maintenant</span>
+            </div>
           </div>
         </div>
       </div>
@@ -529,43 +577,43 @@ const ProblemCard: React.FC<ProblemCardProps> = ({ problem }) => {
           {/* Grille pour les métriques détaillées */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-3">
             {/* Type de problème */}
-            <div className="bg-slate-800/60 rounded-lg p-3 border border-slate-700/50 flex flex-col">
+            <div className="bg-slate-950/80 rounded-lg p-3 border border-slate-700 flex flex-col backdrop-blur-sm hover:bg-slate-900/80 transition-colors">
               <div className="flex items-center gap-2 mb-2">
-                <div className={`p-1 rounded-md ${
+                <div className={`p-1.5 rounded-md ${
                   isResolved 
-                    ? 'bg-green-500/10' 
+                    ? 'bg-green-500/20 ring-1 ring-green-500/50' 
                     : problem.impact === 'ÉLEVÉ' 
-                      ? 'bg-red-500/10' 
+                      ? 'bg-red-500/20 ring-1 ring-red-500/50' 
                       : problem.impact === 'MOYEN' 
-                        ? 'bg-amber-500/10' 
-                        : 'bg-blue-500/10'
+                        ? 'bg-amber-500/20 ring-1 ring-amber-500/50' 
+                        : 'bg-blue-500/20 ring-1 ring-blue-500/50'
                 }`}>
                   {getProblemTypeIcon()}
                 </div>
-                <div className="text-xs uppercase text-slate-400">Type de problème</div>
+                <div className="text-xs uppercase text-slate-400 tracking-wider font-medium">Type de problème</div>
               </div>
-              <div className="text-sm text-slate-300 font-medium">{problem.type}</div>
+              <div className="text-sm text-white font-medium">{problem.type}</div>
             </div>
             
             {/* Zone affectée */}
-            <div className="bg-slate-800/60 rounded-lg p-3 border border-slate-700/50 flex flex-col">
+            <div className="bg-slate-950/80 rounded-lg p-3 border border-slate-700 flex flex-col backdrop-blur-sm hover:bg-slate-900/80 transition-colors">
               <div className="flex items-center gap-2 mb-2">
-                <div className="p-1 rounded-md bg-emerald-500/10">
+                <div className="p-1.5 rounded-md bg-emerald-500/20 ring-1 ring-emerald-500/50">
                   <Shield size={16} className="text-emerald-400" />
                 </div>
-                <div className="text-xs uppercase text-slate-400">Zone affectée</div>
+                <div className="text-xs uppercase text-slate-400 tracking-wider font-medium">Zone affectée</div>
               </div>
-              <div className="text-sm text-slate-300 font-medium">{problem.zone}</div>
+              <div className="text-sm text-white font-medium">{problem.zone}</div>
             </div>
             
             {/* Durée */}
             {problem.duration && (
-              <div className="bg-slate-800/60 rounded-lg p-3 border border-slate-700/50 flex flex-col">
+              <div className="bg-slate-950/80 rounded-lg p-3 border border-slate-700 flex flex-col backdrop-blur-sm hover:bg-slate-900/80 transition-colors">
                 <div className="flex items-center gap-2 mb-2">
-                  <div className="p-1 rounded-md bg-amber-500/10">
+                  <div className="p-1.5 rounded-md bg-amber-500/20 ring-1 ring-amber-500/50">
                     <Clock size={16} className="text-amber-400" />
                   </div>
-                  <div className="text-xs uppercase text-slate-400">Durée</div>
+                  <div className="text-xs uppercase text-slate-400 tracking-wider font-medium">Durée</div>
                 </div>
                 <div className="text-sm text-amber-300 font-medium">{problem.duration}</div>
               </div>
@@ -573,12 +621,12 @@ const ProblemCard: React.FC<ProblemCardProps> = ({ problem }) => {
             
             {/* Services impactés */}
             {problem.servicesImpacted && (
-              <div className="bg-slate-800/60 rounded-lg p-3 border border-slate-700/50 flex flex-col">
+              <div className="bg-slate-950/80 rounded-lg p-3 border border-slate-700 flex flex-col backdrop-blur-sm hover:bg-slate-900/80 transition-colors">
                 <div className="flex items-center gap-2 mb-2">
-                  <div className="p-1 rounded-md bg-blue-500/10">
+                  <div className="p-1.5 rounded-md bg-blue-500/20 ring-1 ring-blue-500/50">
                     <RefreshCw size={16} className="text-blue-400" />
                   </div>
-                  <div className="text-xs uppercase text-slate-400">Services impactés</div>
+                  <div className="text-xs uppercase text-slate-400 tracking-wider font-medium">Services impactés</div>
                 </div>
                 <div className="text-sm flex items-baseline gap-1">
                   <span className="text-blue-400 font-medium">{problem.servicesImpacted}</span>
@@ -589,12 +637,12 @@ const ProblemCard: React.FC<ProblemCardProps> = ({ problem }) => {
             
             {/* Temps de réponse */}
             {problem.responseTime && (
-              <div className="bg-slate-800/60 rounded-lg p-3 border border-slate-700/50 flex flex-col">
+              <div className="bg-slate-950/80 rounded-lg p-3 border border-slate-700 flex flex-col backdrop-blur-sm hover:bg-slate-900/80 transition-colors">
                 <div className="flex items-center gap-2 mb-2">
-                  <div className="p-1 rounded-md bg-amber-500/10">
+                  <div className="p-1.5 rounded-md bg-amber-500/20 ring-1 ring-amber-500/50">
                     <Activity size={16} className="text-amber-400" />
                   </div>
-                  <div className="text-xs uppercase text-slate-400">Temps de réponse</div>
+                  <div className="text-xs uppercase text-slate-400 tracking-wider font-medium">Temps de réponse</div>
                 </div>
                 <div className="text-sm text-amber-300 font-medium">{problem.responseTime}</div>
               </div>
@@ -602,12 +650,12 @@ const ProblemCard: React.FC<ProblemCardProps> = ({ problem }) => {
             
             {/* Utilisation CPU */}
             {problem.cpuUsage && (
-              <div className="bg-slate-800/60 rounded-lg p-3 border border-slate-700/50 flex flex-col">
+              <div className="bg-slate-950/80 rounded-lg p-3 border border-slate-700 flex flex-col backdrop-blur-sm hover:bg-slate-900/80 transition-colors">
                 <div className="flex items-center gap-2 mb-2">
-                  <div className="p-1 rounded-md bg-red-500/10">
+                  <div className="p-1.5 rounded-md bg-red-500/20 ring-1 ring-red-500/50">
                     <Cpu size={16} className="text-red-400" />
                   </div>
-                  <div className="text-xs uppercase text-slate-400">Utilisation CPU</div>
+                  <div className="text-xs uppercase text-slate-400 tracking-wider font-medium">Utilisation CPU</div>
                 </div>
                 <div className="text-sm text-red-300 font-medium">{problem.cpuUsage}</div>
               </div>
@@ -615,12 +663,12 @@ const ProblemCard: React.FC<ProblemCardProps> = ({ problem }) => {
             
             {/* Taux d'erreur */}
             {problem.errorRate && (
-              <div className="bg-slate-800/60 rounded-lg p-3 border border-slate-700/50 flex flex-col">
+              <div className="bg-slate-950/80 rounded-lg p-3 border border-slate-700 flex flex-col backdrop-blur-sm hover:bg-slate-900/80 transition-colors">
                 <div className="flex items-center gap-2 mb-2">
-                  <div className="p-1 rounded-md bg-red-500/10">
+                  <div className="p-1.5 rounded-md bg-red-500/20 ring-1 ring-red-500/50">
                     <AlertTriangle size={16} className="text-red-400" />
                   </div>
-                  <div className="text-xs uppercase text-slate-400">Taux d'erreur</div>
+                  <div className="text-xs uppercase text-slate-400 tracking-wider font-medium">Taux d'erreur</div>
                 </div>
                 <div className="text-sm text-red-300 font-medium">{problem.errorRate}</div>
               </div>
@@ -628,12 +676,12 @@ const ProblemCard: React.FC<ProblemCardProps> = ({ problem }) => {
             
             {/* Utilisateurs affectés */}
             {problem.usersAffected && (
-              <div className="bg-slate-800/60 rounded-lg p-3 border border-slate-700/50 flex flex-col">
+              <div className="bg-slate-950/80 rounded-lg p-3 border border-slate-700 flex flex-col backdrop-blur-sm hover:bg-slate-900/80 transition-colors">
                 <div className="flex items-center gap-2 mb-2">
-                  <div className="p-1 rounded-md bg-purple-500/10">
+                  <div className="p-1.5 rounded-md bg-purple-500/20 ring-1 ring-purple-500/50">
                     <Users size={16} className="text-purple-400" />
                   </div>
-                  <div className="text-xs uppercase text-slate-400">Utilisateurs affectés</div>
+                  <div className="text-xs uppercase text-slate-400 tracking-wider font-medium">Utilisateurs affectés</div>
                 </div>
                 <div className="text-sm text-purple-300 font-medium">{problem.usersAffected}</div>
               </div>
@@ -641,12 +689,12 @@ const ProblemCard: React.FC<ProblemCardProps> = ({ problem }) => {
             
             {/* Transactions échouées */}
             {problem.failedTransactions && (
-              <div className="bg-slate-800/60 rounded-lg p-3 border border-slate-700/50 flex flex-col">
+              <div className="bg-slate-950/80 rounded-lg p-3 border border-slate-700 flex flex-col backdrop-blur-sm hover:bg-slate-900/80 transition-colors">
                 <div className="flex items-center gap-2 mb-2">
-                  <div className="p-1 rounded-md bg-red-500/10">
+                  <div className="p-1.5 rounded-md bg-red-500/20 ring-1 ring-red-500/50">
                     <BarChart3 size={16} className="text-red-400" />
                   </div>
-                  <div className="text-xs uppercase text-slate-400">Transactions échouées</div>
+                  <div className="text-xs uppercase text-slate-400 tracking-wider font-medium">Transactions échouées</div>
                 </div>
                 <div className="text-sm text-red-300 font-medium">{problem.failedTransactions}</div>
               </div>
@@ -656,17 +704,17 @@ const ProblemCard: React.FC<ProblemCardProps> = ({ problem }) => {
       )}
       
       {/* Pied de page - Toujours visible */}
-      <div className="flex justify-between items-center py-2.5 px-4 border-t border-slate-700/70">
+      <div className="flex justify-between items-center py-3 px-4 border-t border-slate-700 bg-gradient-to-b from-slate-900 to-slate-950">
         {/* Niveau d'impact */}
         <div className="flex items-center gap-2 text-xs">
-          <span className="text-slate-400">Impact:</span>
-          <span className={`uppercase px-2 py-0.5 rounded-full text-xs font-medium ${
+          <span className="text-slate-300 font-medium">Impact:</span>
+          <span className={`uppercase px-2.5 py-1 rounded-full text-xs font-semibold ${
             problem.impact === 'MOYEN' 
-              ? 'bg-amber-600/60 text-white' 
+              ? 'bg-gradient-to-r from-amber-600 to-amber-700 text-white ring-1 ring-amber-500/50' 
               : problem.impact === 'ÉLEVÉ' 
-                ? 'bg-red-600/60 text-white' 
-                : 'bg-green-600/60 text-white'
-          }`}>
+                ? 'bg-gradient-to-r from-red-600 to-red-700 text-white ring-1 ring-red-500/50 animate-pulse' 
+                : 'bg-gradient-to-r from-green-600 to-green-700 text-white ring-1 ring-green-500/50'
+          } shadow-sm`}>
             {problem.impact}
           </span>
         </div>
@@ -677,17 +725,17 @@ const ProblemCard: React.FC<ProblemCardProps> = ({ problem }) => {
           target="_blank"
           rel="noopener noreferrer"
           onClick={(e) => e.stopPropagation()} // Empêcher la propagation du clic
-          className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full ${
+          className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full ${
             isResolved
-              ? 'bg-green-500/10 text-green-400 hover:bg-green-500/20 hover:text-green-300'
+              ? 'bg-gradient-to-r from-green-500/20 to-green-600/20 text-green-300 hover:from-green-500/30 hover:to-green-600/30 hover:text-green-200 ring-1 ring-green-500/50'
               : problem.impact === 'ÉLEVÉ'
-                ? 'bg-red-500/10 text-red-400 hover:bg-red-500/20 hover:text-red-300'
+                ? 'bg-gradient-to-r from-red-500/20 to-red-600/20 text-red-300 hover:from-red-500/30 hover:to-red-600/30 hover:text-red-200 ring-1 ring-red-500/50'
                 : problem.impact === 'MOYEN'
-                  ? 'bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 hover:text-amber-300'
-                  : 'bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 hover:text-blue-300'
-          } transition-colors`}
+                  ? 'bg-gradient-to-r from-amber-500/20 to-amber-600/20 text-amber-300 hover:from-amber-500/30 hover:to-amber-600/30 hover:text-amber-200 ring-1 ring-amber-500/50'
+                  : 'bg-gradient-to-r from-blue-500/20 to-blue-600/20 text-blue-300 hover:from-blue-500/30 hover:to-blue-600/30 hover:text-blue-200 ring-1 ring-blue-500/50'
+          } transition-colors shadow-sm font-medium`}
         >
-          <ExternalLink size={12} />
+          <ExternalLink size={14} />
           Détails complets
         </a>
       </div>
