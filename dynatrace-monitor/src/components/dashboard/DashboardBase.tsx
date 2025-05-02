@@ -4,7 +4,7 @@ import ProblemsList from './ProblemsList';
 import ManagementZoneList from './ManagementZoneList';
 import ZoneDetails from './ZoneDetails';
 import { AppContextType } from '../../contexts/AppContext';
-import { Shield, Loader, AlertOctagon, RefreshCw, Clock, BarChart, ChevronLeft, Check, Server } from 'lucide-react';
+import { Shield, Loader, AlertTriangle, RefreshCw, Clock, BarChart, ChevronLeft, Check, Server } from 'lucide-react';
 
 
 interface DashboardBaseProps {
@@ -26,6 +26,7 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
 }) => {
   const { 
     activeProblems,
+    problemsLast72h, // Nouvel état pour les problèmes des 72 dernières heures
     vitalForGroupMZs, 
     vitalForEntrepriseMZs,
     selectedZone, 
@@ -35,13 +36,15 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
     processGroups,
     hosts,
     services,
-    summaryData,
     isLoading,
     error,
     backendConnected,
     performanceMetrics,
     refreshData
   } = context;
+  
+  // État pour le nouvel onglet de problèmes (actifs ou 72h)
+  const [problemTab, setProblemTab] = useState('active'); // 'active' ou 'recent'
   
   // État pour suivre la progression du chargement
   const [loadingProgress, setLoadingProgress] = useState(0);
@@ -152,7 +155,7 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
     return (
       <Layout title={title}>
         <div className="flex flex-col items-center justify-center h-64 p-10 mt-20 bg-red-50 border border-red-200 rounded-lg dark:bg-red-900/20 dark:border-red-800">
-          <AlertOctagon className="w-16 h-16 text-red-500 mb-4" />
+          <AlertTriangle className="w-16 h-16 text-red-500 mb-4" />
           <p className="text-xl text-red-600 dark:text-red-400 mb-4">Le serveur backend n'est pas accessible</p>
           <p className="text-slate-600 dark:text-slate-300 mb-8 text-center max-w-lg">
             Impossible de se connecter au serveur. Vérifiez que le backend est démarré et que votre connexion est active.
@@ -174,7 +177,7 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
     return (
       <Layout title={title}>
         <div className="flex flex-col items-center justify-center h-64 p-10 mt-20 bg-red-50 border border-red-200 rounded-lg dark:bg-red-900/20 dark:border-red-800">
-          <AlertOctagon className="w-16 h-16 text-red-500 mb-4" />
+          <AlertTriangle className="w-16 h-16 text-red-500 mb-4" />
           <p className="text-xl text-red-600 dark:text-red-400 mb-4">Une erreur est survenue</p>
           <p className="text-slate-600 dark:text-slate-300 mb-8 text-center max-w-lg">{error}</p>
           <button 
@@ -381,63 +384,50 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
               </div>
             </div>
           </div>
-        
-          {/* Afficher les données de résumé si disponibles */}
-          {summaryData && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-              <div className="bg-slate-800 dark:bg-slate-800 p-4 rounded-lg border border-slate-700 dark:border-slate-700">
-                <div className="text-xs text-slate-400 dark:text-slate-400 mb-1">Hôtes</div>
-                <div className="text-xl font-bold text-white dark:text-white">{summaryData.hosts?.count || 0}</div>
-                <div className="text-sm text-slate-400 dark:text-slate-400">
-                  CPU Moyen: <span className={
-                    (summaryData.hosts?.avg_cpu || 0) > 80 ? 'text-red-500' : 
-                    (summaryData.hosts?.avg_cpu || 0) > 60 ? 'text-yellow-500' : 
-                    'text-green-500'
-                  }>
-                    {summaryData.hosts?.avg_cpu || 0}%
-                  </span>
-                </div>
+          
+          {/* Onglets des problèmes */}
+          <div className="flex border-b mb-5">
+            <button 
+              onClick={() => setProblemTab('active')}
+              className={`px-4 py-2 font-medium text-sm border-b-2 -mb-px transition-colors ${
+                problemTab === 'active' 
+                  ? `border-${variant === 'vfg' ? 'blue' : 'amber'}-500 ${cssClasses.text}` 
+                  : 'border-transparent text-slate-400 hover:text-slate-300'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <AlertTriangle size={14} />
+                <span>PROBLEMES ACTIFS</span>
               </div>
-              
-              <div className="bg-slate-800 dark:bg-slate-800 p-4 rounded-lg border border-slate-700 dark:border-slate-700">
-                <div className="text-xs text-slate-400 dark:text-slate-400 mb-1">Services</div>
-                <div className="text-xl font-bold text-white dark:text-white">{summaryData.services?.count || 0}</div>
-                <div className="text-sm text-slate-400 dark:text-slate-400">
-                  Taux d'erreur: <span className={
-                    (summaryData.services?.avg_error_rate || 0) > 5 ? 'text-red-500' : 
-                    (summaryData.services?.avg_error_rate || 0) > 1 ? 'text-yellow-500' : 
-                    'text-green-500'
-                  }>
-                    {summaryData.services?.avg_error_rate || 0}%
-                  </span>
-                </div>
+            </button>
+            
+            <button 
+              onClick={() => setProblemTab('recent')}
+              className={`px-4 py-2 font-medium text-sm border-b-2 -mb-px transition-colors ${
+                problemTab === 'recent' 
+                  ? `border-${variant === 'vfg' ? 'blue' : 'amber'}-500 ${cssClasses.text}` 
+                  : 'border-transparent text-slate-400 hover:text-slate-300'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <Clock size={14} />
+                <span>PROBLEMES 72h</span>
               </div>
-              
-              <div className="bg-slate-800 dark:bg-slate-800 p-4 rounded-lg border border-slate-700 dark:border-slate-700">
-                <div className="text-xs text-slate-400 dark:text-slate-400 mb-1">Requêtes</div>
-                <div className="text-xl font-bold text-white dark:text-white">{summaryData.requests?.total || 0}</div>
-                <div className="text-sm text-slate-400 dark:text-slate-400">
-                  Moyenne horaire: {summaryData.requests?.hourly_avg || 0}
-                </div>
-              </div>
-              
-              <div className="bg-slate-800 dark:bg-slate-800 p-4 rounded-lg border border-slate-700 dark:border-slate-700">
-                <div className="text-xs text-slate-400 dark:text-slate-400 mb-1">Problèmes</div>
-                <div className="text-xl font-bold text-white dark:text-white">{summaryData.problems?.count || 0}</div>
-                <div className="text-sm text-slate-400 dark:text-slate-400">
-                  <span className={(summaryData.problems?.count || 0) > 0 ? 'text-red-500' : 'text-green-500'}>
-                    {(summaryData.problems?.count || 0) > 0 ? 'Problèmes actifs' : 'Aucun problème'}
-                  </span>
-                </div>
-              </div>
-            </div>
+            </button>
+          </div>
+          
+          {/* Afficher la liste de problèmes selon l'onglet sélectionné */}
+          {problemTab === 'active' ? (
+            <ProblemsList 
+              problems={activeProblems} 
+              title={`Problèmes actifs sur ${title}`} 
+            />
+          ) : (
+            <ProblemsList 
+              problems={problemsLast72h || []} 
+              title={`Problèmes des dernières 72h sur ${title}`} 
+            />
           )}
-        
-          {/* Liste des problèmes */}
-          <ProblemsList 
-            problems={activeProblems} 
-            title={`Problèmes actifs sur ${title}`} 
-          />
           
           {/* Liste des zones */}
           <ManagementZoneList 
