@@ -443,7 +443,10 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
             availability: `${(99 + (Math.random() * 1)).toFixed(2)}%`,
             status: "healthy" as "healthy" | "warning",
             color: getZoneColor(mzName),
-            dt_url: "#"
+            dt_url: `/ui/managementzones/details/${encodeURIComponent(mzName)}`,
+            hostUrl: `/ui/hosts?managementzone=${encodeURIComponent(mzName)}`,
+            serviceUrl: `/ui/services?managementzone=${encodeURIComponent(mzName)}`,
+            applicationUrl: `/ui/applications?managementzone=${encodeURIComponent(mzName)}`
           }));
           
           setState(prev => ({ ...prev, vitalForGroupMZs: vfgMZs }));
@@ -462,7 +465,10 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
             availability: `${(99 + (Math.random() * 1)).toFixed(2)}%`,
             status: "healthy" as "healthy" | "warning",
             color: getZoneColor(mzName),
-            dt_url: "#"
+            dt_url: `/ui/managementzones/details/${encodeURIComponent(mzName)}`,
+            hostUrl: `/ui/hosts?managementzone=${encodeURIComponent(mzName)}`,
+            serviceUrl: `/ui/services?managementzone=${encodeURIComponent(mzName)}`,
+            applicationUrl: `/ui/applications?managementzone=${encodeURIComponent(mzName)}`
           }));
           
           setState(prev => ({ ...prev, vitalForEntrepriseMZs: vfeMZs }));

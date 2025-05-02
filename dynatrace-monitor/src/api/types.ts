@@ -78,6 +78,9 @@ export interface ManagementZone {
   status: 'healthy' | 'warning';
   color: 'red' | 'amber' | 'orange' | 'blue' | 'emerald' | 'purple' | 'green';
   dt_url: string;
+  hostUrl?: string;
+  serviceUrl?: string;
+  applicationUrl?: string;
 }
 
 // Types pour les process groups

@@ -1,5 +1,6 @@
 import React from 'react';
 import { ManagementZone } from '../../api/types';
+import { ExternalLink, Server, Database, BarChart, Laptop } from 'lucide-react';
 
 interface ManagementZoneRowProps {
   zone: ManagementZone;
@@ -34,22 +35,58 @@ const ManagementZoneRow: React.FC<ManagementZoneRowProps> = ({ zone, onZoneClick
         </div>
       </div>
       
-      {/* Applications */}
-      <div className="col-span-2 text-right">
+      {/* Applications avec lien */}
+      <div className="col-span-2">
         <div className="text-xs text-slate-500 mb-1 dark:text-slate-500">Applications:</div>
-        <div className="font-medium text-white dark:text-white">{zone.apps}</div>
+        <div className="flex items-center gap-1">
+          <Laptop size={14} className="text-blue-400" />
+          <a
+            href={process.env.REACT_APP_DYNATRACE_HOST ? `${process.env.REACT_APP_DYNATRACE_HOST}${zone.applicationUrl}` : zone.applicationUrl || "#"} 
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => { e.stopPropagation(); }}
+            className="font-medium text-blue-400 hover:text-blue-300 dark:text-blue-400 dark:hover:text-blue-300 flex items-center gap-1"
+          >
+            <span>{zone.apps}</span>
+            <ExternalLink size={10} />
+          </a>
+        </div>
       </div>
       
-      {/* Services */}
-      <div className="col-span-2 text-right">
+      {/* Services avec lien */}
+      <div className="col-span-2">
         <div className="text-xs text-slate-500 mb-1 dark:text-slate-500">Services:</div>
-        <div className="font-medium text-white dark:text-white">{zone.services}</div>
+        <div className="flex items-center gap-1">
+          <BarChart size={14} className="text-green-400" />
+          <a
+            href={process.env.REACT_APP_DYNATRACE_HOST ? `${process.env.REACT_APP_DYNATRACE_HOST}${zone.serviceUrl}` : zone.serviceUrl || "#"}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => { e.stopPropagation(); }}
+            className="font-medium text-green-400 hover:text-green-300 dark:text-green-400 dark:hover:text-green-300 flex items-center gap-1"
+          >
+            <span>{zone.services}</span>
+            <ExternalLink size={10} />
+          </a>
+        </div>
       </div>
       
-      {/* Hôtes */}
-      <div className="col-span-2 text-right">
+      {/* Hôtes avec lien */}
+      <div className="col-span-2">
         <div className="text-xs text-slate-500 mb-1 dark:text-slate-500">Hôtes:</div>
-        <div className="font-medium text-white dark:text-white">{zone.hosts}</div>
+        <div className="flex items-center gap-1">
+          <Server size={14} className="text-purple-400" />
+          <a
+            href={process.env.REACT_APP_DYNATRACE_HOST ? `${process.env.REACT_APP_DYNATRACE_HOST}${zone.hostUrl}` : zone.hostUrl || "#"}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => { e.stopPropagation(); }}
+            className="font-medium text-purple-400 hover:text-purple-300 dark:text-purple-400 dark:hover:text-purple-300 flex items-center gap-1"
+          >
+            <span>{zone.hosts}</span>
+            <ExternalLink size={10} />
+          </a>
+        </div>
       </div>
       
       {/* Disponibilité */}
@@ -62,8 +99,8 @@ const ManagementZoneRow: React.FC<ManagementZoneRowProps> = ({ zone, onZoneClick
         }`}>{zone.availability}</div>
       </div>
       
-      {/* Statut et bouton */}
-      <div className="col-span-1 flex items-center">
+      {/* Statut */}
+      <div className="col-span-1">
         <div className="flex items-center gap-1.5">
           <span className={`inline-block w-2.5 h-2.5 rounded-full ${
             zone.status === 'healthy' 
@@ -74,13 +111,17 @@ const ManagementZoneRow: React.FC<ManagementZoneRowProps> = ({ zone, onZoneClick
         </div>
       </div>
       
+      {/* Bouton avec lien Dynatrace */}
       <div className="col-span-1">
         <a 
-          href="#" 
+          href={process.env.REACT_APP_DYNATRACE_HOST ? `${process.env.REACT_APP_DYNATRACE_HOST}${zone.dt_url}` : zone.dt_url || "#"}
+          target="_blank"
+          rel="noopener noreferrer"
           className="flex items-center justify-center gap-1 px-2 py-1 rounded bg-red-900/20 text-red-400 text-xs hover:bg-red-900/30 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/30"
           onClick={(e) => { e.stopPropagation(); }}
         >
-          <span>Détails</span>
+          <ExternalLink size={10} />
+          <span>Dynatrace</span>
         </a>
       </div>
     </div>
