@@ -1,28 +1,38 @@
-import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useApp } from '../contexts/AppContext';
 import Layout from '../components/layout/Layout';
 import ProblemsList from '../components/dashboard/ProblemsList';
 import { ChevronLeft, AlertTriangle } from 'lucide-react';
-import mockActiveProblems from './MockActiveProblemData';
 
 /**
  * Page dédiée à l'affichage des problèmes actifs
  */
 const ActiveProblemsPage: React.FC = () => {
   const navigate = useNavigate();
-  const { activeProblems: realProblems, isLoading } = useApp();
+  const location = useLocation();
+  const { activeProblems, isLoading, refreshData } = useApp();
   
-  // Utiliser des données mockées pour démontrer la différence
-  const activeProblems = mockActiveProblems;
+  // Récupérer le paramètre de type de dashboard depuis l'URL
+  const dashboardType = new URLSearchParams(location.search).get('dashboard') || 'vfg';
   
-  // Navigation retour vers le tableau de bord
+  // Forcer un rafraîchissement des données au chargement avec le bon type de dashboard
+  useEffect(() => {
+    refreshData(dashboardType as 'vfg' | 'vfe');
+  }, [refreshData, dashboardType]);
+  
+  // Navigation retour vers le bon tableau de bord
   const handleBackClick = () => {
-    navigate(-1);
+    navigate(`/dashboard/${dashboardType}`);
   };
 
+  // Déterminer le titre en fonction du type de dashboard
+  const title = dashboardType === 'vfg' 
+    ? "Problèmes Actifs - Vital for Group" 
+    : "Problèmes Actifs - Vital for Entreprise";
+  
   return (
-    <Layout title="Problèmes Actifs">
+    <Layout title={title}>
       <div className="space-y-6">
         {/* Bouton retour */}
         <button 

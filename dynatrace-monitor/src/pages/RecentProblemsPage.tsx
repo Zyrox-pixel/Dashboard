@@ -1,28 +1,38 @@
-import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useApp } from '../contexts/AppContext';
 import Layout from '../components/layout/Layout';
 import ProblemsList from '../components/dashboard/ProblemsList';
 import { ChevronLeft, Clock } from 'lucide-react';
-import mockRecentProblems from './MockRecentProblemData';
 
 /**
  * Page dédiée à l'affichage des problèmes des dernières 72 heures
  */
 const RecentProblemsPage: React.FC = () => {
   const navigate = useNavigate();
-  const { problemsLast72h: realProblems, isLoading } = useApp();
+  const location = useLocation();
+  const { problemsLast72h, isLoading, refreshData } = useApp();
   
-  // Utiliser des données mockées pour démontrer la différence
-  const problemsLast72h = mockRecentProblems;
+  // Récupérer le paramètre de type de dashboard depuis l'URL
+  const dashboardType = new URLSearchParams(location.search).get('dashboard') || 'vfg';
   
-  // Navigation retour vers le tableau de bord
+  // Forcer un rafraîchissement des données au chargement avec le bon type de dashboard
+  useEffect(() => {
+    refreshData(dashboardType as 'vfg' | 'vfe');
+  }, [refreshData, dashboardType]);
+  
+  // Navigation retour vers le bon tableau de bord
   const handleBackClick = () => {
-    navigate(-1);
+    navigate(`/dashboard/${dashboardType}`);
   };
 
+  // Déterminer le titre en fonction du type de dashboard
+  const title = dashboardType === 'vfg' 
+    ? "Problèmes Récents (72h) - Vital for Group" 
+    : "Problèmes Récents (72h) - Vital for Entreprise";
+  
   return (
-    <Layout title="Problèmes Récents (72h)">
+    <Layout title={title}>
       <div className="space-y-6">
         {/* Bouton retour */}
         <button 

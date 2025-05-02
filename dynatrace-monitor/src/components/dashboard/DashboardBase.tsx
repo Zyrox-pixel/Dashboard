@@ -391,7 +391,7 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
             {/* Carte des problèmes actifs */}
             <div 
-              onClick={() => navigate('/problems/active')}
+              onClick={() => navigate(`/problems/active?dashboard=${variant}`)}
               className="p-4 rounded-lg border cursor-pointer transition-all hover:shadow-lg border-slate-700 bg-slate-800 hover:bg-slate-700"
             >
               <div className="flex items-start gap-3">
@@ -414,7 +414,7 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
             
             {/* Carte des problèmes des 72 dernières heures */}
             <div 
-              onClick={() => navigate('/problems/recent')}
+              onClick={() => navigate(`/problems/recent?dashboard=${variant}`)}
               className="p-4 rounded-lg border cursor-pointer transition-all hover:shadow-lg border-slate-700 bg-slate-800 hover:bg-slate-700"
             >
               <div className="flex items-start gap-3">
