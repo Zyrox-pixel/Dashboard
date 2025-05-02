@@ -396,7 +396,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
       if (refreshProblemsOnly) {
         const responses = await Promise.all([
           apiClient.getProblems("OPEN", "-30d", dashboardType, true),  // Force le rafraîchissement avec une période de 30 jours
-          apiClient.getProblems("ALL", "-30d", dashboardType, true)   // Force le rafraîchissement pour ALL aussi, important pour les problèmes récents
+          apiClient.getProblems("ALL", "-30d", dashboardType, true, true)   // Force le rafraîchissement et désactive le filtrage MZ strict pour ALL
         ]);
         problemsResponse = responses[0] as ApiResponse<ProblemResponse[]>;
         problemsLast72hResponse = responses[1] as ApiResponse<ProblemResponse[]>;
@@ -408,7 +408,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
           apiClient.getVitalForGroupMZs(),
           apiClient.getVitalForEntrepriseMZs(),
           apiClient.getProblems("OPEN", "-30d", dashboardType, true),  // Force le rafraîchissement avec une période de 30 jours
-          apiClient.getProblems("ALL", "-30d", dashboardType, true)   // Force le rafraîchissement pour ALL aussi
+          apiClient.getProblems("ALL", "-30d", dashboardType, true, true)   // Force le rafraîchissement et désactive le filtrage MZ strict pour ALL
         ]);
         summaryResponse = responses[0] as ApiResponse<SummaryData>;
         vfgResponse = responses[1] as ApiResponse<VitalForGroupMZsResponse>;

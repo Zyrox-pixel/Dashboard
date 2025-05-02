@@ -1149,23 +1149,59 @@ class OptimizedAPIClient:
                     # Vérifier si le problème est lié à notre Management Zone
                     is_in_mz = False
                     
-                    # Rechercher dans les management zones directement attachées au problème
-                    if 'managementZones' in problem:
-                        for mz in problem.get('managementZones', []):
-                            if mz.get('name') == mz_name:
-                                is_in_mz = True
-                                break
-                    
-                    # Rechercher aussi dans les entités affectées
-                    if not is_in_mz:
-                        for entity in problem.get('affectedEntities', []):
-                            # Vérifier les management zones de chaque entité affectée
-                            for mz in entity.get('managementZones', []):
+                    # Pour les requêtes de type ALL (historique), utiliser un filtrage plus souple
+                    if status == "ALL":
+                        # D'abord vérifier les MZ explicites
+                        if 'managementZones' in problem:
+                            for mz in problem.get('managementZones', []):
                                 if mz.get('name') == mz_name:
                                     is_in_mz = True
                                     break
-                            if is_in_mz:
-                                break
+                        
+                        # Ensuite, vérifier les entités affectées
+                        if not is_in_mz:
+                            for entity in problem.get('affectedEntities', []):
+                                # Vérifier les management zones de chaque entité affectée
+                                if 'managementZones' in entity:
+                                    for mz in entity.get('managementZones', []):
+                                        if mz.get('name') == mz_name:
+                                            is_in_mz = True
+                                            break
+                                if is_in_mz:
+                                    break
+                        
+                        # Pour ALL, vérifier aussi si le titre ou la description mentionne la MZ
+                        if not is_in_mz and mz_name:
+                            # Vérifier le titre
+                            title = problem.get('title', '').lower()
+                            if mz_name.lower() in title:
+                                is_in_mz = True
+                                logger.debug(f"Problème {problem.get('id')} inclus car son titre contient {mz_name}")
+                            
+                            # Vérifier d'autres champs pertinents
+                            for field in ['displayName', 'description']:
+                                if not is_in_mz and field in problem:
+                                    if mz_name.lower() in problem[field].lower():
+                                        is_in_mz = True
+                                        logger.debug(f"Problème {problem.get('id')} inclus car son champ {field} contient {mz_name}")
+                    else:
+                        # Pour les problèmes OPEN, utiliser le filtrage standard
+                        if 'managementZones' in problem:
+                            for mz in problem.get('managementZones', []):
+                                if mz.get('name') == mz_name:
+                                    is_in_mz = True
+                                    break
+                        
+                        # Rechercher aussi dans les entités affectées
+                        if not is_in_mz:
+                            for entity in problem.get('affectedEntities', []):
+                                # Vérifier les management zones de chaque entité affectée
+                                for mz in entity.get('managementZones', []):
+                                    if mz.get('name') == mz_name:
+                                        is_in_mz = True
+                                        break
+                                if is_in_mz:
+                                    break
                     
                     # Si le problème est dans notre MZ, l'ajouter à notre liste
                     if is_in_mz:
