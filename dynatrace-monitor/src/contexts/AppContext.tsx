@@ -13,6 +13,7 @@ import { Database, Shield, Key, Globe, Server, Grid, Building, CreditCard } from
 // Types unifiés pour les contextes
 export interface AppStateType {
   activeProblems: Problem[];
+  problemsLast72h: Problem[]; // Nouveau état pour les problèmes des 72 dernières heures
   vitalForGroupMZs: ManagementZone[];
   vitalForEntrepriseMZs: ManagementZone[];
   selectedZone: string | null;
@@ -48,7 +49,7 @@ export interface AppActionsType {
   setSelectedZone: (zoneId: string | null) => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
   setActiveTab: (tab: string) => void;
-  refreshData: () => Promise<void>;
+  refreshData: (dashboardType?: 'vfg' | 'vfe') => Promise<void>; // Mis à jour pour accepter le type de dashboard
   loadZoneData?: (zoneId: string) => Promise<void>;
 }
 
@@ -109,6 +110,7 @@ export const getZoneColor = (zoneName: string): 'red' | 'amber' | 'orange' | 'bl
 // Initialiser le contexte avec des valeurs par défaut
 const initialAppState: AppStateType = {
   activeProblems: [],
+  problemsLast72h: [], // Initialisation du nouvel état
   vitalForGroupMZs: [],
   vitalForEntrepriseMZs: [],
   selectedZone: null,
@@ -339,8 +341,8 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
   }, [state.vitalForGroupMZs, state.vitalForEntrepriseMZs, apiClient, optimized, getProcessIcon]);
 
   // Fonction pour charger toutes les données
-  const loadAllData = useCallback(async () => {
-    console.log("Loading all data...");
+  const loadAllData = useCallback(async (dashboardType?: 'vfg' | 'vfe') => {
+    console.log(`Loading all data for dashboard type: ${dashboardType || 'none'}`);
     const startTime = performance.now();
     
     setState(prev => ({ 
@@ -378,11 +380,12 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
       }
       
       // Exécuter plusieurs requêtes en parallèle
-      const [summaryResponse, vfgResponse, vfeResponse, problemsResponse] = await Promise.all([
+      const [summaryResponse, vfgResponse, vfeResponse, problemsResponse, problemsLast72hResponse] = await Promise.all([
         apiClient.getSummary(),
         apiClient.getVitalForGroupMZs(),
         apiClient.getVitalForEntrepriseMZs(),
-        apiClient.getProblems()
+        apiClient.getProblems("OPEN", "-24h", dashboardType),  // Passer le type de dashboard
+        apiClient.getProblems("CLOSED", "-72h", dashboardType) // Passer le type de dashboard pour les problèmes récents
       ]);
       
       // Traiter les données du résumé
@@ -432,7 +435,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
         setState(prev => ({ ...prev, vitalForEntrepriseMZs: vfeMZs }));
       }
       
-      // Traiter les données des problèmes
+      // Traiter les données des problèmes actifs
       if (!problemsResponse.error && problemsResponse.data) {
         const problemsData = problemsResponse.data;
         
@@ -488,6 +491,30 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
         }
       }
       
+      // Traiter les données des problèmes des 72 dernières heures
+      if (!problemsLast72hResponse.error && problemsLast72hResponse.data) {
+        const problemsData = problemsLast72hResponse.data;
+        
+        if (Array.isArray(problemsData)) {
+          // Transformer les données
+          const problems: Problem[] = problemsData.map((problem) => ({
+            id: problem.id || `PROB-${Math.random().toString(36).substr(2, 9)}`,
+            title: problem.title || "Problème résolu",
+            code: problem.id ? problem.id.substring(0, 7) : "UNKNOWN",
+            subtitle: `${problem.zone || "Non spécifié"} - Impact: ${problem.impact || "INCONNU"}`,
+            time: problem.start_time ? `Résolu le ${problem.start_time}` : "Récent",
+            type: "Problème Dynatrace",
+            status: "warning", // Différent des problèmes actifs qui sont "critical"
+            impact: problem.impact === "INFRASTRUCTURE" ? "ÉLEVÉ" : problem.impact === "SERVICE" ? "MOYEN" : "FAIBLE",
+            zone: problem.zone || "Non spécifié",
+            servicesImpacted: problem.affected_entities ? problem.affected_entities.toString() : "0",
+            dt_url: problem.dt_url || "#"
+          }));
+          
+          setState(prev => ({ ...prev, problemsLast72h: problems }));
+        }
+      }
+      
       // Si une zone est sélectionnée, charger ses données
       if (state.selectedZone) {
         await loadZoneData(state.selectedZone);
@@ -531,7 +558,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
       initialLoadRef.current = true;
       loadAllData();
     }
-  }, []);
+  }, [loadAllData]);
 
   // Fonction pour définir la zone sélectionnée et charger ses données
   const setSelectedZoneAndLoadData = useCallback((zoneId: string | null) => {
@@ -542,10 +569,10 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
   }, [loadZoneData]);
 
   // Fonction pour rafraîchir les données
-  const refreshData = useCallback(async () => {
-    console.log("Refreshing data...");
+  const refreshData = useCallback(async (dashboardType?: 'vfg' | 'vfe') => {
+    console.log(`Refreshing data for dashboard type: ${dashboardType || 'none'}`);
     setState(prev => ({ ...prev, error: null }));
-    await loadAllData();
+    await loadAllData(dashboardType);
   }, [loadAllData]);
 
   // Fonctions pour modifier l'état

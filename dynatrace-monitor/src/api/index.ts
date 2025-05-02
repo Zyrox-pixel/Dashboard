@@ -501,8 +501,18 @@ class ApiClient {
   /**
    * Récupérer les problèmes
    */
-  public getProblems() {
-    return this.get<ProblemResponse[]>(ENDPOINTS.PROBLEMS);
+  public getProblems(status: string = "OPEN", timeframe: string = "-24h", dashboardType?: string) {
+    const params: any = {
+      status: status,
+      from: timeframe
+    };
+    
+    // Ajouter le type de dashboard s'il est spécifié
+    if (dashboardType) {
+      params.type = dashboardType;
+    }
+    
+    return this.get<ProblemResponse[]>(ENDPOINTS.PROBLEMS, { params });
   }
 
   /**

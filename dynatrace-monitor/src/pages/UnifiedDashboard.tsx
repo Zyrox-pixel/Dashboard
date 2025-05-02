@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import { useParams, Navigate } from 'react-router-dom';
 import DashboardBase from '../components/dashboard/DashboardBase';
 import { useApp } from '../contexts/AppContext';
@@ -44,6 +44,14 @@ const UnifiedDashboard: React.FC = () => {
   // Composant interne qui accède au contexte
   const DashboardWithContext: React.FC = () => {
     const appContext = useApp();
+    const { refreshData } = appContext;
+    
+    // Utiliser useEffect pour charger les données au montage du composant
+    // et passer le type de dashboard correct (vfg ou vfe)
+    useEffect(() => {
+      // Passer le type de dashboard à la fonction refreshData
+      refreshData(dashboardProps.variant as 'vfg' | 'vfe');
+    }, [dashboardProps.variant, refreshData]);
     
     return (
       <DashboardBase 
