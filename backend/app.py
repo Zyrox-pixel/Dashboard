@@ -293,24 +293,6 @@ def get_problems():
         logger.error(f"Erreur lors de la récupération des problèmes: {e}")
         return {'error': str(e)}
 
-@app.route('/api/refresh/<cache_type>', methods=['POST'])
-def refresh_cache(cache_type):
-    if cache_type not in ['services', 'hosts', 'process_groups', 'problems', 'summary', 'all', 'purge']:
-        return jsonify({'error': f'Type de cache {cache_type} non trouvé'}), 404
-    
-    # Si 'purge', vider complètement le cache, y compris les clés personnalisées
-    if cache_type == 'purge':
-        api_client.cache.clear()
-        return jsonify({'success': True, 'message': 'Cache complètement purgé'})
-    
-    # Si 'all', effacer tous les caches standard
-    if cache_type == 'all':
-        api_client.clear_cache()
-        return jsonify({'success': True, 'message': 'Tous les caches ont été effacés'})
-    
-    # Sinon, effacer uniquement le cache spécifié
-    api_client.clear_cache(f"{cache_type}:")
-    return jsonify({'success': True, 'message': f'Cache {cache_type} effacé avec succès'})
 
 @app.route('/api/current-management-zone', methods=['GET'])
 def get_current_management_zone():
@@ -570,13 +552,18 @@ def get_status():
         'version': '1.1.0',
         'optimized': True
     })
-
+    
 @app.route('/api/refresh/<cache_type>', methods=['POST'])
 def refresh_cache(cache_type):
-    if cache_type not in ['services', 'hosts', 'process_groups', 'problems', 'summary', 'all']:
+    if cache_type not in ['services', 'hosts', 'process_groups', 'problems', 'summary', 'all', 'purge']:
         return jsonify({'error': f'Type de cache {cache_type} non trouvé'}), 404
     
-    # Si 'all', effacer tous les caches
+    # Si 'purge', vider complètement le cache, y compris les clés personnalisées
+    if cache_type == 'purge':
+        api_client.cache.clear()
+        return jsonify({'success': True, 'message': 'Cache complètement purgé'})
+    
+    # Si 'all', effacer tous les caches standard
     if cache_type == 'all':
         api_client.clear_cache()
         return jsonify({'success': True, 'message': 'Tous les caches ont été effacés'})
