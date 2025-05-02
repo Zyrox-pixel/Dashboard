@@ -6,7 +6,10 @@ import {
   ProcessGroup, 
   Host,
   Service,
-  SummaryData
+  SummaryData,
+  ApiResponse,
+  VitalForGroupMZsResponse,
+  ProblemResponse
 } from '../api/types';
 import { Database, Shield, Key, Globe, Server, Grid, Building, CreditCard } from 'lucide-react';
 
@@ -236,7 +239,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
           
           // Transformer les données des process groups
           if (dashboardData.processes.data && dashboardData.processes.data.length > 0) {
-            const processGroups: ProcessGroup[] = dashboardData.processes.data.map((process) => ({
+            const processGroups: ProcessGroup[] = dashboardData.processes.data.map((process: any) => ({
               id: process.id || `proc-${Math.random().toString(36).substring(2, 9)}`,
               name: process.name || "Processus inconnu",
               technology: process.technology || "Non spécifié",
@@ -382,7 +385,12 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
       // Exécuter plusieurs requêtes en parallèle
       console.log(`Loading data for dashboard type: ${dashboardType}`);
       
-      let summaryResponse, vfgResponse, vfeResponse, problemsResponse, problemsLast72hResponse;
+      // Déclarer les variables avec leur type explicite
+      let summaryResponse: ApiResponse<SummaryData> | undefined;
+      let vfgResponse: ApiResponse<VitalForGroupMZsResponse> | undefined;
+      let vfeResponse: ApiResponse<VitalForGroupMZsResponse> | undefined;
+      let problemsResponse: ApiResponse<ProblemResponse[]> | undefined;
+      let problemsLast72hResponse: ApiResponse<ProblemResponse[]> | undefined;
       
       // Si on ne rafraîchit que les problèmes, ne récupérer que les données de problèmes
       if (refreshProblemsOnly) {
@@ -390,8 +398,8 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
           apiClient.getProblems("OPEN", "-24h", dashboardType, true),  // Force le rafraîchissement
           apiClient.getProblems("ALL", "-72h", dashboardType)
         ]);
-        problemsResponse = responses[0];
-        problemsLast72hResponse = responses[1];
+        problemsResponse = responses[0] as ApiResponse<ProblemResponse[]>;
+        problemsLast72hResponse = responses[1] as ApiResponse<ProblemResponse[]>;
         console.log('Rafraîchissement des problèmes uniquement terminé');
       } else {
         // Chargement complet de toutes les données
@@ -402,11 +410,11 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
           apiClient.getProblems("OPEN", "-24h", dashboardType, true),  // Force le rafraîchissement
           apiClient.getProblems("ALL", "-72h", dashboardType)
         ]);
-        summaryResponse = responses[0];
-        vfgResponse = responses[1];
-        vfeResponse = responses[2];
-        problemsResponse = responses[3];
-        problemsLast72hResponse = responses[4];
+        summaryResponse = responses[0] as ApiResponse<SummaryData>;
+        vfgResponse = responses[1] as ApiResponse<VitalForGroupMZsResponse>;
+        vfeResponse = responses[2] as ApiResponse<VitalForGroupMZsResponse>;
+        problemsResponse = responses[3] as ApiResponse<ProblemResponse[]>;
+        problemsLast72hResponse = responses[4] as ApiResponse<ProblemResponse[]>;
       }
       console.log('Réponse problèmes 72h (dashboard type):', dashboardType, problemsLast72hResponse);
       console.log('Réponse problèmes 72h:', problemsLast72hResponse);
@@ -586,7 +594,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
         } 
       }));
     }
-  }, [state.selectedZone, state.vitalForGroupMZs, state.vitalForEntrepriseMZs, loadZoneData, apiClient, optimized]);
+  }, [state.selectedZone, state.vitalForGroupMZs, state.vitalForEntrepriseMZs, loadZoneData, apiClient, optimized, getZoneIcon, getZoneColor]);
 
   // Fonction pour rafraîchir les données - version simplifiée
   const refreshData = useCallback(async (dashboardType?: 'vfg' | 'vfe', refreshProblemsOnly?: boolean) => {
@@ -646,7 +654,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
     setSidebarCollapsed,
     setActiveTab,
     refreshData,
-    performanceMetrics,
+    performanceMetrics: state.performanceMetrics || performanceMetrics,
     ...(optimized ? {
       loadZoneData
     } : {})
