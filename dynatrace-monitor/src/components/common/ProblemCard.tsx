@@ -19,99 +19,97 @@ const ProblemCard: React.FC<ProblemCardProps> = ({ problem }) => {
   // Extraire les informations sur la machine/hôte
   // Extraire le nom de l'hôte impacté à partir des informations disponibles
   const getHostInfo = () => {
-    // Fonction pour extraire le nom de l'hôte commençant par "s"
-    const extractHostname = (str: string) => {
-      // Rechercher les noms de machines commençant par "s" et se terminant par .fr.net.intra
-      const serverMatch = str.match(/\b(s[a-z0-9_-]+\.fr\.net\.intra)\b/i);
-      if (serverMatch && serverMatch[1]) {
-        return serverMatch[1];
-      }
+    // Fonction de débogage pour trouver tous les domaines et noms d'hôtes possibles
+    const findAllDomains = (str: string): string[] => {
+      if (!str) return [];
       
-      // Rechercher les noms de machines commençant par "s" si le format complet n'est pas trouvé
-      const serverShortMatch = str.match(/\b(s[a-z0-9_-]+)\b/i);
-      if (serverShortMatch && serverShortMatch[1] && 
-          serverShortMatch[1].length > 3 && // Éviter les faux positifs comme "sur", "sont", etc.
-          !/\bstatus\b/i.test(serverShortMatch[1])) { // Éviter "status"
-        return serverShortMatch[1];
-      }
+      // Chercher tous les patterns qui ressemblent à des FQDN
+      const domainMatches = str.match(/\b[a-z0-9_-]+\.[a-z0-9_.-]+\.[a-z0-9_.-]+\b/gi) || [];
       
-      return null;
+      // Chercher tous les patterns qui ressemblent à des noms d'hôtes
+      const hostMatches = str.match(/\b[a-z][a-z0-9_-]{2,}\b/gi) || [];
+      
+      // Combiner et dédupliquer
+      return [...new Set([...domainMatches, ...hostMatches])];
     };
     
-    // 1. Recherche spécifique dans le sous-titre après "impacted:"
+    // 1. Regarder direct dans le champ impacted
+    if (problem.impacted) {
+      console.log("Impacted field:", problem.impacted);
+      return problem.impacted;
+    }
+    
+    // 2. Chercher spécifiquement après le terme "impacted:" dans les textes
     if (problem.subtitle && problem.subtitle.toLowerCase().includes('impacted')) {
-      const impactParts = problem.subtitle.split(/impacted:?\s*/i);
-      if (impactParts.length > 1) {
-        const impactText = impactParts[1].trim();
-        // Extraire jusqu'au prochain séparateur
-        const impactValue = impactText.split(/[,;:\s]/)[0];
-        // Vérifier si ce qu'on a extrait commence par s
-        if (impactValue.length > 2 && impactValue.toLowerCase().startsWith('s')) {
-          return impactValue;
-        }
+      console.log("Subtitle contains impacted:", problem.subtitle);
+      
+      // Extraire la partie après "impacted:"
+      const matches = problem.subtitle.match(/impacted:?\s+([^,;:]+)/i);
+      if (matches && matches[1]) {
+        const extractedValue = matches[1].trim();
+        console.log("Extracted after impacted:", extractedValue);
+        return extractedValue;
       }
     }
     
-    // 2. Vérifier dans le champ impacted direct
-    if (problem.impacted && typeof problem.impacted === 'string') {
-      const hostname = extractHostname(problem.impacted);
-      if (hostname) {
-        return hostname;
-      }
-    }
+    // 3. Collecter tous les domaines possibles pour le débogage
+    let allPossibleDomains: string[] = [];
     
-    // 3. Vérifier dans les entités impactées 
-    if (problem.impactedEntities && Array.isArray(problem.impactedEntities)) {
-      for (const entity of problem.impactedEntities) {
-        // Vérifier chaque attribut de l'entité
-        const entityFields = [
-          entity.name,
-          entity.displayName,
-          entity.entityName,
-          entity.id
-        ];
-        
-        for (const field of entityFields) {
-          if (field && typeof field === 'string') {
-            const hostname = extractHostname(field);
-            if (hostname) {
-              return hostname;
-            }
-          }
-        }
-      }
-    }
-    
-    // 4. Vérifier les autres champs textuels (sous-titre, titre, host)
-    const fieldsToCheck = [
-      problem.subtitle,               // Sous-titre du problème
-      problem.title,                  // Titre du problème
-      problem.host                    // Hôte explicite
+    // Collecter des champs textuels
+    const textFields = [
+      problem.title,
+      problem.subtitle,
+      problem.host,
+      JSON.stringify(problem.impactedEntities)
     ];
     
-    // Parcourir tous les champs à la recherche du format d'hôte
-    for (const field of fieldsToCheck) {
-      if (field && typeof field === 'string') {
-        const hostname = extractHostname(field);
-        if (hostname) {
-          return hostname;
+    // Analyser chaque champ pour trouver les domaines
+    textFields.forEach(field => {
+      if (field) {
+        const domains = findAllDomains(field);
+        if (domains.length > 0) {
+          allPossibleDomains = [...allPossibleDomains, ...domains];
         }
+      }
+    });
+    
+    // Si nous avons trouvé des domaines, retourner le premier qui commence par 's' ou contient .fr.
+    const sHostname = allPossibleDomains.find(d => d.startsWith('s') && d.length > 3);
+    if (sHostname) {
+      console.log("Found s-hostname:", sHostname);
+      return sHostname;
+    }
+    
+    const frDomain = allPossibleDomains.find(d => d.includes('.fr.'));
+    if (frDomain) {
+      console.log("Found .fr. domain:", frDomain);
+      return frDomain;
+    }
+    
+    // Si nous avons trouvé des domaines mais pas spécifiquement ceux qu'on cherche, 
+    // afficher pour le débogage et retourner le premier
+    if (allPossibleDomains.length > 0) {
+      console.log("All possible domains:", allPossibleDomains);
+      return allPossibleDomains[0];
+    }
+    
+    // Si nous n'avons rien trouvé, essayer d'extraire des composants individuels du sous-titre
+    if (problem.subtitle) {
+      const words = problem.subtitle.split(/\s+/);
+      const possibleHost = words.find(w => 
+        w.startsWith('s') && 
+        w.length > 3 && 
+        !/^(status|service|such|still|some|system)/i.test(w)
+      );
+      
+      if (possibleHost) {
+        console.log("Found possible host in subtitle:", possibleHost);
+        return possibleHost;
       }
     }
     
-    // 5. Chercher dans le texte d'entité des problèmes Dynatrace
-    if (problem.subtitle && problem.subtitle.includes('entity:')) {
-      const entityParts = problem.subtitle.split(/entity:?\s*/i);
-      if (entityParts.length > 1) {
-        const entityText = entityParts[1].trim();
-        const entityValue = entityText.split(/[,;:\s]/)[0];
-        if (entityValue.length > 2 && entityValue.toLowerCase().startsWith('s')) {
-          return entityValue;
-        }
-      }
-    }
-    
-    // Par défaut, retourner la zone ou "Non spécifié"
+    // Par défaut, retourner la zone
+    console.log("No hostname found, returning zone:", problem.zone);
     return problem.zone || "Non spécifié";
   };
   
