@@ -480,24 +480,15 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
         if (Array.isArray(problemsData)) {
           // Transformer les données
           const problems: Problem[] = problemsData.map((problem) => {
-            // Utiliser le champ real_host s'il existe, sinon fallback sur d'autres méthodes
+            // Extraire le nom de l'hôte à partir du titre si possible
             let hostName = '';
-            
-            if (problem.real_host) {
-              // Utiliser le nom de machine réelle fourni par le backend
-              hostName = problem.real_host;
-            } else if (problem.title && problem.title.toLowerCase().includes('host')) {
-              // Méthode de fallback 1: Chercher dans le titre
+            if (problem.title && problem.title.toLowerCase().includes('host')) {
               const words = problem.title.split(' ');
+              // On prend le mot après "host" s'il existe
               const hostIndex = words.findIndex(word => word.toLowerCase() === 'host');
               if (hostIndex !== -1 && hostIndex < words.length - 1) {
                 hostName = words[hostIndex + 1];
               }
-            }
-            
-            // Si aucun nom de machine n'est trouvé, ne pas afficher d'information incorrecte
-            if (!hostName) {
-              hostName = "Non spécifié";
             }
             
             return {
@@ -514,7 +505,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
               dt_url: problem.dt_url || "#",
               duration: problem.duration || "",
               resolved: problem.resolved || false,
-              host: hostName // Utiliser le nom de l'hôte déterminé ci-dessus
+              host: hostName // Ajouter le nom de l'hôte extrait
             };
           });
           
