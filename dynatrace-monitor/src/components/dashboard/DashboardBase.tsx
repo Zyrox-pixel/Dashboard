@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Layout from '../layout/Layout';
 import ProblemsList from './ProblemsList';
 import ManagementZoneList from './ManagementZoneList';
@@ -24,6 +25,7 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
   optimized = false,
   context
 }) => {
+  const navigate = useNavigate();
   const { 
     activeProblems,
     problemsLast72h, // Nouvel état pour les problèmes des 72 dernières heures
@@ -385,49 +387,54 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
             </div>
           </div>
           
-          {/* Onglets des problèmes */}
-          <div className="flex border-b mb-5">
-            <button 
-              onClick={() => setProblemTab('active')}
-              className={`px-4 py-2 font-medium text-sm border-b-2 -mb-px transition-colors ${
-                problemTab === 'active' 
-                  ? `border-${variant === 'vfg' ? 'blue' : 'amber'}-500 ${cssClasses.text}` 
-                  : 'border-transparent text-slate-400 hover:text-slate-300'
-              }`}
+          {/* Cartes des problèmes avec navigation */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            {/* Carte des problèmes actifs */}
+            <div 
+              onClick={() => navigate('/problems/active')}
+              className="p-4 rounded-lg border cursor-pointer transition-all hover:shadow-lg border-slate-700 bg-slate-800 hover:bg-slate-700"
             >
-              <div className="flex items-center gap-2">
-                <AlertTriangle size={14} />
-                <span>PROBLEMES ACTIFS</span>
+              <div className="flex items-start gap-3">
+                <div className="p-3 rounded-lg bg-slate-700">
+                  <AlertTriangle className="text-red-400" size={20} />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-md text-white">
+                    PROBLÈMES ACTIFS
+                  </h3>
+                  <p className="text-sm text-slate-400 mt-1">
+                    {activeProblems.length} problème{activeProblems.length !== 1 ? 's' : ''} en cours
+                  </p>
+                </div>
+                <div className="ml-auto flex items-center justify-center w-10 h-10 rounded-full bg-slate-700 font-bold">
+                  {activeProblems.length}
+                </div>
               </div>
-            </button>
+            </div>
             
-            <button 
-              onClick={() => setProblemTab('recent')}
-              className={`px-4 py-2 font-medium text-sm border-b-2 -mb-px transition-colors ${
-                problemTab === 'recent' 
-                  ? `border-${variant === 'vfg' ? 'blue' : 'amber'}-500 ${cssClasses.text}` 
-                  : 'border-transparent text-slate-400 hover:text-slate-300'
-              }`}
+            {/* Carte des problèmes des 72 dernières heures */}
+            <div 
+              onClick={() => navigate('/problems/recent')}
+              className="p-4 rounded-lg border cursor-pointer transition-all hover:shadow-lg border-slate-700 bg-slate-800 hover:bg-slate-700"
             >
-              <div className="flex items-center gap-2">
-                <Clock size={14} />
-                <span>PROBLEMES 72h</span>
+              <div className="flex items-start gap-3">
+                <div className="p-3 rounded-lg bg-slate-700">
+                  <Clock className="text-amber-400" size={20} />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-md text-white">
+                    PROBLÈMES 72h
+                  </h3>
+                  <p className="text-sm text-slate-400 mt-1">
+                    {problemsLast72h ? problemsLast72h.length : 0} problème{(!problemsLast72h || problemsLast72h.length !== 1) ? 's' : ''} récent{(!problemsLast72h || problemsLast72h.length !== 1) ? 's' : ''}
+                  </p>
+                </div>
+                <div className="ml-auto flex items-center justify-center w-10 h-10 rounded-full bg-slate-700 font-bold">
+                  {problemsLast72h ? problemsLast72h.length : 0}
+                </div>
               </div>
-            </button>
+            </div>
           </div>
-          
-          {/* Afficher la liste de problèmes selon l'onglet sélectionné */}
-          {problemTab === 'active' ? (
-            <ProblemsList 
-              problems={activeProblems} 
-              title={`Problèmes actifs sur ${title}`} 
-            />
-          ) : (
-            <ProblemsList 
-              problems={problemsLast72h || []} 
-              title={`Problèmes des dernières 72h sur ${title}`} 
-            />
-          )}
           
           {/* Liste des zones */}
           <ManagementZoneList 

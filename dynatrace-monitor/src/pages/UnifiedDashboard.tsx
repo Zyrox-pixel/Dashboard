@@ -71,9 +71,7 @@ const UnifiedDashboard: React.FC = () => {
   };
   
   return (
-    <ContextProvider>
-      <DashboardWithContext />
-    </ContextProvider>
+    <DashboardWithContext />
   );
 };
 
