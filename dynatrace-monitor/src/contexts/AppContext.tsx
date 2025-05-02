@@ -341,22 +341,34 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
   }, [state.vitalForGroupMZs, state.vitalForEntrepriseMZs, apiClient, optimized, getProcessIcon]);
 
   // Fonction pour charger toutes les données
-  const loadAllData = useCallback(async (dashboardType?: 'vfg' | 'vfe') => {
-    console.log(`Loading all data for dashboard type: ${dashboardType || 'none'}`);
+  const loadAllData = useCallback(async (dashboardType?: 'vfg' | 'vfe', refreshProblemsOnly: boolean = false) => {
+    console.log(`Loading all data for dashboard type: ${dashboardType || 'none'} ${refreshProblemsOnly ? '(problèmes uniquement)' : ''}`);
     const startTime = performance.now();
     
-    setState(prev => ({ 
-      ...prev, 
-      isLoading: { 
-        ...prev.isLoading, 
-        problems: true, 
-        vitalForGroupMZs: true,
-        vitalForEntrepriseMZs: true,
-        initialLoadComplete: false,
-        dashboardData: true
-      },
-      error: null 
-    }));
+    // Si on ne rafraîchit que les problèmes, ne pas modifier l'état de chargement pour les autres données
+    if (refreshProblemsOnly) {
+      setState(prev => ({ 
+        ...prev, 
+        isLoading: { 
+          ...prev.isLoading, 
+          problems: true,
+        },
+        error: null 
+      }));
+    } else {
+      setState(prev => ({ 
+        ...prev, 
+        isLoading: { 
+          ...prev.isLoading, 
+          problems: true, 
+          vitalForGroupMZs: true,
+          vitalForEntrepriseMZs: true,
+          initialLoadComplete: false,
+          dashboardData: true
+        },
+        error: null 
+      }));
+    }
     
     try {
       // Vérifier si le backend est en ligne
@@ -381,13 +393,110 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
       
       // Exécuter plusieurs requêtes en parallèle
       console.log(`Loading data for dashboard type: ${dashboardType}`);
-      const [summaryResponse, vfgResponse, vfeResponse, problemsResponse, problemsLast72hResponse] = await Promise.all([
-        apiClient.getSummary(),
-        apiClient.getVitalForGroupMZs(),
-        apiClient.getVitalForEntrepriseMZs(),
-        apiClient.getProblems("OPEN", "-24h", dashboardType),  // Problèmes actifs
-        apiClient.getProblems("ALL", "-72h", dashboardType)   // TOUS les problèmes des 72 dernières heures sans filtrage de statut
-      ]);
+      
+      // Si on ne rafraîchit que les problèmes, ne récupérer que les données de problèmes
+      if (refreshProblemsOnly) {
+        const [problemsResponse, problemsLast72hResponse] = await Promise.all([
+          apiClient.getProblems("OPEN", "-24h", dashboardType, true),  // Force le rafraîchissement
+          apiClient.getProblems("ALL", "-72h", dashboardType)
+        ]);
+        console.log('Rafraîchissement des problèmes uniquement terminé');
+        
+        // Mettre à jour les problèmes
+        if (!problemsResponse.error && problemsResponse.data) {
+          const problemsData = problemsResponse.data;
+          
+          if (Array.isArray(problemsData)) {
+            // Transformer les données
+            const problems: Problem[] = problemsData.map((problem) => ({
+              id: problem.id || `PROB-${Math.random().toString(36).substr(2, 9)}`,
+              title: problem.title || "Problème inconnu",
+              code: problem.id ? problem.id.substring(0, 7) : "UNKNOWN",
+              subtitle: `${problem.zone || "Non spécifié"} - Impact: ${problem.impact || "INCONNU"}`,
+              time: problem.start_time ? `Depuis ${problem.start_time}` : "Récent",
+              type: "Problème Dynatrace",
+              status: problem.status === "OPEN" ? "critical" : "warning",
+              impact: problem.impact === "INFRASTRUCTURE" ? "ÉLEVÉ" : problem.impact === "SERVICE" ? "MOYEN" : "FAIBLE",
+              zone: problem.zone || "Non spécifié",
+              servicesImpacted: problem.affected_entities ? problem.affected_entities.toString() : "0",
+              dt_url: problem.dt_url || "#",
+              duration: problem.duration || "",
+              resolved: problem.resolved || false
+            }));
+            
+            setState(prev => ({ ...prev, activeProblems: problems }));
+            
+            if (optimized) {
+              setPerformanceMetrics(prev => ({
+                ...prev,
+                dataSizes: { ...prev.dataSizes, problems: problems.length }
+              }));
+            }
+            
+            // Mettre à jour les compteurs de problèmes pour les MZs
+            setState(prev => {
+              const updatedVfgMZs = prev.vitalForGroupMZs.map(zone => {
+                const zoneProblems = problems.filter(p => p.zone.includes(zone.name));
+                return {
+                  ...zone,
+                  problemCount: zoneProblems.length,
+                  status: (zoneProblems.length > 0 ? "warning" : "healthy") as "warning" | "healthy"
+                };
+              });
+              
+              const updatedVfeMZs = prev.vitalForEntrepriseMZs.map(zone => {
+                const zoneProblems = problems.filter(p => p.zone.includes(zone.name));
+                return {
+                  ...zone,
+                  problemCount: zoneProblems.length,
+                  status: (zoneProblems.length > 0 ? "warning" : "healthy") as "warning" | "healthy"
+                };
+              });
+              
+              return {
+                ...prev,
+                vitalForGroupMZs: updatedVfgMZs,
+                vitalForEntrepriseMZs: updatedVfeMZs
+              };
+            });
+          }
+        }
+        
+        // Traiter les données des problèmes des 72 dernières heures
+        if (!problemsLast72hResponse.error && problemsLast72hResponse.data) {
+          const problemsData = problemsLast72hResponse.data;
+          
+          if (Array.isArray(problemsData)) {
+            // Transformer les données
+            const problems: Problem[] = problemsData.map((problem) => ({
+              id: problem.id || `PROB-${Math.random().toString(36).substr(2, 9)}`,
+              title: problem.title || "Problème résolu",
+              code: problem.id ? problem.id.substring(0, 7) : "UNKNOWN",
+              subtitle: `${problem.zone || "Non spécifié"} - Impact: ${problem.impact || "INCONNU"}`,
+              time: problem.start_time ? `Détecté le ${problem.start_time}` : "Récent",
+              type: "Problème Dynatrace",
+              status: "warning", // Tous les problèmes sur 72h ont un statut visuel warning
+              impact: problem.impact === "INFRASTRUCTURE" ? "ÉLEVÉ" : problem.impact === "SERVICE" ? "MOYEN" : "FAIBLE",
+              zone: problem.zone || "Non spécifié",
+              servicesImpacted: problem.affected_entities ? problem.affected_entities.toString() : "0",
+              dt_url: problem.dt_url || "#",
+              duration: problem.duration || "",
+              resolved: problem.resolved || false
+            }));
+            
+            console.log(`Problèmes 72h transformés: ${problems.length}`);
+            setState(prev => ({ ...prev, problemsLast72h: problems }));
+          }
+        }
+      } else {
+        // Chargement complet de toutes les données
+        const [summaryResponse, vfgResponse, vfeResponse, problemsResponse, problemsLast72hResponse] = await Promise.all([
+          apiClient.getSummary(),
+          apiClient.getVitalForGroupMZs(),
+          apiClient.getVitalForEntrepriseMZs(),
+          apiClient.getProblems("OPEN", "-24h", dashboardType, true),  // Force le rafraîchissement
+          apiClient.getProblems("ALL", "-72h", dashboardType)
+        ]);
       console.log('Réponse problèmes 72h (dashboard type):', dashboardType, problemsLast72hResponse);
       console.log('Réponse problèmes 72h:', problemsLast72hResponse);
 
@@ -546,17 +655,29 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
         error: 'Erreur lors du chargement des données. Veuillez réessayer.'
       }));
     } finally {
-      setState(prev => ({ 
-        ...prev, 
-        isLoading: { 
-          ...prev.isLoading, 
-          problems: false, 
-          vitalForGroupMZs: false,
-          vitalForEntrepriseMZs: false,
-          initialLoadComplete: true,
-          dashboardData: false
-        } 
-      }));
+      if (refreshProblemsOnly) {
+        // Si on ne rafraîchissait que les problèmes, ne mettre à jour que leur état de chargement
+        setState(prev => ({ 
+          ...prev, 
+          isLoading: { 
+            ...prev.isLoading, 
+            problems: false
+          } 
+        }));
+      } else {
+        // Sinon mettre à jour l'état de chargement de tout
+        setState(prev => ({ 
+          ...prev, 
+          isLoading: { 
+            ...prev.isLoading, 
+            problems: false, 
+            vitalForGroupMZs: false,
+            vitalForEntrepriseMZs: false,
+            initialLoadComplete: true,
+            dashboardData: false
+          } 
+        }));
+      }
     }
   }, [state.selectedZone, loadZoneData, apiClient, optimized]);
 
@@ -578,11 +699,32 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
   }, [loadZoneData]);
 
   // Fonction pour rafraîchir les données
-  const refreshData = useCallback(async (dashboardType?: 'vfg' | 'vfe') => {
-    console.log(`Refreshing data for dashboard type: ${dashboardType || 'none'}`);
+  const refreshData = useCallback(async (dashboardType?: 'vfg' | 'vfe', refreshProblemsOnly: boolean = false) => {
+    console.log(`Refreshing data for dashboard type: ${dashboardType || 'none'} ${refreshProblemsOnly ? '(problèmes uniquement)' : ''}`);
     setState(prev => ({ ...prev, error: null }));
-    await loadAllData(dashboardType);
+    await loadAllData(dashboardType, refreshProblemsOnly);
   }, [loadAllData]);
+  
+  // Rafraîchir automatiquement les problèmes actifs toutes les 30 secondes
+  useEffect(() => {
+    // Définir l'intervalle de rafraîchissement automatique des problèmes
+    const refreshInterval = 30000; // 30 secondes en millisecondes
+    
+    console.log(`Configuration du rafraîchissement automatique des problèmes toutes les ${refreshInterval/1000} secondes`);
+    
+    // Configurer l'intervalle
+    const intervalId = setInterval(() => {
+      console.log("Rafraîchissement automatique des problèmes actifs");
+      // Récupérer le type de dashboard actuel (vfg ou vfe)
+      const currentDashboardType = window.location.pathname.includes('vfe') ? 'vfe' : 'vfg';
+      refreshData(currentDashboardType as 'vfg' | 'vfe', true);
+    }, refreshInterval);
+    
+    // Nettoyer l'intervalle lors du démontage du composant
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [refreshData]);
 
   // Fonctions pour modifier l'état
   const setSidebarCollapsed = useCallback((collapsed: boolean) => {

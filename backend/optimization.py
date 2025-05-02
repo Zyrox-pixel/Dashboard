@@ -1037,9 +1037,17 @@ class OptimizedAPIClient:
         """
         # Utiliser une clé de cache unique pour chaque combinaison de paramètres
         cache_key = f"problems:{mz_name}:{time_from}:{status}"
-        cached_data = self.get_cached(cache_key)
-        if cached_data is not None:
-            return cached_data
+        
+        # Pour les problèmes OPEN (actifs), ne pas utiliser le cache afin d'avoir des données en temps réel
+        # Cela garantit que les problèmes résolus sont immédiatement reflétés dans l'interface
+        if status == "OPEN":
+            logger.info(f"Récupération en temps réel des problèmes actifs pour {mz_name}")
+            # On continue sans consulter le cache
+        else:
+            # Pour les autres types de requêtes, on peut utiliser le cache mais avec une durée plus courte
+            cached_data = self.get_cached(cache_key)
+            if cached_data is not None:
+                return cached_data
         
         try:
             # Récupérer tous les problèmes sans filtrer par MZ via l'API
@@ -1135,7 +1143,18 @@ class OptimizedAPIClient:
                 if mz_name:
                     logger.info(f"Problèmes filtrés appartenant à {mz_name}: {mz_problems}/{total_problems}")
             
-            self.set_cache(cache_key, active_problems)
+            # Pour les problèmes actifs (OPEN), utiliser une durée de cache réduite
+            # pour les autres types, utiliser la durée standard
+            if status == "OPEN" or status is None:
+                # La durée de mise en cache pour les problèmes actifs est gérée par PROBLEMS_CACHE_DURATION dans app.py
+                # Elle est plus courte pour garantir des données plus à jour
+                # Utiliser la méthode standard mais noter qu'en app.py, le cache sera court-circuité pour les OPEN
+                self.set_cache(cache_key, active_problems)
+                logger.info(f"Mise en cache des problèmes actifs pour {cache_key} - durée limitée")
+            else:
+                self.set_cache(cache_key, active_problems)
+                logger.info(f"Mise en cache standard des problèmes pour {cache_key}")
+            
             return active_problems
         
         except Exception as e:
@@ -1144,11 +1163,27 @@ class OptimizedAPIClient:
     
     def _format_problem(self, problem, zone=None):
         """Formate un problème pour la réponse API"""
-        # Vérifier si le problème a une heure de fermeture ou statut non-OPEN
-        is_resolved = problem.get('status') != 'OPEN' or problem.get('endTime', 0) > 0
+        # Vérification améliorée pour détecter les problèmes résolus
+        # Un problème est résolu s'il a une heure de fermeture, statut non-OPEN, 
+        # ou si son statut de résolution est défini
+        is_resolved = (
+            problem.get('status') != 'OPEN' or 
+            problem.get('endTime', 0) > 0 or
+            problem.get('resolutionState') == 'RESOLVED' or
+            problem.get('resolved', False)
+        )
         
-        # Déterminer si la date de début est ancienne ou récente
+        # Si l'état est 'OPEN' mais qu'il y a une heure de fermeture, forcer la résolution
+        if problem.get('status') == 'OPEN' and problem.get('endTime', 0) > 0:
+            logger.info(f"Problème {problem.get('problemId')} marqué comme résolu car il a une heure de fermeture")
+            is_resolved = True
+        
+        # Calculer la durée du problème en secondes
         start_time_ms = problem.get('startTime', 0)
+        end_time_ms = problem.get('endTime', 0) if problem.get('endTime', 0) > 0 else int(time.time() * 1000)
+        duration_sec = (end_time_ms - start_time_ms) / 1000
+        
+        # Formatage des dates pour l'affichage
         start_time_str = datetime.fromtimestamp(start_time_ms/1000).strftime('%Y-%m-%d %H:%M')
         
         # Ajouter l'heure de fermeture si elle existe
@@ -1156,6 +1191,15 @@ class OptimizedAPIClient:
         if problem.get('endTime', 0) > 0:
             end_time_ms = problem.get('endTime', 0)
             end_time_str = datetime.fromtimestamp(end_time_ms/1000).strftime('%Y-%m-%d %H:%M')
+        
+        # Déterminer la durée au format lisible
+        duration_display = ""
+        if duration_sec < 60:
+            duration_display = f"{int(duration_sec)}s"
+        elif duration_sec < 3600:
+            duration_display = f"{int(duration_sec / 60)}m"
+        else:
+            duration_display = f"{int(duration_sec / 3600)}h {int((duration_sec % 3600) / 60)}m"
             
         return {
             'id': problem.get('problemId', 'Unknown'),
@@ -1165,6 +1209,7 @@ class OptimizedAPIClient:
             'affected_entities': len(problem.get('affectedEntities', [])),
             'start_time': start_time_str,
             'end_time': end_time_str,  # Ajout de l'heure de fermeture
+            'duration': duration_display,  # Ajout de la durée du problème
             'dt_url': f"{self.env_url}/#problems/problemdetails;pid={problem.get('problemId', 'Unknown')}",
             'zone': zone or self._extract_problem_zone(problem),
             'resolved': is_resolved

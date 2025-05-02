@@ -1,19 +1,31 @@
 import React from 'react';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, RefreshCw } from 'lucide-react';
 import ProblemCard from '../common/ProblemCard';
 import { Problem } from '../../api/types';
+import { useApp } from '../../contexts/AppContext';
 
 interface ProblemsListProps {
   problems: Problem[];
   zoneFilter?: string;
   title?: string;
+  showRefreshButton?: boolean;
 }
 
 const ProblemsList: React.FC<ProblemsListProps> = ({ 
   problems, 
   zoneFilter,
-  title = "Problèmes actifs sur les applications Vital for Group"
+  title = "Problèmes actifs sur les applications Vital for Group",
+  showRefreshButton = true
 }) => {
+  const { refreshData, isLoading } = useApp();
+  
+  // Récupérer le type de dashboard actuel (vfg ou vfe)
+  const dashboardType = window.location.pathname.includes('vfe') ? 'vfe' : 'vfg';
+  
+  // Fonction pour rafraîchir uniquement les problèmes
+  const handleRefreshProblems = () => {
+    refreshData(dashboardType as 'vfg' | 'vfe', true);
+  };
   // Si un filtre de zone est fourni, filtrer les problèmes pour cette zone
   const filteredProblems = zoneFilter 
     ? problems.filter(problem => problem.zone === zoneFilter)
@@ -40,14 +52,29 @@ const ProblemsList: React.FC<ProblemsListProps> = ({
 
   return (
     <section className="mb-5">
-      <div className="flex items-center gap-2 mb-3">
-        <AlertTriangle size={18} className="text-red-500" />
-        <h2 className="text-lg font-bold text-white flex items-center gap-2">
-          {title}
-          <div className="ml-1 w-6 h-6 flex items-center justify-center bg-red-500 text-white rounded-full font-bold text-xs">
-            {filteredProblems.length}
-          </div>
-        </h2>
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <AlertTriangle size={18} className="text-red-500" />
+          <h2 className="text-lg font-bold text-white flex items-center gap-2">
+            {title}
+            <div className="ml-1 w-6 h-6 flex items-center justify-center bg-red-500 text-white rounded-full font-bold text-xs">
+              {filteredProblems.length}
+            </div>
+          </h2>
+        </div>
+        
+        {/* Bouton de rafraîchissement des problèmes en temps réel */}
+        {showRefreshButton && (
+          <button 
+            onClick={handleRefreshProblems}
+            disabled={isLoading.problems}
+            className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-slate-300 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Rafraîchir les problèmes en temps réel"
+          >
+            <RefreshCw size={12} className={`${isLoading.problems ? 'animate-spin' : ''}`} />
+            {isLoading.problems ? 'Rafraîchissement...' : 'Rafraîchir'}
+          </button>
+        )}
       </div>
       
       {filteredProblems.map(problem => (

@@ -25,7 +25,10 @@ load_dotenv()
 # Récupérer les variables d'environnement
 DT_ENV_URL = os.environ.get('DT_ENV_URL')
 API_TOKEN = os.environ.get('API_TOKEN')
+# Durée du cache général
 CACHE_DURATION = int(os.environ.get('CACHE_DURATION', 300))
+# Durée du cache pour les problèmes (plus courte)
+PROBLEMS_CACHE_DURATION = int(os.environ.get('PROBLEMS_CACHE_DURATION', 60))
 MAX_WORKERS = int(os.environ.get('MAX_WORKERS', 20))
 MAX_CONNECTIONS = int(os.environ.get('MAX_CONNECTIONS', 50))
 
@@ -208,7 +211,7 @@ def set_management_zone():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/problems', methods=['GET'])
-@cached('problems')
+# Retiré le décorateur de cache pour les problèmes pour garantir des données en temps réel
 @time_execution
 def get_problems():
     try:
@@ -220,6 +223,11 @@ def get_problems():
         # Débogage approfondi - à activer temporairement
         debug_mode = request.args.get('debug', 'false').lower() == 'true'
         
+        # Paramètre pour activer le cache (désactivé par défaut pour les problèmes OPEN)
+        use_cache = request.args.get('cache', 'false').lower() == 'true'
+        if status == 'OPEN':
+            use_cache = False  # Forcer les problèmes actifs à être toujours à jour
+        
         # Créer une clé de cache unique qui inclut tous les paramètres
         specific_cache_key = f"problems:{get_current_mz()}:{time_from}:{status}:{dashboard_type}"
         
@@ -227,6 +235,10 @@ def get_problems():
         if debug_mode:
             api_client.cache.pop(specific_cache_key, None)
             logger.info(f"Mode debug activé, cache vidé pour la clé: {specific_cache_key}")
+        elif not use_cache:
+            # Vider systématiquement le cache pour les problèmes ouverts
+            api_client.cache.pop(specific_cache_key, None)
+            logger.info(f"Cache des problèmes désactivé pour les problèmes {status}, récupération en temps réel")
         else:
             # Si nous avons déjà cette requête en cache, retourner les données
             cached_data = api_client.get_cached(specific_cache_key)

@@ -500,8 +500,12 @@ class ApiClient {
 
   /**
    * Récupérer les problèmes
+   * @param status Le statut des problèmes à récupérer (OPEN, ALL, etc.)
+   * @param timeframe La période de temps (ex: "-24h")
+   * @param dashboardType Le type de dashboard (vfg, vfe)
+   * @param forceRefresh Si true, force le rafraîchissement (ignore le cache)
    */
-  public getProblems(status: string = "OPEN", timeframe: string = "-24h", dashboardType?: string) {
+  public getProblems(status: string = "OPEN", timeframe: string = "-24h", dashboardType?: string, forceRefresh: boolean = false) {
     const params: any = {
       status: status,
       from: timeframe
@@ -512,7 +516,17 @@ class ApiClient {
       params.type = dashboardType;
     }
     
-    return this.get<ProblemResponse[]>(ENDPOINTS.PROBLEMS, { params });
+    // Si on force le rafraîchissement, ajouter le paramètre debug
+    // Le backend traitera ce paramètre spécial pour invalider le cache
+    if (forceRefresh) {
+      params.debug = 'true';
+      console.log(`Forçage du rafraîchissement des problèmes (statut: ${status}, timeframe: ${timeframe})`);
+    }
+    
+    // Pour les problèmes actifs, toujours désactiver le cache côté client aussi
+    const useCache = !(status === "OPEN" || forceRefresh);
+    
+    return this.get<ProblemResponse[]>(ENDPOINTS.PROBLEMS, { params }, useCache);
   }
 
   /**
