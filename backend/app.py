@@ -216,6 +216,9 @@ def get_problems():
         status = request.args.get('status', 'OPEN')  # Par défaut "OPEN"
         time_from = request.args.get('from', '-24h')  # Par défaut "-24h"
         dashboard_type = request.args.get('type', '')  # Pour identifier VFG ou VFE
+        
+        # Si le statut est ALL, on récupère à la fois les problèmes OPEN et CLOSED
+        use_status = None if status == 'ALL' else status
 
         # Si un type de dashboard est spécifié
         if dashboard_type == 'vfg' or dashboard_type == 'vfe':
@@ -228,7 +231,7 @@ def get_problems():
                 # Récupérer les problèmes pour toutes ces MZs
                 all_problems = []
                 for mz_name in mz_list:
-                    mz_problems = api_client.get_problems_filtered(mz_name, time_from, status)
+                    mz_problems = api_client.get_problems_filtered(mz_name, time_from, use_status)
                     all_problems.extend(mz_problems)
                 
                 # Dédupliquer les problèmes (un même problème peut affecter plusieurs MZs)
@@ -251,7 +254,7 @@ def get_problems():
                 return {'error': 'Aucune Management Zone définie'}
             
             # Utiliser la méthode optimisée pour récupérer les problèmes filtrés
-            return api_client.get_problems_filtered(current_mz, time_from, status)
+            return api_client.get_problems_filtered(current_mz, time_from, use_status)
     except Exception as e:
         logger.error(f"Erreur lors de la récupération des problèmes: {e}")
         return {'error': str(e)}

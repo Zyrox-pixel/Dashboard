@@ -1041,12 +1041,15 @@ class OptimizedAPIClient:
         
         try:
             # Récupérer tous les problèmes sans filtrer par MZ via l'API
+            params = {"from": time_from}
+            
+            # Ajouter le statut seulement s'il est spécifié
+            if status is not None:
+                params["status"] = status
+                
             problems_data = self.query_api(
                 endpoint="problems",
-                params={
-                    "from": time_from,
-                    "status": status
-                },
+                params=params,
                 use_cache=False
             )
             

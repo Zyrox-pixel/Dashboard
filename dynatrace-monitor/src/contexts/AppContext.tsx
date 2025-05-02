@@ -384,8 +384,8 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
         apiClient.getSummary(),
         apiClient.getVitalForGroupMZs(),
         apiClient.getVitalForEntrepriseMZs(),
-        apiClient.getProblems("OPEN", "-24h", dashboardType),  // Passer le type de dashboard
-        apiClient.getProblems("CLOSED", "-72h", dashboardType) // Passer le type de dashboard pour les problèmes récents
+        apiClient.getProblems("OPEN", "-24h", dashboardType),  // Problèmes actifs
+        apiClient.getProblems("ALL", "-72h", dashboardType) // Tous les problèmes des 72 dernières heures
       ]);
       
       // Traiter les données du résumé
