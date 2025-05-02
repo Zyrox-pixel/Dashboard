@@ -413,27 +413,54 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
             </div>
             
             {/* Carte des problèmes des 72 dernières heures */}
-            <div 
-              onClick={() => navigate(`/problems/recent?dashboard=${variant}`)}
-              className="p-4 rounded-lg border cursor-pointer transition-all hover:shadow-lg border-slate-700 bg-slate-800 hover:bg-slate-700"
-            >
-              <div className="flex items-start gap-3">
-                <div className="p-3 rounded-lg bg-slate-700">
-                  <Clock className="text-amber-400" size={20} />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-md text-white">
-                    PROBLÈMES 72h
-                  </h3>
-                  <p className="text-sm text-slate-400 mt-1">
-                    {problemsLast72h ? problemsLast72h.length : 0} problème{(!problemsLast72h || problemsLast72h.length !== 1) ? 's' : ''} récent{(!problemsLast72h || problemsLast72h.length !== 1) ? 's' : ''}
-                  </p>
-                </div>
-                <div className="ml-auto flex items-center justify-center w-10 h-10 rounded-full bg-slate-700 font-bold">
-                  {problemsLast72h ? problemsLast72h.length : 0}
-                </div>
+{/* Carte des problèmes des 72 dernières heures */}
+          <div 
+            onClick={() => navigate(`/problems/recent?dashboard=${variant}`)}
+            className="p-4 rounded-lg border cursor-pointer transition-all hover:shadow-lg border-slate-700 bg-slate-800 hover:bg-slate-700"
+          >
+            <div className="flex items-start gap-3">
+              <div className="p-3 rounded-lg bg-slate-700">
+                <Clock className="text-amber-400" size={20} />
+              </div>
+              <div>
+                <h3 className="font-semibold text-md text-white">
+                  TOUS LES PROBLÈMES 72h
+                </h3>
+                <p className="text-sm text-slate-400 mt-1">
+                  {problemsLast72h ? problemsLast72h.length : 0} problème{(!problemsLast72h || problemsLast72h.length !== 1) ? 's' : ''} sur les 72 dernières heures
+                </p>
+              </div>
+              <div className="ml-auto flex items-center justify-center w-10 h-10 rounded-full bg-slate-700 font-bold">
+                {problemsLast72h ? problemsLast72h.length : 0}
               </div>
             </div>
+          </div>
+
+          {/* Bouton de débogage - À retirer une fois le problème résolu */}
+          <div className="mt-2 p-4 rounded-lg border bg-red-900/20 border-red-800">
+            <h3 className="text-white font-semibold mb-2">Débogage problèmes 72h</h3>
+            <p className="text-sm text-slate-300 mb-3">
+              Liste des management zones Vital for Group:
+            </p>
+            <ul className="text-xs text-slate-400 mb-3 pl-4 list-disc">
+              {vitalForGroupMZs.map(mz => (
+                <li key={mz.id}>{mz.name}</li>
+              ))}
+            </ul>
+            <button
+              onClick={() => {
+                // Rafraîchir les données avec debug=true
+                refreshData(variant);
+                // Afficher les données dans la console
+                console.log("Problèmes actifs:", activeProblems);
+                console.log("Problèmes 72h:", problemsLast72h);
+                console.log("Management Zones:", vitalForGroupMZs);
+                alert(`Données debuguées dans la console! ${problemsLast72h?.length || 0} problèmes sur 72h`);
+              }}
+              className="px-3 py-1.5 bg-red-700 text-white rounded-md hover:bg-red-600 text-sm"
+            >
+              Debug problèmes 72h
+            </button>
           </div>
           
           {/* Liste des zones */}
