@@ -11,6 +11,7 @@ export interface EntityStub {
 }
 
 // Types pour les problèmes
+// Types pour les problèmes
 export interface Problem {
   id: string;
   title: string;
@@ -31,11 +32,25 @@ export interface Problem {
   zone: string;
   dt_url?: string;
   resolved?: boolean; // Champ pour distinguer les problèmes résolus
-  impactedEntities?: EntityStub[]; // Entités impactées par le problème
+  
+  // Entités impactées par le problème - format optimisé
+  impactedEntities?: Array<{
+    entityId: {
+      type: string;
+      id?: string;
+    };
+    name: string;
+    [key: string]: any;
+  }>;
+  
   impacted?: string; // Nom direct de la machine impactée (si disponible)
   
   // Champs additionnels de l'API Dynatrace (optionnels)
-  rootCauseEntity?: EntityStub;   // Entité cause racine du problème
+  rootCauseEntity?: {
+    type: string;
+    name?: string;
+    displayName?: string;
+  };
   startTime?: number;             // Heure de début en ms
   endTime?: number;               // Heure de fin en ms
   displayId?: string;             // ID d'affichage
@@ -152,11 +167,26 @@ export interface ProblemResponse {
   affected_entities?: number;
   start_time?: string;
   dt_url?: string;
+  host?: string;       // Nom explicite de la machine hôte
+  impacted?: string;   // Champ alternatif pour le nom d'hôte
+  displayId?: string;  // ID d'affichage du problème qui pourrait contenir des infos sur l'hôte
+  duration?: string;   // Durée du problème
+  resolved?: boolean;  // Indique si le problème est résolu
+  rootCauseEntity?: {
+    type: string;
+    name?: string;
+    displayName?: string;
+  };
+  // Nouveau champ pour les entités impactées directement depuis l'API Dynatrace
+  impactedEntities?: Array<{
+    entityId: {
+      type: string;
+      id?: string;
+    };
+    name: string;
+    [key: string]: any;
+  }>;
   [key: string]: any; // Pour permettre d'autres propriétés
-  host?: string;       // Explicit host machine name
-  impacted?: string;   // Alternative field for host name
-  displayId?: string;  // Problem display ID that might contain hostname info
-  rootCauseEntity?: EntityStub; // Root cause entity that might be a host
 }
 
 // Type pour la réponse d'un processus de l'API

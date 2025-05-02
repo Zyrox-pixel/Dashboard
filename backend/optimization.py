@@ -1054,7 +1054,10 @@ class OptimizedAPIClient:
         
         try:
             # Récupérer tous les problèmes sans filtrer par MZ via l'API
-            params = {"from": time_from}
+            params = {
+                "from": time_from,
+                "fields": "+impactedEntities,+affectedEntities,+title,+displayId,+rootCause"
+            }
             
             # Pour ALL, on veut tous les problèmes, y compris OPEN et CLOSED
             # Pour ce faire, nous ne spécifierons pas de statut à l'API Dynatrace,
@@ -1271,20 +1274,84 @@ class OptimizedAPIClient:
             days = int(duration_sec / 86400)
             hours = int((duration_sec % 86400) / 3600)
             duration_display = f"{days}j {hours}h"
-            
-        # FONCTION AMÉLIORÉE: Extraction plus précise du nom de machine
-        host_name = "Non spécifié"
         
-        # Liste des mots à exclure qui ne sont jamais des noms d'hôtes
-        excluded_words = [
-            "status", "service", "such", "still", "some", "system", "server",
-            "segmentation", "script", "extension", "memory", "application", 
-            "error", "timeout", "warning", "critical", "problem", "issue", 
-            "failure", "module", "process", "container", "function", "instance", 
-            "request", "being", "response", "health", "payload", "execution", 
-            "processing", "action", "object", "storage", "config", "socket",
-            "network", "security", "traffic", "information", "resource"
-        ]
+        # PRIORITÉ 0: Extraire directement des impactedEntities
+        host_name = "Non spécifié"
+        if 'impactedEntities' in problem:
+            for entity in problem.get('impactedEntities', []):
+                if entity.get('entityId', {}).get('type') == 'HOST':
+                    host_name = entity.get('name', "Non spécifié")
+                    logger.info(f"Hôte trouvé directement dans impactedEntities: {host_name}")
+                    break
+        
+        # PRIORITÉ 1: Si pas trouvé, chercher dans rootCauseEntity s'il existe et est de type HOST
+        if host_name == "Non spécifié" and problem.get('rootCauseEntity') and problem['rootCauseEntity'].get('type') == 'HOST':
+            candidate = problem['rootCauseEntity'].get('name', problem['rootCauseEntity'].get('displayName'))
+            if candidate:
+                host_name = candidate
+                logger.info(f"Hôte trouvé dans rootCauseEntity: {host_name}")
+        
+        # PRIORITÉ 2: Chercher dans les entités affectées de type HOST
+        if host_name == "Non spécifié" and 'affectedEntities' in problem:
+            for entity in problem.get('affectedEntities', []):
+                if entity.get('type') == 'HOST':
+                    candidate = entity.get('name', entity.get('displayName', "Non spécifié"))
+                    if candidate != "Non spécifié":
+                        host_name = candidate
+                        logger.info(f"Hôte trouvé dans affectedEntities: {host_name}")
+                        break
+        
+        # PRIORITÉ 3: Chercher dans le displayId ou entityId s'ils ressemblent à des noms d'hôtes
+        if host_name == "Non spécifié" and problem.get('displayId'):
+            display_id = problem.get('displayId')
+            # Vérifier si displayId contient un nom d'hôte
+            host_match = re.search(r'\b(s[a-z0-9]\d{2,}[a-z0-9]*(?:\.fr\.net\.intra)?)\b', display_id, re.IGNORECASE)
+            if host_match:
+                host_name = host_match.group(1)
+                logger.info(f"Hôte trouvé dans displayId: {host_name}")
+        
+        # PRIORITÉ 4: Rechercher dans le titre avec des patterns spécifiques
+        if host_name == "Non spécifié" and problem.get('title'):
+            title = problem.get('title', '')
+            
+            # Liste de patterns du plus spécifique au moins spécifique
+            patterns = [
+                r'HOST:\s*(\S+)',                                # HOST: hostname
+                r'host\s+(\S+)',                                 # host hostname
+                r'server\s+(\S+)',                               # server hostname
+                r'\bon\s+(\S+)',                                 # on hostname
+                r'\bat\s+(\S+)',                                 # at hostname
+                r'\b(s[a-z0-9]\d{2,}[a-z0-9]*\.fr\.net\.intra)\b',  # Format spécifique d'entreprise
+                r'\b(s[a-z0-9]\d{2,}[a-z0-9]*)\b',                  # Serveurs commençant par S avec chiffres
+                r'\b(srv\d+[a-z0-9]*)\b',                          # Format srv##
+                r'\b(win[a-z0-9]*\d+[a-z0-9]*)\b'                  # Serveurs Windows
+            ]
+            
+            for pattern in patterns:
+                host_match = re.search(pattern, title, re.IGNORECASE)
+                if host_match:
+                    # Récupérer le premier groupe non-None
+                    match_value = next((g for g in host_match.groups() if g), "Non spécifié")
+                    host_name = match_value
+                    logger.info(f"Hôte trouvé dans le titre via pattern {pattern}: {host_name}")
+                    break
+        
+        return {
+            'id': problem.get('problemId', 'Unknown'),
+            'title': problem.get('title', 'Problème inconnu'),
+            'impact': problem.get('impactLevel', 'UNKNOWN'),
+            'status': 'RESOLVED' if is_resolved else problem.get('status', 'OPEN'),
+            'affected_entities': len(problem.get('affectedEntities', [])),
+            'start_time': start_time_str,
+            'end_time': end_time_str,  # Ajout de l'heure de fermeture
+            'duration': duration_display,  # Ajout de la durée du problème
+            'dt_url': f"{self.env_url}/#problems/problemdetails;pid={problem.get('problemId', 'Unknown')}",
+            'zone': zone or self._extract_problem_zone(problem),
+            'resolved': is_resolved,
+            'host': host_name,  # Ajout du champ host explicite
+            'impacted': host_name,  # Ajout pour compatibilité avec le frontend actuel
+            'impactedEntities': problem.get('impactedEntities', []),  # Transférer les entités impactées au frontend
+        }
         
         # Fonction d'aide pour vérifier si un nom est un nom d'hôte valide
         def is_valid_hostname(name):
