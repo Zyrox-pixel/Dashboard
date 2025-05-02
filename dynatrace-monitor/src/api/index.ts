@@ -551,8 +551,6 @@ class ApiClient {
       // Effacer le cache pour forcer le rechargement des données
       this.clearCache('get:');
     }
-    // Vider les caches de pendingRequests pour éviter les requêtes en double
-    this.pendingRequests.clear();
     return this.post(ENDPOINTS.SET_MANAGEMENT_ZONE, { name });
   }
 

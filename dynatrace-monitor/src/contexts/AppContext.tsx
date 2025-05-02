@@ -582,7 +582,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
 
   const setActiveTab = useCallback((tab: string) => {
     setState(prev => ({ ...prev, activeTab: tab }));
-  }, [setState]);
+  }, []);
 
   // Valeur du contexte
   const contextValue = useMemo<AppContextType>(() => ({

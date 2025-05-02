@@ -1,4 +1,4 @@
-import React, { useMemo, useEffect } from 'react';
+import React, { useMemo, useEffect, useRef } from 'react';
 import { useParams, Navigate } from 'react-router-dom';
 import DashboardBase from '../components/dashboard/DashboardBase';
 import { useApp } from '../contexts/AppContext';
@@ -6,7 +6,7 @@ import { AppProvider, OptimizedAppProvider } from '../contexts/AppContext';
 
 // Correction de l'interface pour être compatible avec useParams
 interface DashboardParams {
-  [key: string]: string | undefined; // Ajout de l'index signature
+  [key: string]: string | undefined;
   type?: string;
   optimized?: string;
 }
@@ -46,12 +46,19 @@ const UnifiedDashboard: React.FC = () => {
     const appContext = useApp();
     const { refreshData } = appContext;
     
-    // Utiliser useEffect pour charger les données au montage du composant
-    // et passer le type de dashboard correct (vfg ou vfe)
+    // Utiliser un ref pour suivre si l'initialisation a déjà été effectuée
+    const initializedRef = useRef<{ [key: string]: boolean }>({});
+    
+    // Charger les données une seule fois par type de dashboard
     useEffect(() => {
-      // Passer le type de dashboard à la fonction refreshData
-      refreshData(dashboardProps.variant as 'vfg' | 'vfe');
-    }, [dashboardProps.variant, refreshData]);
+      const variant = dashboardProps.variant;
+      // Vérifier si ce type de dashboard a déjà été initialisé
+      if (!initializedRef.current[variant]) {
+        console.log(`Initializing dashboard data for ${variant}`);
+        refreshData(variant);
+        initializedRef.current[variant] = true;
+      }
+    }, [dashboardProps.variant]); // refreshData est intentionnellement omis des dépendances
     
     return (
       <DashboardBase 
