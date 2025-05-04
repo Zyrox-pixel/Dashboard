@@ -1086,8 +1086,21 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
     // Éviter les doubles rafraîchissements
     if (isRefreshingAll) return;
     
-    // Activer l'état de rafraîchissement
+    // Activer l'état de rafraîchissement et afficher une notification immédiate
     setIsRefreshingAll(true);
+    
+    // Afficher un message de notification visible immédiatement
+    const notification = document.createElement('div');
+    notification.className = 'fixed top-5 right-5 bg-indigo-600 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 z-50';
+    notification.innerHTML = `
+      <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+      </svg>
+      <span>Rafraîchissement des données en cours...</span>
+    `;
+    document.body.appendChild(notification);
+    
     setLocalRefreshNotification("Rafraîchissement des données en cours...");
     
     try {
@@ -1187,27 +1200,36 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
         setLocalRefreshNotification(null);
       }, 2000);
       
-      // Recharger la page avec les paramètres actuels pour obtenir des données fraîches
-      // Cette approche est plus sûre que de tenter de mettre à jour tous les états manuellement
-      // et garanti une cohérence des données
-      // Nous conservons tous les paramètres d'URL pour maintenir le contexte
+      // Ajouter un délai pour assurer que toutes les requêtes sont terminées
+      console.log("Préparation au rechargement de la page...");
+      
+      // Utiliser une approche plus directe pour éviter les problèmes de rendu
+      // Forcer un rechargement complet de la page après un délai suffisant
       setTimeout(() => {
-        window.location.reload();
-      }, 500);
+        console.log("Rechargement de la page pour afficher les données fraîches");
+        
+        // Désactiver l'indicateur de chargement juste avant le rechargement
+        setIsRefreshingAll(false);
+        setIsRefreshingProblems(false);
+        
+        // Forcer un rechargement complet sans utiliser le cache
+        window.location.reload(true);
+      }, 1500);
       
     } catch (error) {
       console.error("Erreur lors du rafraîchissement global:", error);
       setLocalRefreshNotification("Erreur lors du rafraîchissement");
       setTimeout(() => {
         setLocalRefreshNotification(null);
+        setIsRefreshingAll(false);
+        setIsRefreshingProblems(false);
       }, 3000);
-    } finally {
-      setIsRefreshingAll(false);
     }
   };
   
-  // État de chargement pour les détails de la zone
-  if (isLoading) {
+  // Afficher l'état de chargement pour les détails de la zone
+  // Note: Ne pas utiliser appContext.isLoading ici car cela peut causer une boucle infinie de chargement
+  if (isLoading && !isRefreshingAll) {
     return (
       <div>
         <button 
@@ -1288,12 +1310,17 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
           </a>
           
           <button 
-            onClick={directRefreshZoneData}
-            disabled={isRefreshingAll || appContext.isLoading.problems || appContext.isLoading.zoneDetails}
+            onClick={() => {
+              // Utiliser directRefreshZoneData pour un rafraîchissement complet
+              directRefreshZoneData();
+              // Forcer une notification visuelle immédiate à l'utilisateur
+              setLocalRefreshNotification("Rafraîchissement des données en cours...");
+            }}
+            disabled={isRefreshingAll}
             className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:bg-indigo-800 disabled:opacity-70 text-sm"
           >
-            <RefreshCw size={14} className={`${isRefreshingAll || appContext.isLoading.problems || appContext.isLoading.zoneDetails ? 'animate-spin' : ''}`} />
-            <span>{isRefreshingAll || appContext.isLoading.problems || appContext.isLoading.zoneDetails ? 'Rafraîchissement...' : 'Rafraîchir'}</span>
+            <RefreshCw size={14} className={`${isRefreshingAll ? 'animate-spin' : ''}`} />
+            <span>{isRefreshingAll ? 'Rafraîchissement...' : 'Rafraîchir'}</span>
           </button>
         </div>
       </div>
