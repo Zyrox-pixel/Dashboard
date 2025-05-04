@@ -1,8 +1,10 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { AlertTriangle, RefreshCw, CalendarRange, Clock, SortDesc, SortAsc, Filter } from 'lucide-react';
 import ProblemCard from '../common/ProblemCard';
 import { Problem } from '../../api/types';
 import { useApp } from '../../contexts/AppContext';
+import axios from 'axios';
+import { API_BASE_URL } from '../../api/endpoints';
 
 interface ProblemsListProps {
   problems: Problem[];
@@ -27,21 +29,101 @@ const ProblemsList: React.FC<ProblemsListProps> = ({
   title = "Problèmes assignés aux Management Zones",
   showRefreshButton = true
 }) => {
-  const { refreshData, isLoading } = useApp();
+  const { isLoading } = useApp();
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc'); // plus récent d'abord par défaut
   const [groupByDate, setGroupByDate] = useState<boolean>(true); // grouper par date par défaut
+  const [localProblems, setLocalProblems] = useState<Problem[]>(problems);
+  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+  
+  // Mettre à jour les problèmes locaux quand les props problems changent
+  useEffect(() => {
+    setLocalProblems(problems);
+  }, [problems]);
   
   // Récupérer le type de dashboard actuel (vfg ou vfe)
   const dashboardType = window.location.pathname.includes('vfe') ? 'vfe' : 'vfg';
   
-  // Fonction pour rafraîchir uniquement les problèmes - version améliorée avec promesse
+  // Nouvelle fonction pour rafraîchir les problèmes directement depuis l'API
   const handleRefreshProblems = async () => {
+    // Marquer comme en cours de rafraîchissement
+    setIsRefreshing(true);
+    
     try {
-      // Utiliser async/await pour gérer la promesse retournée par refreshData
-      await refreshData(dashboardType as 'vfg' | 'vfe', true);
-      console.log("Rafraîchissement des problèmes terminé avec succès");
+      // Déterminer les paramètres pour l'API en fonction du contexte
+      const status = "OPEN"; // On veut les problèmes actifs
+      const params: any = {
+        status: status,
+        debug: 'true', // Forcer le rafraîchissement
+        type: dashboardType
+      };
+      
+      console.log("Rafraîchissement direct des problèmes...");
+      
+      // Appel direct à l'API backend
+      const response = await axios.get(`${API_BASE_URL}/problems`, { params });
+      
+      if (response.data) {
+        let refreshedProblems = response.data;
+        
+        // Si un filtre de zone est fourni, appliquer le filtre côté client
+        if (zoneFilter) {
+          refreshedProblems = refreshedProblems.filter((problem: any) => problem.zone === zoneFilter);
+        }
+        
+        // Transformer les données si nécessaire pour correspondre au format Problem
+        const formattedProblems: Problem[] = refreshedProblems.map((problem: any) => {
+          // Extraire le nom de l'hôte à partir des entités impactées (priorité)
+          let hostName = '';
+          
+          // PRIORITÉ 1: Utiliser directement impactedEntities
+          if (problem.impactedEntities && Array.isArray(problem.impactedEntities)) {
+            const hostEntity = problem.impactedEntities.find((entity: any) => 
+              entity.entityId && entity.entityId.type === 'HOST' && entity.name);
+            if (hostEntity) {
+              hostName = hostEntity.name;
+            }
+          }
+          
+          // PRIORITÉ 2: Si pas trouvé, utiliser le champ host ou impacted s'ils existent
+          if (!hostName) {
+            if (problem.host && problem.host !== "Non spécifié") {
+              hostName = problem.host;
+            } else if (problem.impacted && problem.impacted !== "Non spécifié") {
+              hostName = problem.impacted;
+            }
+          }
+          
+          return {
+            id: problem.id || `PROB-${Math.random().toString(36).substr(2, 9)}`,
+            title: problem.title || "Problème inconnu",
+            code: problem.id ? problem.id.substring(0, 7) : "UNKNOWN",
+            subtitle: `${problem.zone || "Non spécifié"} - Impact: ${problem.impact || "INCONNU"}`,
+            time: problem.start_time ? `Depuis ${problem.start_time}` : "Récent",
+            type: problem.impact === "INFRASTRUCTURE" ? "Problème d'Infrastructure" : "Problème de Service",
+            status: problem.status === "OPEN" ? "critical" : "warning",
+            impact: problem.impact === "INFRASTRUCTURE" ? "ÉLEVÉ" : problem.impact === "SERVICE" ? "MOYEN" : "FAIBLE",
+            zone: problem.zone || "Non spécifié",
+            servicesImpacted: problem.affected_entities ? problem.affected_entities.toString() : "0",
+            dt_url: problem.dt_url || "#",
+            duration: problem.duration || "",
+            resolved: problem.resolved || false,
+            host: hostName, // Utiliser le nom d'hôte extrait
+            impacted: hostName, // Pour compatibilité
+            impactedEntities: problem.impactedEntities, // Transférer les entités impactées pour utilisation dans ProblemCard
+            rootCauseEntity: problem.rootCauseEntity // Transférer aussi la cause racine si disponible
+          };
+        });
+        
+        // Mettre à jour l'état local avec les nouveaux problèmes
+        setLocalProblems(formattedProblems);
+        
+        console.log(`Rafraîchissement direct terminé. ${formattedProblems.length} problèmes trouvés.`);
+      }
     } catch (error) {
-      console.error("Erreur lors du rafraîchissement des problèmes:", error);
+      console.error("Erreur lors du rafraîchissement direct des problèmes:", error);
+    } finally {
+      // Désactiver l'indicateur de chargement
+      setIsRefreshing(false);
     }
   };
 
@@ -58,9 +140,9 @@ const ProblemsList: React.FC<ProblemsListProps> = ({
   // Si un filtre de zone est fourni, filtrer les problèmes pour cette zone
   const filteredProblems = useMemo(() => {
     return zoneFilter 
-      ? problems.filter(problem => problem.zone === zoneFilter)
-      : problems;
-  }, [problems, zoneFilter]);
+      ? localProblems.filter(problem => problem.zone === zoneFilter)
+      : localProblems;
+  }, [localProblems, zoneFilter]);
 
   // Trier les problèmes par date
   const sortedProblems = useMemo(() => {
@@ -154,12 +236,12 @@ const ProblemsList: React.FC<ProblemsListProps> = ({
           {showRefreshButton && (
             <button 
               onClick={handleRefreshProblems}
-              disabled={isLoading.problems}
+              disabled={isRefreshing}
               className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-slate-300 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed"
               title="Rafraîchir les problèmes en temps réel"
             >
-              <RefreshCw size={12} className={`${isLoading.problems ? 'animate-spin' : ''}`} />
-              <span className="hidden sm:inline">{isLoading.problems ? 'Rafraîchissement...' : 'Rafraîchir'}</span>
+              <RefreshCw size={12} className={`${isRefreshing ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">{isRefreshing ? 'Rafraîchissement...' : 'Rafraîchir'}</span>
             </button>
           )}
         </div>
