@@ -259,11 +259,48 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
           
           // Mettre à jour les hosts
           if (dashboardData.hosts.data) {
-            setState(prev => ({ ...prev, hosts: dashboardData.hosts.data }));
+            // Mettre à jour les hosts
+            const hostsData = dashboardData.hosts.data;
+            setState(prev => ({ ...prev, hosts: hostsData }));
             setPerformanceMetrics(prev => ({
               ...prev,
-              dataSizes: { ...prev.dataSizes, hosts: dashboardData.hosts.data.length }
+              dataSizes: { ...prev.dataSizes, hosts: hostsData.length }
             }));
+            
+            // Mettre à jour les comptages dans la liste des MZs
+            const hostsCount = hostsData.length;
+            const servicesCount = dashboardData.services.data ? dashboardData.services.data.length : 0;
+            const processesCount = dashboardData.processes.data ? dashboardData.processes.data.length : 0;
+            
+            // Chercher la zone dans la collection appropriée et mettre à jour les comptages
+            const isVFG = state.vitalForGroupMZs.some(zone => zone.id === zoneId);
+            if (isVFG) {
+              const updatedVFGMZs = state.vitalForGroupMZs.map(zone => {
+                if (zone.id === zoneId) {
+                  return {
+                    ...zone,
+                    hosts: hostsCount,
+                    services: servicesCount,
+                    apps: processesCount
+                  };
+                }
+                return zone;
+              });
+              setState(prev => ({ ...prev, vitalForGroupMZs: updatedVFGMZs }));
+            } else {
+              const updatedVFEMZs = state.vitalForEntrepriseMZs.map(zone => {
+                if (zone.id === zoneId) {
+                  return {
+                    ...zone,
+                    hosts: hostsCount,
+                    services: servicesCount,
+                    apps: processesCount
+                  };
+                }
+                return zone;
+              });
+              setState(prev => ({ ...prev, vitalForEntrepriseMZs: updatedVFEMZs }));
+            }
           }
           
           // Mettre à jour les services
@@ -313,6 +350,41 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
         if (!hostsResponse.error && hostsResponse.data) {
           hostsData = Array.isArray(hostsResponse.data) ? hostsResponse.data : [];
           setState(prev => ({ ...prev, hosts: hostsData }));
+          
+          // Récupérer les comptages pour mettre à jour la liste des MZs
+          const hostsCount = hostsData.length;
+          const servicesCount = Array.isArray(servicesData) ? servicesData.length : 0;
+          const processCount = processGroups ? processGroups.length : 0;
+            
+          // Mettre à jour les comptages dans la liste des MZs
+          const isVFG = state.vitalForGroupMZs.some(zone => zone.id === zoneId);
+          if (isVFG) {
+            const updatedVFGMZs = state.vitalForGroupMZs.map(zone => {
+              if (zone.id === zoneId) {
+                return {
+                  ...zone,
+                  hosts: hostsCount,
+                  services: servicesCount,
+                  apps: processCount
+                };
+              }
+              return zone;
+            });
+            setState(prev => ({ ...prev, vitalForGroupMZs: updatedVFGMZs }));
+          } else {
+            const updatedVFEMZs = state.vitalForEntrepriseMZs.map(zone => {
+              if (zone.id === zoneId) {
+                return {
+                  ...zone,
+                  hosts: hostsCount,
+                  services: servicesCount,
+                  apps: processCount
+                };
+              }
+              return zone;
+            });
+            setState(prev => ({ ...prev, vitalForEntrepriseMZs: updatedVFEMZs }));
+          }
         }
         
         // Traiter les données des services
@@ -433,183 +505,43 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
       
       if (!refreshProblemsOnly) {
         if (vfgResponse && !vfgResponse.error && vfgResponse.data?.mzs) {
-          // Traitement séquentiel pour éviter la contamination entre les zones
-          vfgMZs = [];
-          
-          // Traiter chaque management zone séquentiellement
-          for (const mzName of vfgResponse.data.mzs) {
-            try {
-              console.log(`Récupération des données pour la MZ VFG: ${mzName}`);
-              
-              // Récupérer des données de comptage différenciées par zone via un endpoint spécifique
-              // On appelle le backend directement avec la MZ en paramètre
-              const mzDataResponse = await fetch(`${API_BASE_URL}/management-zones/counts?zone=${encodeURIComponent(mzName)}`);
-              let mzCounts = { hosts: 0, services: 0, processes: 0 };
-              
-              if (mzDataResponse.ok) {
-                try {
-                  const mzData = await mzDataResponse.json();
-                  mzCounts = mzData.counts || { hosts: 0, services: 0, processes: 0 };
-                  console.log(`Données VFG reçues pour ${mzName}:`, mzCounts);
-                } catch (jsonError) {
-                  console.error(`Erreur lors du parsing JSON pour ${mzName}:`, jsonError);
-                }
-              } else {
-                console.error(`Erreur HTTP ${mzDataResponse.status} pour ${mzName}`);
-                
-                // Si nous avons un échec API, utiliser des nombres aléatoires mais distincts pour chaque MZ
-                // en utilisant le nom de la MZ comme seed pour un générateur pseudo-aléatoire
-                const seed = mzName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-                const rng = (min: number, max: number) => {
-                  const x = Math.sin(seed * 9999) * 10000;
-                  const rand = x - Math.floor(x);
-                  return Math.floor(rand * (max - min + 1) + min);
-                };
-                
-                mzCounts = {
-                  hosts: rng(5, 20),
-                  services: rng(10, 30),
-                  processes: rng(8, 25)
-                };
-                console.log(`Utilisation de données générées pour ${mzName}:`, mzCounts);
-              }
-              
-              // Définir la disponibilité (pour l'instant, on utilise une valeur calculée basée sur le nom de la MZ)
-              const seed = mzName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-              const availability = `${(99 + (Math.sin(seed) * 0.5 + 0.5)).toFixed(2)}%`;
-              
-              vfgMZs.push({
-                id: `env-${mzName.replace(/\s+/g, '-')}`,
-                name: mzName,
-                code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
-                icon: getZoneIcon(mzName),
-                problemCount: 0,
-                apps: mzCounts.processes,
-                services: mzCounts.services,
-                hosts: mzCounts.hosts,
-                availability: availability,
-                status: "healthy" as "healthy" | "warning",
-                color: getZoneColor(mzName),
-                dt_url: "#"
-              });
-            } catch (error) {
-              console.error(`Erreur lors de la récupération des données pour la MZ ${mzName}:`, error);
-              
-              // Calculer des valeurs uniques pour chaque MZ en cas d'erreur
-              const seed = mzName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-              const rng = (min: number, max: number) => {
-                const x = Math.sin(seed * 9999) * 10000;
-                const rand = x - Math.floor(x);
-                return Math.floor(rand * (max - min + 1) + min);
-              };
-              
-              vfgMZs.push({
-                id: `env-${mzName.replace(/\s+/g, '-')}`,
-                name: mzName,
-                code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
-                icon: getZoneIcon(mzName),
-                problemCount: 0,
-                apps: rng(8, 25),
-                services: rng(10, 30),
-                hosts: rng(5, 20),
-                availability: `${(99 + (Math.sin(seed) * 0.5 + 0.5)).toFixed(2)}%`,
-                status: "healthy" as "healthy" | "warning",
-                color: getZoneColor(mzName),
-                dt_url: "#"
-              });
-            }
-          }
+          // Utiliser les vraies données de l'API
+          vfgMZs = vfgResponse.data.mzs.map(mzName => ({
+            id: `env-${mzName.replace(/\s+/g, '-')}`,
+            name: mzName,
+            code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
+            icon: getZoneIcon(mzName),
+            problemCount: 0,
+            // Récupérer ces données depuis l'API lors de la sélection de chaque zone
+            apps: 0,    // Sera rempli lors de la sélection de la zone
+            services: 0, // Sera rempli lors de la sélection de la zone
+            hosts: 0,    // Sera rempli lors de la sélection de la zone
+            availability: "99.99%", // Sera calculé lors de la sélection de la zone
+            status: "healthy" as "healthy" | "warning",
+            color: getZoneColor(mzName),
+            dt_url: "#"
+          }));
           
           setState(prev => ({ ...prev, vitalForGroupMZs: vfgMZs }));
         }
         
         if (vfeResponse && !vfeResponse.error && vfeResponse.data?.mzs) {
-          // Traitement séquentiel pour éviter la contamination entre les zones
-          vfeMZs = [];
-          
-          // Traiter chaque management zone séquentiellement
-          for (const mzName of vfeResponse.data.mzs) {
-            try {
-              console.log(`Récupération des données pour la MZ VFE: ${mzName}`);
-              
-              // Récupérer des données de comptage différenciées par zone via un endpoint spécifique
-              // On appelle le backend directement avec la MZ en paramètre
-              const mzDataResponse = await fetch(`${API_BASE_URL}/management-zones/counts?zone=${encodeURIComponent(mzName)}`);
-              let mzCounts = { hosts: 0, services: 0, processes: 0 };
-              
-              if (mzDataResponse.ok) {
-                try {
-                  const mzData = await mzDataResponse.json();
-                  mzCounts = mzData.counts || { hosts: 0, services: 0, processes: 0 };
-                  console.log(`Données VFE reçues pour ${mzName}:`, mzCounts);
-                } catch (jsonError) {
-                  console.error(`Erreur lors du parsing JSON pour ${mzName}:`, jsonError);
-                }
-              } else {
-                console.error(`Erreur HTTP ${mzDataResponse.status} pour ${mzName}`);
-                
-                // Si nous avons un échec API, utiliser des nombres aléatoires mais distincts pour chaque MZ
-                // en utilisant le nom de la MZ comme seed pour un générateur pseudo-aléatoire
-                const seed = mzName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) + 1000; // Ajout de 1000 pour différencier des VFG
-                const rng = (min: number, max: number) => {
-                  const x = Math.sin(seed * 9999) * 10000;
-                  const rand = x - Math.floor(x);
-                  return Math.floor(rand * (max - min + 1) + min);
-                };
-                
-                mzCounts = {
-                  hosts: rng(5, 20),
-                  services: rng(10, 30),
-                  processes: rng(8, 25)
-                };
-                console.log(`Utilisation de données générées pour ${mzName}:`, mzCounts);
-              }
-              
-              // Définir la disponibilité (pour l'instant, on utilise une valeur calculée basée sur le nom de la MZ)
-              const seed = mzName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) + 1000; // Différent de VFG
-              const availability = `${(99 + (Math.sin(seed) * 0.5 + 0.5)).toFixed(2)}%`;
-              
-              vfeMZs.push({
-                id: `env-${mzName.replace(/\s+/g, '-')}`,
-                name: mzName,
-                code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
-                icon: getZoneIcon(mzName),
-                problemCount: 0,
-                apps: mzCounts.processes,
-                services: mzCounts.services,
-                hosts: mzCounts.hosts,
-                availability: availability,
-                status: "healthy" as "healthy" | "warning",
-                color: getZoneColor(mzName),
-                dt_url: "#"
-              });
-            } catch (error) {
-              console.error(`Erreur lors de la récupération des données pour la MZ ${mzName}:`, error);
-              
-              // Calculer des valeurs uniques pour chaque MZ en cas d'erreur
-              const seed = mzName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) + 1000;
-              const rng = (min: number, max: number) => {
-                const x = Math.sin(seed * 9999) * 10000;
-                const rand = x - Math.floor(x);
-                return Math.floor(rand * (max - min + 1) + min);
-              };
-              
-              vfeMZs.push({
-                id: `env-${mzName.replace(/\s+/g, '-')}`,
-                name: mzName,
-                code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
-                icon: getZoneIcon(mzName),
-                problemCount: 0,
-                apps: rng(8, 25),
-                services: rng(10, 30),
-                hosts: rng(5, 20),
-                availability: `${(99 + (Math.sin(seed) * 0.5 + 0.5)).toFixed(2)}%`,
-                status: "healthy" as "healthy" | "warning",
-                color: getZoneColor(mzName),
-                dt_url: "#"
-              });
-            }
-          }
+          // Utiliser les vraies données de l'API
+          vfeMZs = vfeResponse.data.mzs.map(mzName => ({
+            id: `env-${mzName.replace(/\s+/g, '-')}`,
+            name: mzName,
+            code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
+            icon: getZoneIcon(mzName),
+            problemCount: 0,
+            // Récupérer ces données depuis l'API lors de la sélection de chaque zone
+            apps: 0,    // Sera rempli lors de la sélection de la zone
+            services: 0, // Sera rempli lors de la sélection de la zone
+            hosts: 0,    // Sera rempli lors de la sélection de la zone
+            availability: "99.99%", // Sera calculé lors de la sélection de la zone
+            status: "healthy" as "healthy" | "warning",
+            color: getZoneColor(mzName),
+            dt_url: "#"
+          }));
           
           setState(prev => ({ ...prev, vitalForEntrepriseMZs: vfeMZs }));
         }
