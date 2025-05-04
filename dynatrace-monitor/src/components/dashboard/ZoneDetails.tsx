@@ -1049,6 +1049,20 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
     });
   }, []);
 
+  // Données de comptage réelles basées sur les tableaux actuels
+  const realCounts = useMemo(() => ({
+    hosts: hosts?.length || 0,
+    services: services?.length || 0,
+    apps: processGroups?.length || 0
+  }), [hosts, services, processGroups]);
+  
+  // Log pour vérifier les valeurs
+  useEffect(() => {
+    if (!isLoading) {
+      console.log(`Comptages réels pour ${zone.name}:`, realCounts);
+    }
+  }, [isLoading, realCounts, zone.name]);
+
   // État de chargement pour les détails de la zone
   if (isLoading) {
     return (
@@ -1070,20 +1084,6 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
       </div>
     );
   }
-
-  // Données de comptage réelles basées sur les tableaux actuels
-  const realCounts = useMemo(() => ({
-    hosts: hosts?.length || 0,
-    services: services?.length || 0,
-    apps: processGroups?.length || 0
-  }), [hosts, services, processGroups]);
-  
-  // Log pour vérifier les valeurs
-  useEffect(() => {
-    if (!isLoading) {
-      console.log(`Comptages réels pour ${zone.name}:`, realCounts);
-    }
-  }, [isLoading, realCounts, zone.name]);
 
   return (
     <div>
