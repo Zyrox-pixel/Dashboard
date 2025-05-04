@@ -11,6 +11,7 @@ import {
   VitalForGroupMZsResponse,
   ProblemResponse
 } from '../api/types';
+import { API_BASE_URL } from '../api/endpoints';
 import { Database, Shield, Key, Globe, Server, Grid, Building, CreditCard } from 'lucide-react';
 
 // Types unifiés pour les contextes
