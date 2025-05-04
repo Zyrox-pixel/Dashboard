@@ -1308,7 +1308,7 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
             <PaginatedTable 
               data={filteredHosts}
               columns={hostColumns}
-              pageSize={1000}
+              pageSize={20}
               emptyMessage={
                 osFilters.length > 0
                   ? "Aucun hôte ne correspond aux filtres sélectionnés."
@@ -1400,7 +1400,7 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
           <PaginatedTable 
             data={filteredServices}
             columns={serviceColumns}
-            pageSize={1000}
+            pageSize={20}
             emptyMessage={
               serviceFilters.length > 0
                 ? "Aucun service ne correspond aux filtres sélectionnés."
@@ -1453,7 +1453,7 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
           <PaginatedTable 
             data={filteredProcessGroups}
             columns={processColumns}
-            pageSize={1000}
+            pageSize={20}
             emptyMessage={
               processFilters.length > 0
                 ? "Aucun process group ne correspond aux filtres sélectionnés."
