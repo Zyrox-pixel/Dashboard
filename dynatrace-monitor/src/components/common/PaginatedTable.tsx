@@ -30,7 +30,7 @@ interface PaginatedTableProps<T> {
 const PaginatedTable = <T extends { id?: string }>({
   data,
   columns,
-  pageSize = 20, // Augmenté à 20 éléments par page par défaut
+  pageSize = 100, // Augmenté à 100 éléments par page pour afficher plus d'applications
   emptyMessage = "Aucune donnée disponible"
 }: PaginatedTableProps<T>) => {
   const { isDarkTheme } = useTheme();

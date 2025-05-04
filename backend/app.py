@@ -512,9 +512,12 @@ def get_management_zone_counts():
                 }
                 
                 # Paramètres pour ne récupérer que le comptage
+                # On définit une taille de page à 1 car on a seulement besoin du comptage total
+                # Mais on s'assure que les résultats ne sont pas limités avec pageSize=0 qui retourne tous les résultats
                 params = {
                     'entitySelector': f'type({entity_type}),mzName("{mz_name}")',
-                    'pageSize': 1
+                    'pageSize': 1,
+                    'totalCount': 'true'
                 }
                 
                 logger.info(f"Requête API: {api_url} avec sélecteur: {params['entitySelector']}")

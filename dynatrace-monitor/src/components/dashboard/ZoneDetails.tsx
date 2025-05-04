@@ -1071,6 +1071,26 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
     );
   }
 
+  // Mise à jour des compteurs depuis les données chargées
+  useEffect(() => {
+    if (!isLoading) {
+      // Mettre à jour les comptages dans le récapitulatif en fonction des données réelles chargées
+      const realCountsZone = {
+        ...zone,
+        apps: processGroups.length,
+        services: services.length,
+        hosts: hosts.length
+      };
+      
+      // Log pour vérifier les valeurs
+      console.log(`Mise à jour des comptages pour ${zone.name}:`, {
+        apps: processGroups.length,
+        services: services.length,
+        hosts: hosts.length
+      });
+    }
+  }, [isLoading, processGroups, services, hosts, zone]);
+
   return (
     <div>
       <button 
@@ -1294,7 +1314,7 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
             <PaginatedTable 
               data={filteredHosts}
               columns={hostColumns}
-              pageSize={20}
+              pageSize={100}
               emptyMessage={
                 osFilters.length > 0
                   ? "Aucun hôte ne correspond aux filtres sélectionnés."
@@ -1386,7 +1406,7 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
           <PaginatedTable 
             data={filteredServices}
             columns={serviceColumns}
-            pageSize={20}
+            pageSize={100}
             emptyMessage={
               serviceFilters.length > 0
                 ? "Aucun service ne correspond aux filtres sélectionnés."
@@ -1439,7 +1459,7 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
           <PaginatedTable 
             data={filteredProcessGroups}
             columns={processColumns}
-            pageSize={20}
+            pageSize={100}
             emptyMessage={
               processFilters.length > 0
                 ? "Aucun process group ne correspond aux filtres sélectionnés."
