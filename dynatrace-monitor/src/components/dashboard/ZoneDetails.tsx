@@ -1071,25 +1071,19 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
     );
   }
 
-  // Mise à jour des compteurs depuis les données chargées
+  // Données de comptage réelles basées sur les tableaux actuels
+  const realCounts = useMemo(() => ({
+    hosts: hosts?.length || 0,
+    services: services?.length || 0,
+    apps: processGroups?.length || 0
+  }), [hosts, services, processGroups]);
+  
+  // Log pour vérifier les valeurs
   useEffect(() => {
     if (!isLoading) {
-      // Mettre à jour les comptages dans le récapitulatif en fonction des données réelles chargées
-      const realCountsZone = {
-        ...zone,
-        apps: processGroups.length,
-        services: services.length,
-        hosts: hosts.length
-      };
-      
-      // Log pour vérifier les valeurs
-      console.log(`Mise à jour des comptages pour ${zone.name}:`, {
-        apps: processGroups.length,
-        services: services.length,
-        hosts: hosts.length
-      });
+      console.log(`Comptages réels pour ${zone.name}:`, realCounts);
     }
-  }, [isLoading, processGroups, services, hosts, zone]);
+  }, [isLoading, realCounts, zone.name]);
 
   return (
     <div>
@@ -1169,19 +1163,19 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
           isDarkTheme ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-slate-200'
         }`}>
           <div className="text-xs text-slate-400 mb-1">Applications</div>
-          <div className="text-xl font-bold">{zone.apps}</div>
+          <div className="text-xl font-bold">{realCounts.apps}</div>
         </div>
         <div className={`p-3 rounded-lg border ${
           isDarkTheme ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-slate-200'
         }`}>
           <div className="text-xs text-slate-400 mb-1">Services</div>
-          <div className="text-xl font-bold">{zone.services}</div>
+          <div className="text-xl font-bold">{realCounts.services}</div>
         </div>
         <div className={`p-3 rounded-lg border ${
           isDarkTheme ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-slate-200'
         }`}>
           <div className="text-xs text-slate-400 mb-1">Hôtes</div>
-          <div className="text-xl font-bold">{zone.hosts}</div>
+          <div className="text-xl font-bold">{realCounts.hosts}</div>
         </div>
       </div>
       
