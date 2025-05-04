@@ -1156,11 +1156,17 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
           </a>
           
           <button 
-            onClick={() => refreshData()}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 text-sm"
+            onClick={() => {
+              // Récupérer le type de dashboard actuel (vfg ou vfe)
+              const dashboardType = window.location.pathname.includes('vfe') ? 'vfe' : 'vfg';
+              // Rafraîchir les données avec le paramètre refreshProblemsOnly à false pour tout rafraîchir
+              appContext.refreshData(dashboardType as 'vfg' | 'vfe', false);
+            }}
+            disabled={appContext.isLoading.problems || appContext.isLoading.zoneDetails}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:bg-indigo-800 disabled:opacity-70 text-sm"
           >
-            <RefreshCw size={14} />
-            <span>Rafraîchir</span>
+            <RefreshCw size={14} className={`${appContext.isLoading.problems || appContext.isLoading.zoneDetails ? 'animate-spin' : ''}`} />
+            <span>{appContext.isLoading.problems || appContext.isLoading.zoneDetails ? 'Rafraîchissement...' : 'Rafraîchir'}</span>
           </button>
         </div>
       </div>
