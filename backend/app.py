@@ -380,10 +380,12 @@ def get_hosts():
         # Utiliser la fonction build_entity_selector
         entity_selector = build_entity_selector("HOST", current_mz)
         
-        # Récupérer les entités hôtes
+        # Récupérer les entités hôtes avec une taille de page augmentée
+        logger.info(f"Récupération des hôtes pour {current_mz} avec une taille de page de 1000")
         hosts_data = api_client.query_api("entities", {
             "entitySelector": entity_selector,
-            "fields": "+properties,+fromRelationships"
+            "fields": "+properties,+fromRelationships",
+            "pageSize": 1000  # Augmenter la taille de la page pour récupérer jusqu'à 1000 hôtes
         })
         
         # Extraire les IDs des hôtes
