@@ -12,7 +12,7 @@ interface ManagementZoneListProps {
 const ManagementZoneList: React.FC<ManagementZoneListProps> = ({ zones, onZoneClick }) => {
   const { isDarkTheme } = useTheme();
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 8; // Limite à 8 management zones par page
+  const itemsPerPage = 50; // Limite à 50 management zones par page
   
   // Pagination
   const totalPages = Math.ceil(zones.length / itemsPerPage);
