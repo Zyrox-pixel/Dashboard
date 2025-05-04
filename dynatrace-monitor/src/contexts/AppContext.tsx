@@ -842,8 +842,8 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
         console.log(`Récupération prioritaire des comptages pour ${zoneId}`);
         
         // Trouver la zone dans l'une des collections
-        const selectedZone = vitalForGroupMZs.find(z => z.id === zoneId) || 
-                           vitalForEntrepriseMZs.find(z => z.id === zoneId);
+        const selectedZone = state.vitalForGroupMZs.find((z: ManagementZone) => z.id === zoneId) || 
+                           state.vitalForEntrepriseMZs.find((z: ManagementZone) => z.id === zoneId);
         
         if (selectedZone) {
           // Forcer un préchargement spécifique des données de services pour cette zone
@@ -859,7 +859,7 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
                 console.log(`Préchargement des services pour ${selectedZone.name}: ${servicesCount} services trouvés`);
                 
                 // Mettre à jour immédiatement le comptage des services pour cette zone
-                const isVFG = vitalForGroupMZs.some(zone => zone.id === zoneId);
+                const isVFG = state.vitalForGroupMZs.some((zone: ManagementZone) => zone.id === zoneId);
                 if (isVFG) {
                   setState(prev => ({
                     ...prev,
@@ -895,7 +895,7 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
         loadZoneData(zoneId);
       }
     }
-  }, [loadZoneData, vitalForGroupMZs, vitalForEntrepriseMZs, apiClient]);
+  }, [loadZoneData, state.vitalForGroupMZs, state.vitalForEntrepriseMZs, apiClient]);
 
   // Fonctions pour modifier l'état
   const setSidebarCollapsed = useCallback((collapsed: boolean) => {
