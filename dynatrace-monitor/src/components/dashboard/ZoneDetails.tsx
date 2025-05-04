@@ -7,6 +7,8 @@ import ProblemsList from './ProblemsList';
 import PaginatedTable, { Column } from '../common/PaginatedTable';
 import AdvancedFilter, { FilterCategory, FilterValue, FilterItem } from '../common/AdvancedFilter';
 import FilterBadges, { FilterBadge } from '../common/FilterBadges';
+import axios from 'axios';
+import { API_BASE_URL } from '../../api/endpoints';
 
 interface ZoneDetailsProps {
   zone: ManagementZone;
@@ -1085,16 +1087,146 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
     );
   }
 
-  // Afficher une notification de chargement en cours si les problèmes se rafraîchissent
+  // États pour gérer les chargements locaux
   const [isRefreshingProblems, setIsRefreshingProblems] = useState(false);
+  const [isRefreshingAll, setIsRefreshingAll] = useState(false);
+  const [localRefreshNotification, setLocalRefreshNotification] = useState<string | null>(null);
+  const [localZoneProblems, setLocalZoneProblems] = useState<Problem[]>([]);
+  
+  // Fonction pour rafraîchir directement les données de la zone
+  const directRefreshZoneData = async () => {
+    // Éviter les doubles rafraîchissements
+    if (isRefreshingAll) return;
+    
+    // Activer l'état de rafraîchissement
+    setIsRefreshingAll(true);
+    setLocalRefreshNotification("Rafraîchissement des données en cours...");
+    
+    try {
+      // Récupérer le type de dashboard actuel (vfg ou vfe)
+      const dashboardType = window.location.pathname.includes('vfe') ? 'vfe' : 'vfg';
+      
+      // 1. D'abord, rafraîchir les problèmes
+      try {
+        setIsRefreshingProblems(true);
+        const problemsParams = {
+          status: "OPEN",
+          debug: 'true', // Force le rafraîchissement
+          type: dashboardType
+        };
+        
+        console.log("Rafraîchissement direct des problèmes...");
+        const problemsResponse = await axios.get(`${API_BASE_URL}/problems`, { params: problemsParams });
+        
+        if (problemsResponse.data) {
+          // Filtrer pour la zone actuelle
+          const zoneName = zone.name;
+          const zoneProblems = problemsResponse.data.filter((problem: any) => problem.zone === zoneName);
+          
+          // Transformer les données en format Problem
+          const formattedProblems: Problem[] = zoneProblems.map((problem: any) => {
+            // Extraire le nom de l'hôte à partir des entités impactées
+            let hostName = '';
+            
+            if (problem.impactedEntities && Array.isArray(problem.impactedEntities)) {
+              const hostEntity = problem.impactedEntities.find((entity: any) => 
+                entity.entityId && entity.entityId.type === 'HOST' && entity.name);
+              if (hostEntity) {
+                hostName = hostEntity.name;
+              }
+            }
+            
+            if (!hostName) {
+              if (problem.host && problem.host !== "Non spécifié") {
+                hostName = problem.host;
+              } else if (problem.impacted && problem.impacted !== "Non spécifié") {
+                hostName = problem.impacted;
+              }
+            }
+            
+            return {
+              id: problem.id || `PROB-${Math.random().toString(36).substr(2, 9)}`,
+              title: problem.title || "Problème inconnu",
+              code: problem.id ? problem.id.substring(0, 7) : "UNKNOWN",
+              subtitle: `${problem.zone || "Non spécifié"} - Impact: ${problem.impact || "INCONNU"}`,
+              time: problem.start_time ? `Depuis ${problem.start_time}` : "Récent",
+              type: problem.impact === "INFRASTRUCTURE" ? "Problème d'Infrastructure" : "Problème de Service",
+              status: problem.status === "OPEN" ? "critical" : "warning",
+              impact: problem.impact === "INFRASTRUCTURE" ? "ÉLEVÉ" : problem.impact === "SERVICE" ? "MOYEN" : "FAIBLE",
+              zone: problem.zone || "Non spécifié",
+              servicesImpacted: problem.affected_entities ? problem.affected_entities.toString() : "0",
+              dt_url: problem.dt_url || "#",
+              duration: problem.duration || "",
+              resolved: problem.resolved || false,
+              host: hostName,
+              impacted: hostName,
+              impactedEntities: problem.impactedEntities,
+              rootCauseEntity: problem.rootCauseEntity
+            };
+          });
+          
+          // Mettre à jour l'état local
+          setLocalZoneProblems(formattedProblems);
+          console.log(`Rafraîchissement des problèmes terminé. ${formattedProblems.length} problèmes trouvés.`);
+        }
+      } catch (problemError) {
+        console.error("Erreur lors du rafraîchissement des problèmes:", problemError);
+      } finally {
+        setIsRefreshingProblems(false);
+      }
+      
+      // 2. Définir la Management Zone pour les prochaines requêtes
+      try {
+        setLocalRefreshNotification("Configuration de la Management Zone...");
+        await axios.post(`${API_BASE_URL}/set-management-zone`, { name: zone.name });
+        console.log(`Management Zone définie sur: ${zone.name}`);
+      } catch (mzError) {
+        console.error("Erreur lors de la définition de la Management Zone:", mzError);
+      }
+      
+      // 3. Rafraîchir les caches côté serveur
+      try {
+        setLocalRefreshNotification("Rafraîchissement des caches...");
+        await axios.post(`${API_BASE_URL}/refresh/all`);
+        console.log("Caches rafraîchis avec succès");
+      } catch (cacheError) {
+        console.error("Erreur lors du rafraîchissement des caches:", cacheError);
+      }
+      
+      // 4. Notification finale
+      setLocalRefreshNotification("Rafraîchissement terminé !");
+      setTimeout(() => {
+        setLocalRefreshNotification(null);
+      }, 2000);
+      
+      // Recharger la page avec les paramètres actuels pour obtenir des données fraîches
+      // Cette approche est plus sûre que de tenter de mettre à jour tous les états manuellement
+      // et garanti une cohérence des données
+      // Nous conservons tous les paramètres d'URL pour maintenir le contexte
+      setTimeout(() => {
+        window.location.reload();
+      }, 500);
+      
+    } catch (error) {
+      console.error("Erreur lors du rafraîchissement global:", error);
+      setLocalRefreshNotification("Erreur lors du rafraîchissement");
+      setTimeout(() => {
+        setLocalRefreshNotification(null);
+      }, 3000);
+    } finally {
+      setIsRefreshingAll(false);
+    }
+  };
   
   // Obtenir l'état de chargement des problèmes depuis le contexte
   const appContext = useApp();
   
   // Mettre à jour l'état local quand l'état de chargement des problèmes change
   useEffect(() => {
-    setIsRefreshingProblems(appContext.isLoading.problems);
-  }, [appContext.isLoading.problems]);
+    if (!isRefreshingAll) { // Ne pas écraser notre état local pendant un rafraîchissement direct
+      setIsRefreshingProblems(appContext.isLoading.problems);
+    }
+  }, [appContext.isLoading.problems, isRefreshingAll]);
 
   return (
     <div>
@@ -1156,24 +1288,12 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
           </a>
           
           <button 
-            onClick={async () => {
-              // Récupérer le type de dashboard actuel (vfg ou vfe)
-              const dashboardType = window.location.pathname.includes('vfe') ? 'vfe' : 'vfg';
-              
-              try {
-                // Utiliser async/await pour gérer le rafraîchissement de manière non bloquante
-                // Rafraîchir les données avec le paramètre refreshProblemsOnly à false pour tout rafraîchir
-                await appContext.refreshData(dashboardType as 'vfg' | 'vfe', false);
-                console.log("Rafraîchissement global terminé avec succès");
-              } catch (error) {
-                console.error("Erreur lors du rafraîchissement global:", error);
-              }
-            }}
-            disabled={appContext.isLoading.problems || appContext.isLoading.zoneDetails}
+            onClick={directRefreshZoneData}
+            disabled={isRefreshingAll || appContext.isLoading.problems || appContext.isLoading.zoneDetails}
             className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:bg-indigo-800 disabled:opacity-70 text-sm"
           >
-            <RefreshCw size={14} className={`${appContext.isLoading.problems || appContext.isLoading.zoneDetails ? 'animate-spin' : ''}`} />
-            <span>{appContext.isLoading.problems || appContext.isLoading.zoneDetails ? 'Rafraîchissement...' : 'Rafraîchir'}</span>
+            <RefreshCw size={14} className={`${isRefreshingAll || appContext.isLoading.problems || appContext.isLoading.zoneDetails ? 'animate-spin' : ''}`} />
+            <span>{isRefreshingAll || appContext.isLoading.problems || appContext.isLoading.zoneDetails ? 'Rafraîchissement...' : 'Rafraîchir'}</span>
           </button>
         </div>
       </div>
