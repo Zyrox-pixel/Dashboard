@@ -1156,11 +1156,18 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
           </a>
           
           <button 
-            onClick={() => {
+            onClick={async () => {
               // Récupérer le type de dashboard actuel (vfg ou vfe)
               const dashboardType = window.location.pathname.includes('vfe') ? 'vfe' : 'vfg';
-              // Rafraîchir les données avec le paramètre refreshProblemsOnly à false pour tout rafraîchir
-              appContext.refreshData(dashboardType as 'vfg' | 'vfe', false);
+              
+              try {
+                // Utiliser async/await pour gérer le rafraîchissement de manière non bloquante
+                // Rafraîchir les données avec le paramètre refreshProblemsOnly à false pour tout rafraîchir
+                await appContext.refreshData(dashboardType as 'vfg' | 'vfe', false);
+                console.log("Rafraîchissement global terminé avec succès");
+              } catch (error) {
+                console.error("Erreur lors du rafraîchissement global:", error);
+              }
             }}
             disabled={appContext.isLoading.problems || appContext.isLoading.zoneDetails}
             className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:bg-indigo-800 disabled:opacity-70 text-sm"

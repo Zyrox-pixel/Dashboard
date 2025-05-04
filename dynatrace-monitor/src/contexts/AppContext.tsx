@@ -792,11 +792,62 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
     }
   }, [state.selectedZone, state.vitalForGroupMZs, state.vitalForEntrepriseMZs, loadZoneData, apiClient, optimized, getZoneIcon, getZoneColor]);
 
-  // Fonction pour rafraîchir les données - version simplifiée
+  // Fonction pour rafraîchir les données - version non bloquante améliorée
   const refreshData = useCallback(async (dashboardType?: 'vfg' | 'vfe', refreshProblemsOnly?: boolean) => {
     console.log(`Refreshing data for dashboard type: ${dashboardType || 'none'} ${refreshProblemsOnly ? '(problèmes uniquement)' : ''}`);
     setState(prev => ({ ...prev, error: null }));
-    await loadAllData(dashboardType, refreshProblemsOnly || false);
+    
+    // Retourner la promesse pour permettre la gestion d'erreurs
+    try {
+      // Exécuter loadAllData de manière non bloquante si on est dans un contexte de zone détaillée
+      if (refreshProblemsOnly && window.location.pathname.includes('/zone/')) {
+        console.log("Mode de rafraîchissement non bloquant activé pour les problèmes en zone");
+        
+        // Mettre à jour l'état pour indiquer le chargement des problèmes
+        setState(prev => ({ 
+          ...prev, 
+          isLoading: { 
+            ...prev.isLoading, 
+            problems: true
+          }
+        }));
+        
+        // Exécuter loadAllData avec un timeout court pour s'assurer que l'UI reste réactive
+        return new Promise((resolve, reject) => {
+          setTimeout(async () => {
+            try {
+              await loadAllData(dashboardType, true);
+              resolve(true);
+            } catch (error) {
+              console.error("Erreur dans le rafraîchissement asynchrone:", error);
+              reject(error);
+            } finally {
+              setState(prev => ({ 
+                ...prev, 
+                isLoading: { 
+                  ...prev.isLoading, 
+                  problems: false
+                }
+              }));
+            }
+          }, 10);
+        });
+      } else {
+        // Dans les autres cas, exécuter normalement
+        return await loadAllData(dashboardType, refreshProblemsOnly || false);
+      }
+    } catch (error) {
+      console.error("Erreur dans refreshData:", error);
+      setState(prev => ({ 
+        ...prev, 
+        isLoading: { 
+          ...prev.isLoading, 
+          problems: false
+        },
+        error: "Erreur lors du rafraîchissement des données"
+      }));
+      throw error; // Propager l'erreur pour la gestion en amont
+    }
   }, [loadAllData]);
 
   // Charger les données initiales
@@ -825,15 +876,20 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
       // Ne pas bloquer l'interface pendant le rafraîchissement
       setState(prev => ({ ...prev, isLoading: { ...prev.isLoading, problems: true }}));
       
-      setTimeout(() => {
-        refreshData(currentDashboardType as 'vfg' | 'vfe', true)
-          .then(() => {
-            console.log("Rafraîchissement des problèmes terminé");
-          })
-          .catch(err => {
-            console.error("Erreur lors du rafraîchissement des problèmes:", err);
-          });
-      }, 100); // Petit délai pour s'assurer que l'UI reste réactive
+      // Utiliser un microtask pour exécuter le rafraîchissement
+      // Cela permet de s'assurer que l'interface reste réactive
+      // tout en évitant de retarder inutilement le rafraîchissement
+      Promise.resolve().then(async () => {
+        try {
+          await refreshData(currentDashboardType as 'vfg' | 'vfe', true);
+          console.log("Rafraîchissement automatique des problèmes terminé avec succès");
+        } catch (err) {
+          console.error("Erreur lors du rafraîchissement automatique des problèmes:", err);
+        } finally {
+          // S'assurer que l'indicateur de chargement est bien désactivé
+          setState(prev => ({ ...prev, isLoading: { ...prev.isLoading, problems: false }}));
+        }
+      });
     }, refreshInterval);
     
     // Nettoyer l'intervalle lors du démontage du composant

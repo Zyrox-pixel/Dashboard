@@ -34,9 +34,15 @@ const ProblemsList: React.FC<ProblemsListProps> = ({
   // Récupérer le type de dashboard actuel (vfg ou vfe)
   const dashboardType = window.location.pathname.includes('vfe') ? 'vfe' : 'vfg';
   
-  // Fonction pour rafraîchir uniquement les problèmes
-  const handleRefreshProblems = () => {
-    refreshData(dashboardType as 'vfg' | 'vfe', true);
+  // Fonction pour rafraîchir uniquement les problèmes - version améliorée avec promesse
+  const handleRefreshProblems = async () => {
+    try {
+      // Utiliser async/await pour gérer la promesse retournée par refreshData
+      await refreshData(dashboardType as 'vfg' | 'vfe', true);
+      console.log("Rafraîchissement des problèmes terminé avec succès");
+    } catch (error) {
+      console.error("Erreur lors du rafraîchissement des problèmes:", error);
+    }
   };
 
   // Fonction pour changer l'ordre de tri
