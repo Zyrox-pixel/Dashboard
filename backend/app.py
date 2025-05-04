@@ -448,10 +448,11 @@ def get_processes():
         # Utiliser la fonction build_entity_selector
         entity_selector = build_entity_selector("PROCESS_GROUP", current_mz)
         
-        # Récupérer les groupes de processus
+        # Récupérer les groupes de processus sans limite (augmenter pageSize)
         process_groups_data = api_client.query_api("entities", {
             "entitySelector": entity_selector,
-            "fields": "+properties,+fromRelationships"
+            "fields": "+properties,+fromRelationships",
+            "pageSize": 1000  # Augmenter la taille de la page pour récupérer jusqu'à 1000 process groups
         })
         
         process_metrics = []

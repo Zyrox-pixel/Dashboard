@@ -153,7 +153,16 @@ class OptimizedAPIClient:
         # Exécuter la requête avec sémaphore
         url = f"{self.env_url}/api/v2/{endpoint}"
         try:
-            response = self._request_with_semaphore("GET", url, params=params, timeout=(5, 30))
+            # Si c'est une requête pour des entities, vérifier si pageSize est spécifié
+            # pour les process groups, utiliser une taille de page plus grande par défaut si non spécifié
+            if endpoint == "entities" and params and "entitySelector" in params:
+                if "type(PROCESS_GROUP)" in params["entitySelector"] and "pageSize" not in params:
+                    # Copier les paramètres pour ne pas modifier l'original
+                    params = params.copy()
+                    params["pageSize"] = 1000  # Récupérer jusqu'à 1000 process groups par défaut
+                    logger.info(f"Auto-configured pageSize=1000 for process groups query")
+            
+            response = self._request_with_semaphore("GET", url, params=params, timeout=(10, 60))  # Timeout augmenté pour les grandes requêtes
             result = response.json()
             
             # Mettre en cache le résultat
