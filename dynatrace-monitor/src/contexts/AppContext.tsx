@@ -354,7 +354,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
           // Récupérer les comptages pour mettre à jour la liste des MZs
           const hostsCount = hostsData.length;
           const servicesCount = Array.isArray(servicesData) ? servicesData.length : 0;
-          const processCount = processGroups ? processGroups.length : 0;
+          const processCount = Array.isArray(processData) ? processData.length : 0;
             
           // Mettre à jour les comptages dans la liste des MZs
           const isVFG = state.vitalForGroupMZs.some(zone => zone.id === zoneId);
