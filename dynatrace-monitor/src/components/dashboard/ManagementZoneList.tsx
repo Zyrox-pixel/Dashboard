@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Layers, Filter, Info, ChevronLeft, ChevronRight } from 'lucide-react';
 import ManagementZoneRow from '../common/ManagementZoneRow';
 import { ManagementZone } from '../../api/types';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useApp } from '../../contexts/AppContext';
 
 interface ManagementZoneListProps {
   zones: ManagementZone[];
@@ -11,8 +12,33 @@ interface ManagementZoneListProps {
 
 const ManagementZoneList: React.FC<ManagementZoneListProps> = ({ zones, onZoneClick }) => {
   const { isDarkTheme } = useTheme();
+  const { refreshData } = useApp();
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8; // Limite à 8 management zones par page
+  const [autoRefreshAttempts, setAutoRefreshAttempts] = useState(0);
+  
+  // Vérifier si des zones ont des services à 0 mais des hosts ou applications > 0
+  useEffect(() => {
+    // Si nous avons déjà essayé 3 fois, ne plus essayer
+    if (autoRefreshAttempts >= 3) return;
+    
+    // Vérifier si nous avons des zones avec services=0 mais hosts>0 ou apps>0
+    const hasZonesWithMissingServices = zones.some(
+      zone => zone.services === 0 && (zone.hosts > 0 || zone.apps > 0)
+    );
+    
+    if (hasZonesWithMissingServices) {
+      console.log(`Zones avec services=0 détectées. Tentative de rafraîchissement automatique (${autoRefreshAttempts + 1}/3)`);
+      
+      // Attendre 2 secondes avant de rafraîchir pour éviter un rafraîchissement trop fréquent
+      const timer = setTimeout(() => {
+        refreshData();
+        setAutoRefreshAttempts(prev => prev + 1);
+      }, 2000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [zones, autoRefreshAttempts, refreshData]);
   
   // Pagination
   const totalPages = Math.ceil(zones.length / itemsPerPage);

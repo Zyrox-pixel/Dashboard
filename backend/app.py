@@ -504,38 +504,78 @@ def get_management_zone_counts():
         
         # Fonction pour récupérer le nombre d'entités par type
         def get_entity_count(entity_type, mz_name):
-            try:
-                # Construire l'URL API
-                api_url = f"{DT_ENV_URL}/api/v2/entities"
-                headers = {
-                    'Authorization': f'Api-Token {API_TOKEN}',
-                    'Accept': 'application/json'
-                }
-                
-                # Paramètres pour ne récupérer que le comptage
-                # On définit une taille de page à 1 car on a seulement besoin du comptage total
-                # Mais on s'assure que les résultats ne sont pas limités avec pageSize=0 qui retourne tous les résultats
-                params = {
-                    'entitySelector': f'type({entity_type}),mzName("{mz_name}")',
-                    'pageSize': 1,
-                    'totalCount': 'true'
-                }
-                
-                logger.info(f"Requête API: {api_url} avec sélecteur: {params['entitySelector']}")
-                
-                # Effectuer la requête HTTP
-                response = requests.get(api_url, headers=headers, params=params, verify=False)
-                response.raise_for_status()
-                data = response.json()
-                
-                # Retourner le nombre total
-                count = data.get('totalCount', 0)
-                logger.info(f"Comptage pour {entity_type} dans {mz_name}: {count}")
-                return count
-                
-            except Exception as e:
-                logger.error(f"Erreur lors du comptage des {entity_type} pour {mz_name}: {e}")
-                return 0
+            # Paramètres importants pour les retries
+            max_retries = 3
+            retry_delay = 2  # secondes
+            
+            for attempt in range(max_retries):
+                try:
+                    # Construire l'URL API
+                    api_url = f"{DT_ENV_URL}/api/v2/entities"
+                    headers = {
+                        'Authorization': f'Api-Token {API_TOKEN}',
+                        'Accept': 'application/json'
+                    }
+                    
+                    # Paramètres pour ne récupérer que le comptage
+                    # On définit une taille de page à 1 car on a seulement besoin du comptage total
+                    # Mais on s'assure que les résultats ne sont pas limités avec pageSize=0 qui retourne tous les résultats
+                    params = {
+                        'entitySelector': f'type({entity_type}),mzName("{mz_name}")',
+                        'pageSize': 1,
+                        'totalCount': 'true'
+                    }
+                    
+                    logger.info(f"Requête API (tentative {attempt+1}/{max_retries}): {api_url} avec sélecteur: {params['entitySelector']}")
+                    
+                    # Effectuer la requête HTTP avec un timeout plus long
+                    # Augmenter le timeout proportionnellement au nombre de tentatives
+                    timeout = 30 * (attempt + 1)
+                    response = requests.get(api_url, headers=headers, params=params, verify=False, timeout=timeout)
+                    response.raise_for_status()
+                    data = response.json()
+                    
+                    # Retourner le nombre total
+                    count = data.get('totalCount', 0)
+                    logger.info(f"Comptage pour {entity_type} dans {mz_name}: {count}")
+                    
+                    # Mise en cache du résultat pour réduire la charge sur l'API
+                    key = f"count:{entity_type}:{mz_name}"
+                    api_client.set_cache(key, count)
+                    
+                    return count
+                    
+                except requests.exceptions.Timeout:
+                    logger.warning(f"Timeout lors du comptage des {entity_type} pour {mz_name} (tentative {attempt+1}/{max_retries})")
+                    if attempt < max_retries - 1:
+                        logger.info(f"Attente de {retry_delay} secondes avant la prochaine tentative...")
+                        time.sleep(retry_delay)
+                    else:
+                        # Dernière tentative, vérifier si nous avons une valeur en cache
+                        key = f"count:{entity_type}:{mz_name}"
+                        cached = api_client.get_cached(key)
+                        if cached is not None:
+                            logger.info(f"Utilisation de la valeur en cache pour {entity_type} dans {mz_name}: {cached}")
+                            return cached
+                        logger.error(f"Échec de toutes les tentatives pour {entity_type}")
+                        return 0
+                        
+                except Exception as e:
+                    logger.error(f"Erreur lors du comptage des {entity_type} pour {mz_name}: {e}")
+                    if attempt < max_retries - 1:
+                        logger.info(f"Attente de {retry_delay} secondes avant la prochaine tentative...")
+                        time.sleep(retry_delay)
+                    else:
+                        # Dernière tentative, vérifier si nous avons une valeur en cache
+                        key = f"count:{entity_type}:{mz_name}"
+                        cached = api_client.get_cached(key)
+                        if cached is not None:
+                            logger.info(f"Utilisation de la valeur en cache pour {entity_type} dans {mz_name}: {cached}")
+                            return cached
+                        return 0
+            
+            # Nous ne devrions jamais arriver ici, mais au cas où
+            return 0
         
         # Récupérer les comptages en parallèle avec threads
         import concurrent.futures
