@@ -800,7 +800,8 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
     // Gérer les erreurs dans la fonction
     try {
       // Exécuter loadAllData de manière non bloquante si on est dans un contexte de zone détaillée
-      if (refreshProblemsOnly && window.location.pathname.includes('/zone/')) {
+      // CORRECTION: vérifier si une zone est sélectionnée plutôt que de se baser sur le chemin URL
+      if (refreshProblemsOnly && state.selectedZone) {
         console.log("Mode de rafraîchissement non bloquant activé pour les problèmes en zone");
         
         // Mettre à jour l'état pour indiquer le chargement des problèmes
@@ -846,9 +847,8 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
         },
         error: "Erreur lors du rafraîchissement des données"
       }));
-      // L'erreur est gérée localement, ne pas la propager
     }
-  }, [loadAllData]);
+  }, [loadAllData, state.selectedZone]); // Ajout de state.selectedZone comme dépendance
 
   // Charger les données initiales
   useEffect(() => {
