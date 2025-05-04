@@ -89,19 +89,58 @@ class OptimizedAPIClient:
         with self.cache_lock:
             if cache_key in self.cache:
                 item = self.cache[cache_key]
-                if time.time() - item['timestamp'] < self.cache_duration:
-                    logger.debug(f"Cache hit for {cache_key}")
+                
+                # Déterminer la durée de cache à utiliser (personnalisée ou standard)
+                cache_duration = item.get('duration', self.cache_duration)
+                
+                # Vérifier si le cache est encore valide
+                current_time = time.time()
+                cache_age = current_time - item['timestamp']
+                
+                if cache_age < cache_duration:
+                    # Si c'est un cache persistant, ajouter un log informatif
+                    if 'duration' in item and cache_key.startswith('persistent_'):
+                        logger.info(f"Hit du cache persistant pour {cache_key} (âge: {cache_age/60:.1f}min, expiration: {(cache_duration-cache_age)/60:.1f}min)")
+                    else:
+                        logger.debug(f"Cache hit for {cache_key}")
                     return item['data']
+                else:
+                    logger.debug(f"Cache expiré pour {cache_key} (âge: {cache_age/60:.1f}min > durée: {cache_duration/60:.1f}min)")
+        
         logger.debug(f"Cache miss for {cache_key}")
         return None
 
     def set_cache(self, cache_key, data):
-        """Met à jour le cache avec de nouvelles données"""
+        """Met à jour le cache avec de nouvelles données avec la durée standard"""
         with self.cache_lock:
             self.cache[cache_key] = {
                 'data': data,
                 'timestamp': time.time()
             }
+    
+    def set_persistent_cache(self, cache_key, data, duration=14400):
+        """
+        Met à jour le cache avec une durée personnalisée plus longue
+        Utile pour les données qui changent rarement (services, process groups)
+        
+        Args:
+            cache_key (str): Clé de cache
+            data: Données à mettre en cache
+            duration (int): Durée de vie du cache en secondes (défaut: 4 heures)
+        """
+        with self.cache_lock:
+            self.cache[cache_key] = {
+                'data': data,
+                'timestamp': time.time(),
+                'duration': duration  # Durée personnalisée
+            }
+            logger.info(f"Données mises en cache persistant ({duration/3600}h) pour la clé {cache_key}")
+            
+            # Log de debug pour la taille des données
+            if isinstance(data, list):
+                logger.info(f"Taille des données en cache: {len(data)} éléments pour {cache_key}")
+            elif isinstance(data, dict):
+                logger.info(f"Données en cache: dictionnaire avec {len(data)} clés pour {cache_key}")
 
     def clear_cache(self, pattern=None):
         """

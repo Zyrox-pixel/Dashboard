@@ -400,27 +400,40 @@ def get_hosts():
         return {'error': str(e)}
 
 @app.route('/api/services', methods=['GET'])
-@cached('services')
+@cached('services')  # Le décorateur @cached utilise déjà le cache standard
 @time_execution
 def get_services():
     try:
-        now = datetime.now()
-        from_time = int((now - timedelta(minutes=30)).timestamp() * 1000)  # Récupération des 30 dernières minutes
-        to_time = int(now.timestamp() * 1000)
-        
-        # Récupérer la Management Zone actuelle
+        # Vérifier si nous avons un cache persistant pour cette management zone
         current_mz = get_current_mz()
         if not current_mz:
             return {'error': 'Aucune Management Zone définie'}
+        
+        # Clé de cache persistant spécifique à cette MZ
+        persistent_cache_key = f"persistent_services:{current_mz}"
+        
+        # Vérifier si nous avons des données en cache persistant et si le cache n'est pas explicitement désactivé
+        refresh_cache = request.args.get('refresh', 'false').lower() == 'true'
+        if not refresh_cache:
+            cached_services = api_client.get_cached(persistent_cache_key)
+            if cached_services is not None:
+                logger.info(f"Utilisation du cache persistant pour les services de {current_mz}")
+                return cached_services
+        
+        # Continuer avec le traitement normal si pas de cache ou refresh demandé
+        now = datetime.now()
+        from_time = int((now - timedelta(minutes=30)).timestamp() * 1000)  # Récupération des 30 dernières minutes
+        to_time = int(now.timestamp() * 1000)
         
         # Utiliser la fonction build_entity_selector
         entity_selector = build_entity_selector("SERVICE", current_mz)
         
         # Récupérer les entités services avec une taille de page augmentée
+        logger.info(f"Récupération des services pour {current_mz} avec une taille de page de 1000")
         services_data = api_client.query_api("entities", {
             "entitySelector": entity_selector,
             "fields": "+properties,+fromRelationships",
-            "pageSize": 1000  # Augmenter la taille de la page pour récupérer jusqu'à 1000 services, comme pour les process groups
+            "pageSize": 1000  # Augmenter la taille de la page pour récupérer jusqu'à 1000 services
         })
         
         # Extraire les IDs des services
@@ -431,7 +444,12 @@ def get_services():
             return []
         
         # Récupérer les métriques pour tous les services en parallèle
-        return api_client.get_service_metrics_parallel(service_ids, from_time, to_time)
+        services_result = api_client.get_service_metrics_parallel(service_ids, from_time, to_time)
+        
+        # Stocker le résultat dans un cache persistant avec une durée plus longue (4 heures)
+        api_client.set_persistent_cache(persistent_cache_key, services_result, duration=14400)  # 4 heures en secondes
+        
+        return services_result
     except Exception as e:
         logger.error(f"Erreur lors de la récupération des services: {e}")
         return {'error': str(e)}
@@ -445,11 +463,23 @@ def get_processes():
         current_mz = get_current_mz()
         if not current_mz:
             return {'error': 'Aucune Management Zone définie'}
+            
+        # Clé de cache persistant spécifique à cette MZ
+        persistent_cache_key = f"persistent_processes:{current_mz}"
+        
+        # Vérifier si nous avons des données en cache persistant et si le cache n'est pas explicitement désactivé
+        refresh_cache = request.args.get('refresh', 'false').lower() == 'true'
+        if not refresh_cache:
+            cached_processes = api_client.get_cached(persistent_cache_key)
+            if cached_processes is not None:
+                logger.info(f"Utilisation du cache persistant pour les process groups de {current_mz}")
+                return cached_processes
         
         # Utiliser la fonction build_entity_selector
         entity_selector = build_entity_selector("PROCESS_GROUP", current_mz)
         
         # Récupérer les groupes de processus sans limite (augmenter pageSize)
+        logger.info(f"Récupération des process groups pour {current_mz} avec une taille de page de 1000")
         process_groups_data = api_client.query_api("entities", {
             "entitySelector": entity_selector,
             "fields": "+properties,+fromRelationships",
@@ -485,6 +515,9 @@ def get_processes():
                     'tech_icon': tech_info['icon'],
                     'dt_url': dt_url
                 })
+        
+        # Stocker le résultat dans un cache persistant avec une durée plus longue (4 heures)
+        api_client.set_persistent_cache(persistent_cache_key, process_metrics, duration=14400)  # 4 heures en secondes
         
         return process_metrics
     except Exception as e:
