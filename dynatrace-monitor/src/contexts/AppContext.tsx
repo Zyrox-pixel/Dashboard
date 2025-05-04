@@ -828,11 +828,74 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
 
   // Fonction pour définir la zone sélectionnée et charger ses données
   const setSelectedZoneAndLoadData = useCallback((zoneId: string | null) => {
-    setState(prev => ({ ...prev, selectedZone: zoneId }));
+    // Mettre d'abord l'état en chargement pour éviter tout affichage incomplet
+    setState(prev => ({ 
+      ...prev, 
+      selectedZone: zoneId,
+      isLoading: { ...prev.isLoading, zoneDetails: true }
+    }));
+    
     if (zoneId) {
-      loadZoneData(zoneId);
+      // Force le rafraîchissement complet avant de charger les données de la zone
+      try {
+        // Récupérer les comptages à jour pour la zone sélectionnée
+        console.log(`Récupération prioritaire des comptages pour ${zoneId}`);
+        
+        // Trouver la zone dans l'une des collections
+        const selectedZone = vitalForGroupMZs.find(z => z.id === zoneId) || 
+                           vitalForEntrepriseMZs.find(z => z.id === zoneId);
+        
+        if (selectedZone) {
+          // Forcer un préchargement spécifique des données de services pour cette zone
+          apiClient.setManagementZone(selectedZone.name)
+            .then(() => {
+              return apiClient.getServices();
+            })
+            .then(servicesResponse => {
+              if (!servicesResponse.error && servicesResponse.data) {
+                const servicesData = Array.isArray(servicesResponse.data) ? servicesResponse.data : [];
+                const servicesCount = servicesData.length;
+                
+                console.log(`Préchargement des services pour ${selectedZone.name}: ${servicesCount} services trouvés`);
+                
+                // Mettre à jour immédiatement le comptage des services pour cette zone
+                const isVFG = vitalForGroupMZs.some(zone => zone.id === zoneId);
+                if (isVFG) {
+                  setState(prev => ({
+                    ...prev,
+                    vitalForGroupMZs: prev.vitalForGroupMZs.map(zone => 
+                      zone.id === zoneId ? {...zone, services: servicesCount} : zone
+                    )
+                  }));
+                } else {
+                  setState(prev => ({
+                    ...prev,
+                    vitalForEntrepriseMZs: prev.vitalForEntrepriseMZs.map(zone => 
+                      zone.id === zoneId ? {...zone, services: servicesCount} : zone
+                    )
+                  }));
+                }
+              }
+              
+              // Continuer avec le chargement normal
+              loadZoneData(zoneId);
+            })
+            .catch(error => {
+              console.error('Erreur lors du préchargement des services:', error);
+              // Continuer avec le chargement normal même en cas d'erreur
+              loadZoneData(zoneId);
+            });
+        } else {
+          // Zone non trouvée, procéder au chargement normal
+          loadZoneData(zoneId);
+        }
+      } catch (error) {
+        console.error('Erreur générale lors du préchargement:', error);
+        // En cas d'erreur, continuer avec le chargement normal
+        loadZoneData(zoneId);
+      }
     }
-  }, [loadZoneData]);
+  }, [loadZoneData, vitalForGroupMZs, vitalForEntrepriseMZs, apiClient]);
 
   // Fonctions pour modifier l'état
   const setSidebarCollapsed = useCallback((collapsed: boolean) => {
