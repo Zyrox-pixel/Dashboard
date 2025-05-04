@@ -1212,8 +1212,8 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
         setIsRefreshingAll(false);
         setIsRefreshingProblems(false);
         
-        // Forcer un rechargement complet sans utiliser le cache
-        window.location.reload(true);
+        // Forcer un rechargement complet
+        window.location.reload();
       }, 1500);
       
     } catch (error) {
