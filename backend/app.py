@@ -490,6 +490,84 @@ def get_processes():
         return {'error': str(e)}
 
 
+@app.route('/api/management-zones/counts', methods=['GET'])
+@time_execution
+def get_management_zone_counts():
+    try:
+        # Récupérer la zone spécifiée dans les paramètres de requête
+        zone_name = request.args.get('zone')
+        if not zone_name:
+            return jsonify({'error': 'Le paramètre "zone" est requis'}), 400
+            
+        logger.info(f"Récupération des comptages pour la management zone: {zone_name}")
+        
+        # Stocker temporairement la MZ actuelle
+        current_mz = get_current_mz()
+        config_file = 'mz_config.json'
+        
+        try:
+            # Définir la management zone pour obtenir les données spécifiques
+            config = {'current_mz': zone_name}
+            with open(config_file, 'w') as f:
+                json.dump(config, f)
+                
+            # Effectuer les requêtes pour cette MZ spécifique
+            entity_selector_host = build_entity_selector("HOST", zone_name)
+            entity_selector_service = build_entity_selector("SERVICE", zone_name)
+            entity_selector_process = build_entity_selector("PROCESS_GROUP", zone_name)
+            
+            # Récupérer les entités de cette zone en parallèle
+            hosts_data = api_client.query_api("entities", {
+                "entitySelector": entity_selector_host,
+                "fields": "name,type"
+            })
+            
+            services_data = api_client.query_api("entities", {
+                "entitySelector": entity_selector_service,
+                "fields": "name,type"
+            })
+            
+            processes_data = api_client.query_api("entities", {
+                "entitySelector": entity_selector_process,
+                "fields": "name,type"
+            })
+            
+            # Compter le nombre d'hôtes, services et process groups
+            hosts_count = len(hosts_data.get('entities', [])) if hosts_data else 0
+            services_count = len(services_data.get('entities', [])) if services_data else 0
+            processes_count = len(processes_data.get('entities', [])) if processes_data else 0
+            
+            logger.info(f"Comptages pour {zone_name}: hosts={hosts_count}, services={services_count}, processes={processes_count}")
+            
+            # Restaurer la MZ d'origine
+            config = {'current_mz': current_mz}
+            with open(config_file, 'w') as f:
+                json.dump(config, f)
+            
+            # Retourner les comptages
+            return jsonify({
+                'counts': {
+                    'hosts': hosts_count,
+                    'services': services_count,
+                    'processes': processes_count
+                },
+                'zone': zone_name
+            })
+            
+        except Exception as e:
+            # En cas d'erreur, restaurer la MZ d'origine et propager l'erreur
+            config = {'current_mz': current_mz}
+            with open(config_file, 'w') as f:
+                json.dump(config, f)
+            
+            logger.error(f"Erreur lors de la récupération des comptages pour {zone_name}: {e}")
+            raise
+            
+    except Exception as e:
+        logger.error(f"Erreur lors de la récupération des comptages de MZ: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/management-zones', methods=['GET'])
 @cached('management_zones')
 @time_execution
