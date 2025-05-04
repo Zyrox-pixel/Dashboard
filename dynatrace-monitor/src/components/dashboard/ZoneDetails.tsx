@@ -1065,33 +1065,21 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
     }
   }, [isLoading, realCounts, zone.name]);
 
-  // État de chargement pour les détails de la zone
-  if (isLoading) {
-    return (
-      <div>
-        <button 
-          onClick={onBackClick}
-          className={`mb-5 flex items-center gap-2 px-4 py-1.5 rounded-lg border ${
-            isDarkTheme ? 'border-slate-600 text-slate-300 hover:bg-slate-700' : 'border-slate-300 text-slate-600 hover:bg-slate-100'
-          }`}
-        >
-          <ChevronLeft size={14} />
-          <span>Retour aux Management Zones</span>
-        </button>
-        
-        <div className="flex flex-col items-center justify-center h-64">
-          <Loader className="w-10 h-10 text-indigo-500 animate-spin mb-4" />
-          <p className="text-slate-400">Chargement des détails de la zone...</p>
-        </div>
-      </div>
-    );
-  }
-
   // États pour gérer les chargements locaux
   const [isRefreshingProblems, setIsRefreshingProblems] = useState(false);
   const [isRefreshingAll, setIsRefreshingAll] = useState(false);
   const [localRefreshNotification, setLocalRefreshNotification] = useState<string | null>(null);
   const [localZoneProblems, setLocalZoneProblems] = useState<Problem[]>([]);
+  
+  // Obtenir l'état de chargement des problèmes depuis le contexte
+  const appContext = useApp();
+  
+  // Mettre à jour l'état local quand l'état de chargement des problèmes change
+  useEffect(() => {
+    if (!isRefreshingAll) { // Ne pas écraser notre état local pendant un rafraîchissement direct
+      setIsRefreshingProblems(appContext.isLoading.problems);
+    }
+  }, [appContext.isLoading.problems, isRefreshingAll]);
   
   // Fonction pour rafraîchir directement les données de la zone
   const directRefreshZoneData = async () => {
@@ -1218,15 +1206,27 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
     }
   };
   
-  // Obtenir l'état de chargement des problèmes depuis le contexte
-  const appContext = useApp();
-  
-  // Mettre à jour l'état local quand l'état de chargement des problèmes change
-  useEffect(() => {
-    if (!isRefreshingAll) { // Ne pas écraser notre état local pendant un rafraîchissement direct
-      setIsRefreshingProblems(appContext.isLoading.problems);
-    }
-  }, [appContext.isLoading.problems, isRefreshingAll]);
+  // État de chargement pour les détails de la zone
+  if (isLoading) {
+    return (
+      <div>
+        <button 
+          onClick={onBackClick}
+          className={`mb-5 flex items-center gap-2 px-4 py-1.5 rounded-lg border ${
+            isDarkTheme ? 'border-slate-600 text-slate-300 hover:bg-slate-700' : 'border-slate-300 text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          <ChevronLeft size={14} />
+          <span>Retour aux Management Zones</span>
+        </button>
+        
+        <div className="flex flex-col items-center justify-center h-64">
+          <Loader className="w-10 h-10 text-indigo-500 animate-spin mb-4" />
+          <p className="text-slate-400">Chargement des détails de la zone...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>
