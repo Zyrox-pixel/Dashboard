@@ -1,10 +1,10 @@
 import React, { useMemo, useCallback, useState, useEffect } from 'react';
 import { ChevronLeft, Clock, AlertTriangle, ExternalLink, RefreshCw, Cpu, Activity, Server, Filter, Loader, Database, Search, ArrowUp, ArrowDown, X, Check, Monitor, Sliders } from 'lucide-react';
+import { useApp } from '../../contexts/AppContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { ManagementZone, Problem, ProcessGroup, Host, Service } from '../../api/types';
 import ProblemsList from './ProblemsList';
 import PaginatedTable, { Column } from '../common/PaginatedTable';
-import { useApp } from '../../contexts/AppContext';
 import AdvancedFilter, { FilterCategory, FilterValue, FilterItem } from '../common/AdvancedFilter';
 import FilterBadges, { FilterBadge } from '../common/FilterBadges';
 
@@ -1085,8 +1085,26 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
     );
   }
 
+  // Afficher une notification de chargement en cours si les problèmes se rafraîchissent
+  const [isRefreshingProblems, setIsRefreshingProblems] = useState(false);
+  
+  // Obtenir l'état de chargement des problèmes depuis le contexte
+  const appContext = useApp();
+  
+  // Mettre à jour l'état local quand l'état de chargement des problèmes change
+  useEffect(() => {
+    setIsRefreshingProblems(appContext.isLoading.problems);
+  }, [appContext.isLoading.problems]);
+
   return (
     <div>
+      {isRefreshingProblems && (
+        <div className="fixed bottom-5 right-5 bg-indigo-600 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 z-50 animate-pulse">
+          <RefreshCw size={16} className="animate-spin" />
+          <span>Rafraîchissement des problèmes en cours...</span>
+        </div>
+      )}
+    
       <button 
         onClick={onBackClick}
         className={`mb-5 flex items-center gap-2 px-4 py-1.5 rounded-lg border ${

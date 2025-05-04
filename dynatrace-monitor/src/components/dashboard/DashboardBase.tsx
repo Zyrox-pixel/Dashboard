@@ -112,6 +112,15 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
   
   // Gérer le clic sur le bouton retour
   const handleBackClick = () => {
+    // Avant d'effacer la zone, s'assurer que les problèmes ne sont pas en cours de chargement
+    if (isLoading.problems) {
+      console.log("Attendez que les problèmes finissent de se charger avant de retourner...");
+      // Ajouter un délai pour éviter de revenir pendant un refresh
+      setTimeout(() => {
+        setSelectedZone(null);
+      }, 500);
+      return;
+    }
     setSelectedZone(null);
   };
   

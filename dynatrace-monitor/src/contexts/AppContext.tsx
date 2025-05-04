@@ -816,8 +816,24 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
     const intervalId = setInterval(() => {
       console.log("Rafraîchissement automatique des problèmes actifs");
       // Récupérer le type de dashboard actuel (vfg ou vfe)
+      // Utilisons un indicateur visuel pour montrer que nous rafraîchissons sans bloquer
+      console.log("Démarrage d'un rafraîchissement en arrière-plan des problèmes");
+      
+      // Rafraîchissement asynchrone pour éviter de bloquer l'interface
       const currentDashboardType = window.location.pathname.includes('vfe') ? 'vfe' : 'vfg';
-      refreshData(currentDashboardType as 'vfg' | 'vfe', true);
+      
+      // Ne pas bloquer l'interface pendant le rafraîchissement
+      setState(prev => ({ ...prev, isLoading: { ...prev.isLoading, problems: true }}));
+      
+      setTimeout(() => {
+        refreshData(currentDashboardType as 'vfg' | 'vfe', true)
+          .then(() => {
+            console.log("Rafraîchissement des problèmes terminé");
+          })
+          .catch(err => {
+            console.error("Erreur lors du rafraîchissement des problèmes:", err);
+          });
+      }, 100); // Petit délai pour s'assurer que l'UI reste réactive
     }, refreshInterval);
     
     // Nettoyer l'intervalle lors du démontage du composant
