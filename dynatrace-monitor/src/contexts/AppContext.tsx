@@ -793,11 +793,11 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
   }, [state.selectedZone, state.vitalForGroupMZs, state.vitalForEntrepriseMZs, loadZoneData, apiClient, optimized, getZoneIcon, getZoneColor]);
 
   // Fonction pour rafraîchir les données - version non bloquante améliorée
-  const refreshData = useCallback(async (dashboardType?: 'vfg' | 'vfe', refreshProblemsOnly?: boolean) => {
+  const refreshData = useCallback(async (dashboardType?: 'vfg' | 'vfe', refreshProblemsOnly?: boolean): Promise<void> => {
     console.log(`Refreshing data for dashboard type: ${dashboardType || 'none'} ${refreshProblemsOnly ? '(problèmes uniquement)' : ''}`);
     setState(prev => ({ ...prev, error: null }));
     
-    // Retourner la promesse pour permettre la gestion d'erreurs
+    // Gérer les erreurs dans la fonction
     try {
       // Exécuter loadAllData de manière non bloquante si on est dans un contexte de zone détaillée
       if (refreshProblemsOnly && window.location.pathname.includes('/zone/')) {
@@ -813,11 +813,11 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
         }));
         
         // Exécuter loadAllData avec un timeout court pour s'assurer que l'UI reste réactive
-        return new Promise((resolve, reject) => {
+        await new Promise<void>((resolve, reject) => {
           setTimeout(async () => {
             try {
               await loadAllData(dashboardType, true);
-              resolve(true);
+              resolve();
             } catch (error) {
               console.error("Erreur dans le rafraîchissement asynchrone:", error);
               reject(error);
@@ -834,7 +834,7 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
         });
       } else {
         // Dans les autres cas, exécuter normalement
-        return await loadAllData(dashboardType, refreshProblemsOnly || false);
+        await loadAllData(dashboardType, refreshProblemsOnly || false);
       }
     } catch (error) {
       console.error("Erreur dans refreshData:", error);
@@ -846,7 +846,7 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
         },
         error: "Erreur lors du rafraîchissement des données"
       }));
-      throw error; // Propager l'erreur pour la gestion en amont
+      // L'erreur est gérée localement, ne pas la propager
     }
   }, [loadAllData]);
 
