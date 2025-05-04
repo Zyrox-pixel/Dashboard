@@ -501,67 +501,62 @@ def get_management_zone_counts():
             
         logger.info(f"Récupération des comptages pour la management zone: {zone_name}")
         
-        # Stocker temporairement la MZ actuelle
-        current_mz = get_current_mz()
-        config_file = 'mz_config.json'
-        
-        try:
-            # Définir la management zone pour obtenir les données spécifiques
-            config = {'current_mz': zone_name}
-            with open(config_file, 'w') as f:
-                json.dump(config, f)
+        # Fonction pour récupérer le nombre d'entités par type
+        def get_entity_count(entity_type, mz_name):
+            try:
+                # Construire l'URL API
+                api_url = f"{DT_ENV_URL}/api/v2/entities"
+                headers = {
+                    'Authorization': f'Api-Token {API_TOKEN}',
+                    'Accept': 'application/json'
+                }
                 
-            # Effectuer les requêtes pour cette MZ spécifique
-            entity_selector_host = build_entity_selector("HOST", zone_name)
-            entity_selector_service = build_entity_selector("SERVICE", zone_name)
-            entity_selector_process = build_entity_selector("PROCESS_GROUP", zone_name)
+                # Paramètres pour ne récupérer que le comptage
+                params = {
+                    'entitySelector': f'type({entity_type}),mzName("{mz_name}")',
+                    'pageSize': 1
+                }
+                
+                logger.info(f"Requête API: {api_url} avec sélecteur: {params['entitySelector']}")
+                
+                # Effectuer la requête HTTP
+                response = requests.get(api_url, headers=headers, params=params, verify=False)
+                response.raise_for_status()
+                data = response.json()
+                
+                # Retourner le nombre total
+                count = data.get('totalCount', 0)
+                logger.info(f"Comptage pour {entity_type} dans {mz_name}: {count}")
+                return count
+                
+            except Exception as e:
+                logger.error(f"Erreur lors du comptage des {entity_type} pour {mz_name}: {e}")
+                return 0
+        
+        # Récupérer les comptages en parallèle avec threads
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+            # Soumettre les tâches
+            host_future = executor.submit(get_entity_count, "HOST", zone_name)
+            service_future = executor.submit(get_entity_count, "SERVICE", zone_name)
+            process_future = executor.submit(get_entity_count, "PROCESS_GROUP", zone_name)
             
-            # Récupérer les entités de cette zone en parallèle
-            hosts_data = api_client.query_api("entities", {
-                "entitySelector": entity_selector_host,
-                "fields": "name,type"
-            })
-            
-            services_data = api_client.query_api("entities", {
-                "entitySelector": entity_selector_service,
-                "fields": "name,type"
-            })
-            
-            processes_data = api_client.query_api("entities", {
-                "entitySelector": entity_selector_process,
-                "fields": "name,type"
-            })
-            
-            # Compter le nombre d'hôtes, services et process groups
-            hosts_count = len(hosts_data.get('entities', [])) if hosts_data else 0
-            services_count = len(services_data.get('entities', [])) if services_data else 0
-            processes_count = len(processes_data.get('entities', [])) if processes_data else 0
-            
-            logger.info(f"Comptages pour {zone_name}: hosts={hosts_count}, services={services_count}, processes={processes_count}")
-            
-            # Restaurer la MZ d'origine
-            config = {'current_mz': current_mz}
-            with open(config_file, 'w') as f:
-                json.dump(config, f)
-            
-            # Retourner les comptages
-            return jsonify({
-                'counts': {
-                    'hosts': hosts_count,
-                    'services': services_count,
-                    'processes': processes_count
-                },
-                'zone': zone_name
-            })
-            
-        except Exception as e:
-            # En cas d'erreur, restaurer la MZ d'origine et propager l'erreur
-            config = {'current_mz': current_mz}
-            with open(config_file, 'w') as f:
-                json.dump(config, f)
-            
-            logger.error(f"Erreur lors de la récupération des comptages pour {zone_name}: {e}")
-            raise
+            # Récupérer les résultats
+            hosts_count = host_future.result()
+            services_count = service_future.result()
+            processes_count = process_future.result()
+        
+        logger.info(f"Comptages pour {zone_name}: hosts={hosts_count}, services={services_count}, processes={processes_count}")
+        
+        # Retourner les comptages
+        return jsonify({
+            'counts': {
+                'hosts': hosts_count,
+                'services': services_count,
+                'processes': processes_count
+            },
+            'zone': zone_name
+        })
             
     except Exception as e:
         logger.error(f"Erreur lors de la récupération des comptages de MZ: {e}")

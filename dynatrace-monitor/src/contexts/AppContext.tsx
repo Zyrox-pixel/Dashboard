@@ -505,43 +505,117 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
       
       if (!refreshProblemsOnly) {
         if (vfgResponse && !vfgResponse.error && vfgResponse.data?.mzs) {
-          // Utiliser les vraies données de l'API
-          vfgMZs = vfgResponse.data.mzs.map(mzName => ({
-            id: `env-${mzName.replace(/\s+/g, '-')}`,
-            name: mzName,
-            code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
-            icon: getZoneIcon(mzName),
-            problemCount: 0,
-            // Récupérer ces données depuis l'API lors de la sélection de chaque zone
-            apps: 0,    // Sera rempli lors de la sélection de la zone
-            services: 0, // Sera rempli lors de la sélection de la zone
-            hosts: 0,    // Sera rempli lors de la sélection de la zone
-            availability: "99.99%", // Sera calculé lors de la sélection de la zone
-            status: "healthy" as "healthy" | "warning",
-            color: getZoneColor(mzName),
-            dt_url: "#"
-          }));
+          // Obtenir les comptages pour chaque zone en parallèle
+          const mzPromises = vfgResponse.data.mzs.map(async (mzName) => {
+            try {
+              console.log(`Récupération des comptages pour la MZ VFG: ${mzName}`);
+              
+              // Récupérer les comptages depuis l'API
+              const response = await fetch(`${API_BASE_URL}/management-zones/counts?zone=${encodeURIComponent(mzName)}`);
+              
+              if (response.ok) {
+                const data = await response.json();
+                const counts = data.counts || { hosts: 0, services: 0, processes: 0 };
+                console.log(`Comptages reçus pour ${mzName}:`, counts);
+                
+                return {
+                  id: `env-${mzName.replace(/\s+/g, '-')}`,
+                  name: mzName,
+                  code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
+                  icon: getZoneIcon(mzName),
+                  problemCount: 0,
+                  apps: counts.processes,
+                  services: counts.services,
+                  hosts: counts.hosts,
+                  availability: "99.99%", // Pour l'instant, valeur par défaut
+                  status: "healthy" as "healthy" | "warning",
+                  color: getZoneColor(mzName),
+                  dt_url: "#"
+                };
+              } else {
+                console.error(`Erreur ${response.status} pour ${mzName}: ${await response.text()}`);
+                throw new Error(`Erreur API ${response.status}`);
+              }
+            } catch (error) {
+              console.error(`Erreur pour ${mzName}:`, error);
+              // En cas d'erreur, retourner un objet avec des comptages à 0
+              return {
+                id: `env-${mzName.replace(/\s+/g, '-')}`,
+                name: mzName,
+                code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
+                icon: getZoneIcon(mzName),
+                problemCount: 0,
+                apps: 0,
+                services: 0,
+                hosts: 0,
+                availability: "99.99%",
+                status: "healthy" as "healthy" | "warning",
+                color: getZoneColor(mzName),
+                dt_url: "#"
+              };
+            }
+          });
+          
+          // Attendre la résolution de toutes les promesses
+          vfgMZs = await Promise.all(mzPromises);
           
           setState(prev => ({ ...prev, vitalForGroupMZs: vfgMZs }));
         }
         
         if (vfeResponse && !vfeResponse.error && vfeResponse.data?.mzs) {
-          // Utiliser les vraies données de l'API
-          vfeMZs = vfeResponse.data.mzs.map(mzName => ({
-            id: `env-${mzName.replace(/\s+/g, '-')}`,
-            name: mzName,
-            code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
-            icon: getZoneIcon(mzName),
-            problemCount: 0,
-            // Récupérer ces données depuis l'API lors de la sélection de chaque zone
-            apps: 0,    // Sera rempli lors de la sélection de la zone
-            services: 0, // Sera rempli lors de la sélection de la zone
-            hosts: 0,    // Sera rempli lors de la sélection de la zone
-            availability: "99.99%", // Sera calculé lors de la sélection de la zone
-            status: "healthy" as "healthy" | "warning",
-            color: getZoneColor(mzName),
-            dt_url: "#"
-          }));
+          // Obtenir les comptages pour chaque zone en parallèle
+          const mzPromises = vfeResponse.data.mzs.map(async (mzName) => {
+            try {
+              console.log(`Récupération des comptages pour la MZ VFE: ${mzName}`);
+              
+              // Récupérer les comptages depuis l'API
+              const response = await fetch(`${API_BASE_URL}/management-zones/counts?zone=${encodeURIComponent(mzName)}`);
+              
+              if (response.ok) {
+                const data = await response.json();
+                const counts = data.counts || { hosts: 0, services: 0, processes: 0 };
+                console.log(`Comptages reçus pour ${mzName}:`, counts);
+                
+                return {
+                  id: `env-${mzName.replace(/\s+/g, '-')}`,
+                  name: mzName,
+                  code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
+                  icon: getZoneIcon(mzName),
+                  problemCount: 0,
+                  apps: counts.processes,
+                  services: counts.services,
+                  hosts: counts.hosts,
+                  availability: "99.99%", // Pour l'instant, valeur par défaut
+                  status: "healthy" as "healthy" | "warning",
+                  color: getZoneColor(mzName),
+                  dt_url: "#"
+                };
+              } else {
+                console.error(`Erreur ${response.status} pour ${mzName}: ${await response.text()}`);
+                throw new Error(`Erreur API ${response.status}`);
+              }
+            } catch (error) {
+              console.error(`Erreur pour ${mzName}:`, error);
+              // En cas d'erreur, retourner un objet avec des comptages à 0
+              return {
+                id: `env-${mzName.replace(/\s+/g, '-')}`,
+                name: mzName,
+                code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
+                icon: getZoneIcon(mzName),
+                problemCount: 0,
+                apps: 0,
+                services: 0,
+                hosts: 0,
+                availability: "99.99%",
+                status: "healthy" as "healthy" | "warning",
+                color: getZoneColor(mzName),
+                dt_url: "#"
+              };
+            }
+          });
+          
+          // Attendre la résolution de toutes les promesses
+          vfeMZs = await Promise.all(mzPromises);
           
           setState(prev => ({ ...prev, vitalForEntrepriseMZs: vfeMZs }));
         }
