@@ -46,11 +46,19 @@ class OptimizedAPIClient:
         self.cache = {}
         self.cache_lock = threading.Lock()
         
+        # Configuration avancée des retries
+        retry_strategy = requests.adapters.Retry(
+            total=5,  # Nombre max de retries
+            backoff_factor=0.5,  # Facteur pour le délai exponentiel
+            status_forcelist=[408, 429, 500, 502, 503, 504],  # Statuts HTTP qui déclenchent un retry
+            allowed_methods=["GET"]  # Méthodes HTTP qui déclenchent un retry
+        )
+        
         # Configuration avancée des connexions
         adapter = requests.adapters.HTTPAdapter(
             pool_connections=max_connections,
             pool_maxsize=max_connections,
-            max_retries=3,
+            max_retries=retry_strategy,
             pool_block=False  # Ne pas bloquer lorsque le pool est plein
         )
         
@@ -63,6 +71,9 @@ class OptimizedAPIClient:
             'Accept': 'application/json'
         })
         self.session.verify = self.verify_ssl
+        
+        # Définir un timeout par défaut plus long
+        self.default_timeout = (30, 120)  # (connect timeout, read timeout)
         
         # Utiliser des sémaphores pour contrôler l'accès aux ressources
         self.semaphore = threading.BoundedSemaphore(value=self.max_connections)
@@ -114,12 +125,26 @@ class OptimizedAPIClient:
             with self.request_count_lock:
                 self.request_count += 1
             
+            # Utiliser le timeout par défaut si aucun n'est spécifié
+            if 'timeout' not in kwargs:
+                kwargs['timeout'] = self.default_timeout
+            
+            # Ajouter un log pour le debugging
+            logger.info(f"Requête {method} vers {url} avec timeout={kwargs.get('timeout')}")
+            
             try:
                 response = self.session.request(method, url, **kwargs)
                 response.raise_for_status()
                 return response
+            except requests.exceptions.Timeout as e:
+                logger.error(f"Timeout pour la requête {url}: {e}")
+                # Les timeouts sont gérés par la stratégie de retry configurée dans le session
+                raise
+            except requests.exceptions.ConnectionError as e:
+                logger.error(f"Erreur de connexion pour {url}: {e}")
+                raise
             except requests.exceptions.RequestException as e:
-                logger.error(f"Erreur de requête HTTP: {e}")
+                logger.error(f"Erreur de requête HTTP pour {url}: {e}")
                 raise
             finally:
                 # Libérer la connexion explicitement

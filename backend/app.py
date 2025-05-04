@@ -416,10 +416,11 @@ def get_services():
         # Utiliser la fonction build_entity_selector
         entity_selector = build_entity_selector("SERVICE", current_mz)
         
-        # Récupérer les entités services
+        # Récupérer les entités services avec une taille de page augmentée
         services_data = api_client.query_api("entities", {
             "entitySelector": entity_selector,
-            "fields": "+properties,+fromRelationships"
+            "fields": "+properties,+fromRelationships",
+            "pageSize": 1000  # Augmenter la taille de la page pour récupérer jusqu'à 1000 services, comme pour les process groups
         })
         
         # Extraire les IDs des services

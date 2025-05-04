@@ -43,13 +43,7 @@ const ManagementZoneRow: React.FC<ManagementZoneRowProps> = ({ zone, onZoneClick
       {/* Services */}
       <div className="col-span-2 text-right">
         <div className="text-xs text-slate-500 mb-1 dark:text-slate-500">Services:</div>
-        <div className="font-medium text-white dark:text-white">
-          {zone.services === 0 && zone.hosts > 0 ? (
-            <span className="text-yellow-400">Chargement...</span>
-          ) : (
-            zone.services
-          )}
-        </div>
+        <div className="font-medium text-white dark:text-white">{zone.services}</div>
       </div>
       
       {/* Hôtes */}
