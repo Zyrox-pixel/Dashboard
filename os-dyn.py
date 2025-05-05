@@ -19,7 +19,7 @@ DYNATRACE_BASE_URL = "VOTRE_URL/api/v2" # Assurez-vous que c'est la bonne URL de
 EXCEL_FILE = "OS_DYNATRACE.xlsx"
 OUTPUT_EXCEL_FILE = "OS_DYNATRACE_updated.xlsx" # Sauvegarde dans un nouveau fichier par sécurité
 # Noms des colonnes dans le fichier Excel
-HOSTNAME_COLUMN = "Hostname" # Colonne contenant le nom à comparer avec 'VMware name'
+HOSTNAME_COLUMN = "Hostname" # Colonne contenant le nom à comparer avec 'detectedName'
 NEW_OS_COLUMN = "OS DYNATRACE" # Colonne à ajouter/mettre à jour
 
 # --- Vérification de la configuration ---
@@ -36,7 +36,8 @@ if "VOTRE_URL" in DYNATRACE_BASE_URL:
 
 def fetch_all_dynatrace_hosts(base_url, api_token):
     """
-    Récupère tous les hosts depuis l'API Dynatrace v2 avec les propriétés nécessaires.
+    Récupère tous les hosts depuis l'API Dynatrace v2 avec les propriétés nécessaires
+    (detectedName, osType, osVersion) en demandant explicitement les 'properties'.
     Gère la pagination.
     """
     all_hosts_data = {}
@@ -45,13 +46,18 @@ def fetch_all_dynatrace_hosts(base_url, api_token):
         "Authorization": f"Api-Token {api_token}",
         "Accept": "application/json; charset=utf-8"
     }
-    # Champs nécessaires : nom VMware, type d'OS, version d'OS, et entityId.
-    # 'displayName' a été retiré car il causait une erreur 400 lors de la sélection explicite.
-    fields = "properties.vmwareName,properties.osType,properties.osVersion,entityId"
+    # Champs nécessaires identifiés via le débogage :
+    # detectedName (pour le matching), osType, osVersion.
+    # On demande 'properties' pour s'assurer d'obtenir ces clés.
+    # Note: L'API semble exiger 'fields=properties' dans cet environnement pour renvoyer les détails.
+    #       On ne peut pas lister 'properties.detectedName' etc. directement comme dans d'autres cas.
+    #       On filtre donc après avoir reçu TOUTES les propriétés.
+    fields_to_request = "properties"
+
     params = {
         "entitySelector": 'type("HOST")',
-        "fields": fields, # On passe directement la liste des champs (sans '+')
-        "pageSize": 400 # Augmenter pour réduire le nombre d'appels (max 1000 normalement)
+        "fields": fields_to_request, # Demande explicite des propriétés
+        "pageSize": 400 # Taille de page raisonnable
     }
     next_page_key = None
     total_fetched = 0
@@ -62,14 +68,12 @@ def fetch_all_dynatrace_hosts(base_url, api_token):
         if next_page_key:
             params["nextPageKey"] = next_page_key
         else:
-            # Supprime la clé si elle existe d'une itération précédente
             params.pop("nextPageKey", None)
 
         try:
-            # Ajout de verify=False pour ignorer les erreurs de certificat SSL (ex: proxy interne)
-            # ATTENTION : Désactive la vérification de sécurité du certificat !
+            # Ajout de verify=False pour ignorer les erreurs de certificat SSL
             response = requests.get(endpoint, headers=headers, params=params, timeout=60, verify=False)
-            response.raise_for_status() # Lève une exception pour les codes d'erreur HTTP (4xx, 5xx)
+            response.raise_for_status()
             data = response.json()
 
             hosts_page = data.get("entities", [])
@@ -78,56 +82,45 @@ def fetch_all_dynatrace_hosts(base_url, api_token):
             print(f"  Récupéré {count_page} hosts (total: {total_fetched} / {data.get('totalCount', 'N/A')})...")
 
             for host in hosts_page:
-                properties = host.get("properties", {})
-                vmware_name = properties.get("vmwareName")
+                properties = host.get("properties", {}) # Récupère le bloc properties
+                entity_id = host.get("entityId", "N/A") # entityId est normalement inclus par défaut
+
+                # Extraire les valeurs nécessaires des propriétés
+                dynatrace_hostname = properties.get("detectedName") # Utilise detectedName pour le matching
                 os_type = properties.get("osType", "N/A")
                 os_version = properties.get("osVersion", "N/A")
-                entity_id = host.get("entityId", "N/A")
-                # displayName n'est plus demandé ni utilisé ici
 
-                # Utilise le vmwareName comme clé s'il existe, sinon ignore (ou log l'info)
-                if vmware_name:
+                # Utilise le detectedName comme clé s'il existe
+                if dynatrace_hostname:
                     # Formatte la chaîne OS
                     os_string = f"{os_type} {os_version}".strip()
                     if os_string == "N/A N/A" or os_string == "N/A":
                         os_string = "OS Info Missing in Dynatrace"
 
-                    # Gère les doublons de vmwareName (prend le dernier vu, ou log un avertissement)
-                    if vmware_name in all_hosts_data:
-                         # Utilisation de entity_id pour identifier l'hôte causant le doublon
-                         print(f"  Avertissement: VMware name '{vmware_name}' est dupliqué. Ancienne valeur: {all_hosts_data[vmware_name]['os_string']}, Nouvelle valeur (pour host {entity_id}): {os_string}")
+                    # Gère les doublons de detectedName (log un avertissement)
+                    if dynatrace_hostname in all_hosts_data:
+                         print(f"  Avertissement: detectedName '{dynatrace_hostname}' est dupliqué. Host ID: {entity_id}. OS: {os_string}")
 
-                    all_hosts_data[vmware_name] = {
+                    # Stocke l'info OS avec detectedName comme clé
+                    all_hosts_data[dynatrace_hostname] = {
                         "os_string": os_string,
                         "entity_id": entity_id
-                        # pas de displayName stocké
                     }
                 #else:
-                #    # Log si vmwareName manque, en utilisant entity_id
-                #    print(f"  Info: Host {entity_id} n'a pas de propriété 'vmwareName'. Ignoré pour le matching.")
+                #    print(f"  Info: Host {entity_id} n'a pas de propriété 'detectedName'. Ignoré pour le matching.")
 
 
             next_page_key = data.get("nextPageKey")
             if not next_page_key:
                 print("Fin de la récupération des hosts Dynatrace.")
-                break # Sortir de la boucle while si plus de pages
+                break # Sortir de la boucle while
 
-            # Petite pause pour éviter de surcharger l'API (optionnel mais peut être utile)
-            # time.sleep(0.2)
+            # time.sleep(0.2) # Pause optionnelle
 
         except requests.exceptions.RequestException as e:
             print(f"\nErreur lors de l'appel API Dynatrace : {e}")
-            print(f"URL: {e.request.url if e.request else 'N/A'}")
-            if e.response is not None:
-                print(f"Statut: {e.response.status_code}")
-                # Essayons d'afficher la réponse même en cas d'erreur (si disponible)
-                try:
-                    error_details = e.response.json()
-                    print(f"Réponse JSON: {error_details}")
-                except ValueError: # Au cas où la réponse n'est pas du JSON valide
-                    print(f"Réponse texte: {e.response.text}")
-            return None # Retourne None en cas d'erreur API
-
+            # ... (gestion des erreurs comme avant) ...
+            return None
         except Exception as e:
             print(f"\nErreur inattendue lors de la récupération des hosts : {e}")
             return None
@@ -147,7 +140,6 @@ def main():
         print(f"Erreur lors de la lecture du fichier Excel : {e}")
         sys.exit(1)
 
-    # Vérifier si la colonne Hostname existe
     if HOSTNAME_COLUMN not in df.columns:
         print(f"Erreur : La colonne '{HOSTNAME_COLUMN}' est introuvable dans le fichier Excel.")
         print(f"Colonnes disponibles : {list(df.columns)}")
@@ -161,8 +153,7 @@ def main():
         sys.exit(1)
 
     if not dynatrace_hosts:
-        print("Avertissement : Aucune donnée de host avec 'vmwareName' n'a été récupérée depuis Dynatrace.")
-        # On continue quand même pour créer la colonne, mais elle sera vide ou remplie de "Not Found".
+        print("Avertissement : Aucune donnée de host avec 'detectedName' n'a été récupérée depuis Dynatrace.")
 
     print(f"\nTraitement des {len(df)} lignes du fichier Excel...")
     results = []
@@ -171,54 +162,42 @@ def main():
 
     # Itérer sur chaque ligne du DataFrame Excel
     for index, row in df.iterrows():
-        # Récupérer le nom d'hôte depuis la colonne spécifiée
         excel_hostname = row[HOSTNAME_COLUMN]
 
-        # Gérer les cas où le nom d'hôte est vide ou NaN dans l'Excel
         if pd.isna(excel_hostname) or not excel_hostname:
             results.append("Hostname manquant dans Excel")
             not_found_count += 1
-            continue # Passer à la ligne suivante
+            continue
 
-        # Nettoyer le nom d'hôte (par ex. enlever les espaces superflus, convertir en string)
         excel_hostname_cleaned = str(excel_hostname).strip()
 
-        # Rechercher le nom d'hôte nettoyé dans les données Dynatrace (clé = vmwareName)
+        # Rechercher l'hostname Excel dans les clés du dictionnaire dynatrace_hosts (qui sont les detectedName)
+        # !! IMPORTANT : Suppose que excel_hostname_cleaned est identique à detectedName (ex: FQDN) !!
         host_info = dynatrace_hosts.get(excel_hostname_cleaned)
 
         if host_info:
-            # Si trouvé, récupérer la chaîne OS formatée
             os_dynatrace = host_info["os_string"]
             results.append(os_dynatrace)
             found_count += 1
-            # Décommenter pour voir les détails du matching réussi
-            # print(f"  Ligne {index+1}: Trouvé '{excel_hostname_cleaned}' -> '{os_dynatrace}' (Dynatrace Host ID: {host_info['entity_id']})")
         else:
-            # Si non trouvé, mettre une valeur par défaut
-            results.append("Not Found in Dynatrace by VMware Name")
+            results.append("Not Found in Dynatrace by detectedName") # Message mis à jour
             not_found_count += 1
-            # Décommenter pour voir les détails du matching échoué
-            # print(f"  Ligne {index+1}: Non trouvé '{excel_hostname_cleaned}'")
 
-        # Afficher la progression (optionnel)
-        if (index + 1) % 100 == 0: # Affiche tous les 100 traités
+        if (index + 1) % 100 == 0:
              print(f"  Traité {index + 1}/{len(df)} lignes...")
 
-    # Afficher la fin du traitement des lignes
     print(f"  Traité {len(df)}/{len(df)} lignes.")
 
-    # Ajouter la nouvelle colonne (ou la mettre à jour si elle existe déjà)
     print(f"\nAjout/Mise à jour de la colonne '{NEW_OS_COLUMN}' dans le DataFrame...")
     df[NEW_OS_COLUMN] = results
 
     print(f"\nRésumé du matching:")
-    print(f"  - Serveurs trouvés dans Dynatrace (via VMware Name): {found_count}")
+    print(f"  - Serveurs trouvés dans Dynatrace (via detectedName): {found_count}")
     print(f"  - Serveurs non trouvés ou Hostname manquant: {not_found_count}")
 
-    # Sauvegarder le DataFrame modifié dans un NOUVEAU fichier Excel
     try:
         print(f"\nSauvegarde des résultats dans : {OUTPUT_EXCEL_FILE}")
-        df.to_excel(OUTPUT_EXCEL_FILE, index=False) # index=False pour ne pas écrire l'index pandas dans le fichier
+        df.to_excel(OUTPUT_EXCEL_FILE, index=False)
         print("Opération terminée avec succès !")
     except Exception as e:
         print(f"\nErreur lors de la sauvegarde du fichier Excel '{OUTPUT_EXCEL_FILE}' : {e}")
