@@ -3,12 +3,18 @@ import requests
 import os
 import sys
 import time
+import urllib3 # Ajouté pour désactiver les avertissements SSL
+
+# --- Désactivation des avertissements SSL ---
+# Utilisé car verify=False est ajouté plus bas.
+# ATTENTION : Cela désactive une vérification de sécurité. Utilisez avec prudence.
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # --- Configuration ---
 # !! Sécurité : Récupérer le token depuis une variable d'environnement !!
 DYNATRACE_API_TOKEN = os.getenv("DYNATRACE_API_TOKEN")
 # Remplacez VOTRE_URL par votre URL d'environnement Dynatrace (ex: https://abc12345.live.dynatrace.com)
-DYNATRACE_BASE_URL = "VOTRE_URL/api/v2"
+DYNATRACE_BASE_URL = "VOTRE_URL/api/v2" # Assurez-vous que c'est la bonne URL de base API v2
 # Nom du fichier Excel d'entrée et de sortie
 EXCEL_FILE = "OS_DYNATRACE.xlsx"
 OUTPUT_EXCEL_FILE = "OS_DYNATRACE_updated.xlsx" # Sauvegarde dans un nouveau fichier par sécurité
@@ -39,11 +45,12 @@ def fetch_all_dynatrace_hosts(base_url, api_token):
         "Authorization": f"Api-Token {api_token}",
         "Accept": "application/json; charset=utf-8"
     }
-    # Champs nécessaires : nom VMware, type d'OS, version d'OS
-    fields = "properties.vmwareName,properties.osType,properties.osVersion,entityId,displayName"
+    # Champs nécessaires : nom VMware, type d'OS, version d'OS, et entityId.
+    # 'displayName' a été retiré car il causait une erreur 400 lors de la sélection explicite.
+    fields = "properties.vmwareName,properties.osType,properties.osVersion,entityId"
     params = {
         "entitySelector": 'type("HOST")',
-        "fields": f"+{fields}",
+        "fields": fields, # On passe directement la liste des champs (sans '+')
         "pageSize": 400 # Augmenter pour réduire le nombre d'appels (max 1000 normalement)
     }
     next_page_key = None
@@ -59,7 +66,9 @@ def fetch_all_dynatrace_hosts(base_url, api_token):
             params.pop("nextPageKey", None)
 
         try:
-            response = requests.get(endpoint, headers=headers, params=params, timeout=60) # Timeout de 60s
+            # Ajout de verify=False pour ignorer les erreurs de certificat SSL (ex: proxy interne)
+            # ATTENTION : Désactive la vérification de sécurité du certificat !
+            response = requests.get(endpoint, headers=headers, params=params, timeout=60, verify=False)
             response.raise_for_status() # Lève une exception pour les codes d'erreur HTTP (4xx, 5xx)
             data = response.json()
 
@@ -74,26 +83,28 @@ def fetch_all_dynatrace_hosts(base_url, api_token):
                 os_type = properties.get("osType", "N/A")
                 os_version = properties.get("osVersion", "N/A")
                 entity_id = host.get("entityId", "N/A")
-                display_name = host.get("displayName", "N/A")
+                # displayName n'est plus demandé ni utilisé ici
 
                 # Utilise le vmwareName comme clé s'il existe, sinon ignore (ou log l'info)
                 if vmware_name:
                     # Formatte la chaîne OS
                     os_string = f"{os_type} {os_version}".strip()
-                    if os_string == "N/A N/A":
+                    if os_string == "N/A N/A" or os_string == "N/A":
                         os_string = "OS Info Missing in Dynatrace"
 
                     # Gère les doublons de vmwareName (prend le dernier vu, ou log un avertissement)
                     if vmware_name in all_hosts_data:
-                         print(f"  Avertissement: VMware name '{vmware_name}' est dupliqué. Ancienne valeur: {all_hosts_data[vmware_name]['os_string']}, Nouvelle valeur (pour host {entity_id}/{display_name}): {os_string}")
-                    
+                         # Utilisation de entity_id pour identifier l'hôte causant le doublon
+                         print(f"  Avertissement: VMware name '{vmware_name}' est dupliqué. Ancienne valeur: {all_hosts_data[vmware_name]['os_string']}, Nouvelle valeur (pour host {entity_id}): {os_string}")
+
                     all_hosts_data[vmware_name] = {
                         "os_string": os_string,
-                        "entity_id": entity_id,
-                        "display_name": display_name
+                        "entity_id": entity_id
+                        # pas de displayName stocké
                     }
                 #else:
-                #    print(f"  Info: Host {entity_id} ('{display_name}') n'a pas de propriété 'vmwareName'. Ignoré pour le matching.")
+                #    # Log si vmwareName manque, en utilisant entity_id
+                #    print(f"  Info: Host {entity_id} n'a pas de propriété 'vmwareName'. Ignoré pour le matching.")
 
 
             next_page_key = data.get("nextPageKey")
@@ -101,15 +112,20 @@ def fetch_all_dynatrace_hosts(base_url, api_token):
                 print("Fin de la récupération des hosts Dynatrace.")
                 break # Sortir de la boucle while si plus de pages
 
-            # Petite pause pour éviter de surcharger l'API (optionnel mais recommandé)
-            # time.sleep(0.5)
+            # Petite pause pour éviter de surcharger l'API (optionnel mais peut être utile)
+            # time.sleep(0.2)
 
         except requests.exceptions.RequestException as e:
             print(f"\nErreur lors de l'appel API Dynatrace : {e}")
             print(f"URL: {e.request.url if e.request else 'N/A'}")
             if e.response is not None:
                 print(f"Statut: {e.response.status_code}")
-                print(f"Réponse: {e.response.text}")
+                # Essayons d'afficher la réponse même en cas d'erreur (si disponible)
+                try:
+                    error_details = e.response.json()
+                    print(f"Réponse JSON: {error_details}")
+                except ValueError: # Au cas où la réponse n'est pas du JSON valide
+                    print(f"Réponse texte: {e.response.text}")
             return None # Retourne None en cas d'erreur API
 
         except Exception as e:
@@ -164,7 +180,7 @@ def main():
             not_found_count += 1
             continue # Passer à la ligne suivante
 
-        # Nettoyer le nom d'hôte (par ex. enlever les espaces superflus)
+        # Nettoyer le nom d'hôte (par ex. enlever les espaces superflus, convertir en string)
         excel_hostname_cleaned = str(excel_hostname).strip()
 
         # Rechercher le nom d'hôte nettoyé dans les données Dynatrace (clé = vmwareName)
@@ -175,17 +191,21 @@ def main():
             os_dynatrace = host_info["os_string"]
             results.append(os_dynatrace)
             found_count += 1
-            # print(f"  Trouvé: '{excel_hostname_cleaned}' -> '{os_dynatrace}' (Dynatrace Host: {host_info['display_name']}/{host_info['entity_id']})")
+            # Décommenter pour voir les détails du matching réussi
+            # print(f"  Ligne {index+1}: Trouvé '{excel_hostname_cleaned}' -> '{os_dynatrace}' (Dynatrace Host ID: {host_info['entity_id']})")
         else:
             # Si non trouvé, mettre une valeur par défaut
             results.append("Not Found in Dynatrace by VMware Name")
             not_found_count += 1
-            # print(f"  Non trouvé: '{excel_hostname_cleaned}'")
+            # Décommenter pour voir les détails du matching échoué
+            # print(f"  Ligne {index+1}: Non trouvé '{excel_hostname_cleaned}'")
 
         # Afficher la progression (optionnel)
-        if (index + 1) % 50 == 0:
+        if (index + 1) % 100 == 0: # Affiche tous les 100 traités
              print(f"  Traité {index + 1}/{len(df)} lignes...")
 
+    # Afficher la fin du traitement des lignes
+    print(f"  Traité {len(df)}/{len(df)} lignes.")
 
     # Ajouter la nouvelle colonne (ou la mettre à jour si elle existe déjà)
     print(f"\nAjout/Mise à jour de la colonne '{NEW_OS_COLUMN}' dans le DataFrame...")
