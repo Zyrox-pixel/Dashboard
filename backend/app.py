@@ -543,7 +543,7 @@ def get_processes():
                 tech_info = api_client.extract_technology(pg_id)
                 
                 # Récupérer l'URL Dynatrace de l'entité
-                dt_url = f"{DT_ENV_URL}/#entity/{pg_id}"
+                dt_url = f"{DT_ENV_URL}/ui/entity/{pg_id}"
                 
                 process_metrics.append({
                     'id': pg_id,
@@ -697,7 +697,7 @@ def get_management_zones():
                 management_zones.append({
                     'id': f"env-{i}",
                     'name': mz_name,
-                    'dt_url': f"{DT_ENV_URL}/#settings/managementzones"
+                    'dt_url': f"{DT_ENV_URL}/ui/settings/managementzones"
                 })
             
             logger.info(f"Trouvé {len(management_zones)} management zones depuis le fichier .env")
@@ -720,7 +720,7 @@ def get_management_zones():
             management_zones.append({
                 'id': mz.get('id'),
                 'name': mz.get('name'),
-                'dt_url': f"{DT_ENV_URL}/#settings/managementzones;id={mz.get('id')}"
+                'dt_url': f"{DT_ENV_URL}/ui/settings/managementzones;id={mz.get('id')}"
             })
         
         logger.info(f"Trouvé {len(management_zones)} management zones")

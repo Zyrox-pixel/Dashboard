@@ -831,7 +831,7 @@ class OptimizedAPIClient:
                 'status': service_status,
                 'technology': tech_info['name'],
                 'tech_icon': tech_info['icon'],
-                'dt_url': f"{self.env_url}/#entity/{service_id}",
+                'dt_url': f"{self.env_url}/ui/entity/{service_id}",
                 'response_time_history': response_time_history,
                 'error_rate_history': error_rate_history,
                 'request_count_history': request_count_history
@@ -1090,7 +1090,7 @@ class OptimizedAPIClient:
                 'cpu': cpu_usage,
                 'ram': ram_usage,
                 'os_version': os_version,  # Ajout de la version de l'OS
-                'dt_url': f"{self.env_url}/#entity/{host_id}",
+                'dt_url': f"{self.env_url}/ui/entity/{host_id}",
                 'cpu_history': cpu_history,
                 'ram_history': ram_history
             })
@@ -1556,7 +1556,7 @@ class OptimizedAPIClient:
             'start_time': start_time_str,
             'end_time': end_time_str,  # Ajout de l'heure de fermeture
             'duration': duration_display,  # Ajout de la durée du problème
-            'dt_url': f"{self.env_url}/#problems/problemdetails;pid={problem.get('problemId', 'Unknown')}",
+            'dt_url': f"{self.env_url}/ui/problems/problemdetails;pid={problem.get('problemId', 'Unknown')}",
             'zone': zone or self._extract_problem_zone(problem),
             'resolved': is_resolved,
             'host': host_name,  # Ajout du champ host explicite
