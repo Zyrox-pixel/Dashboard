@@ -52,7 +52,8 @@ def fetch_all_dynatrace_hosts(base_url, api_token):
     # Note: L'API semble exiger 'fields=properties' dans cet environnement pour renvoyer les détails.
     #       On ne peut pas lister 'properties.detectedName' etc. directement comme dans d'autres cas.
     #       On filtre donc après avoir reçu TOUTES les propriétés.
-    fields_to_request = "properties"
+    fields_to_request = "properties.detectedName,properties.osType,properties.osVersion"
+
 
     params = {
         "entitySelector": 'type("HOST")',
