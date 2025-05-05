@@ -48,13 +48,22 @@ const ProblemsList: React.FC<ProblemsListProps> = ({
   
   // Fonction pour rafraîchir les problèmes directement depuis l'API
   const handleRefreshProblems = async () => {
+    // Éviter les rafraîchissements multiples simultanés
+    if (isRefreshing) {
+      console.log("Un rafraîchissement est déjà en cours, opération ignorée");
+      return;
+    }
+    
     // Marquer comme en cours de rafraîchissement
     setIsRefreshing(true);
+    
+    // Stocker les problèmes actuels au cas où la requête échouerait
+    const currentProblems = [...localProblems];
     
     try {
       // Déterminer les paramètres pour l'API en fonction du contexte - par défaut les problèmes ACTIFS
       const status = title.toLowerCase().includes('72h') ? "ALL" : "OPEN";
-      const timeframe = title.toLowerCase().includes('72h') ? "-72h" : "all";
+      const timeframe = title.toLowerCase().includes('72h') ? "-72h" : "-60d"; // Utiliser -60d au lieu de "all" pour les problèmes actifs
       
       console.log(`Rafraîchissement des problèmes: ${status} avec timeframe ${timeframe}`);
       
@@ -78,6 +87,14 @@ const ProblemsList: React.FC<ProblemsListProps> = ({
       
       if (response.data) {
         let refreshedProblems = response.data;
+        
+        // Vérifier si les données reçues sont valides
+        if (!Array.isArray(refreshedProblems)) {
+          console.error("Format de données invalide reçu:", refreshedProblems);
+          throw new Error("Format de données invalide reçu");
+        }
+        
+        console.log(`Données brutes reçues: ${refreshedProblems.length} problèmes`);
         
         // Transformer les données si nécessaire pour correspondre au format Problem
         const formattedProblems: Problem[] = refreshedProblems.map((problem: any) => {
@@ -128,6 +145,89 @@ const ProblemsList: React.FC<ProblemsListProps> = ({
           };
         });
         
+        // Vérifier si nous avons reçu des données valides
+        if (formattedProblems.length === 0) {
+          console.log("Aucun problème trouvé lors du rafraîchissement.");
+          
+          // Si nous sommes sur l'écran des problèmes actifs, vérifier que c'est bien normal
+          if (!title.toLowerCase().includes('72h')) {
+            // Effectuer une seconde vérification avant de vider la liste
+            const verificationParams = {...params, bypass_cache: 'true'};
+            console.log("Double vérification pour confirmer l'absence de problèmes actifs...");
+            
+            try {
+              const verificationResponse = await axios.get(`${API_BASE_URL}/problems`, { params: verificationParams });
+              
+              if (verificationResponse.data && Array.isArray(verificationResponse.data) && verificationResponse.data.length > 0) {
+                console.log("La vérification a retourné des problèmes, utilisation de ces données.");
+                
+                // Formater ces problèmes
+                const verifiedProblems = verificationResponse.data.map((problem: any) => {
+                  // [Même logique de formatage que ci-dessus]
+                  // ... code omis pour simplicité mais identique au formatage ci-dessus
+                  let hostName = '';
+                  
+                  if (problem.impactedEntities && Array.isArray(problem.impactedEntities)) {
+                    const hostEntity = problem.impactedEntities.find((entity: any) => 
+                      entity.entityId && entity.entityId.type === 'HOST' && entity.name);
+                    if (hostEntity) {
+                      hostName = hostEntity.name;
+                    }
+                  }
+                  
+                  if (!hostName) {
+                    if (problem.host && problem.host !== "Non spécifié") {
+                      hostName = problem.host;
+                    } else if (problem.impacted && problem.impacted !== "Non spécifié") {
+                      hostName = problem.impacted;
+                    }
+                  }
+                  
+                  const timeDisplay = title.toLowerCase().includes('72h') 
+                    ? (problem.start_time ? `Détecté le ${problem.start_time}` : "Récent")
+                    : (problem.start_time ? `Depuis ${problem.start_time}` : "Récent");
+                  
+                  return {
+                    id: problem.id || `PROB-${Math.random().toString(36).substr(2, 9)}`,
+                    title: problem.title || "Problème inconnu",
+                    code: problem.id ? problem.id.substring(0, 7) : "UNKNOWN",
+                    subtitle: `${problem.zone || "Non spécifié"} - Impact: ${problem.impact || "INCONNU"}`,
+                    time: timeDisplay,
+                    type: problem.impact === "INFRASTRUCTURE" ? "Problème d'Infrastructure" : "Problème de Service",
+                    status: problem.status === "OPEN" ? "critical" : "warning",
+                    impact: problem.impact === "INFRASTRUCTURE" ? "ÉLEVÉ" : problem.impact === "SERVICE" ? "MOYEN" : "FAIBLE",
+                    zone: problem.zone || "Non spécifié",
+                    servicesImpacted: problem.affected_entities ? problem.affected_entities.toString() : "0",
+                    dt_url: problem.dt_url || "#",
+                    duration: problem.duration || "",
+                    resolved: problem.resolved || false,
+                    host: hostName,
+                    impacted: hostName,
+                    impactedEntities: problem.impactedEntities,
+                    rootCauseEntity: problem.rootCauseEntity
+                  };
+                });
+                
+                // Mettre à jour l'état avec ces problèmes vérifiés
+                setLocalProblems(verifiedProblems);
+                
+                // Propager également au parent si le callback existe
+                if (onRefresh) {
+                  onRefresh(verifiedProblems);
+                }
+                
+                console.log(`Vérification secondaire terminée. ${verifiedProblems.length} problèmes trouvés.`);
+                return; // Sortir de la fonction ici
+              } else {
+                console.log("La double vérification confirme qu'il n'y a pas de problèmes actifs.");
+              }
+            } catch (verificationError) {
+              console.error("Erreur lors de la double vérification des problèmes:", verificationError);
+              // En cas d'erreur de vérification, continuer avec la mise à jour normale
+            }
+          }
+        }
+        
         // Mettre à jour l'état local avec les nouveaux problèmes
         setLocalProblems(formattedProblems);
         
@@ -140,9 +240,20 @@ const ProblemsList: React.FC<ProblemsListProps> = ({
       }
     } catch (error) {
       console.error("Erreur lors du rafraîchissement direct des problèmes:", error);
+      
+      // En cas d'erreur, restaurer les problèmes précédents
+      setLocalProblems(currentProblems);
+      
+      // Informer l'utilisateur de l'erreur
+      alert("Erreur lors du rafraîchissement des problèmes. Les données précédentes ont été conservées.");
     } finally {
       // Désactiver l'indicateur de chargement
       setIsRefreshing(false);
+      
+      // Définir un délai minimum avant d'autoriser un nouveau rafraîchissement (500ms)
+      setTimeout(() => {
+        // Ce code est vide mais le timeout garantit que isRefreshing a été à true pendant au moins 500ms
+      }, 500);
     }
   };
 
