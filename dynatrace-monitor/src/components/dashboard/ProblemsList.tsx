@@ -68,10 +68,12 @@ const ProblemsList: React.FC<ProblemsListProps> = ({
     
     try {
       // Déterminer les paramètres pour l'API en fonction du contexte - par défaut les problèmes ACTIFS
-      const status = title.toLowerCase().includes('72h') ? "ALL" : "OPEN";
-      const timeframe = title.toLowerCase().includes('72h') ? "-72h" : "-60d"; // Utiliser -60d au lieu de "all" pour les problèmes actifs
+      // Utiliser le titre de la page pour déterminer s'il s'agit de problèmes 72h ou de problèmes actifs
+      const is72h = title.toLowerCase().includes('72h');
+      const status = is72h ? "ALL" : "OPEN";
+      const timeframe = is72h ? "-72h" : "-60d"; // Utiliser -60d au lieu de "all" pour les problèmes actifs
       
-      console.log(`Rafraîchissement des problèmes: ${status} avec timeframe ${timeframe}`);
+      console.log(`Rafraîchissement des problèmes: ${status} avec timeframe ${timeframe}, is72h=${is72h}`);
       
       const params: any = {
         status: status,
@@ -126,7 +128,9 @@ const ProblemsList: React.FC<ProblemsListProps> = ({
           }
           
           // Adapter le format d'affichage du temps en fonction du contexte (problèmes récents vs actifs)
-          const timeDisplay = title.toLowerCase().includes('72h') 
+          // Déterminer si nous sommes sur la page des problèmes des 72 dernières heures
+          const is72h = title.toLowerCase().includes('72h');
+          const timeDisplay = is72h 
             ? (problem.start_time ? `Détecté le ${problem.start_time}` : "Récent")
             : (problem.start_time ? `Depuis ${problem.start_time}` : "Récent");
           
@@ -194,7 +198,9 @@ const ProblemsList: React.FC<ProblemsListProps> = ({
                     }
                   }
                   
-                  const timeDisplay = title.toLowerCase().includes('72h') 
+                  // Extraire la logique de vérification pour uniformité
+                  const is72h = title.toLowerCase().includes('72h');
+                  const timeDisplay = is72h 
                     ? (problem.start_time ? `Détecté le ${problem.start_time}` : "Récent")
                     : (problem.start_time ? `Depuis ${problem.start_time}` : "Récent");
                   
