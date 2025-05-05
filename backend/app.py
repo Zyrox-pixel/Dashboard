@@ -218,9 +218,11 @@ def get_problems():
         # Récupérer les paramètres de requête
         status = request.args.get('status', 'OPEN')  # Par défaut "OPEN"
         time_from = request.args.get('from', '-30d')  # Par défaut "-30d" pour inclure les problèmes plus anciens
-        # Nous n'avons plus besoin de ce paramètre, car nous voulons toujours filtrer par les management zones spécifiées
-        # disable_mz_filter = request.args.get('disable_mz_filter', 'false').lower() == 'true'
         dashboard_type = request.args.get('type', '')  # Pour identifier VFG ou VFE
+        zone_filter = request.args.get('zone', '')  # Pour filtrer par une zone spécifique
+        
+        # Désactiver le filtrage par MZ n'est plus nécessaire, car on filtre toujours par MZ
+        disable_mz_filter = request.args.get('disable_mz_filter', 'false').lower() == 'true'
         
         # Débogage approfondi - à activer temporairement
         debug_mode = request.args.get('debug', 'false').lower() == 'true'
@@ -231,7 +233,7 @@ def get_problems():
             use_cache = False  # Forcer les problèmes actifs à être toujours à jour
         
         # Créer une clé de cache unique qui inclut tous les paramètres
-        specific_cache_key = f"problems:{get_current_mz()}:{time_from}:{status}:{dashboard_type}"
+        specific_cache_key = f"problems:{get_current_mz()}:{time_from}:{status}:{dashboard_type}:{zone_filter}"
         
         # Si le mode debug est activé, vider le cache pour cette requête
         if debug_mode:
@@ -255,7 +257,28 @@ def get_problems():
         
         # Si un type de dashboard est spécifié (vfg ou vfe)
         if dashboard_type in ['vfg', 'vfe']:
-            # Récupérer la liste des MZ correspondantes
+            # Si un filtre de zone est fourni, l'utiliser à la place de la liste complète
+            if zone_filter:
+                logger.info(f"Filtrage par zone spécifique: {zone_filter} pour dashboard {dashboard_type}")
+                try:
+                    # Récupérer les problèmes pour la zone spécifique
+                    problems = api_client.get_problems_filtered(zone_filter, time_from, use_status)
+                    logger.info(f"Zone {zone_filter}: {len(problems)} problèmes trouvés")
+                    
+                    # Ajouter le champ 'resolved' pour les requêtes ALL
+                    for problem in problems:
+                        if status == 'ALL' and 'resolved' not in problem:
+                            problem['resolved'] = problem.get('status') != 'OPEN'
+                    
+                    # Mettre en cache le résultat avec la clé spécifique
+                    api_client.set_cache(specific_cache_key, problems)
+                    return problems
+                    
+                except Exception as zone_error:
+                    logger.error(f"Erreur lors de la récupération des problèmes pour zone {zone_filter}: {zone_error}")
+                    return []
+            
+            # Comportement normal pour tous les problèmes du dashboard
             mz_list_var = 'VFG_MZ_LIST' if dashboard_type == 'vfg' else 'VFE_MZ_LIST'
             mz_string = os.environ.get(mz_list_var, '')
             
@@ -311,9 +334,18 @@ def get_problems():
             if not current_mz:
                 return {'error': 'Aucune Management Zone définie'}
             
-            # Utiliser la méthode optimisée pour récupérer les problèmes filtrés
-            # Si on désactive le filtrage par MZ, on passe None pour mz_name
-            effective_mz = None if disable_mz_filter else current_mz
+            # Si un filtre de zone est fourni, l'utiliser à la place de la MZ courante
+            if zone_filter:
+                logger.info(f"Filtrage par zone spécifique: {zone_filter}")
+                effective_mz = zone_filter
+            # Sinon si le filtrage MZ est désactivé
+            elif disable_mz_filter:
+                effective_mz = None
+            # Sinon, utiliser la MZ courante
+            else:
+                effective_mz = current_mz
+                
+            # Récupérer les problèmes avec la MZ effective
             problems = api_client.get_problems_filtered(effective_mz, time_from, use_status)
             
             # En mode debug, afficher les problèmes pour investigation
