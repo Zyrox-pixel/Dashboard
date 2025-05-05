@@ -133,6 +133,8 @@ const ProblemsList: React.FC<ProblemsListProps> = ({
           const impact = problem.impact === "INFRASTRUCTURE" ? "ÉLEVÉ" : 
                       problem.impact === "SERVICE" ? "MOYEN" : "FAIBLE";
           
+          const problemStatus = problem.status === "OPEN" ? "critical" : "warning";
+          
           return {
             id: problem.id || `PROB-${Math.random().toString(36).substr(2, 9)}`,
             title: problem.title || "Problème inconnu",
@@ -140,7 +142,7 @@ const ProblemsList: React.FC<ProblemsListProps> = ({
             subtitle: `${problem.zone || "Non spécifié"} - Impact: ${problem.impact || "INCONNU"}`,
             time: timeDisplay,
             type: problem.impact === "INFRASTRUCTURE" ? "Problème d'Infrastructure" : "Problème de Service",
-            status: problem.status === "OPEN" ? "critical" : "warning",
+            status: problemStatus as "critical" | "warning" | "low",
             impact: impact as "ÉLEVÉ" | "MOYEN" | "FAIBLE",
             zone: problem.zone || "Non spécifié",
             servicesImpacted: problem.affected_entities ? problem.affected_entities.toString() : "0",
@@ -199,6 +201,8 @@ const ProblemsList: React.FC<ProblemsListProps> = ({
                   const impact = problem.impact === "INFRASTRUCTURE" ? "ÉLEVÉ" : 
                                 problem.impact === "SERVICE" ? "MOYEN" : "FAIBLE";
                   
+                  const problemStatus = problem.status === "OPEN" ? "critical" : "warning";
+                  
                   return {
                     id: problem.id || `PROB-${Math.random().toString(36).substr(2, 9)}`,
                     title: problem.title || "Problème inconnu",
@@ -206,7 +210,7 @@ const ProblemsList: React.FC<ProblemsListProps> = ({
                     subtitle: `${problem.zone || "Non spécifié"} - Impact: ${problem.impact || "INCONNU"}`,
                     time: timeDisplay,
                     type: problem.impact === "INFRASTRUCTURE" ? "Problème d'Infrastructure" : "Problème de Service",
-                    status: problem.status === "OPEN" ? "critical" : "warning",
+                    status: problemStatus as "critical" | "warning" | "low",
                     impact: impact as "ÉLEVÉ" | "MOYEN" | "FAIBLE",
                     zone: problem.zone || "Non spécifié",
                     servicesImpacted: problem.affected_entities ? problem.affected_entities.toString() : "0",
