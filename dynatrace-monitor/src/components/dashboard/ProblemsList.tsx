@@ -130,6 +130,9 @@ const ProblemsList: React.FC<ProblemsListProps> = ({
             ? (problem.start_time ? `Détecté le ${problem.start_time}` : "Récent")
             : (problem.start_time ? `Depuis ${problem.start_time}` : "Récent");
           
+          const impact = problem.impact === "INFRASTRUCTURE" ? "ÉLEVÉ" : 
+                      problem.impact === "SERVICE" ? "MOYEN" : "FAIBLE";
+          
           return {
             id: problem.id || `PROB-${Math.random().toString(36).substr(2, 9)}`,
             title: problem.title || "Problème inconnu",
@@ -138,7 +141,7 @@ const ProblemsList: React.FC<ProblemsListProps> = ({
             time: timeDisplay,
             type: problem.impact === "INFRASTRUCTURE" ? "Problème d'Infrastructure" : "Problème de Service",
             status: problem.status === "OPEN" ? "critical" : "warning",
-            impact: problem.impact === "INFRASTRUCTURE" ? "ÉLEVÉ" : problem.impact === "SERVICE" ? "MOYEN" : "FAIBLE",
+            impact: impact as "ÉLEVÉ" | "MOYEN" | "FAIBLE",
             zone: problem.zone || "Non spécifié",
             servicesImpacted: problem.affected_entities ? problem.affected_entities.toString() : "0",
             dt_url: problem.dt_url || "#",
@@ -193,6 +196,9 @@ const ProblemsList: React.FC<ProblemsListProps> = ({
                     ? (problem.start_time ? `Détecté le ${problem.start_time}` : "Récent")
                     : (problem.start_time ? `Depuis ${problem.start_time}` : "Récent");
                   
+                  const impact = problem.impact === "INFRASTRUCTURE" ? "ÉLEVÉ" : 
+                                problem.impact === "SERVICE" ? "MOYEN" : "FAIBLE";
+                  
                   return {
                     id: problem.id || `PROB-${Math.random().toString(36).substr(2, 9)}`,
                     title: problem.title || "Problème inconnu",
@@ -201,7 +207,7 @@ const ProblemsList: React.FC<ProblemsListProps> = ({
                     time: timeDisplay,
                     type: problem.impact === "INFRASTRUCTURE" ? "Problème d'Infrastructure" : "Problème de Service",
                     status: problem.status === "OPEN" ? "critical" : "warning",
-                    impact: problem.impact === "INFRASTRUCTURE" ? "ÉLEVÉ" : problem.impact === "SERVICE" ? "MOYEN" : "FAIBLE",
+                    impact: impact as "ÉLEVÉ" | "MOYEN" | "FAIBLE",
                     zone: problem.zone || "Non spécifié",
                     servicesImpacted: problem.affected_entities ? problem.affected_entities.toString() : "0",
                     dt_url: problem.dt_url || "#",
