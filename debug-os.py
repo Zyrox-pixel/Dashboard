@@ -40,9 +40,10 @@ def fetch_and_print_one_host_json(base_url, api_token):
     }
 
     params = {
-        "entitySelector": 'type("HOST")', # Gardez ceci ou filtrez sur un ID connu si possible
-        # Pas de paramètre "fields" pour récupérer la structure complète par défaut
-        "pageSize": 1 # Modifié pour ne récupérer qu'un seul hôte pour l'analyse
+        # Cible spécifiquement l'hôte de la capture d'écran par son displayName
+        "entitySelector": 'type("HOST"),displayName("s01vl9946175.fr.net.intra")',
+        # Pas de paramètre "fields"
+        "pageSize": 1 # Devrait trouver au plus 1 hôte
     }
 
     print("Début de la récupération depuis Dynatrace (Mode Débogage - 1 host)...")
