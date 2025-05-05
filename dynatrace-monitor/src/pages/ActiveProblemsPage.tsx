@@ -1,9 +1,10 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useApp } from '../contexts/AppContext';
 import Layout from '../components/layout/Layout';
 import ProblemsList from '../components/dashboard/ProblemsList';
 import { ChevronLeft, AlertTriangle } from 'lucide-react';
+import { Problem } from '../api/types';
 
 /**
  * Page dédiée à l'affichage des problèmes actifs
@@ -13,19 +14,58 @@ const ActiveProblemsPage: React.FC = () => {
   const location = useLocation();
   const { activeProblems, isLoading, refreshData } = useApp();
   
+  // État local pour empêcher les actualisations trop fréquentes
+  const [lastRefreshTime, setLastRefreshTime] = useState<number>(0);
+  const [localProblems, setLocalProblems] = useState<Problem[]>([]);
+  
   // Récupérer le paramètre de type de dashboard depuis l'URL
   const dashboardType = new URLSearchParams(location.search).get('dashboard') || 'vfg';
+  
+  // Synchroniser les problèmes locaux avec les problèmes globaux
+  useEffect(() => {
+    if (activeProblems.length > 0) {
+      console.log(`Mise à jour des problèmes locaux sur la page avec ${activeProblems.length} problèmes`);
+      setLocalProblems(activeProblems);
+    }
+  }, [activeProblems]);
   
   // Forcer un rafraîchissement des données une seule fois au chargement
   useEffect(() => {
     // Utiliser un flag pour éviter les boucles infinies
     const loadOnce = async () => {
-      await refreshData(dashboardType as 'vfg' | 'vfe', false);
+      console.log("Chargement initial des problèmes actifs");
+      try {
+        await refreshData(dashboardType as 'vfg' | 'vfe', false);
+        setLastRefreshTime(Date.now());
+      } catch (error) {
+        console.error("Erreur lors du chargement initial des problèmes:", error);
+      }
     };
     
     loadOnce();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  
+  // Gestionnaire pour les rafraîchissements manuels
+  const handleManualRefresh = useCallback(async (refreshedProblems: Problem[]) => {
+    // Mettre à jour la dernière heure de rafraîchissement
+    const now = Date.now();
+    const timeSinceLastRefresh = now - lastRefreshTime;
+    
+    // Limiter les rafraîchissements à un toutes les 5 secondes
+    if (timeSinceLastRefresh < 5000) {
+      console.log(`Rafraîchissement ignoré : dernier rafraîchissement il y a seulement ${timeSinceLastRefresh}ms`);
+      return;
+    }
+    
+    console.log(`Rafraîchissement manuel traité : ${refreshedProblems.length} problèmes reçus`);
+    
+    // Mettre à jour notre état local immédiatement
+    setLocalProblems(refreshedProblems);
+    setLastRefreshTime(now);
+    
+    // Ne pas re-déclencher le context refresh si nous venons de recevoir les problèmes mis à jour
+  }, [lastRefreshTime]);
   
   // Navigation retour vers le bon tableau de bord
   const handleBackClick = () => {
@@ -68,16 +108,17 @@ const ActiveProblemsPage: React.FC = () => {
         </div>
 
         {/* Section des problèmes */}
-        {isLoading.problems ? (
+        {isLoading.problems && localProblems.length === 0 ? (
           <div className="flex items-center justify-center h-64">
             <div className="w-12 h-12 border-t-4 border-b-4 border-red-500 rounded-full animate-spin"></div>
             <span className="ml-3 text-slate-400">Chargement des problèmes...</span>
           </div>
         ) : (
           <ProblemsList 
-            problems={activeProblems} 
-            title="Tous les problèmes actifs (sans limite de temps)"
+            problems={localProblems} 
+            title="Tous les problèmes actifs (fenêtre de 60 jours)"
             showRefreshButton={true}
+            onRefresh={handleManualRefresh}
           />
         )}
       </div>

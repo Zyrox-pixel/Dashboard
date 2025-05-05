@@ -39,9 +39,15 @@ const ProblemsList: React.FC<ProblemsListProps> = ({
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   
   // Mettre à jour les problèmes locaux quand les props problems changent
+  // mais seulement si nous ne sommes pas en train de rafraîchir pour éviter des mises à jour conflictuelles
   useEffect(() => {
-    setLocalProblems(problems);
-  }, [problems]);
+    if (!isRefreshing) {
+      console.log(`Mise à jour des problèmes locaux depuis les props (${problems.length} problèmes)`);
+      setLocalProblems(problems);
+    } else {
+      console.log('Mise à jour des props ignorée car un rafraîchissement est en cours');
+    }
+  }, [problems, isRefreshing]);
   
   // Récupérer le type de dashboard actuel (vfg ou vfe)
   const dashboardType = window.location.pathname.includes('vfe') ? 'vfe' : 'vfg';
