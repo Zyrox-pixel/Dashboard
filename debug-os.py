@@ -40,8 +40,8 @@ def fetch_and_print_one_host_json(base_url, api_token):
     }
 
     params = {
-        "entitySelector": 'type("HOST"),displayName("s01vl9946175.fr.net.intra")',
-        "fields": "properties",  # Demande explicite de TOUT le bloc 'properties'
+        "entitySelector": 'type("HOST"),entityName("s01vl9946175.fr.net.intra")', # Remplacer displayName par entityName
+        "fields": "properties",  # Gardons la demande explicite de properties pour l'instant
         "pageSize": 1
     }
 
