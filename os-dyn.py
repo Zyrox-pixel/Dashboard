@@ -57,7 +57,7 @@ def fetch_all_dynatrace_hosts(base_url, api_token):
     params = {
         "entitySelector": 'type("HOST")',
         "fields": fields_to_request, # Demande explicite des propriétés
-        "pageSize": 400 # Taille de page raisonnable
+        "pageSize": 100 # Taille de page raisonnable
     }
     next_page_key = None
     total_fetched = 0
