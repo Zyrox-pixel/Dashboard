@@ -469,7 +469,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
       // Si on ne rafraîchit que les problèmes, ne récupérer que les données de problèmes
       if (refreshProblemsOnly) {
         const responses = await Promise.all([
-          apiClient.getProblems("OPEN", "all", dashboardType, true),  // Force le rafraîchissement sans limite de temps pour les problèmes en cours
+          apiClient.getProblems("OPEN", "-60d", dashboardType, true),  // Force le rafraîchissement pour les problèmes actifs sur 60 jours
           apiClient.getProblems("ALL", "-72h", dashboardType, true)   // Force le rafraîchissement pour les problèmes récents avec 72h de délai
         ]);
         problemsResponse = responses[0] as ApiResponse<ProblemResponse[]>;
@@ -481,7 +481,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
           apiClient.getSummary(),
           apiClient.getVitalForGroupMZs(),
           apiClient.getVitalForEntrepriseMZs(),
-          apiClient.getProblems("OPEN", "all", dashboardType, true),  // Force le rafraîchissement sans limite de temps pour les problèmes en cours
+          apiClient.getProblems("OPEN", "-60d", dashboardType, true),  // Force le rafraîchissement pour les problèmes actifs sur 60 jours
           apiClient.getProblems("ALL", "-72h", dashboardType, true)   // Force le rafraîchissement pour les problèmes récents avec 72h de délai
         ]);
         summaryResponse = responses[0] as ApiResponse<SummaryData>;

@@ -217,7 +217,10 @@ def get_problems():
     try:
         # Récupérer les paramètres de requête
         status = request.args.get('status', 'OPEN')  # Par défaut "OPEN"
-        time_from = request.args.get('from', '-30d')  # Par défaut "-30d" pour inclure les problèmes plus anciens
+        time_from = request.args.get('from', '-30d')  # Par défaut "-30d" pour l'historique standard
+        # Utiliser une période plus longue pour les problèmes actifs
+        if status == 'OPEN' and 'from' not in request.args:
+            time_from = '-60d'  # Augmenté à 60 jours pour voir les problèmes actifs plus anciens
         dashboard_type = request.args.get('type', '')  # Pour identifier VFG ou VFE
         zone_filter = request.args.get('zone', '')  # Pour filtrer par une zone spécifique
         

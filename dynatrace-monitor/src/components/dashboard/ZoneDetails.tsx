@@ -1177,6 +1177,7 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
               try {
                 // Utiliser async/await pour gérer le rafraîchissement de manière non bloquante
                 // Rafraîchir les données avec le paramètre refreshProblemsOnly à false pour tout rafraîchir
+                // et forcer le timeframe à 60 jours (défini dans le backend)
                 await appContext.refreshData(dashboardType as 'vfg' | 'vfe', false);
                 console.log("Rafraîchissement global terminé avec succès");
               } catch (error) {
