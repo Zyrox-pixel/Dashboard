@@ -30,7 +30,8 @@ def check_dynatrace_token(config):
         response = requests.get(
             f"{config['DYNATRACE']['tenant_url']}/api/v1/time",
             headers={"Authorization": f"Api-Token {config['DYNATRACE']['api_token']}"},
-            timeout=int(config['DYNATRACE']['timeout'])
+            timeout=int(config['DYNATRACE']['timeout']),
+            verify=False  # Ignorer la vérification TLS
         )
         response.raise_for_status()
         return True
@@ -45,6 +46,10 @@ def get_os_from_dynatrace(hostname, ip_address, config):
     pour un host spécifique, en utilisant d'abord la propriété "VMware name" si disponible.
     """
     try:
+        # Désactiver les avertissements pour les certificats non vérifiés
+        import urllib3
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+        
         # Essayons d'abord de trouver l'entité host par domaine ou hostname partiel
         response = requests.get(
             f"{config['DYNATRACE']['tenant_url']}/api/v1/entities",
@@ -53,7 +58,8 @@ def get_os_from_dynatrace(hostname, ip_address, config):
                 "fields": "+properties,+displayName,+tags"
             },
             headers={"Authorization": f"Api-Token {config['DYNATRACE']['api_token']}"},
-            timeout=int(config['DYNATRACE']['timeout'])
+            timeout=int(config['DYNATRACE']['timeout']),
+            verify=False  # Ignorer la vérification TLS
         )
         response.raise_for_status()
         data = response.json()
