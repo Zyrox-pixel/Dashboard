@@ -1092,8 +1092,22 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
   const appContext = useApp();
   
   // Mettre à jour l'état local quand l'état de chargement des problèmes change
+  // Ajouter un timeout pour s'assurer que l'indicateur de chargement ne reste pas bloqué
   useEffect(() => {
-    setIsRefreshingProblems(appContext.isLoading.problems);
+    if (appContext.isLoading.problems) {
+      setIsRefreshingProblems(true);
+      
+      // Définir un timeout pour masquer l'indicateur après 20 secondes maximum
+      const timeoutId = setTimeout(() => {
+        console.log("Timeout de sécurité pour l'indicateur de chargement des problèmes");
+        setIsRefreshingProblems(false);
+      }, 20000);
+      
+      // Nettoyer le timeout si l'état change avant
+      return () => clearTimeout(timeoutId);
+    } else {
+      setIsRefreshingProblems(false);
+    }
   }, [appContext.isLoading.problems]);
 
   return (

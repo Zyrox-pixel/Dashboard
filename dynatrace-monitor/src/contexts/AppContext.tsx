@@ -873,8 +873,19 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
       // Rafraîchissement asynchrone pour éviter de bloquer l'interface
       const currentDashboardType = window.location.pathname.includes('vfe') ? 'vfe' : 'vfg';
       
+      // Vérifier si on est sur une page de détail de zone
+      const isZoneDetailPage = state.selectedZone !== null;
+      
+      console.log(`Rafraîchissement automatique sur page de détail zone: ${isZoneDetailPage ? 'oui' : 'non'}`);
+      
       // Ne pas bloquer l'interface pendant le rafraîchissement
       setState(prev => ({ ...prev, isLoading: { ...prev.isLoading, problems: true }}));
+      
+      // Définir un timeout pour s'assurer que l'indicateur de chargement ne reste pas bloqué
+      const timeoutId = setTimeout(() => {
+        console.log("Timeout de sécurité déclenché pour le rafraîchissement des problèmes");
+        setState(prev => ({ ...prev, isLoading: { ...prev.isLoading, problems: false }}));
+      }, 30000); // 30 secondes maximum
       
       // Utiliser un microtask pour exécuter le rafraîchissement
       // Cela permet de s'assurer que l'interface reste réactive
@@ -888,6 +899,8 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
         } finally {
           // S'assurer que l'indicateur de chargement est bien désactivé
           setState(prev => ({ ...prev, isLoading: { ...prev.isLoading, problems: false }}));
+          // Nettoyer le timeout
+          clearTimeout(timeoutId);
         }
       });
     }, refreshInterval);

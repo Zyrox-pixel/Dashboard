@@ -57,18 +57,19 @@ const ProblemsList: React.FC<ProblemsListProps> = ({
         type: dashboardType
       };
       
-      console.log("Rafraîchissement direct des problèmes...");
+      // Si un filtre de zone est fourni, l'ajouter aux paramètres pour filtrer côté serveur
+      if (zoneFilter) {
+        params.zone = zoneFilter;
+        console.log(`Rafraîchissement direct des problèmes pour la zone: ${zoneFilter}`);
+      } else {
+        console.log("Rafraîchissement direct des problèmes...");
+      }
       
-      // Appel direct à l'API backend
+      // Appel direct à l'API backend avec les paramètres incluant la zone
       const response = await axios.get(`${API_BASE_URL}/problems`, { params });
       
       if (response.data) {
         let refreshedProblems = response.data;
-        
-        // Si un filtre de zone est fourni, appliquer le filtre côté client
-        if (zoneFilter) {
-          refreshedProblems = refreshedProblems.filter((problem: any) => problem.zone === zoneFilter);
-        }
         
         // Transformer les données si nécessaire pour correspondre au format Problem
         const formattedProblems: Problem[] = refreshedProblems.map((problem: any) => {
