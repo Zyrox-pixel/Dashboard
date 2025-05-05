@@ -16,9 +16,10 @@ def load_config():
         # Créer un fichier de configuration par défaut si inexistant
         config['DYNATRACE'] = {
             'tenant_url': 'https://gmon-itgs.group.echonet',
-            'environment_id': 'e/6d539108-2970-46ba-b505-d3cf7712f038',  # ID d'environnement
             'api_token': 'VOTRE_API_TOKEN',
-            'timeout': '30'
+            'timeout': '30',
+            # L'ID d'environnement est optionnel et sera utilisé s'il est fourni
+            'environment_id': 'e/6d539108-2970-46ba-b505-d3cf7712f038'
         }
         with open('config.ini', 'w') as f:
             config.write(f)
@@ -27,9 +28,20 @@ def load_config():
 
 # Fonction pour vérifier si le token Dynatrace est valide
 def check_dynatrace_token(config):
+    # Définir api_url avant le bloc try pour qu'il soit accessible dans except
+    api_url = ""
+    
     try:
-        # Construire l'URL complète avec l'ID d'environnement
-        api_url = f"{config['DYNATRACE']['tenant_url']}/{config['DYNATRACE']['environment_id']}/api/v1/time"
+        # Vérifier si environment_id existe dans la configuration
+        if 'environment_id' not in config['DYNATRACE']:
+            print("ATTENTION: 'environment_id' n'est pas défini dans config.ini.")
+            print("Utilisation de l'URL sans ID d'environnement.")
+            api_url = f"{config['DYNATRACE']['tenant_url']}/api/v1/time"
+        else:
+            # Construire l'URL complète avec l'ID d'environnement
+            api_url = f"{config['DYNATRACE']['tenant_url']}/{config['DYNATRACE']['environment_id']}/api/v1/time"
+        
+        print(f"Vérification de l'API Dynatrace avec URL: {api_url}")
         
         response = requests.get(
             api_url,
@@ -50,13 +62,20 @@ def get_os_from_dynatrace(hostname, ip_address, config):
     Cette fonction utilise l'API Dynatrace pour récupérer les informations d'OS
     pour un host spécifique, en utilisant d'abord la propriété "VMware name" si disponible.
     """
+    # Définir api_url avant le bloc try pour qu'il soit accessible dans except
+    api_url = ""
+    
     try:
         # Désactiver les avertissements pour les certificats non vérifiés
         import urllib3
         urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
         
-        # Construire l'URL complète avec l'ID d'environnement
-        api_url = f"{config['DYNATRACE']['tenant_url']}/{config['DYNATRACE']['environment_id']}/api/v1/entities"
+        # Vérifier si environment_id existe dans la configuration
+        if 'environment_id' not in config['DYNATRACE']:
+            api_url = f"{config['DYNATRACE']['tenant_url']}/api/v1/entities"
+        else:
+            # Construire l'URL complète avec l'ID d'environnement
+            api_url = f"{config['DYNATRACE']['tenant_url']}/{config['DYNATRACE']['environment_id']}/api/v1/entities"
         
         print(f"Interrogation de Dynatrace via: {api_url}")
         
@@ -145,6 +164,7 @@ def get_os_from_dynatrace(hostname, ip_address, config):
             return "Non trouvé dans Dynatrace"
     except Exception as e:
         print(f"Erreur lors de la requête Dynatrace pour {hostname}: {e}")
+        print(f"URL utilisée: {api_url}")
         return "Erreur de requête"
 
 # Fonction principale
