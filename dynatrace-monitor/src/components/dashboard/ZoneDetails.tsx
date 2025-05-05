@@ -33,6 +33,7 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
 }) => {
   const { isDarkTheme } = useTheme();
   const { refreshData } = useApp();
+  const [filteredProblems, setFilteredProblems] = useState<Problem[]>([]);
   
   // États pour le tri et la recherche
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'ascending' | 'descending' | null }>({
@@ -54,10 +55,11 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
   const [processFilters, setProcessFilters] = useState<FilterValue[]>([]);
   
   // Filtrer les problèmes pour la zone courante (mémorisé)
-  const zoneProblems = useMemo(() => 
-    problems.filter(problem => problem.zone === zone.name),
-    [problems, zone.name]
-  );
+  useEffect(() => {
+    // Filtrer les problèmes pour la zone courante
+    const zoneProblemsFiltered = problems.filter(problem => problem.zone === zone.name);
+    setFilteredProblems(zoneProblemsFiltered);
+  }, [problems, zone.name]);
 
   // Déterminer les couleurs en fonction de la zone et du thème (mémorisé)
   const zoneColors = useMemo(() => {
@@ -108,6 +110,27 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
     
     return colors[zone.color] || colors.blue;
   }, [zone.color, isDarkTheme]);
+  
+  const handleRefreshedProblems = useCallback((refreshedProblems: Problem[]) => {
+    // Filtrer les problèmes rafraîchis pour cette zone spécifique
+    const zoneRefreshedProblems = refreshedProblems.filter(problem => problem.zone === zone.name);
+    
+    // Mettre à jour l'état local des problèmes filtrés
+    setFilteredProblems(zoneRefreshedProblems);
+    
+    console.log(`Mise à jour des problèmes pour la zone ${zone.name}: ${zoneRefreshedProblems.length} problèmes trouvés`);
+  }, [zone.name]);
+  
+  // 4. Modifiez l'appel à ProblemsList pour utiliser filteredProblems au lieu de zoneProblems
+  // et passez la fonction de callback
+  {filteredProblems.length > 0 && (
+    <ProblemsList 
+      problems={filteredProblems} 
+      title={`Problèmes actifs dans ${zone.name}`}
+      zoneFilter={zone.name}
+      onRefresh={handleRefreshedProblems}
+    />
+  )}
   
   // Fonction pour gérer le tri des colonnes
   const requestSort = (key: string) => {
@@ -1146,10 +1169,10 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
                 <span className="text-xs text-slate-400">Dernière mise à jour: {new Date().toLocaleTimeString()}</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <AlertTriangle size={12} className={zoneProblems.length > 0 ? "text-red-500" : "text-green-500"} />
-                <span className={`text-xs ${zoneProblems.length > 0 ? "text-red-400" : "text-green-400"}`}>
-                  {zoneProblems.length > 0 
-                    ? `${zoneProblems.length} problème${zoneProblems.length > 1 ? 's' : ''} actif${zoneProblems.length > 1 ? 's' : ''}` 
+                <AlertTriangle size={12} className={filteredProblems.length > 0 ? "text-red-500" : "text-green-500"} />
+                <span className={`text-xs ${filteredProblems.length > 0 ? "text-red-400" : "text-green-400"}`}>
+                  {filteredProblems.length > 0 
+                    ? `${filteredProblems.length} problème${filteredProblems.length > 1 ? 's' : ''} actif${filteredProblems.length > 1 ? 's' : ''}` 
                     : "Aucun problème"
                   }
                 </span>
@@ -1226,10 +1249,12 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
       </div>
       
       {/* Problèmes actifs pour cette zone */}
-      {zoneProblems.length > 0 && (
+      {filteredProblems.length > 0 && (
         <ProblemsList 
-          problems={zoneProblems} 
-          title={`Problèmes actifs dans ${zone.name}`} 
+          problems={filteredProblems} 
+          title={`Problèmes actifs dans ${zone.name}`}
+          zoneFilter={zone.name}
+          onRefresh={handleRefreshedProblems}
         />
       )}
       

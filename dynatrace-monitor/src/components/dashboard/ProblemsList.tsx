@@ -11,7 +11,9 @@ interface ProblemsListProps {
   zoneFilter?: string;
   title?: string;
   showRefreshButton?: boolean;
+  onRefresh?: (refreshedProblems: Problem[]) => void;
 }
+
 
 // Helper pour extraire la date d'un problème (pour le regroupement)
 const extractDateFromProblem = (problem: Problem): string => {
@@ -27,7 +29,8 @@ const ProblemsList: React.FC<ProblemsListProps> = ({
   problems, 
   zoneFilter,
   title = "Problèmes assignés aux Management Zones",
-  showRefreshButton = true
+  showRefreshButton = true,
+  onRefresh
 }) => {
   const { isLoading } = useApp();
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc'); // plus récent d'abord par défaut
@@ -117,6 +120,11 @@ const ProblemsList: React.FC<ProblemsListProps> = ({
         
         // Mettre à jour l'état local avec les nouveaux problèmes
         setLocalProblems(formattedProblems);
+        
+        // Propager les problèmes rafraîchis au parent si la fonction de callback existe
+        if (onRefresh) {
+          onRefresh(formattedProblems);
+        }
         
         console.log(`Rafraîchissement direct terminé. ${formattedProblems.length} problèmes trouvés.`);
       }
