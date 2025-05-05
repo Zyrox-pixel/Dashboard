@@ -15,7 +15,8 @@ def load_config():
     else:
         # Créer un fichier de configuration par défaut si inexistant
         config['DYNATRACE'] = {
-            'tenant_url': 'https://VOTRE_TENANT.live.dynatrace.com',
+            'tenant_url': 'https://gmon-itgs.group.echonet',
+            'environment_id': 'e/6d539108-2970-46ba-b505-d3cf7712f038',  # ID d'environnement
             'api_token': 'VOTRE_API_TOKEN',
             'timeout': '30'
         }
@@ -27,8 +28,11 @@ def load_config():
 # Fonction pour vérifier si le token Dynatrace est valide
 def check_dynatrace_token(config):
     try:
+        # Construire l'URL complète avec l'ID d'environnement
+        api_url = f"{config['DYNATRACE']['tenant_url']}/{config['DYNATRACE']['environment_id']}/api/v1/time"
+        
         response = requests.get(
-            f"{config['DYNATRACE']['tenant_url']}/api/v1/time",
+            api_url,
             headers={"Authorization": f"Api-Token {config['DYNATRACE']['api_token']}"},
             timeout=int(config['DYNATRACE']['timeout']),
             verify=False  # Ignorer la vérification TLS
@@ -37,6 +41,7 @@ def check_dynatrace_token(config):
         return True
     except Exception as e:
         print(f"Erreur lors de la vérification du token Dynatrace: {e}")
+        print(f"URL utilisée: {api_url}")
         return False
 
 # Fonction pour interroger Dynatrace et obtenir l'OS pour un système
@@ -50,9 +55,14 @@ def get_os_from_dynatrace(hostname, ip_address, config):
         import urllib3
         urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
         
+        # Construire l'URL complète avec l'ID d'environnement
+        api_url = f"{config['DYNATRACE']['tenant_url']}/{config['DYNATRACE']['environment_id']}/api/v1/entities"
+        
+        print(f"Interrogation de Dynatrace via: {api_url}")
+        
         # Essayons d'abord de trouver l'entité host par domaine ou hostname partiel
         response = requests.get(
-            f"{config['DYNATRACE']['tenant_url']}/api/v1/entities",
+            api_url,
             params={
                 "entitySelector": f"type(HOST)",
                 "fields": "+properties,+displayName,+tags"
