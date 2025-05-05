@@ -11,11 +11,29 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # --- Configuration ---
 DYNATRACE_API_TOKEN = os.getenv("DYNATRACE_API_TOKEN")
-DYNATRACE_BASE_URL = "VOTRE_URL/api/v2" # À remplir
+# !!! REMPLACEZ VOTRE_URL CI-DESSOUS !!!
+DYNATRACE_BASE_URL = "VOTRE_URL/api/v2"
 EXCEL_FILE = "OS_DYNATRACE.xlsx"
-OUTPUT_EXCEL_FILE = "OS_DYNATRACE_updated_v2.xlsx" # Nouveau nom de sortie pour éviter d'écraser
+OUTPUT_EXCEL_FILE = "OS_DYNATRACE_updated_v3.xlsx" # Encore un nouveau nom de sortie
 HOSTNAME_COLUMN = "Hostname" # Colonne Excel avec le nom court
 NEW_OS_COLUMN = "OS DYNATRACE"
+
+# !!! VÉRIFIEZ ET COMPLÉTEZ CETTE LISTE SI NÉCESSAIRE !!!
+# Ordre : Les suffixes les plus probables en premier pour optimiser un peu.
+# "" (chaîne vide) à la fin pour tester le nom court seul.
+KNOWN_SUFFIXES = [
+    ".fr.net.intra",
+    ".apps.tech.net.intra",
+    ".fra.net.intra",
+    ".warp.net.intra",
+    ".oned.net.intra",
+    "" # Pour tester le nom court sans suffixe en dernier
+]
+
+# Délai en secondes entre le traitement de chaque ligne Excel pour éviter le rate limiting
+# Augmentez si vous obtenez des erreurs API (ex: 429 Too Many Requests)
+# Diminuez prudemment si c'est trop lent ET que l'API le supporte.
+API_CALL_DELAY_PER_ROW = 0.75 # secondes
 
 # --- Vérification de la configuration ---
 if not DYNATRACE_API_TOKEN:
@@ -27,107 +45,81 @@ if "VOTRE_URL" in DYNATRACE_BASE_URL:
 
 # --- Fonctions ---
 
-def get_host_os_info_startswith(short_hostname, base_url, api_token):
+def find_host_and_get_os(short_hostname, suffixes_to_try, base_url, api_token):
     """
-    Tente de récupérer l'info OS pour un host en utilisant un filtre startsWith (expérimental).
-    Gère les cas 0, 1 ou plusieurs hosts trouvés par le filtre.
+    Cherche un host en essayant d'ajouter des suffixes au nom court.
+    Retourne l'info OS si trouvé, ou un statut sinon.
     """
     endpoint = f"{base_url}/entities"
     headers = {
         "Authorization": f"Api-Token {api_token}",
         "Accept": "application/json; charset=utf-8"
     }
-    # Champs nécessaires : detectedName (pour vérifier le match), osType, osVersion
-    fields = "properties.detectedName,properties.osType,properties.osVersion"
+    # Champs OS nécessaires. On n'a plus besoin de detectedName ici.
+    fields = "properties.osType,properties.osVersion"
 
-    # *** ATTENTION : Syntaxe 'entityName.startsWith' expérimentale ! ***
-    # Assurez-vous que le nom d'hôte ne contient pas de guillemets qui casseraient la chaîne
-    safe_hostname = short_hostname.replace('"', "'") # Simple précaution
-    entity_selector = f'type("HOST"),entityName.startsWith("{safe_hostname}")'
+    # Nettoyage simple du nom d'hôte pour l'URL
+    safe_hostname = short_hostname.replace('"', "'")
 
-    params = {
-        "entitySelector": entity_selector,
-        "fields": fields
-        # pageSize n'est pas utile ici, on s'attend à peu de résultats par nom court
-    }
+    for suffix in suffixes_to_try:
+        potential_fqdn = safe_hostname + suffix
+        # print(f"    Essai avec FQDN: {potential_fqdn}") # Décommenter pour voir les essais
 
-    try:
-        response = requests.get(endpoint, headers=headers, params=params, timeout=60, verify=False)
+        entity_selector = f'type("HOST"),entityName("{potential_fqdn}")'
+        params = {
+            "entitySelector": entity_selector,
+            "fields": fields
+        }
 
-        # Gérer spécifiquement l'erreur 400 qui pourrait indiquer que 'startsWith' n'est pas supporté
-        if response.status_code == 400:
-             try:
-                 error_data = response.json()
-                 if "constraintViolations" in error_data.get("error", {}):
-                     for violation in error_data["error"]["constraintViolations"]:
-                         if "entitySelector" in violation.get("path", "") and "startsWith" in violation.get("message", ""):
-                             return "Error: Filtre 'startsWith' non supporté par l'API ?"
-             except ValueError: # Pas de JSON dans la réponse d'erreur
-                 pass # On renverra l'erreur générale ci-dessous
-             # Relancer l'exception pour l'erreur 400 générique si ce n'est pas lié à startsWith
-             response.raise_for_status()
+        try:
+            # Petit délai optionnel *entre* les essais de suffixes pour un même host
+            # time.sleep(0.1)
 
-        response.raise_for_status() # Gère les autres erreurs HTTP (4xx, 5xx sauf 400 déjà traité)
-        data = response.json()
-        entities = data.get("entities", [])
-        num_found = len(entities)
+            response = requests.get(endpoint, headers=headers, params=params, timeout=60, verify=False)
+            response.raise_for_status() # Lève une exception pour les erreurs HTTP (4xx, 5xx)
+            data = response.json()
+            entities = data.get("entities", [])
 
-        if num_found == 0:
-            return "Not Found (startsWith)"
-
-        elif num_found == 1:
-            entity = entities[0]
-            properties = entity.get("properties", {})
-            detected_name = properties.get("detectedName")
-            # Vérification stricte : le detectedName doit commencer par short_hostname suivi d'un . ou être égal
-            if detected_name and (detected_name == short_hostname or detected_name.startswith(short_hostname + '.')):
-                os_type = properties.get("osType", "N/A")
-                os_version = properties.get("osVersion", "N/A")
-                os_string = f"{os_type} {os_version}".strip()
-                return os_string if os_string not in ["N/A N/A", "N/A"] else "OS Info Missing"
-            else:
-                # Trouvé 1 mais le nom ne correspond pas exactement au début
-                return f"Mismatch (startsWith found {detected_name})"
-
-        else: # num_found > 1
-            verified_entity = None
-            match_count = 0
-            possible_matches = []
-            for entity in entities:
+            if len(entities) == 1:
+                # Trouvé !
+                entity = entities[0]
                 properties = entity.get("properties", {})
-                detected_name = properties.get("detectedName")
-                possible_matches.append(detected_name or "N/A")
-                # Vérification stricte
-                if detected_name and (detected_name == short_hostname or detected_name.startswith(short_hostname + '.')):
-                    match_count += 1
-                    verified_entity = entity # Garde le dernier trouvé en cas de doublon exact (rare)
-
-            if match_count == 1:
-                # Un seul correspondait exactement au début du nom
-                properties = verified_entity.get("properties", {})
+                os_type = properties.get("osType", "N/A")
+                os_version = properties.get("osVersion", "N/A")
+                os_string = f"{os_type} {os_version}".strip()
+                # print(f" -> Trouvé!") # Décommenter pour voir quand ça matche
+                return os_string if os_string not in ["N/A N/A", "N/A"] else "OS Info Missing"
+            elif len(entities) > 1:
+                # Ne devrait pas arriver avec un entityName exact, mais sécurité
+                print(f"  Avertissement: Plusieurs ({len(entities)}) hosts trouvés pour FQDN exact '{potential_fqdn}'. Utilisation du premier.")
+                entity = entities[0]
+                properties = entity.get("properties", {})
                 os_type = properties.get("osType", "N/A")
                 os_version = properties.get("osVersion", "N/A")
                 os_string = f"{os_type} {os_version}".strip()
                 return os_string if os_string not in ["N/A N/A", "N/A"] else "OS Info Missing"
-            elif match_count > 1:
-                return f"Ambiguous (startsWith - {match_count} exact prefix matches)"
-            else: # match_count == 0
-                return f"Ambiguous (startsWith - found {num_found}, none matching prefix: {', '.join(possible_matches[:3])}..)"
+            # Si len(entities) == 0, on continue et essaie le suffixe suivant
 
-    except requests.exceptions.RequestException as e:
-        print(f"\nErreur API pour hostname '{short_hostname}' : {e}")
-        # Si c'est une erreur 400 non interceptée plus haut
-        if e.response is not None and e.response.status_code == 400:
-             try:
-                 error_data = e.response.json()
-                 return f"Error 400: {error_data.get('error', {}).get('message', e.response.text)}"
-             except ValueError:
-                 return f"Error 400: {e.response.text}"
-        return f"Error: Network/API ({type(e).__name__})"
+        except requests.exceptions.RequestException as e:
+            # Gérer les erreurs API spécifiques à cet essai, mais continuer à essayer les autres suffixes
+            print(f"\n    Erreur API pour FQDN '{potential_fqdn}' : {e.response.status_code if e.response is not None else e}")
+            # Si l'erreur est une erreur client (4xx) autre que 404, cela peut indiquer un problème avec le nom/suffixe
+            if e.response is not None and 400 <= e.response.status_code < 500 and e.response.status_code != 404:
+                 # On pourrait arrêter d'essayer les suffixes pour ce nom court si l'erreur est bloquante
+                 # return f"Error API {e.response.status_code} on {potential_fqdn}"
+                 pass # Pour l'instant, on continue les autres suffixes
+            # Si c'est une erreur serveur (5xx) ou réseau, on pourrait arrêter
+            elif e.response is None or e.response.status_code >= 500:
+                 return f"Error: Network/API Server ({type(e).__name__})"
 
-    except Exception as e:
-        print(f"\nErreur inattendue pour hostname '{short_hostname}' : {e}")
-        return f"Error: Unexpected ({type(e).__name__})"
+
+        except Exception as e:
+            print(f"\n    Erreur inattendue pour FQDN '{potential_fqdn}' : {e}")
+            # Continuer à essayer les autres suffixes
+            pass
+
+    # Si la boucle se termine sans avoir trouvé de correspondance
+    return "Not Found (all suffixes tried)"
 
 # --- Script principal ---
 def main():
@@ -145,14 +137,23 @@ def main():
         print(f"Erreur : La colonne '{HOSTNAME_COLUMN}' (nom court) est introuvable.")
         sys.exit(1)
 
-    print(f"Traitement de {len(df)} lignes du fichier Excel (mode serveur par serveur - startsWith)...")
+    print(f"Traitement de {len(df)} lignes du fichier Excel (mode serveur par serveur - essai suffixes)...")
+    print(f"Suffixes qui seront testés (dans l'ordre): {KNOWN_SUFFIXES}")
+    print(f"Pause entre chaque ligne Excel: {API_CALL_DELAY_PER_ROW} secondes")
+
     results = []
-    # Créer un Rate Limiter simple (ex: 1 seconde entre chaque appel)
-    # Utile pour éviter de surcharger l'API avec N appels rapides
-    api_call_delay = 0.5 # secondes entre les appels (ajustez si nécessaire)
+
+    # Estimer le temps total (très approximatif)
+    estimated_calls_max = len(df) * len(KNOWN_SUFFIXES)
+    estimated_seconds_max = len(df) * API_CALL_DELAY_PER_ROW + estimated_calls_max * 0.1 # Ajoute une petite estimation par appel
+    print(f"Estimation: ~{len(df)} lignes, jusqu'à {estimated_calls_max} appels API possibles.")
+    print(f"             Temps estimé max: {time.strftime('%H:%M:%S', time.gmtime(estimated_seconds_max))} (HH:MM:SS)")
+    print("-" * 30)
+
+    start_total_time = time.time()
 
     for index, row in df.iterrows():
-        start_time = time.time()
+        start_row_time = time.time()
         short_hostname_excel = row[HOSTNAME_COLUMN]
 
         if pd.isna(short_hostname_excel) or not short_hostname_excel:
@@ -161,35 +162,41 @@ def main():
             continue
 
         short_hostname_cleaned = str(short_hostname_excel).strip()
-        print(f" Ligne {index + 1}/{len(df)}: Recherche de '{short_hostname_cleaned}'...", end='')
+        print(f" Ligne {index + 1}/{len(df)}: Recherche de '{short_hostname_cleaned}'...", end='', flush=True)
 
-        # Appel de la fonction pour récupérer l'info OS
-        os_info = get_host_os_info_startswith(short_hostname_cleaned, DYNATRACE_BASE_URL, DYNATRACE_API_TOKEN)
+        # Appel de la fonction pour trouver l'hôte et récupérer l'info OS
+        os_info = find_host_and_get_os(short_hostname_cleaned, KNOWN_SUFFIXES, DYNATRACE_BASE_URL, DYNATRACE_API_TOKEN)
         results.append(os_info)
         print(f" Résultat: {os_info}")
 
-        # Pause pour éviter le rate limiting
-        elapsed_time = time.time() - start_time
-        sleep_time = max(0, api_call_delay - elapsed_time)
+        # Pause principale entre le traitement de chaque LIGNE Excel
+        elapsed_row_time = time.time() - start_row_time
+        sleep_time = max(0, API_CALL_DELAY_PER_ROW - elapsed_row_time)
         if sleep_time > 0:
             time.sleep(sleep_time)
 
+    end_total_time = time.time()
+    print("-" * 30)
+    print(f"Temps total d'exécution : {time.strftime('%H:%M:%S', time.gmtime(end_total_time - start_total_time))}")
 
     print("\nAjout de la colonne OS...")
     df[NEW_OS_COLUMN] = results
 
     # Calcul simple des stats
     total_processed = len(results)
-    success_count = sum(1 for r in results if not isinstance(r, str) or ("Error" not in r and "Found" not in r and "Mismatch" not in r and "Ambiguous" not in r and "manquant" not in r))
+    success_count = sum(1 for r in results if not isinstance(r, str) or ("Error" not in r and "Found" not in r and "Missing" not in r and "manquant" not in r))
     not_found_count = sum(1 for r in results if isinstance(r, str) and "Not Found" in r)
     error_count = sum(1 for r in results if isinstance(r, str) and "Error" in r)
-    other_issues = total_processed - success_count - not_found_count - error_count
+    os_missing_count = sum(1 for r in results if isinstance(r, str) and "OS Info Missing" in r)
+    other_issues = total_processed - success_count - not_found_count - error_count - os_missing_count
 
     print(f"\nRésumé du traitement ({total_processed} lignes):")
     print(f"  - Succès (OS trouvé): {success_count}")
-    print(f"  - Non trouvés (startsWith): {not_found_count}")
+    print(f"  - OS non trouvé (host trouvé): {os_missing_count}")
+    print(f"  - Hôte non trouvé (tous suffixes): {not_found_count}")
     print(f"  - Erreurs (API, etc.): {error_count}")
-    print(f"  - Autres (Ambigu, Mismatch, Vide): {other_issues}")
+    print(f"  - Autres (Vide): {other_issues}")
+
 
     try:
         print(f"\nSauvegarde des résultats dans : {OUTPUT_EXCEL_FILE}")
