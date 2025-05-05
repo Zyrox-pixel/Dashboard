@@ -78,6 +78,7 @@ const RecentProblemsPage: React.FC = () => {
           <ProblemsList 
             problems={problemsLast72h} 
             title="Tous les problèmes des dernières 72h"
+            showRefreshButton={false}
           />
         ) : (
           <div className="p-6 rounded-lg bg-slate-800 border border-slate-700 text-center">

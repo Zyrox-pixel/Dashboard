@@ -46,16 +46,21 @@ const ProblemsList: React.FC<ProblemsListProps> = ({
   // Récupérer le type de dashboard actuel (vfg ou vfe)
   const dashboardType = window.location.pathname.includes('vfe') ? 'vfe' : 'vfg';
   
-  // Nouvelle fonction pour rafraîchir les problèmes directement depuis l'API
+  // Fonction pour rafraîchir les problèmes directement depuis l'API
   const handleRefreshProblems = async () => {
     // Marquer comme en cours de rafraîchissement
     setIsRefreshing(true);
     
     try {
-      // Déterminer les paramètres pour l'API en fonction du contexte
-      const status = "OPEN"; // On veut les problèmes actifs
+      // Déterminer les paramètres pour l'API en fonction du contexte - par défaut les problèmes ACTIFS
+      const status = title.toLowerCase().includes('72h') ? "ALL" : "OPEN";
+      const timeframe = title.toLowerCase().includes('72h') ? "-72h" : "all";
+      
+      console.log(`Rafraîchissement des problèmes: ${status} avec timeframe ${timeframe}`);
+      
       const params: any = {
         status: status,
+        from: timeframe,
         debug: 'true', // Forcer le rafraîchissement
         type: dashboardType
       };
@@ -97,12 +102,17 @@ const ProblemsList: React.FC<ProblemsListProps> = ({
             }
           }
           
+          // Adapter le format d'affichage du temps en fonction du contexte (problèmes récents vs actifs)
+          const timeDisplay = title.toLowerCase().includes('72h') 
+            ? (problem.start_time ? `Détecté le ${problem.start_time}` : "Récent")
+            : (problem.start_time ? `Depuis ${problem.start_time}` : "Récent");
+          
           return {
             id: problem.id || `PROB-${Math.random().toString(36).substr(2, 9)}`,
             title: problem.title || "Problème inconnu",
             code: problem.id ? problem.id.substring(0, 7) : "UNKNOWN",
             subtitle: `${problem.zone || "Non spécifié"} - Impact: ${problem.impact || "INCONNU"}`,
-            time: problem.start_time ? `Depuis ${problem.start_time}` : "Récent",
+            time: timeDisplay,
             type: problem.impact === "INFRASTRUCTURE" ? "Problème d'Infrastructure" : "Problème de Service",
             status: problem.status === "OPEN" ? "critical" : "warning",
             impact: problem.impact === "INFRASTRUCTURE" ? "ÉLEVÉ" : problem.impact === "SERVICE" ? "MOYEN" : "FAIBLE",

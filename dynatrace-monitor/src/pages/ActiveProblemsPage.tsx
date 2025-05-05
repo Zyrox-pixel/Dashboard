@@ -77,6 +77,7 @@ const ActiveProblemsPage: React.FC = () => {
           <ProblemsList 
             problems={activeProblems} 
             title="Tous les problèmes actifs (sans limite de temps)"
+            showRefreshButton={true}
           />
         )}
       </div>
