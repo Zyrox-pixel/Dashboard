@@ -105,14 +105,6 @@ def list_dynatrace_problems(api_url, api_token, management_zone_name):
             return filtered_problems
     
     return problems
-        print(f"Erreur lors de la récupération des problèmes: {response.status_code}")
-        print(response.text)
-        return []
-    
-    # Récupérer les problèmes
-    problems = response.json().get('problems', [])
-    
-    return problems
 
 def display_problems(problems):
     """
