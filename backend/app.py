@@ -299,10 +299,30 @@ def get_problems_72h():
                 unique_problems = []
                 problem_ids = set()
                 
-                for problem in all_problems:
-                    if 'id' in problem and problem['id'] not in problem_ids:
-                        problem_ids.add(problem['id'])
-                        unique_problems.append(problem)
+                # Vérifier la structure des problèmes et la clé d'identification
+                logger.info(f"Déduplication: examen de {len(all_problems)} problèmes")
+                
+                # Vérifier la structure du premier problème si disponible
+                if all_problems and len(all_problems) > 0:
+                    logger.info(f"Structure du premier problème:")
+                    problem_keys = list(all_problems[0].keys())
+                    logger.info(f"Clés disponibles: {problem_keys}")
+                    
+                    # Déterminer la bonne clé d'ID (problemId ou id)
+                    id_key = 'problemId' if 'problemId' in problem_keys else 'id'
+                    logger.info(f"Utilisation de la clé '{id_key}' pour l'identification des problèmes")
+                    
+                    # Utilisez la bonne clé pour la déduplication
+                    for problem in all_problems:
+                        problem_id = problem.get(id_key)
+                        if problem_id and problem_id not in problem_ids:
+                            problem_ids.add(problem_id)
+                            unique_problems.append(problem)
+                            logger.info(f"Problème ajouté: {problem_id}")
+                else:
+                    logger.warning("Aucun problème à dédupliquer")
+                
+                logger.info(f"Déduplication terminée: {len(unique_problems)} problèmes uniques sur {len(all_problems)} au total")
                 
                 logger.info(f"Récupéré {len(unique_problems)} problèmes uniques sur 72h pour {dashboard_type.upper()} avec test_get_problems")
                 
