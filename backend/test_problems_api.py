@@ -167,22 +167,51 @@ def test_get_problems(management_zone_name=None, time_from="now-72h", status="OP
 def main():
     print("=== TEST DE L'API PROBLEMS DYNATRACE ===\n")
     
-    # Test 1: Tous les problèmes des 72 dernières heures
-    print("\n\n=== TEST 1: Tous les problèmes des 72 dernières heures ===")
-    all_problems = test_get_problems(time_from="now-72h", status="OPEN,CLOSED")
-    
-    # Test 2: Problèmes pour une MZ spécifique (utiliser la première MZ de VFG_MZ_LIST)
+    # Récupérer la liste des MZs depuis VFG_MZ_LIST
     vfg_mz_string = os.environ.get('VFG_MZ_LIST', '')
-    if vfg_mz_string:
-        first_mz = vfg_mz_string.split(',')[0].strip()
-        print(f"\n\n=== TEST 2: Problèmes pour la MZ '{first_mz}' ===")
-        mz_problems = test_get_problems(management_zone_name=first_mz, time_from="now-72h", status="OPEN,CLOSED")
+    if not vfg_mz_string:
+        print("ERREUR: VFG_MZ_LIST est vide dans le fichier .env")
+        return
+        
+    mz_list = [mz.strip() for mz in vfg_mz_string.split(',')]
+    print(f"Liste des MZs VFG trouvées: {mz_list}")
     
-    # Test 3: Problèmes ouverts uniquement (7 derniers jours)
-    print("\n\n=== TEST 3: Problèmes ouverts uniquement (7 derniers jours) ===")
-    open_problems = test_get_problems(time_from="now-7d", status="OPEN")
+    # Récupérer tous les problèmes pour chaque MZ et les combiner
+    all_problems = []
     
-    print("\n=== TESTS TERMINÉS ===")
+    for mz_name in mz_list:
+        print(f"\n\n=== Récupération des problèmes pour la MZ '{mz_name}' ===")
+        mz_problems = test_get_problems(management_zone_name=mz_name, time_from="now-72h", status="OPEN,CLOSED")
+        
+        if mz_problems:
+            all_problems.extend(mz_problems)
+            print(f"Nombre total de problèmes avec cette MZ: {len(mz_problems)}")
+    
+    # Afficher le résumé
+    # Dédupliquer les problèmes par ID
+    unique_problems = []
+    problem_ids = set()
+    
+    for problem in all_problems:
+        if problem['id'] not in problem_ids:
+            problem_ids.add(problem['id'])
+            unique_problems.append(problem)
+    
+    print(f"\n\n=== RÉSUMÉ ===")
+    print(f"Nombre total de problèmes récupérés: {len(all_problems)}")
+    print(f"Nombre de problèmes uniques après déduplication: {len(unique_problems)}")
+    
+    if unique_problems:
+        print("\nListe des problèmes uniques trouvés:")
+        for i, p in enumerate(unique_problems, 1):
+            title = p.get('title', 'Sans titre')
+            status = p.get('status', 'INCONNU')
+            mz = p.get('managementZones', [])
+            mz_names = [zone.get('name', 'Inconnue') for zone in mz] if mz else ['Non spécifié']
+            
+            print(f"{i}. [{status}] {title} - MZs: {', '.join(mz_names)}")
+    
+    print("\n=== TEST TERMINÉ ===")
 
 if __name__ == "__main__":
     main()
