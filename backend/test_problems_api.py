@@ -58,7 +58,7 @@ def test_get_problems(management_zone_name=None, time_from="now-72h", status="OP
     problem_selector = ""
     if management_zone_name:
         escaped_mz_name = management_zone_name.replace('"', '\\"')
-        problem_selector = f'managementZone("{escaped_mz_name}")'
+        problem_selector = f'managementZones("{escaped_mz_name}")'
         print(f"Sélecteur de problèmes: '{problem_selector}'")
     
     # Paramètres initiaux pour la première requête

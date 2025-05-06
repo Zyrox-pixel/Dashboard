@@ -902,7 +902,7 @@ def get_all_problems_with_pagination(management_zone_name=None, time_from="now-7
     problem_selector = ""
     if management_zone_name:
         escaped_mz_name = management_zone_name.replace('"', '\\"')
-        problem_selector = f'managementZone("{escaped_mz_name}")'
+        problem_selector = f'managementZones("{escaped_mz_name}")'
         logger.info(f"Requête de problèmes avec sélecteur MZ: '{problem_selector}'")
     
     # Paramètres initiaux pour la première requête
