@@ -3,6 +3,8 @@ import datetime
 from datetime import timedelta
 import json
 
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
 def list_dynatrace_problems(api_url, api_token, management_zone_name):
     """
     Liste tous les problèmes d'une zone de gestion Dynatrace (ouverts et fermés) 
@@ -28,9 +30,11 @@ def list_dynatrace_problems(api_url, api_token, management_zone_name):
     
     # Construire l'URL pour obtenir les problèmes
     problems_url = f"{api_url}/api/v2/problems"
+    
+    # Essayer d'abord avec le paramètre managementZone
     params = {
         'from': from_timestamp,
-        'managementZone': management_zone_name,  # Utiliser directement le nom au lieu de l'ID
+        'managementZone': management_zone_name,  
         'status': 'OPEN,CLOSED'  # Pour inclure à la fois les problèmes ouverts et fermés
     }
     
@@ -38,6 +42,67 @@ def list_dynatrace_problems(api_url, api_token, management_zone_name):
     response = requests.get(problems_url, headers=headers, params=params, verify=False)
     
     if response.status_code != 200:
+        print(f"Erreur lors de la première tentative: {response.status_code}")
+        print(response.text)
+        
+        # Essayer une approche alternative avec un filtre de requête
+        params = {
+            'from': from_timestamp,
+            'status': 'OPEN,CLOSED',
+            'filter': f'managementZone("{management_zone_name}")'
+        }
+        
+        response = requests.get(problems_url, headers=headers, params=params, verify=False)
+        
+        if response.status_code != 200:
+            print(f"Erreur lors de la deuxième tentative: {response.status_code}")
+            print(response.text)
+            
+            # Si les deux tentatives échouent, récupérer tous les problèmes puis filtrer manuellement
+            print("Tentative de récupération de tous les problèmes puis filtrage manuel...")
+            params = {
+                'from': from_timestamp,
+                'status': 'OPEN,CLOSED'
+            }
+            
+            response = requests.get(problems_url, headers=headers, params=params, verify=False)
+            
+            if response.status_code != 200:
+                print(f"Erreur lors de la récupération de tous les problèmes: {response.status_code}")
+                print(response.text)
+                return []
+            
+            # Récupérer tous les problèmes puis filtrer manuellement par management zone
+            all_problems = response.json().get('problems', [])
+            filtered_problems = []
+            
+            for problem in all_problems:
+                # Vérifier si le problème appartient à la management zone spécifiée
+                mgmt_zones = problem.get('managementZones', [])
+                if any(zone.get('name') == management_zone_name for zone in mgmt_zones):
+                    filtered_problems.append(problem)
+            
+            print(f"Récupération de {len(filtered_problems)} problèmes sur {len(all_problems)} après filtrage manuel.")
+            return filtered_problems
+    
+    # Si la première tentative réussit
+    problems = response.json().get('problems', [])
+    
+    # Vérifier si nous devons filtrer manuellement pour être sûr
+    if len(problems) > 0:
+        # Vérifier si le problème appartient bien à la management zone spécifiée (vérification supplémentaire)
+        filtered_problems = []
+        for problem in problems:
+            mgmt_zones = problem.get('managementZones', [])
+            if any(zone.get('name') == management_zone_name for zone in mgmt_zones):
+                filtered_problems.append(problem)
+        
+        # Si la différence est grande, c'est que le filtrage de l'API n'a pas fonctionné correctement
+        if len(problems) - len(filtered_problems) > 5:
+            print(f"Attention: Le filtrage API semble ne pas fonctionner correctement. {len(filtered_problems)} problèmes sur {len(problems)} appartiennent réellement à la management zone.")
+            return filtered_problems
+    
+    return problems
         print(f"Erreur lors de la récupération des problèmes: {response.status_code}")
         print(response.text)
         return []
@@ -84,6 +149,7 @@ def display_problems(problems):
         print(f"  - Fin: {end_time}")
         print(f"  - URL: {problem.get('problemDetailsWebUrl', 'N/A')}")
         print("=" * 80)
+
 
 if __name__ == "__main__":
     # Ces variables devront être définies par l'utilisateur
