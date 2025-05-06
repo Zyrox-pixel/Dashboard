@@ -719,9 +719,30 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
         if (Array.isArray(problemsData)) {
           // Transformer les données
           const problems: Problem[] = problemsData.map((problem) => {
-            // Extraire le nom de l'hôte à partir du titre si possible
+            // Extraire le nom de l'hôte à partir des entités impactées (priorité)
             let hostName = '';
-            if (problem.title && problem.title.toLowerCase().includes('host')) {
+            
+            // PRIORITÉ 1: Utiliser directement impactedEntities
+            if (problem.impactedEntities && Array.isArray(problem.impactedEntities)) {
+              const hostEntity = problem.impactedEntities.find(entity => 
+                entity.entityId && entity.entityId.type === 'HOST' && entity.name);
+              if (hostEntity) {
+                hostName = hostEntity.name;
+                console.log(`Nom d'hôte extrait de impactedEntities pour le problème 72h ${problem.id}: ${hostName}`);
+              }
+            }
+            
+            // PRIORITÉ 2: Si pas trouvé, utiliser le champ host ou impacted s'ils existent
+            if (!hostName) {
+              if (problem.host && problem.host !== "Non spécifié") {
+                hostName = problem.host;
+              } else if (problem.impacted && problem.impacted !== "Non spécifié") {
+                hostName = problem.impacted;
+              }
+            }
+            
+            // PRIORITÉ 3: Extraire du titre si toujours rien
+            if (!hostName && problem.title && problem.title.toLowerCase().includes('host')) {
               const words = problem.title.split(' ');
               // On prend le mot après "host" s'il existe
               const hostIndex = words.findIndex(word => word.toLowerCase() === 'host');
@@ -744,7 +765,10 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
               dt_url: problem.dt_url || "#",
               duration: problem.duration || "",
               resolved: problem.resolved || false,
-              host: hostName // Ajouter le nom de l'hôte extrait
+              host: hostName, // Utiliser le nom d'hôte extrait
+              impacted: hostName, // Pour compatibilité
+              impactedEntities: problem.impactedEntities, // Transférer les entités impactées pour utilisation dans ProblemCard
+              rootCauseEntity: problem.rootCauseEntity // Transférer aussi la cause racine si disponible
             };
           });
           
