@@ -1556,7 +1556,7 @@ class OptimizedAPIClient:
             'start_time': start_time_str,
             'end_time': end_time_str,  # Ajout de l'heure de fermeture
             'duration': duration_display,  # Ajout de la durée du problème
-            'dt_url': f"{self.env_url}/ui/problems/problemdetails;pid={problem.get('problemId', 'Unknown')}",
+            'dt_url': f"{self.env_url}/#problems/problemdetails;pid={problem.get('problemId', 'Unknown')}",
             'zone': zone or self._extract_problem_zone(problem),
             'resolved': is_resolved,
             'host': host_name,  # Ajout du champ host explicite
