@@ -11,7 +11,7 @@ def list_dynatrace_problems(api_url, api_token, management_zone_name):
     Args:
         api_url (str): L'URL de base de l'API Dynatrace (exemple: https://yourdomain.live.dynatrace.com)
         api_token (str): Token d'API avec les permissions nécessaires
-        management_zone_name (str): Nom de la zone de gestion (pas l'ID)
+        management_zone_name (str): Nom de la zone de gestion
         
     Returns:
         list: Liste des problèmes trouvés
@@ -20,32 +20,6 @@ def list_dynatrace_problems(api_url, api_token, management_zone_name):
         'Authorization': f'Api-Token {api_token}',
         'Accept': 'application/json'
     }
-    
-    # Étape 1: Trouver l'ID de la zone de gestion à partir de son nom
-    management_zone_id = None
-    
-    # Obtenir toutes les zones de gestion
-    mgmt_zones_url = f"{api_url}/api/config/v1/managementZones"
-    response = requests.get(mgmt_zones_url, headers=headers)
-    
-    if response.status_code != 200:
-        print(f"Erreur lors de la récupération des zones de gestion: {response.status_code}")
-        print(response.text)
-        return []
-    
-    # Chercher la zone de gestion par son nom
-    mgmt_zones = response.json().get('values', [])
-    
-    for zone in mgmt_zones:
-        if zone.get('name') == management_zone_name:
-            management_zone_id = zone.get('id')
-            break
-    
-    if not management_zone_id:
-        print(f"Zone de gestion '{management_zone_name}' non trouvée.")
-        return []
-    
-    # Étape 2: Obtenir les problèmes des 72 dernières heures
     
     # Calculer le timestamp pour les 72 dernières heures (en millisecondes)
     now = datetime.datetime.now()
@@ -56,12 +30,12 @@ def list_dynatrace_problems(api_url, api_token, management_zone_name):
     problems_url = f"{api_url}/api/v2/problems"
     params = {
         'from': from_timestamp,
-        'managementZoneId': management_zone_id,
+        'managementZone': management_zone_name,  # Utiliser directement le nom au lieu de l'ID
         'status': 'OPEN,CLOSED'  # Pour inclure à la fois les problèmes ouverts et fermés
     }
     
-    # Effectuer la requête pour obtenir les problèmes
-    response = requests.get(problems_url, headers=headers, params=params)
+    # Effectuer la requête pour obtenir les problèmes (sans vérification SSL)
+    response = requests.get(problems_url, headers=headers, params=params, verify=False)
     
     if response.status_code != 200:
         print(f"Erreur lors de la récupération des problèmes: {response.status_code}")
