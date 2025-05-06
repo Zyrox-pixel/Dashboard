@@ -939,9 +939,27 @@ def get_all_problems_with_pagination(management_zone_name=None, time_from="now-7
             
             data = response.json()
             problems_on_page = data.get('problems', [])
-            all_problems.extend(problems_on_page)
             
-            logger.info(f"Page {page_num}: {len(problems_on_page)} problèmes récupérés. Total jusqu'à présent: {len(all_problems)}.")
+            # Vérifier la structure des problèmes et exclure les invalides
+            valid_problems = []
+            for prob in problems_on_page:
+                if not isinstance(prob, dict):
+                    logger.warning(f"Problème ignoré: format inattendu (non-dictionnaire): {type(prob)}")
+                    continue
+                    
+                if 'id' not in prob:
+                    logger.warning(f"Problème ignoré: pas d'ID trouvé: {json.dumps(prob)[:200]}...")
+                    continue
+                    
+                valid_problems.append(prob)
+            
+            # Si des problèmes ont été ignorés, enregistrer un avertissement
+            if len(valid_problems) < len(problems_on_page):
+                logger.warning(f"Page {page_num}: {len(problems_on_page) - len(valid_problems)} problèmes invalides ignorés")
+                
+            all_problems.extend(valid_problems)
+            
+            logger.info(f"Page {page_num}: {len(valid_problems)} problèmes valides récupérés. Total jusqu'à présent: {len(all_problems)}.")
             
             next_page_key = data.get("nextPageKey")
             if next_page_key:

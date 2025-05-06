@@ -188,17 +188,28 @@ def main():
             print(f"Nombre total de problèmes avec cette MZ: {len(mz_problems)}")
     
     # Afficher le résumé
-    # Dédupliquer les problèmes par ID
+    # Dédupliquer les problèmes par ID et vérifier les champs manquants
     unique_problems = []
     problem_ids = set()
+    invalid_problems = []
     
-    for problem in all_problems:
+    print("\nVérification des problèmes récupérés...")
+    
+    for i, problem in enumerate(all_problems):
+        # Vérifier si l'objet contient un ID
+        if 'id' not in problem:
+            print(f"ATTENTION: Problème sans ID trouvé à l'index {i}")
+            print(f"Contenu du problème sans ID: {json.dumps(problem, indent=2)}")
+            invalid_problems.append(problem)
+            continue
+            
         if problem['id'] not in problem_ids:
             problem_ids.add(problem['id'])
             unique_problems.append(problem)
     
     print(f"\n\n=== RÉSUMÉ ===")
     print(f"Nombre total de problèmes récupérés: {len(all_problems)}")
+    print(f"Nombre de problèmes invalides (sans ID): {len(invalid_problems)}")
     print(f"Nombre de problèmes uniques après déduplication: {len(unique_problems)}")
     
     if unique_problems:
