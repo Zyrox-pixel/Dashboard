@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 import logging
 import threading
 from optimization import OptimizedAPIClient, time_execution
+import traceback
 
 # Configuration du logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -210,6 +211,127 @@ def set_management_zone():
         logger.error(f"Erreur lors de la définition de la MZ: {e}")
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/problems-72h', methods=['GET'])
+@time_execution
+def get_problems_72h():
+    """
+    Endpoint dédié pour récupérer tous les problèmes des 72 dernières heures.
+    Basé sur l'approche du script Python qui fonctionne correctement,
+    avec gestion de la pagination et filtrage précis.
+    """
+    try:
+        # Récupérer les paramètres de requête
+        dashboard_type = request.args.get('type', '')  # Pour identifier VFG ou VFE
+        zone_filter = request.args.get('zone', '')  # Pour filtrer par une zone spécifique
+        debug_mode = request.args.get('debug', 'false').lower() == 'true'
+        
+        # Logs pour debug
+        logger.info(f"Requête problèmes-72h: dashboard_type={dashboard_type}, zone_filter={zone_filter}, debug={debug_mode}")
+        logger.info(f"Variables d'environnement: DT_ENV_URL={DT_ENV_URL}, API_TOKEN={'présent' if API_TOKEN else 'manquant'}")
+        
+        # Créer une clé de cache unique pour cette requête
+        specific_cache_key = f"problems-72h:{dashboard_type}:{zone_filter}"
+        
+        # En mode debug, toujours vider le cache
+        if debug_mode:
+            api_client.cache.pop(specific_cache_key, None)
+            logger.info(f"Mode debug activé, cache vidé pour la clé: {specific_cache_key}")
+        # Sinon, vérifier le cache
+        else:
+            cached_data = api_client.get_cached(specific_cache_key)
+            if cached_data is not None:
+                logger.info(f"Retour des données en cache pour problems-72h")
+                return jsonify(cached_data)
+        
+        # Si un type de dashboard est spécifié (vfg ou vfe)
+        if dashboard_type in ['vfg', 'vfe']:
+            # Si un filtre de zone est fourni, l'utiliser au lieu de toutes les zones
+            if zone_filter:
+                logger.info(f"Filtrage par zone spécifique: {zone_filter} pour dashboard {dashboard_type}")
+                try:
+                    # Utiliser le moteur spécifique qui gère la pagination
+                    problems = get_all_problems_with_pagination(zone_filter, "now-72h", "OPEN,CLOSED")
+                    logger.info(f"Zone {zone_filter}: {len(problems)} problèmes trouvés sur 72h")
+                    
+                    # Mettre en cache le résultat
+                    api_client.set_cache(specific_cache_key, problems)
+                    return jsonify(problems)
+                except Exception as zone_error:
+                    logger.error(f"Erreur lors de la récupération des problèmes pour zone {zone_filter}: {zone_error}")
+                    return jsonify([])
+            
+            # Récupérer la liste des MZs pour ce dashboard type
+            mz_list_var = 'VFG_MZ_LIST' if dashboard_type == 'vfg' else 'VFE_MZ_LIST'
+            mz_string = os.environ.get(mz_list_var, '')
+            
+            if not mz_string:
+                logger.warning(f"{mz_list_var} est vide ou non définie dans .env")
+                return jsonify([])
+                
+            mz_list = [mz.strip() for mz in mz_string.split(',')]
+            logger.info(f"Liste des MZs {dashboard_type} pour problèmes 72h: {mz_list}")
+            
+            # Récupérer les problèmes pour chaque MZ et les combiner
+            all_problems = []
+            
+            for mz_name in mz_list:
+                try:
+                    logger.info(f"Récupération des problèmes 72h pour MZ: {mz_name}")
+                    # Utiliser la nouvelle fonction qui gère la pagination
+                    mz_problems = get_all_problems_with_pagination(mz_name, "now-72h", "OPEN,CLOSED")
+                    logger.info(f"MZ {mz_name}: {len(mz_problems)} problèmes trouvés sur 72h")
+                    all_problems.extend(mz_problems)
+                except Exception as mz_error:
+                    logger.error(f"Erreur lors de la récupération des problèmes 72h pour MZ {mz_name}: {mz_error}")
+            
+            # Dédupliquer les problèmes (un même problème peut affecter plusieurs MZs)
+            unique_problems = []
+            problem_ids = set()
+            for problem in all_problems:
+                if problem['id'] not in problem_ids:
+                    problem_ids.add(problem['id'])
+                    unique_problems.append(problem)
+            
+            logger.info(f"Récupéré {len(unique_problems)} problèmes uniques sur 72h pour {dashboard_type.upper()}")
+            
+            # En mode debug, afficher les problèmes pour investigation
+            if debug_mode:
+                for i, prob in enumerate(unique_problems):
+                    logger.info(f"Problème 72h #{i+1}: {prob['id']} - {prob['title']} - Status: {prob['status']}")
+            
+            # Mettre en cache le résultat
+            api_client.set_cache(specific_cache_key, unique_problems)
+            return jsonify(unique_problems)
+            
+        else:
+            # Pour une MZ spécifique ou sans filtrage
+            if zone_filter:
+                logger.info(f"Filtrage par zone spécifique: {zone_filter} pour problèmes 72h")
+                effective_mz = zone_filter
+            else:
+                # Utiliser la MZ courante ou aucune MZ si filtrage désactivé
+                current_mz = get_current_mz()
+                effective_mz = current_mz
+                
+            # Utiliser la nouvelle fonction qui gère la pagination
+            problems = get_all_problems_with_pagination(effective_mz, "now-72h", "OPEN,CLOSED")
+            
+            # En mode debug, afficher les problèmes pour investigation
+            if debug_mode:
+                for i, prob in enumerate(problems):
+                    logger.info(f"Problème 72h #{i+1}: {prob['id']} - {prob['title']} - Status: {prob['status']}")
+            
+            # Mettre en cache le résultat
+            api_client.set_cache(specific_cache_key, problems)
+            
+            logger.info(f"MZ {effective_mz}: {len(problems)} problèmes récupérés sur 72h")
+            return jsonify(problems)
+            
+    except Exception as e:
+        logger.error(f"Erreur lors de la récupération des problèmes 72h: {e}")
+        logger.error(traceback.format_exc())
+        return jsonify({'error': str(e)})
+
 @app.route('/api/problems', methods=['GET'])
 # Retiré le décorateur de cache pour les problèmes pour garantir des données en temps réel
 @time_execution
@@ -257,6 +379,9 @@ def get_problems():
         
         # Log pour debug
         logger.info(f"Requête problèmes: status={status}, time_from={time_from}, dashboard_type={dashboard_type}, debug={debug_mode}")
+        
+        # Ajouter des détails sur l'état de l'environnement pour le débogage
+        logger.info(f"Variables d'environnement: DT_ENV_URL={DT_ENV_URL}, API_TOKEN={'présent' if API_TOKEN else 'manquant'}")
         
         # Si un type de dashboard est spécifié (vfg ou vfe)
         if dashboard_type in ['vfg', 'vfe']:
@@ -748,6 +873,108 @@ def get_management_zones():
             logger.error(f"Erreur lors du fallback sur .env: {fallback_error}")
         
         return {'error': str(e)}
+
+# Fonction pour obtenir tous les problèmes avec pagination
+def get_all_problems_with_pagination(management_zone_name=None, time_from="now-72h", status="OPEN,CLOSED"):
+    """
+    Récupère tous les problèmes avec pagination complète, en suivant l'approche du script Python qui fonctionne.
+    
+    Args:
+        management_zone_name (str, optional): Nom de la Management Zone pour filtrer les problèmes.
+        time_from (str, optional): Point de départ temporel (ex: "now-72h"). 
+        status (str, optional): Statut des problèmes à récupérer ("OPEN", "CLOSED", ou "OPEN,CLOSED").
+        
+    Returns:
+        list: Liste des problèmes récupérés.
+    """
+    # Construction des headers pour l'API Dynatrace
+    headers = {
+        'Authorization': f'Api-Token {API_TOKEN}',
+        'Accept': 'application/json; charset=utf-8'
+    }
+    
+    api_url = DT_ENV_URL.rstrip('/')
+    problems_url = f"{api_url}/api/v2/problems"
+    
+    all_problems = []
+    
+    # Échapper les guillemets doubles dans le nom de la MZ pour le sélecteur
+    problem_selector = ""
+    if management_zone_name:
+        escaped_mz_name = management_zone_name.replace('"', '\\"')
+        problem_selector = f'managementZone("{escaped_mz_name}")'
+        logger.info(f"Requête de problèmes avec sélecteur MZ: '{problem_selector}'")
+    
+    # Paramètres initiaux pour la première requête
+    current_params = {
+        'from': time_from,
+        'status': status,
+        'pageSize': 500  # Demander le maximum par page pour réduire le nombre d'appels
+    }
+    
+    # Ajouter le sélecteur de problèmes si défini
+    if problem_selector:
+        current_params['problemSelector'] = problem_selector
+    
+    page_num = 1
+    logger.info(f"Début de la récupération des problèmes pour timeframe: {time_from}, status: {status}" + 
+                (f", MZ: '{management_zone_name}'" if management_zone_name else ""))
+    
+    while True:
+        if 'nextPageKey' in current_params:
+            logger.info(f"Récupération de la page {page_num} avec nextPageKey: {current_params['nextPageKey'][:20]}...")
+        else:
+            logger.info(f"Récupération de la page {page_num} avec les paramètres initiaux: {current_params}")
+        
+        try:
+            verify_ssl = os.environ.get('VERIFY_SSL', 'False').lower() in ('true', '1', 't')
+            response = requests.get(
+                problems_url, 
+                headers=headers, 
+                params=current_params, 
+                verify=verify_ssl,
+                timeout=30
+            )
+            response.raise_for_status()
+            
+            data = response.json()
+            problems_on_page = data.get('problems', [])
+            all_problems.extend(problems_on_page)
+            
+            logger.info(f"Page {page_num}: {len(problems_on_page)} problèmes récupérés. Total jusqu'à présent: {len(all_problems)}.")
+            
+            next_page_key = data.get("nextPageKey")
+            if next_page_key:
+                # Pour les pages suivantes, seuls nextPageKey et pageSize sont nécessaires
+                current_params = {'nextPageKey': next_page_key, 'pageSize': 500}
+                page_num += 1
+                # Petite pause pour ne pas surcharger l'API
+                time.sleep(0.2)
+            else:
+                # Plus de pages à récupérer
+                break
+                
+        except requests.exceptions.HTTPError as http_err:
+            logger.error(f"Erreur HTTP lors de la récupération des problèmes (page {page_num}): {http_err}")
+            logger.error(f"Réponse du serveur: {response.text if response and hasattr(response, 'text') else 'Pas de réponse détaillée'}")
+            break
+        except requests.exceptions.Timeout as timeout_err:
+            logger.error(f"Timeout lors de la requête (page {page_num}): {timeout_err}")
+            break
+        except requests.exceptions.RequestException as req_err:
+            logger.error(f"Erreur de requête générique (page {page_num}): {req_err}")
+            break
+        except json.JSONDecodeError as json_err:
+            logger.error(f"Erreur de décodage JSON (page {page_num}): {json_err}")
+            logger.error(f"Réponse brute reçue: {response.text if response and hasattr(response, 'text') else 'Pas de réponse détaillée'}")
+            break
+        except Exception as e:
+            logger.error(f"Erreur inattendue: {e}")
+            logger.error(traceback.format_exc())
+            break
+    
+    logger.info(f"Récupération terminée. Nombre total de problèmes: {len(all_problems)}")
+    return all_problems
 
 @app.route('/api/status', methods=['GET'])
 def get_status():
