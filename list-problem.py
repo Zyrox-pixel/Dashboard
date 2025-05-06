@@ -2,7 +2,9 @@ import requests
 import datetime
 from datetime import timedelta
 import json
+import urllib3
 
+# Désactiver les avertissements liés à la vérification SSL
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 def list_dynatrace_problems(api_url, api_token, management_zone_name):
@@ -149,7 +151,6 @@ def display_problems(problems):
         print(f"  - Fin: {end_time}")
         print(f"  - URL: {problem.get('problemDetailsWebUrl', 'N/A')}")
         print("=" * 80)
-
 
 if __name__ == "__main__":
     # Ces variables devront être définies par l'utilisateur
