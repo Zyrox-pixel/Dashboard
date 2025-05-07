@@ -333,11 +333,14 @@ def get_problems_72h():
                         if 'managementZones' in problem:
                             problem_mzs = [mz.get('name', '') for mz in problem.get('managementZones', [])]
                         
-                        # Vérifier si une des MZ du problème est dans notre liste
+                        # Vérifier si une des MZ du problème correspond EXACTEMENT à une MZ de notre liste
                         for mz_name in mz_list:
-                            if mz_name in problem_mzs:
+                            # Journaliser les MZs pour débogage
+                            logger.info(f"Comparaison: problème {problem.get(id_key)} a MZs={problem_mzs}, comparé avec {mz_name}")
+                            # Vérification stricte d'égalité complète, pas de correspondance partielle
+                            if any(problem_mz == mz_name for problem_mz in problem_mzs):
                                 is_in_mz_list = True
-                                logger.info(f"Problème {problem.get(id_key)} appartient à la MZ {mz_name}")
+                                logger.info(f"MATCH EXACT: Problème {problem.get(id_key)} appartient à la MZ {mz_name}")
                                 break
                         
                         if is_in_mz_list:
@@ -471,11 +474,14 @@ def get_problems_72h():
                     if 'managementZones' in problem:
                         problem_mzs = [mz.get('name', '') for mz in problem.get('managementZones', [])]
                     
-                    # Vérifier si une des MZ du problème est dans notre liste
+                    # Vérifier si une des MZ du problème correspond EXACTEMENT à une MZ de notre liste
                     for mz_name in mz_list:
-                        if mz_name in problem_mzs:
+                        # Journaliser les MZs pour débogage
+                        logger.info(f"Comparaison: problème {problem.get('id')} a MZs={problem_mzs}, comparé avec {mz_name}")
+                        # Vérification stricte d'égalité complète, pas de correspondance partielle
+                        if any(problem_mz == mz_name for problem_mz in problem_mzs):
                             is_in_mz_list = True
-                            logger.info(f"Problème {problem.get('id')} appartient à la MZ {mz_name}")
+                            logger.info(f"MATCH EXACT: Problème {problem.get('id')} appartient à la MZ {mz_name}")
                             break
                     
                     if is_in_mz_list:
