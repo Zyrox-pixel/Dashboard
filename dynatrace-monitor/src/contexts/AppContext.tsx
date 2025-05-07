@@ -417,23 +417,26 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
   }, [state.vitalForGroupMZs, state.vitalForEntrepriseMZs, apiClient, optimized, getProcessIcon]);
 
   // Fonction pour charger toutes les données
-  const loadAllData = useCallback(async (dashboardType?: 'vfg' | 'vfe', refreshProblemsOnly?: boolean) => {
+  const loadAllData = useCallback(async (dashboardType?: 'vfg' | 'vfe', refreshProblemsOnly?: boolean, silentMode: boolean = false) => {
     // Modification de la fonction pour utiliser async/await avec Promise.all
-    console.log(`Loading all data for dashboard type: ${dashboardType || 'none'} ${refreshProblemsOnly ? '(problèmes uniquement)' : ''}`);
+    console.log(`Loading all data for dashboard type: ${dashboardType || 'none'} ${refreshProblemsOnly ? '(problèmes uniquement)' : ''} ${silentMode ? '(mode silencieux)' : ''}`);
     const startTime = performance.now();
     
-    setState(prev => ({ 
-      ...prev, 
-      isLoading: { 
-        ...prev.isLoading, 
-        problems: true, 
-        vitalForGroupMZs: !refreshProblemsOnly,
-        vitalForEntrepriseMZs: !refreshProblemsOnly,
-        initialLoadComplete: false,
-        dashboardData: !refreshProblemsOnly
-      },
-      error: null 
-    }));
+    // Ne mettre à jour les indicateurs de chargement que si nous ne sommes pas en mode silencieux
+    if (!silentMode) {
+      setState(prev => ({ 
+        ...prev, 
+        isLoading: { 
+          ...prev.isLoading, 
+          problems: true, 
+          vitalForGroupMZs: !refreshProblemsOnly,
+          vitalForEntrepriseMZs: !refreshProblemsOnly,
+          initialLoadComplete: false,
+          dashboardData: !refreshProblemsOnly
+        },
+        error: null 
+      }));
+    }
     
     try {
       // Vérifier si le backend est en ligne
@@ -802,22 +805,27 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
         error: 'Erreur lors du chargement des données. Veuillez réessayer.'
       }));
     } finally {
-      setState(prev => ({ 
-        ...prev, 
-        isLoading: { 
-          ...prev.isLoading, 
-          problems: false, 
-          vitalForGroupMZs: !refreshProblemsOnly ? false : prev.isLoading.vitalForGroupMZs,
-          vitalForEntrepriseMZs: !refreshProblemsOnly ? false : prev.isLoading.vitalForEntrepriseMZs,
-          initialLoadComplete: !refreshProblemsOnly ? true : prev.isLoading.initialLoadComplete,
-          dashboardData: false
-        } 
-      }));
+      // Ne réinitialiser les indicateurs de chargement que si nous ne sommes pas en mode silencieux
+      if (!silentMode) {
+        setState(prev => ({ 
+          ...prev, 
+          isLoading: { 
+            ...prev.isLoading, 
+            problems: false, 
+            vitalForGroupMZs: !refreshProblemsOnly ? false : prev.isLoading.vitalForGroupMZs,
+            vitalForEntrepriseMZs: !refreshProblemsOnly ? false : prev.isLoading.vitalForEntrepriseMZs,
+            initialLoadComplete: !refreshProblemsOnly ? true : prev.isLoading.initialLoadComplete,
+            dashboardData: false
+          } 
+        }));
+      }
     }
   }, [state.selectedZone, state.vitalForGroupMZs, state.vitalForEntrepriseMZs, loadZoneData, apiClient, optimized, getZoneIcon, getZoneColor]);
 
   // Drapeau pour éviter les appels multiples à refreshData
   const refreshInProgressRef = useRef(false);
+  // Identifiant du dernier timeout pour éviter les collisions
+  const refreshTimeoutIdRef = useRef<number | null>(null);
 
   // Fonction pour rafraîchir les données - version non bloquante améliorée
   const refreshData = useCallback(async (dashboardType?: 'vfg' | 'vfe', refreshProblemsOnly?: boolean): Promise<void> => {
@@ -827,6 +835,12 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
       return;
     }
     
+    // Annuler tout timeout précédent pour éviter les collisions
+    if (refreshTimeoutIdRef.current !== null) {
+      clearTimeout(refreshTimeoutIdRef.current);
+      refreshTimeoutIdRef.current = null;
+    }
+    
     // Marquer le début du rafraîchissement
     refreshInProgressRef.current = true;
     
@@ -834,10 +848,13 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
     setState(prev => ({ ...prev, error: null }));
     
     // Définir un timeout maximum pour éviter que le drapeau reste bloqué
-    const timeoutId = setTimeout(() => {
+    const timeoutId = window.setTimeout(() => {
       console.log("Timeout de sécurité pour refreshData : réinitialisation du drapeau");
       refreshInProgressRef.current = false;
+      refreshTimeoutIdRef.current = null;
     }, 60000); // 60 secondes maximum
+    
+    refreshTimeoutIdRef.current = timeoutId;
     
     // Gérer les erreurs dans la fonction
     try {
@@ -856,7 +873,7 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
         
         // Exécuter loadAllData avec un timeout court pour s'assurer que l'UI reste réactive
         await new Promise<void>((resolve, reject) => {
-          setTimeout(async () => {
+          const asyncTimeoutId = window.setTimeout(async () => {
             try {
               await loadAllData(dashboardType, true);
               resolve();
@@ -872,7 +889,10 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
                 }
               }));
             }
-          }, 10);
+          }, 100); // Légèrement plus long pour éviter les problèmes de délai
+          
+          // Nettoyer le timeout en cas d'annulation
+          return () => clearTimeout(asyncTimeoutId);
         });
       } else {
         // Dans les autres cas, exécuter normalement
@@ -891,80 +911,141 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
     } finally {
       // Réinitialiser le drapeau et nettoyer le timeout
       refreshInProgressRef.current = false;
-      clearTimeout(timeoutId);
+      if (refreshTimeoutIdRef.current === timeoutId) {
+        clearTimeout(timeoutId);
+        refreshTimeoutIdRef.current = null;
+      }
     }
   }, [loadAllData, state.selectedZone]); // Ajout de state.selectedZone comme dépendance
 
+  // Référence à l'intervalle pour le rafraîchissement automatique
+  const autoRefreshIntervalRef = useRef<number | null>(null);
+  // Référence au dernier timeoutId pour le rafraîchissement automatique
+  const autoRefreshTimeoutRef = useRef<number | null>(null);
+  // Horodatage du dernier rafraîchissement réussi
+  const lastSuccessfulRefreshRef = useRef<number>(0);
+  
   // Charger les données initiales et configurer le rafraîchissement automatique
   useEffect(() => {
-    if (!initialLoadRef.current) {
-      console.log("Initial data load");
-      initialLoadRef.current = true;
-      loadAllData(undefined, false);
-    }
+    // Fonction pour effectuer le chargement initial
+    const performInitialLoad = async () => {
+      if (!initialLoadRef.current) {
+        console.log("Initial data load");
+        initialLoadRef.current = true;
+        try {
+          await loadAllData(undefined, false);
+          lastSuccessfulRefreshRef.current = Date.now();
+        } catch (error) {
+          console.error("Erreur lors du chargement initial des données:", error);
+        }
+      }
+    };
     
-    // Variable pour suivre si un rafraîchissement est en cours
-    let isRefreshInProgress = false;
+    // Lancer le chargement initial
+    performInitialLoad();
+    
+    // Fonction pour effectuer le rafraîchissement automatique
+    const performAutoRefresh = async () => {
+      // Vérifier si un rafraîchissement est déjà en cours avec refreshInProgressRef
+      if (refreshInProgressRef.current) {
+        console.log("Rafraîchissement via refreshData déjà en cours, auto-refresh ignoré");
+        return;
+      }
+      
+      // Vérifier si le dernier rafraîchissement réussi est assez récent (<1 minute)
+      const timeSinceLastRefresh = Date.now() - lastSuccessfulRefreshRef.current;
+      if (timeSinceLastRefresh < 60000) { // Moins d'une minute
+        console.log(`Dernier rafraîchissement trop récent (${Math.round(timeSinceLastRefresh/1000)}s), nouvel auto-refresh ignoré`);
+        return;
+      }
+      
+      console.log("Démarrage du rafraîchissement automatique");
+      
+      // Récupérer le type de dashboard actuel (vfg ou vfe)
+      const currentDashboardType = window.location.pathname.includes('vfe') ? 'vfe' : 'vfg';
+      
+      // NE PAS mettre à jour l'indicateur de chargement pour un rafraîchissement en arrière-plan
+      // Les rafraîchissements automatiques doivent être transparents pour l'utilisateur
+      // Le code ci-dessous est commenté intentionnellement
+      /*
+      if (!state.isLoading.problems) {
+        setState(prev => ({ ...prev, isLoading: { ...prev.isLoading, problems: true }}));
+      }
+      */
+      
+      // Annuler tout timeout précédent
+      if (autoRefreshTimeoutRef.current !== null) {
+        clearTimeout(autoRefreshTimeoutRef.current);
+      }
+      
+      // Définir un timeout juste pour nettoyer les références, mais sans modifier les indicateurs de chargement
+      const timeoutId = window.setTimeout(() => {
+        console.log("Timeout de sécurité pour auto-refresh : nettoyage des références");
+        // Ne pas mettre à jour l'état d'isLoading pour un rafraîchissement en arrière-plan
+        // setState(prev => ({ ...prev, isLoading: { ...prev.isLoading, problems: false }}));
+        autoRefreshTimeoutRef.current = null;
+      }, 30000); // 30 secondes maximum
+      
+      autoRefreshTimeoutRef.current = timeoutId;
+      
+      // Fonction simplifiée pour le rafraîchissement silencieux
+      const silentRefresh = async () => {
+        try {
+          // Récupérer le type de dashboard actuel
+          const dashboardType = currentDashboardType as 'vfg' | 'vfe';
+          
+          // Utiliser la fonction loadAllData avec le mode silencieux
+          await loadAllData(dashboardType, true, true); // true pour refreshProblemsOnly, true pour silentMode
+          
+          // Marquer le rafraîchissement comme réussi
+          console.log("Rafraîchissement silencieux terminé avec succès");
+          lastSuccessfulRefreshRef.current = Date.now();
+        } catch (error) {
+          console.error("Erreur lors du rafraîchissement silencieux:", error);
+        }
+      };
+      
+      try {
+        // Appeler le rafraîchissement silencieux à la place de refreshData
+        await silentRefresh();
+      } catch (err) {
+        console.error("Erreur lors du rafraîchissement automatique:", err);
+      } finally {
+        // Nettoyer le timeout si c'est toujours le même, mais NE PAS modifier l'indicateur de chargement
+        if (autoRefreshTimeoutRef.current === timeoutId) {
+          clearTimeout(timeoutId);
+          autoRefreshTimeoutRef.current = null;
+        }
+      }
+    };
     
     // Rafraîchir automatiquement les problèmes actifs toutes les 5 minutes
     const refreshInterval = 300000; // 5 minutes en millisecondes
     
     console.log(`Configuration du rafraîchissement automatique des problèmes toutes les ${refreshInterval/1000} secondes`);
     
-    // Configurer l'intervalle
-    const intervalId = setInterval(() => {
-      // Éviter les rafraîchissements multiples simultanés
-      if (isRefreshInProgress) {
-        console.log("Rafraîchissement déjà en cours, nouvelle tentative ignorée");
-        return;
+    // Nettoyer tout intervalle existant
+    if (autoRefreshIntervalRef.current !== null) {
+      clearInterval(autoRefreshIntervalRef.current);
+    }
+    
+    // Configurer le nouvel intervalle
+    const intervalId = window.setInterval(performAutoRefresh, refreshInterval);
+    autoRefreshIntervalRef.current = intervalId;
+    
+    // Nettoyer l'intervalle et les timeouts lors du démontage du composant
+    return () => {
+      if (autoRefreshIntervalRef.current !== null) {
+        clearInterval(autoRefreshIntervalRef.current);
+        autoRefreshIntervalRef.current = null;
       }
       
-      console.log("Rafraîchissement automatique des problèmes actifs");
-      
-      // Marquer le début du rafraîchissement
-      isRefreshInProgress = true;
-      
-      // Récupérer le type de dashboard actuel (vfg ou vfe)
-      const currentDashboardType = window.location.pathname.includes('vfe') ? 'vfe' : 'vfg';
-      
-      // Vérifier si on est sur une page de détail de zone
-      const isZoneDetailPage = state.selectedZone !== null;
-      
-      console.log(`Rafraîchissement automatique sur page de détail zone: ${isZoneDetailPage ? 'oui' : 'non'}`);
-      
-      // Ne pas bloquer l'interface pendant le rafraîchissement
-      setState(prev => ({ ...prev, isLoading: { ...prev.isLoading, problems: true }}));
-      
-      // Définir un timeout pour s'assurer que l'indicateur de chargement ne reste pas bloqué
-      const timeoutId = setTimeout(() => {
-        console.log("Timeout de sécurité déclenché pour le rafraîchissement des problèmes");
-        setState(prev => ({ ...prev, isLoading: { ...prev.isLoading, problems: false }}));
-        isRefreshInProgress = false; // Réinitialiser le drapeau
-      }, 30000); // 30 secondes maximum
-      
-      // Utiliser un microtask pour exécuter le rafraîchissement
-      Promise.resolve().then(async () => {
-        try {
-          await refreshData(currentDashboardType as 'vfg' | 'vfe', true);
-          console.log("Rafraîchissement automatique des problèmes terminé avec succès");
-        } catch (err) {
-          console.error("Erreur lors du rafraîchissement automatique des problèmes:", err);
-        } finally {
-          // S'assurer que l'indicateur de chargement est bien désactivé
-          setState(prev => ({ ...prev, isLoading: { ...prev.isLoading, problems: false }}));
-          // Nettoyer le timeout
-          clearTimeout(timeoutId);
-          // Marquer la fin du rafraîchissement
-          isRefreshInProgress = false;
-        }
-      });
-    }, refreshInterval);
-    
-    // Nettoyer l'intervalle lors du démontage du composant
-    return () => {
-      clearInterval(intervalId);
+      if (autoRefreshTimeoutRef.current !== null) {
+        clearTimeout(autoRefreshTimeoutRef.current);
+        autoRefreshTimeoutRef.current = null;
+      }
     };
-  }, [loadAllData, refreshData]);
+  }, [loadAllData, refreshData, state.isLoading.problems]);
 
   // Fonction pour définir la zone sélectionnée et charger ses données
   const setSelectedZoneAndLoadData = useCallback((zoneId: string | null) => {
