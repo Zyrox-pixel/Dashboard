@@ -1,5 +1,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { AlertTriangle, RefreshCw, CalendarRange, Clock, SortDesc, SortAsc, Filter, ChevronDown, ChevronRight } from 'lucide-react';
+import { 
+  AlertTriangle, RefreshCw, CalendarRange, Clock, SortDesc, SortAsc, 
+  Filter, ChevronDown, ChevronRight, Timer, AlarmClock, Hourglass 
+} from 'lucide-react';
 import ProblemCard from '../common/ProblemCard';
 import { Problem } from '../../api/types';
 import { useApp } from '../../contexts/AppContext';
@@ -25,6 +28,9 @@ const extractDateFromProblem = (problem: Problem): string => {
   return 'Date inconnue';
 };
 
+// Définir les options de filtrage par durée
+type DurationFilter = 'all' | 'lessThan15' | 'between15And60' | 'moreThan60';
+
 const ProblemsList: React.FC<ProblemsListProps> = ({ 
   problems, 
   zoneFilter,
@@ -36,6 +42,7 @@ const ProblemsList: React.FC<ProblemsListProps> = ({
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc'); // plus récent d'abord par défaut
   const [groupByDate, setGroupByDate] = useState<boolean>(true); // grouper par date par défaut
   const [groupByZone, setGroupByZone] = useState<boolean>(true); // grouper par zone par défaut
+  const [durationFilter, setDurationFilter] = useState<DurationFilter>('all'); // filtre par durée
   const [expandedZones, setExpandedZones] = useState<{[key: string]: boolean}>({});
   const [localProblems, setLocalProblems] = useState<Problem[]>(problems);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
@@ -303,6 +310,33 @@ const ProblemsList: React.FC<ProblemsListProps> = ({
       [zone]: !prev[zone]
     }));
   };
+  
+  // Fonction pour changer le filtre de durée
+  const changeDurationFilter = (filter: DurationFilter) => {
+    setDurationFilter(filter);
+  };
+  
+  // Fonction pour extraire la durée en minutes à partir de la chaîne de caractères
+  const extractDurationMinutes = (durationString: string | undefined): number => {
+    if (!durationString) return 0;
+    
+    // Cherche les heures
+    const hoursMatch = durationString.match(/(\d+)\s*h/i);
+    // Cherche les minutes
+    const minutesMatch = durationString.match(/(\d+)\s*min/i);
+    
+    let totalMinutes = 0;
+    
+    if (hoursMatch && hoursMatch[1]) {
+      totalMinutes += parseInt(hoursMatch[1]) * 60;
+    }
+    
+    if (minutesMatch && minutesMatch[1]) {
+      totalMinutes += parseInt(minutesMatch[1]);
+    }
+    
+    return totalMinutes;
+  };
 
   // Initialiser l'état d'expansion des zones lorsque les problèmes changent
   useEffect(() => {
@@ -322,12 +356,33 @@ const ProblemsList: React.FC<ProblemsListProps> = ({
     });
   }, [localProblems]);
   
-  // Si un filtre de zone est fourni, filtrer les problèmes pour cette zone
+  // Appliquer les filtres par zone et par durée
   const filteredProblems = useMemo(() => {
-    return zoneFilter 
+    // D'abord filtrer par zone si nécessaire
+    const zoneFiltered = zoneFilter 
       ? localProblems.filter(problem => problem.zone === zoneFilter)
       : localProblems;
-  }, [localProblems, zoneFilter]);
+    
+    // Ensuite filtrer par durée si nécessaire
+    if (durationFilter === 'all') {
+      return zoneFiltered;
+    }
+    
+    return zoneFiltered.filter(problem => {
+      const durationMinutes = extractDurationMinutes(problem.duration);
+      
+      switch (durationFilter) {
+        case 'lessThan15':
+          return durationMinutes < 15;
+        case 'between15And60':
+          return durationMinutes >= 15 && durationMinutes < 60;
+        case 'moreThan60':
+          return durationMinutes >= 60;
+        default:
+          return true;
+      }
+    });
+  }, [localProblems, zoneFilter, durationFilter]);
 
   // Trier les problèmes par date
   const sortedProblems = useMemo(() => {
@@ -409,7 +464,26 @@ const ProblemsList: React.FC<ProblemsListProps> = ({
           </h2>
         </div>
         <div className="p-6 bg-slate-800 rounded-md border border-slate-700 text-slate-400">
-          Tout semble fonctionner normalement. Aucun problème n'est détecté actuellement.
+          {durationFilter !== 'all' ? (
+            <>
+              <p className="mb-2">Aucun problème ne correspond au filtre de durée sélectionné :</p>
+              <div className="flex gap-2 mt-2">
+                <span className="px-2 py-1 bg-amber-900/30 text-amber-300 border border-amber-700/40 rounded text-xs">
+                  {durationFilter === 'lessThan15' && '< 15 minutes'}
+                  {durationFilter === 'between15And60' && '15 - 60 minutes'}
+                  {durationFilter === 'moreThan60' && '> 1 heure'}
+                </span>
+                <button 
+                  onClick={() => changeDurationFilter('all')}
+                  className="px-2 py-1 text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 rounded"
+                >
+                  Afficher tous les problèmes
+                </button>
+              </div>
+            </>
+          ) : (
+            "Tout semble fonctionner normalement. Aucun problème n'est détecté actuellement."
+          )}
         </div>
       </section>
     );
@@ -448,10 +522,77 @@ const ProblemsList: React.FC<ProblemsListProps> = ({
             <div className="ml-1 w-6 h-6 flex items-center justify-center bg-slate-700 border border-red-500/40 text-red-200 rounded-full font-bold text-xs">
               {filteredProblems.length}
             </div>
+            {/* Afficher badge pour le filtre de durée actif */}
+            {durationFilter !== 'all' && (
+              <div className="ml-2 px-2 py-0.5 text-xs bg-amber-900/30 text-amber-300 border border-amber-700/40 rounded-full">
+                {durationFilter === 'lessThan15' && '< 15 min'}
+                {durationFilter === 'between15And60' && '15-60 min'}
+                {durationFilter === 'moreThan60' && '> 1h'}
+              </div>
+            )}
           </h2>
         </div>
         
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Filtre par durée */}
+          <div className="relative group">
+            <button 
+              className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium ${
+                durationFilter !== 'all'
+                  ? 'text-amber-300 bg-amber-900/40 border border-amber-700/50' 
+                  : 'text-slate-300 bg-slate-700 hover:bg-slate-600'
+              }`}
+              title="Filtrer par durée du problème"
+            >
+              <Hourglass size={12} />
+              <span className="hidden sm:inline">
+                {durationFilter === 'all' && 'Toutes durées'}
+                {durationFilter === 'lessThan15' && '< 15 min'}
+                {durationFilter === 'between15And60' && '15-60 min'}
+                {durationFilter === 'moreThan60' && '> 1 heure'}
+              </span>
+              <ChevronDown size={10} className="ml-1" />
+            </button>
+            
+            {/* Dropdown menu pour le filtre de durée */}
+            <div className="absolute left-0 mt-1 w-32 bg-slate-800 border border-slate-700 rounded-md shadow-lg z-10 hidden group-hover:block">
+              <div className="py-1">
+                <button 
+                  onClick={() => changeDurationFilter('all')}
+                  className={`block w-full text-left px-4 py-1 text-xs ${
+                    durationFilter === 'all' ? 'bg-slate-700 text-white' : 'text-slate-300 hover:bg-slate-700'
+                  }`}
+                >
+                  Toutes durées
+                </button>
+                <button 
+                  onClick={() => changeDurationFilter('lessThan15')}
+                  className={`block w-full text-left px-4 py-1 text-xs ${
+                    durationFilter === 'lessThan15' ? 'bg-slate-700 text-amber-300' : 'text-slate-300 hover:bg-slate-700'
+                  }`}
+                >
+                  &lt; 15 minutes
+                </button>
+                <button 
+                  onClick={() => changeDurationFilter('between15And60')}
+                  className={`block w-full text-left px-4 py-1 text-xs ${
+                    durationFilter === 'between15And60' ? 'bg-slate-700 text-amber-300' : 'text-slate-300 hover:bg-slate-700'
+                  }`}
+                >
+                  15 - 60 minutes
+                </button>
+                <button 
+                  onClick={() => changeDurationFilter('moreThan60')}
+                  className={`block w-full text-left px-4 py-1 text-xs ${
+                    durationFilter === 'moreThan60' ? 'bg-slate-700 text-amber-300' : 'text-slate-300 hover:bg-slate-700'
+                  }`}
+                >
+                  &gt; 1 heure
+                </button>
+              </div>
+            </div>
+          </div>
+          
           {/* Contrôle pour le groupement par zone */}
           <button 
             onClick={toggleGroupByZone}
