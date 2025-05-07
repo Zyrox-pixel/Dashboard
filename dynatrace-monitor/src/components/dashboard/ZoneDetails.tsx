@@ -1079,12 +1079,37 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
     apps: processGroups?.length || 0
   }), [hosts, services, processGroups]);
   
+  // Afficher une notification de chargement en cours si les problèmes se rafraîchissent
+  const [isRefreshingProblems, setIsRefreshingProblems] = useState(false);
+  
+  // Obtenir l'état de chargement des problèmes depuis le contexte
+  const appContext = useApp();
+  
   // Log pour vérifier les valeurs
   useEffect(() => {
     if (!isLoading) {
       console.log(`Comptages réels pour ${zone.name}:`, realCounts);
     }
   }, [isLoading, realCounts, zone.name]);
+  
+  // Mettre à jour l'état local quand l'état de chargement des problèmes change
+  // Ajouter un timeout pour s'assurer que l'indicateur de chargement ne reste pas bloqué
+  useEffect(() => {
+    if (appContext.isLoading.problems) {
+      setIsRefreshingProblems(true);
+      
+      // Définir un timeout pour masquer l'indicateur après 20 secondes maximum
+      const timeoutId = setTimeout(() => {
+        console.log("Timeout de sécurité pour l'indicateur de chargement des problèmes");
+        setIsRefreshingProblems(false);
+      }, 20000);
+      
+      // Nettoyer le timeout si l'état change avant
+      return () => clearTimeout(timeoutId);
+    } else {
+      setIsRefreshingProblems(false);
+    }
+  }, [appContext.isLoading.problems]);
 
   // État de chargement pour les détails de la zone
   if (isLoading) {
@@ -1107,31 +1132,6 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
       </div>
     );
   }
-
-  // Afficher une notification de chargement en cours si les problèmes se rafraîchissent
-  const [isRefreshingProblems, setIsRefreshingProblems] = useState(false);
-  
-  // Obtenir l'état de chargement des problèmes depuis le contexte
-  const appContext = useApp();
-  
-  // Mettre à jour l'état local quand l'état de chargement des problèmes change
-  // Ajouter un timeout pour s'assurer que l'indicateur de chargement ne reste pas bloqué
-  useEffect(() => {
-    if (appContext.isLoading.problems) {
-      setIsRefreshingProblems(true);
-      
-      // Définir un timeout pour masquer l'indicateur après 20 secondes maximum
-      const timeoutId = setTimeout(() => {
-        console.log("Timeout de sécurité pour l'indicateur de chargement des problèmes");
-        setIsRefreshingProblems(false);
-      }, 20000);
-      
-      // Nettoyer le timeout si l'état change avant
-      return () => clearTimeout(timeoutId);
-    } else {
-      setIsRefreshingProblems(false);
-    }
-  }, [appContext.isLoading.problems]);
 
   return (
     <div>
