@@ -477,6 +477,28 @@ const ProblemsList: React.FC<ProblemsListProps> = ({
     }, {});
   }, [sortedProblems, groupByDate, groupByZone]);
 
+  // Filtrer les groupes vides pour éviter des problèmes d'affichage
+  const filteredGroupedProblems = useMemo(() => {
+    const result: { [zone: string]: { [date: string]: Problem[] } } = {};
+    
+    Object.entries(groupedProblems).forEach(([zone, dateGroups]) => {
+      // Filtrer les dates qui ont au moins un problème
+      const nonEmptyDates = Object.entries(dateGroups)
+        .filter(([_, problems]) => problems.length > 0)
+        .reduce((acc, [date, problems]) => {
+          acc[date] = problems;
+          return acc;
+        }, {} as { [date: string]: Problem[] });
+      
+      // N'ajouter la zone que si elle a au moins une date avec des problèmes
+      if (Object.keys(nonEmptyDates).length > 0) {
+        result[zone] = nonEmptyDates;
+      }
+    });
+    
+    return result;
+  }, [groupedProblems]);
+
   // Si aucun problème n'est trouvé après filtrage, afficher un message
   if (filteredProblems.length === 0) {
     return (
@@ -514,28 +536,6 @@ const ProblemsList: React.FC<ProblemsListProps> = ({
       </section>
     );
   }
-  
-  // Filtrer les groupes vides pour éviter des problèmes d'affichage
-  const filteredGroupedProblems = useMemo(() => {
-    const result: { [zone: string]: { [date: string]: Problem[] } } = {};
-    
-    Object.entries(groupedProblems).forEach(([zone, dateGroups]) => {
-      // Filtrer les dates qui ont au moins un problème
-      const nonEmptyDates = Object.entries(dateGroups)
-        .filter(([_, problems]) => problems.length > 0)
-        .reduce((acc, [date, problems]) => {
-          acc[date] = problems;
-          return acc;
-        }, {} as { [date: string]: Problem[] });
-      
-      // N'ajouter la zone que si elle a au moins une date avec des problèmes
-      if (Object.keys(nonEmptyDates).length > 0) {
-        result[zone] = nonEmptyDates;
-      }
-    });
-    
-    return result;
-  }, [groupedProblems]);
 
   return (
     <section className="mb-5">
