@@ -499,38 +499,60 @@ const ProblemsList: React.FC<ProblemsListProps> = ({
     return result;
   }, [groupedProblems]);
 
-  // Si aucun problème n'est trouvé après filtrage, afficher un message
+  // Si aucun problème n'est trouvé après filtrage, afficher un message prestigieux
   if (filteredProblems.length === 0) {
     return (
       <section className="mb-5">
-        <div className="flex items-center gap-2 mb-3">
-          <AlertTriangle size={18} className="text-green-500" />
-          <h2 className="text-lg font-bold flex items-center gap-2">
-            {zoneFilter 
-              ? `Aucun problème actif dans ${zoneFilter}` 
-              : "Aucun problème actif"}
-          </h2>
+        <div className="flex items-center gap-3 mb-4">
+          <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-br from-emerald-600 to-green-800 shadow-md border border-emerald-300/20">
+            <AlertTriangle size={20} className="text-white" strokeWidth={2.5} />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+              {zoneFilter 
+                ? `Situation Normale dans ${zoneFilter}` 
+                : "Services Opérationnels"}
+            </h2>
+            <p className="text-xs text-slate-400 italic mt-1">
+              Aucune alerte détectée - Tous les systèmes fonctionnent normalement
+            </p>
+          </div>
         </div>
-        <div className="p-6 bg-slate-800 rounded-md border border-slate-700 text-slate-400">
+        <div className="p-8 bg-gradient-to-b from-slate-800 to-slate-900 rounded-lg border border-slate-700/50 shadow-lg">
           {durationFilter !== 'all' ? (
-            <>
-              <p className="mb-2">Aucun problème ne correspond au filtre de durée sélectionné :</p>
-              <div className="flex gap-2 mt-2">
-                <span className="px-2 py-1 bg-amber-900/30 text-amber-300 border border-amber-700/40 rounded text-xs">
+            <div className="flex flex-col items-center text-center">
+              <div className="w-16 h-16 rounded-full bg-gradient-to-r from-amber-800/30 to-amber-900/30 flex items-center justify-center mb-4 border border-amber-700/20">
+                <Hourglass size={32} className="text-amber-300" />
+              </div>
+              <p className="text-slate-300 mb-3 font-medium">Aucun problème ne correspond au filtre de durée sélectionné</p>
+              <div className="inline-flex gap-3 items-center justify-center mt-2">
+                <span className="px-3 py-1.5 bg-amber-900/40 text-amber-300 border border-amber-700/30 rounded-md text-xs shadow-inner">
                   {durationFilter === 'lessThan15' && '< 15 minutes'}
                   {durationFilter === 'between15And60' && '15 - 60 minutes'}
                   {durationFilter === 'moreThan60' && '> 1 heure'}
                 </span>
                 <button 
                   onClick={() => changeDurationFilter('all')}
-                  className="px-2 py-1 text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 rounded"
+                  className="px-3 py-1.5 text-xs bg-gradient-to-r from-blue-700 to-indigo-800 hover:from-blue-600 hover:to-indigo-700 text-white rounded-md shadow-md border border-indigo-500/30 transition-all duration-200"
                 >
                   Afficher tous les problèmes
                 </button>
               </div>
-            </>
+            </div>
           ) : (
-            "Tout semble fonctionner normalement. Aucun problème n'est détecté actuellement."
+            <div className="flex flex-col items-center text-center">
+              <div className="w-20 h-20 rounded-full bg-gradient-to-r from-emerald-800/30 to-green-900/30 flex items-center justify-center mb-5 border border-emerald-700/20">
+                <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-400">
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                  <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                </svg>
+              </div>
+              <h3 className="text-lg font-bold text-emerald-400 mb-2">Tous les services fonctionnent normalement</h3>
+              <p className="text-slate-400 max-w-md">
+                La surveillance en temps réel n'a détecté aucune anomalie dans les systèmes. 
+                Les services critiques opèrent selon les performances attendues.
+              </p>
+            </div>
           )}
         </div>
       </section>
@@ -539,137 +561,163 @@ const ProblemsList: React.FC<ProblemsListProps> = ({
 
   return (
     <section className="mb-5">
-      {/* En-tête avec titre et contrôles */}
-      <div className="flex flex-wrap items-center justify-between mb-3 gap-2">
-        <div className="flex items-center gap-2">
-          <AlertTriangle size={18} className="text-red-500" />
-          <h2 className="text-lg font-bold text-white flex items-center gap-2">
-            {title}
-            <div className="ml-1 w-6 h-6 flex items-center justify-center bg-slate-700 border border-red-500/40 text-red-200 rounded-full font-bold text-xs">
-              {filteredProblems.length}
-            </div>
-            {/* Afficher badge pour le filtre de durée actif */}
-            {durationFilter !== 'all' && (
-              <div className="ml-2 px-2 py-0.5 text-xs bg-amber-900/30 text-amber-300 border border-amber-700/40 rounded-full">
-                {durationFilter === 'lessThan15' && '< 15 min'}
-                {durationFilter === 'between15And60' && '15-60 min'}
-                {durationFilter === 'moreThan60' && '> 1h'}
+      {/* En-tête avec titre et contrôles - Style prestigieux */}
+      <div className="flex flex-wrap items-center justify-between mb-4 gap-2">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-br from-indigo-600 to-blue-800 shadow-md border border-indigo-300/20">
+            <AlertTriangle size={20} className="text-white" strokeWidth={2.5} />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+              {title.toLowerCase().includes('72h') ? 
+                "Historique des Incidents (72h)" : 
+                "Surveillance Active des Services"}
+              <div className="ml-2 px-3 py-1 flex items-center justify-center bg-gradient-to-r from-indigo-900/80 to-blue-900/80 shadow-inner border border-indigo-500/30 text-indigo-100 rounded-md font-bold text-sm">
+                {filteredProblems.length}
               </div>
-            )}
-          </h2>
+              {/* Afficher badge pour le filtre de durée actif */}
+              {durationFilter !== 'all' && (
+                <div className="ml-2 px-3 py-1 text-xs bg-amber-900/50 text-amber-200 border border-amber-600/40 rounded-md shadow-sm">
+                  {durationFilter === 'lessThan15' && '< 15 min'}
+                  {durationFilter === 'between15And60' && '15-60 min'}
+                  {durationFilter === 'moreThan60' && '> 1h'}
+                </div>
+              )}
+            </h2>
+            <p className="text-xs text-slate-400 italic mt-1">
+              {title.toLowerCase().includes('72h') ? 
+                "Suivi consolidé des incidents résolus et en cours sur les 72 dernières heures" : 
+                "Monitoring en temps réel des alertes critiques et anomalies détectées"}
+            </p>
+          </div>
         </div>
         
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Filtre par durée */}
-          <div className="relative duration-dropdown-container">
+        <div className="flex flex-wrap items-center gap-3 mt-2 md:mt-0">
+          {/* Groupe de contrôles avec conteneur prestigieux */}
+          <div className="bg-gradient-to-r from-slate-800/80 to-slate-900/80 p-1.5 rounded-lg border border-slate-700/50 shadow-md flex items-center gap-2">
+            {/* Filtre par durée */}
+            <div className="relative duration-dropdown-container">
+              <button 
+                onClick={toggleDurationDropdown}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 ${
+                  durationFilter !== 'all'
+                    ? 'text-amber-200 bg-gradient-to-r from-amber-900/70 to-amber-800/70 shadow-inner border border-amber-600/40' 
+                    : 'text-slate-200 bg-slate-700/80 hover:bg-slate-600/80 border border-slate-600/30 hover:border-slate-500/40'
+                }`}
+                title="Filtrer par durée du problème"
+              >
+                <Hourglass size={14} className="text-amber-300" />
+                <span className="hidden sm:inline">
+                  {durationFilter === 'all' && 'Toutes durées'}
+                  {durationFilter === 'lessThan15' && '< 15 min'}
+                  {durationFilter === 'between15And60' && '15-60 min'}
+                  {durationFilter === 'moreThan60' && '> 1 heure'}
+                </span>
+                <ChevronDown size={12} className="ml-1" />
+              </button>
+              
+              {/* Dropdown menu pour le filtre de durée */}
+              {isDurationDropdownOpen && (
+                <div className="absolute left-0 mt-1.5 w-40 bg-slate-800 border border-slate-600/50 rounded-md shadow-xl z-10">
+                  <div className="p-1">
+                    <button 
+                      onClick={() => changeDurationFilter('all')}
+                      className={`block w-full text-left px-4 py-1.5 text-xs rounded ${
+                        durationFilter === 'all' ? 
+                          'bg-indigo-900/60 text-indigo-100 border border-indigo-700/40' : 
+                          'text-slate-300 hover:bg-slate-700/60'
+                      }`}
+                    >
+                      Toutes durées
+                    </button>
+                    <button 
+                      onClick={() => changeDurationFilter('lessThan15')}
+                      className={`block w-full text-left px-4 py-1.5 text-xs rounded mt-1 ${
+                        durationFilter === 'lessThan15' ? 
+                          'bg-amber-900/60 text-amber-100 border border-amber-700/40' : 
+                          'text-slate-300 hover:bg-slate-700/60'
+                      }`}
+                    >
+                      &lt; 15 minutes
+                    </button>
+                    <button 
+                      onClick={() => changeDurationFilter('between15And60')}
+                      className={`block w-full text-left px-4 py-1.5 text-xs rounded mt-1 ${
+                        durationFilter === 'between15And60' ? 
+                          'bg-amber-900/60 text-amber-100 border border-amber-700/40' : 
+                          'text-slate-300 hover:bg-slate-700/60'
+                      }`}
+                    >
+                      15 - 60 minutes
+                    </button>
+                    <button 
+                      onClick={() => changeDurationFilter('moreThan60')}
+                      className={`block w-full text-left px-4 py-1.5 text-xs rounded mt-1 ${
+                        durationFilter === 'moreThan60' ? 
+                          'bg-amber-900/60 text-amber-100 border border-amber-700/40' : 
+                          'text-slate-300 hover:bg-slate-700/60'
+                      }`}
+                    >
+                      &gt; 1 heure
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            {/* Contrôle pour le groupement par zone */}
             <button 
-              onClick={toggleDurationDropdown}
-              className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium ${
-                durationFilter !== 'all'
-                  ? 'text-amber-300 bg-amber-900/40 border border-amber-700/50' 
-                  : 'text-slate-300 bg-slate-700 hover:bg-slate-600'
+              onClick={toggleGroupByZone}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 ${
+                groupByZone 
+                  ? 'text-green-200 bg-gradient-to-r from-green-900/70 to-emerald-800/70 shadow-inner border border-green-600/40' 
+                  : 'text-slate-200 bg-slate-700/80 hover:bg-slate-600/80 border border-slate-600/30 hover:border-slate-500/40'
               }`}
-              title="Filtrer par durée du problème"
+              title={groupByZone ? "Désactiver le regroupement par zone" : "Activer le regroupement par zone"}
             >
-              <Hourglass size={12} />
-              <span className="hidden sm:inline">
-                {durationFilter === 'all' && 'Toutes durées'}
-                {durationFilter === 'lessThan15' && '< 15 min'}
-                {durationFilter === 'between15And60' && '15-60 min'}
-                {durationFilter === 'moreThan60' && '> 1 heure'}
-              </span>
-              <ChevronDown size={10} className="ml-1" />
+              <Filter size={14} className={groupByZone ? "text-green-300" : "text-slate-400"} />
+              <span className="hidden sm:inline">Grouper par zone</span>
+            </button>
+
+            {/* Contrôle pour le groupement par date */}
+            <button 
+              onClick={toggleGroupByDate}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 ${
+                groupByDate 
+                  ? 'text-blue-200 bg-gradient-to-r from-blue-900/70 to-indigo-800/70 shadow-inner border border-blue-600/40' 
+                  : 'text-slate-200 bg-slate-700/80 hover:bg-slate-600/80 border border-slate-600/30 hover:border-slate-500/40'
+              }`}
+              title={groupByDate ? "Désactiver le regroupement par date" : "Activer le regroupement par date"}
+            >
+              <CalendarRange size={14} className={groupByDate ? "text-blue-300" : "text-slate-400"} />
+              <span className="hidden sm:inline">Grouper par date</span>
             </button>
             
-            {/* Dropdown menu pour le filtre de durée */}
-            {isDurationDropdownOpen && (
-              <div className="absolute left-0 mt-1 w-32 bg-slate-800 border border-slate-700 rounded-md shadow-lg z-10">
-                <div className="py-1">
-                  <button 
-                    onClick={() => changeDurationFilter('all')}
-                    className={`block w-full text-left px-4 py-1 text-xs ${
-                      durationFilter === 'all' ? 'bg-slate-700 text-white' : 'text-slate-300 hover:bg-slate-700'
-                    }`}
-                  >
-                    Toutes durées
-                  </button>
-                  <button 
-                    onClick={() => changeDurationFilter('lessThan15')}
-                    className={`block w-full text-left px-4 py-1 text-xs ${
-                      durationFilter === 'lessThan15' ? 'bg-slate-700 text-amber-300' : 'text-slate-300 hover:bg-slate-700'
-                    }`}
-                  >
-                    &lt; 15 minutes
-                  </button>
-                  <button 
-                    onClick={() => changeDurationFilter('between15And60')}
-                    className={`block w-full text-left px-4 py-1 text-xs ${
-                      durationFilter === 'between15And60' ? 'bg-slate-700 text-amber-300' : 'text-slate-300 hover:bg-slate-700'
-                    }`}
-                  >
-                    15 - 60 minutes
-                  </button>
-                  <button 
-                    onClick={() => changeDurationFilter('moreThan60')}
-                    className={`block w-full text-left px-4 py-1 text-xs ${
-                      durationFilter === 'moreThan60' ? 'bg-slate-700 text-amber-300' : 'text-slate-300 hover:bg-slate-700'
-                    }`}
-                  >
-                    &gt; 1 heure
-                  </button>
-                </div>
-              </div>
-            )}
+            {/* Contrôle pour l'ordre de tri */}
+            <button 
+              onClick={toggleSortOrder}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 
+              text-slate-200 bg-slate-700/80 hover:bg-slate-600/80 border border-slate-600/30 hover:border-slate-500/40`}
+              title={sortOrder === 'desc' ? "Trier du plus ancien au plus récent" : "Trier du plus récent au plus ancien"}
+            >
+              {sortOrder === 'desc' ? <SortDesc size={14} className="text-slate-400" /> : <SortAsc size={14} className="text-slate-400" />}
+              <span className="hidden sm:inline">{sortOrder === 'desc' ? 'Plus récent' : 'Plus ancien'}</span>
+            </button>
           </div>
-          
-          {/* Contrôle pour le groupement par zone */}
-          <button 
-            onClick={toggleGroupByZone}
-            className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium ${
-              groupByZone 
-                ? 'text-green-300 bg-green-900/40 border border-green-700/50' 
-                : 'text-slate-300 bg-slate-700 hover:bg-slate-600'
-            }`}
-            title={groupByZone ? "Désactiver le regroupement par zone" : "Activer le regroupement par zone"}
-          >
-            <Filter size={12} />
-            <span className="hidden sm:inline">Grouper par zone</span>
-          </button>
-
-          {/* Contrôle pour le groupement par date */}
-          <button 
-            onClick={toggleGroupByDate}
-            className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium ${
-              groupByDate 
-                ? 'text-blue-300 bg-blue-900/40 border border-blue-700/50' 
-                : 'text-slate-300 bg-slate-700 hover:bg-slate-600'
-            }`}
-            title={groupByDate ? "Désactiver le regroupement par date" : "Activer le regroupement par date"}
-          >
-            <CalendarRange size={12} />
-            <span className="hidden sm:inline">Grouper par date</span>
-          </button>
-          
-          {/* Contrôle pour l'ordre de tri */}
-          <button 
-            onClick={toggleSortOrder}
-            className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-slate-300 bg-slate-700 hover:bg-slate-600"
-            title={sortOrder === 'desc' ? "Trier du plus ancien au plus récent" : "Trier du plus récent au plus ancien"}
-          >
-            {sortOrder === 'desc' ? <SortDesc size={12} /> : <SortAsc size={12} />}
-            <span className="hidden sm:inline">{sortOrder === 'desc' ? 'Plus récent' : 'Plus ancien'}</span>
-          </button>
           
           {/* Bouton de rafraîchissement des problèmes en temps réel */}
           {showRefreshButton && (
             <button 
               onClick={handleRefreshProblems}
               disabled={isRefreshing}
-              className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-slate-300 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center gap-2 px-4 py-1.5 rounded-md text-xs font-medium 
+                bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-500 hover:to-indigo-600 
+                text-white shadow-md border border-indigo-400/30
+                disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
               title="Rafraîchir les problèmes en temps réel"
             >
-              <RefreshCw size={12} className={`${isRefreshing ? 'animate-spin' : ''}`} />
-              <span className="hidden sm:inline">{isRefreshing ? 'Rafraîchissement...' : 'Rafraîchir'}</span>
+              <RefreshCw size={14} className={`${isRefreshing ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">{isRefreshing ? 'Rafraîchissement...' : 'Rafraîchir les données'}</span>
             </button>
           )}
         </div>
@@ -681,37 +729,46 @@ const ProblemsList: React.FC<ProblemsListProps> = ({
           {/* En-tête de zone avec bouton de déroulement (seulement si groupByZone est activé ou si on a un filtre de zone) */}
           {(groupByZone || zoneFilter) && (
             <div 
-              className="flex items-center justify-between gap-2 mb-2 py-2 px-4 bg-slate-700 rounded-md hover:bg-slate-600 cursor-pointer"
+              className="flex items-center justify-between gap-2 mb-3 py-3 px-5 bg-gradient-to-r from-slate-800 to-slate-900 rounded-lg shadow-md border border-slate-700/80 hover:border-green-700/30 transition-all duration-200 cursor-pointer group"
               onClick={() => toggleZoneExpansion(zone)}
             >
-              <div className="flex items-center gap-2">
-                <Filter size={16} className="text-green-400" />
-                <h3 className="text-sm font-medium text-green-200">{zone}</h3>
-                <div className="ml-2 px-2 py-0.5 rounded-full bg-slate-700 border border-rose-600/40 text-xs text-rose-200 font-medium">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-green-900/70 to-emerald-800/70 shadow-inner border border-green-600/30">
+                  <Filter size={16} className="text-green-300" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-medium text-white group-hover:text-green-200 transition-colors duration-200">{zone}</h3>
+                  <p className="text-xs text-slate-500 mt-0.5">Zone de management</p>
+                </div>
+                <div className="ml-2 px-3 py-1 rounded-md bg-gradient-to-r from-rose-900/60 to-red-900/60 border border-rose-700/30 text-xs text-rose-100 font-medium shadow-inner">
                   {/* Compte total des problèmes dans cette zone */}
                   {Object.values(dateGroups).flat().length}
                 </div>
               </div>
               {/* Icône de flèche pour indiquer l'état d'expansion */}
-              {expandedZones[zone] ? 
-                <ChevronDown size={16} className="text-slate-400" /> : 
-                <ChevronRight size={16} className="text-slate-400" />
-              }
+              <div className="w-7 h-7 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center group-hover:bg-slate-700 transition-colors duration-200">
+                {expandedZones[zone] ? 
+                  <ChevronDown size={16} className="text-green-300" /> : 
+                  <ChevronRight size={16} className="text-green-300" />
+                }
+              </div>
             </div>
           )}
           
           {/* Contenu de la zone (visible seulement si la zone est dépliée ou si le regroupement par zone est désactivé) */}
           {(!groupByZone || expandedZones[zone]) && (
-            <div className="pl-4 border-l-2 border-slate-700">
+            <div className="pl-5 ml-4 border-l-2 border-green-900/40 mb-5">
               {/* Pour chaque groupe de date dans cette zone */}
               {Object.entries(dateGroups).map(([date, problems]) => (
-                <div key={date} className="mb-4">
+                <div key={date} className="mb-5">
                   {/* En-tête de date (seulement si groupByDate est activé) */}
                   {groupByDate && (
-                    <div className="flex items-center gap-2 mb-2 py-1 px-3 bg-slate-700/50 rounded-md">
-                      <Clock size={14} className="text-blue-400" />
-                      <h3 className="text-sm font-medium text-blue-200">{date}</h3>
-                      <div className="ml-2 px-1.5 py-0.5 rounded-full bg-slate-700 border border-amber-500/30 text-xs text-amber-300 font-medium">
+                    <div className="flex items-center gap-3 mb-3 py-2 px-4 bg-gradient-to-r from-slate-800/80 to-slate-900/80 rounded-md border border-slate-700/40">
+                      <div className="flex items-center justify-center w-6 h-6 rounded-full bg-gradient-to-br from-blue-900/70 to-indigo-800/70 shadow-inner border border-blue-700/30">
+                        <Clock size={14} className="text-blue-300" />
+                      </div>
+                      <h3 className="text-sm font-medium text-blue-100">{date}</h3>
+                      <div className="ml-2 px-2.5 py-1 rounded-md bg-gradient-to-r from-amber-900/60 to-orange-900/60 border border-amber-700/30 text-xs text-amber-200 font-medium shadow-inner">
                         {problems.length}
                       </div>
                     </div>
