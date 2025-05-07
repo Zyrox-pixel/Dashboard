@@ -445,7 +445,7 @@ const ProblemsList: React.FC<ProblemsListProps> = ({
           <AlertTriangle size={18} className="text-red-500" />
           <h2 className="text-lg font-bold text-white flex items-center gap-2">
             {title}
-            <div className="ml-1 w-6 h-6 flex items-center justify-center bg-red-600 text-white rounded-full font-bold text-xs shadow-inner shadow-red-900">
+            <div className="ml-1 w-6 h-6 flex items-center justify-center bg-slate-700 border border-red-500/40 text-red-200 rounded-full font-bold text-xs">
               {filteredProblems.length}
             </div>
           </h2>
@@ -517,7 +517,7 @@ const ProblemsList: React.FC<ProblemsListProps> = ({
               <div className="flex items-center gap-2">
                 <Filter size={16} className="text-green-400" />
                 <h3 className="text-sm font-medium text-green-200">{zone}</h3>
-                <div className="ml-2 px-2 py-0.5 rounded-full bg-red-900 text-xs text-red-100 font-medium">
+                <div className="ml-2 px-2 py-0.5 rounded-full bg-slate-700 border border-rose-600/40 text-xs text-rose-200 font-medium">
                   {/* Compte total des problèmes dans cette zone */}
                   {Object.values(dateGroups).flat().length}
                 </div>
@@ -541,7 +541,7 @@ const ProblemsList: React.FC<ProblemsListProps> = ({
                     <div className="flex items-center gap-2 mb-2 py-1 px-3 bg-slate-700/50 rounded-md">
                       <Clock size={14} className="text-blue-400" />
                       <h3 className="text-sm font-medium text-blue-200">{date}</h3>
-                      <div className="ml-2 px-1.5 py-0.5 rounded-full bg-amber-700 text-xs text-amber-100 font-medium">
+                      <div className="ml-2 px-1.5 py-0.5 rounded-full bg-slate-700 border border-amber-500/30 text-xs text-amber-300 font-medium">
                         {problems.length}
                       </div>
                     </div>
