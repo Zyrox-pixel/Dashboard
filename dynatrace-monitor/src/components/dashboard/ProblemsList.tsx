@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { AlertTriangle, RefreshCw, CalendarRange, Clock, SortDesc, SortAsc, Filter } from 'lucide-react';
+import { AlertTriangle, RefreshCw, CalendarRange, Clock, SortDesc, SortAsc, Filter, ChevronDown, ChevronRight } from 'lucide-react';
 import ProblemCard from '../common/ProblemCard';
 import { Problem } from '../../api/types';
 import { useApp } from '../../contexts/AppContext';
@@ -35,6 +35,8 @@ const ProblemsList: React.FC<ProblemsListProps> = ({
   const { isLoading } = useApp();
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc'); // plus récent d'abord par défaut
   const [groupByDate, setGroupByDate] = useState<boolean>(true); // grouper par date par défaut
+  const [groupByZone, setGroupByZone] = useState<boolean>(true); // grouper par zone par défaut
+  const [expandedZones, setExpandedZones] = useState<{[key: string]: boolean}>({});
   const [localProblems, setLocalProblems] = useState<Problem[]>(problems);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   
@@ -288,6 +290,37 @@ const ProblemsList: React.FC<ProblemsListProps> = ({
   const toggleGroupByDate = () => {
     setGroupByDate(!groupByDate);
   };
+
+  // Fonction pour activer/désactiver le regroupement par zone
+  const toggleGroupByZone = () => {
+    setGroupByZone(!groupByZone);
+  };
+
+  // Fonction pour basculer l'expansion d'une zone spécifique
+  const toggleZoneExpansion = (zone: string) => {
+    setExpandedZones(prev => ({
+      ...prev,
+      [zone]: !prev[zone]
+    }));
+  };
+
+  // Initialiser l'état d'expansion des zones lorsque les problèmes changent
+  useEffect(() => {
+    const uniqueZones = Array.from(new Set(localProblems.map(problem => problem.zone)));
+    
+    setExpandedZones(prev => {
+      const newState = { ...prev };
+      
+      // Ajouter les nouvelles zones et conserver l'état des zones existantes
+      uniqueZones.forEach(zone => {
+        if (newState[zone] === undefined) {
+          newState[zone] = false; // Par défaut, les nouvelles zones sont réduites
+        }
+      });
+      
+      return newState;
+    });
+  }, [localProblems]);
   
   // Si un filtre de zone est fourni, filtrer les problèmes pour cette zone
   const filteredProblems = useMemo(() => {
@@ -310,21 +343,58 @@ const ProblemsList: React.FC<ProblemsListProps> = ({
     });
   }, [filteredProblems, sortOrder]);
 
-  // Regrouper les problèmes par date si nécessaire
+  // Regrouper les problèmes par zone et/ou par date
   const groupedProblems = useMemo(() => {
-    if (!groupByDate) {
-      return { 'Tous les problèmes': sortedProblems };
+    // Si aucun regroupement n'est activé
+    if (!groupByDate && !groupByZone) {
+      return { 'Tous les problèmes': { 'Tous les problèmes': sortedProblems } };
     }
-
-    return sortedProblems.reduce((groups: { [key: string]: Problem[] }, problem) => {
+    
+    // Si on regroupe seulement par date (comportement original)
+    if (groupByDate && !groupByZone) {
+      const byDate = sortedProblems.reduce((groups: { [key: string]: Problem[] }, problem) => {
+        const date = extractDateFromProblem(problem);
+        if (!groups[date]) {
+          groups[date] = [];
+        }
+        groups[date].push(problem);
+        return groups;
+      }, {});
+      
+      return { 'Tous les problèmes': byDate };
+    }
+    
+    // Si on regroupe seulement par zone
+    if (!groupByDate && groupByZone) {
+      return sortedProblems.reduce((zoneGroups: { [key: string]: { [key: string]: Problem[] } }, problem) => {
+        const zone = problem.zone || 'Zone non spécifiée';
+        
+        if (!zoneGroups[zone]) {
+          zoneGroups[zone] = { 'Tous les problèmes': [] };
+        }
+        
+        zoneGroups[zone]['Tous les problèmes'].push(problem);
+        return zoneGroups;
+      }, {});
+    }
+    
+    // Si on regroupe par zone et par date
+    return sortedProblems.reduce((zoneGroups: { [key: string]: { [key: string]: Problem[] } }, problem) => {
+      const zone = problem.zone || 'Zone non spécifiée';
       const date = extractDateFromProblem(problem);
-      if (!groups[date]) {
-        groups[date] = [];
+      
+      if (!zoneGroups[zone]) {
+        zoneGroups[zone] = {};
       }
-      groups[date].push(problem);
-      return groups;
+      
+      if (!zoneGroups[zone][date]) {
+        zoneGroups[zone][date] = [];
+      }
+      
+      zoneGroups[zone][date].push(problem);
+      return zoneGroups;
     }, {});
-  }, [sortedProblems, groupByDate]);
+  }, [sortedProblems, groupByDate, groupByZone]);
 
   // Si aucun problème n'est trouvé après filtrage, afficher un message
   if (filteredProblems.length === 0) {
@@ -344,6 +414,28 @@ const ProblemsList: React.FC<ProblemsListProps> = ({
       </section>
     );
   }
+  
+  // Filtrer les groupes vides pour éviter des problèmes d'affichage
+  const filteredGroupedProblems = useMemo(() => {
+    const result: { [zone: string]: { [date: string]: Problem[] } } = {};
+    
+    Object.entries(groupedProblems).forEach(([zone, dateGroups]) => {
+      // Filtrer les dates qui ont au moins un problème
+      const nonEmptyDates = Object.entries(dateGroups)
+        .filter(([_, problems]) => problems.length > 0)
+        .reduce((acc, [date, problems]) => {
+          acc[date] = problems;
+          return acc;
+        }, {} as { [date: string]: Problem[] });
+      
+      // N'ajouter la zone que si elle a au moins une date avec des problèmes
+      if (Object.keys(nonEmptyDates).length > 0) {
+        result[zone] = nonEmptyDates;
+      }
+    });
+    
+    return result;
+  }, [groupedProblems]);
 
   return (
     <section className="mb-5">
@@ -360,6 +452,20 @@ const ProblemsList: React.FC<ProblemsListProps> = ({
         </div>
         
         <div className="flex items-center gap-2">
+          {/* Contrôle pour le groupement par zone */}
+          <button 
+            onClick={toggleGroupByZone}
+            className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium ${
+              groupByZone 
+                ? 'text-green-300 bg-green-900/40 border border-green-700/50' 
+                : 'text-slate-300 bg-slate-700 hover:bg-slate-600'
+            }`}
+            title={groupByZone ? "Désactiver le regroupement par zone" : "Activer le regroupement par zone"}
+          >
+            <Filter size={12} />
+            <span className="hidden sm:inline">Grouper par zone</span>
+          </button>
+
           {/* Contrôle pour le groupement par date */}
           <button 
             onClick={toggleGroupByDate}
@@ -399,26 +505,58 @@ const ProblemsList: React.FC<ProblemsListProps> = ({
         </div>
       </div>
       
-      {/* Affichage des problèmes regroupés par date */}
-      {Object.entries(groupedProblems).map(([date, problems]) => (
-        <div key={date} className="mb-6">
-          {/* Afficher l'en-tête de date seulement si groupByDate est activé */}
-          {groupByDate && (
-            <div className="flex items-center gap-2 mb-2 py-1 px-3 bg-slate-700/50 rounded-md">
-              <Clock size={14} className="text-blue-400" />
-              <h3 className="text-sm font-medium text-blue-200">{date}</h3>
-              <div className="ml-2 px-1.5 py-0.5 rounded-full bg-slate-600 text-xs text-slate-300">
-                {problems.length}
+      {/* Affichage des problèmes regroupés par zone et/ou par date */}
+      {Object.entries(filteredGroupedProblems).map(([zone, dateGroups]) => (
+        <div key={zone} className="mb-6">
+          {/* En-tête de zone avec bouton de déroulement (seulement si groupByZone est activé ou si on a un filtre de zone) */}
+          {(groupByZone || zoneFilter) && (
+            <div 
+              className="flex items-center justify-between gap-2 mb-2 py-2 px-4 bg-slate-700 rounded-md hover:bg-slate-600 cursor-pointer"
+              onClick={() => toggleZoneExpansion(zone)}
+            >
+              <div className="flex items-center gap-2">
+                <Filter size={16} className="text-green-400" />
+                <h3 className="text-sm font-medium text-green-200">{zone}</h3>
+                <div className="ml-2 px-2 py-0.5 rounded-full bg-slate-600 text-xs text-slate-300">
+                  {/* Compte total des problèmes dans cette zone */}
+                  {Object.values(dateGroups).flat().length}
+                </div>
               </div>
+              {/* Icône de flèche pour indiquer l'état d'expansion */}
+              {expandedZones[zone] ? 
+                <ChevronDown size={16} className="text-slate-400" /> : 
+                <ChevronRight size={16} className="text-slate-400" />
+              }
             </div>
           )}
           
-          {/* Afficher les problèmes de cette date */}
-          <div className="space-y-2">
-            {problems.map(problem => (
-              <ProblemCard key={problem.id} problem={problem} />
-            ))}
-          </div>
+          {/* Contenu de la zone (visible seulement si la zone est dépliée ou si le regroupement par zone est désactivé) */}
+          {(!groupByZone || expandedZones[zone]) && (
+            <div className="pl-4 border-l-2 border-slate-700">
+              {/* Pour chaque groupe de date dans cette zone */}
+              {Object.entries(dateGroups).map(([date, problems]) => (
+                <div key={date} className="mb-4">
+                  {/* En-tête de date (seulement si groupByDate est activé) */}
+                  {groupByDate && (
+                    <div className="flex items-center gap-2 mb-2 py-1 px-3 bg-slate-700/50 rounded-md">
+                      <Clock size={14} className="text-blue-400" />
+                      <h3 className="text-sm font-medium text-blue-200">{date}</h3>
+                      <div className="ml-2 px-1.5 py-0.5 rounded-full bg-slate-600 text-xs text-slate-300">
+                        {problems.length}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Problèmes pour cette date */}
+                  <div className="space-y-2">
+                    {problems.map(problem => (
+                      <ProblemCard key={problem.id} problem={problem} />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       ))}
     </section>
