@@ -268,9 +268,15 @@ def get_problems_72h():
                     problems = test_get_problems(management_zone_name=zone_filter, time_from="now-72h", status="OPEN,CLOSED")
                     logger.info(f"Zone {zone_filter}: {len(problems)} problèmes trouvés sur 72h avec test_get_problems")
                     
+                    # Formater chaque problème pour ajouter les informations d'entité impactée
+                    formatted_problems = []
+                    for problem in problems:
+                        formatted_problem = api_client._format_problem(problem, zone_filter)
+                        formatted_problems.append(formatted_problem)
+                    
                     # Mettre en cache le résultat
-                    api_client.set_cache(specific_cache_key, problems)
-                    return jsonify(problems)
+                    api_client.set_cache(specific_cache_key, formatted_problems)
+                    return jsonify(formatted_problems)
                 
                 # Récupérer la liste des MZs pour ce dashboard type
                 mz_list_var = 'VFG_MZ_LIST' if dashboard_type == 'vfg' else 'VFE_MZ_LIST'
@@ -326,9 +332,15 @@ def get_problems_72h():
                 
                 logger.info(f"Récupéré {len(unique_problems)} problèmes uniques sur 72h pour {dashboard_type.upper()} avec test_get_problems")
                 
+                # Formater chaque problème pour ajouter les informations d'entité impactée
+                formatted_problems = []
+                for problem in unique_problems:
+                    formatted_problem = api_client._format_problem(problem, zone_filter)
+                    formatted_problems.append(formatted_problem)
+                
                 # Mettre en cache le résultat
-                api_client.set_cache(specific_cache_key, unique_problems)
-                return jsonify(unique_problems)
+                api_client.set_cache(specific_cache_key, formatted_problems)
+                return jsonify(formatted_problems)
             
             # En cas de dashboard type non reconnu, essayer la méthode normale
             logger.info("Retour à l'implémentation standard")
@@ -441,11 +453,17 @@ def get_problems_72h():
                     except Exception as e:
                         logger.error(f"Erreur lors de l'affichage du problème {i}: {e}")
             
-            # Mettre en cache le résultat
-            api_client.set_cache(specific_cache_key, unique_problems)
+            # Formater chaque problème pour ajouter les informations d'entité impactée
+            formatted_problems = []
+            for problem in unique_problems:
+                formatted_problem = api_client._format_problem(problem, zone_filter)
+                formatted_problems.append(formatted_problem)
             
-            logger.info(f"Fin du traitement - {len(unique_problems)} problèmes retournés")
-            return jsonify(unique_problems)
+            # Mettre en cache le résultat
+            api_client.set_cache(specific_cache_key, formatted_problems)
+            
+            logger.info(f"Fin du traitement - {len(formatted_problems)} problèmes formatés et retournés")
+            return jsonify(formatted_problems)
             
         else:
             # Pour une MZ spécifique ou sans filtrage
@@ -465,11 +483,17 @@ def get_problems_72h():
                 for i, prob in enumerate(problems):
                     logger.info(f"Problème 72h #{i+1}: {prob['id']} - {prob['title']} - Status: {prob['status']}")
             
-            # Mettre en cache le résultat
-            api_client.set_cache(specific_cache_key, problems)
+            # Formater chaque problème pour ajouter les informations d'entité impactée
+            formatted_problems = []
+            for problem in problems:
+                formatted_problem = api_client._format_problem(problem, effective_mz)
+                formatted_problems.append(formatted_problem)
             
-            logger.info(f"MZ {effective_mz}: {len(problems)} problèmes récupérés sur 72h")
-            return jsonify(problems)
+            # Mettre en cache le résultat
+            api_client.set_cache(specific_cache_key, formatted_problems)
+            
+            logger.info(f"MZ {effective_mz}: {len(formatted_problems)} problèmes récupérés et formatés sur 72h")
+            return jsonify(formatted_problems)
             
     except Exception as e:
         logger.error(f"Erreur lors de la récupération des problèmes 72h: {e}")
