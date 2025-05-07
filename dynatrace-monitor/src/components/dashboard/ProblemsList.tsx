@@ -46,6 +46,7 @@ const ProblemsList: React.FC<ProblemsListProps> = ({
   const [expandedZones, setExpandedZones] = useState<{[key: string]: boolean}>({});
   const [localProblems, setLocalProblems] = useState<Problem[]>(problems);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+  const [isDurationDropdownOpen, setIsDurationDropdownOpen] = useState<boolean>(false);
   
   // Mettre à jour les problèmes locaux quand les props problems changent
   // mais seulement si nous ne sommes pas en train de rafraîchir pour éviter des mises à jour conflictuelles
@@ -314,7 +315,32 @@ const ProblemsList: React.FC<ProblemsListProps> = ({
   // Fonction pour changer le filtre de durée
   const changeDurationFilter = (filter: DurationFilter) => {
     setDurationFilter(filter);
+    setIsDurationDropdownOpen(false); // Fermer le dropdown après la sélection
   };
+  
+  // Fonction pour basculer l'état du dropdown de durée
+  const toggleDurationDropdown = () => {
+    setIsDurationDropdownOpen(!isDurationDropdownOpen);
+  };
+  
+  // Gestionnaire de clic pour fermer le dropdown quand on clique ailleurs dans la page
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      // Vérifier si le clic est en dehors du dropdown
+      if (isDurationDropdownOpen && !target.closest('.duration-dropdown-container')) {
+        setIsDurationDropdownOpen(false);
+      }
+    };
+    
+    // Ajouter l'écouteur d'événement
+    document.addEventListener('mousedown', handleClickOutside);
+    
+    // Nettoyer l'écouteur d'événement
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isDurationDropdownOpen]);
   
   // Fonction pour extraire la durée en minutes à partir de la chaîne de caractères
   const extractDurationMinutes = (durationString: string | undefined): number => {
@@ -535,8 +561,9 @@ const ProblemsList: React.FC<ProblemsListProps> = ({
         
         <div className="flex flex-wrap items-center gap-2">
           {/* Filtre par durée */}
-          <div className="relative group">
+          <div className="relative duration-dropdown-container">
             <button 
+              onClick={toggleDurationDropdown}
               className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium ${
                 durationFilter !== 'all'
                   ? 'text-amber-300 bg-amber-900/40 border border-amber-700/50' 
@@ -555,42 +582,44 @@ const ProblemsList: React.FC<ProblemsListProps> = ({
             </button>
             
             {/* Dropdown menu pour le filtre de durée */}
-            <div className="absolute left-0 mt-1 w-32 bg-slate-800 border border-slate-700 rounded-md shadow-lg z-10 hidden group-hover:block">
-              <div className="py-1">
-                <button 
-                  onClick={() => changeDurationFilter('all')}
-                  className={`block w-full text-left px-4 py-1 text-xs ${
-                    durationFilter === 'all' ? 'bg-slate-700 text-white' : 'text-slate-300 hover:bg-slate-700'
-                  }`}
-                >
-                  Toutes durées
-                </button>
-                <button 
-                  onClick={() => changeDurationFilter('lessThan15')}
-                  className={`block w-full text-left px-4 py-1 text-xs ${
-                    durationFilter === 'lessThan15' ? 'bg-slate-700 text-amber-300' : 'text-slate-300 hover:bg-slate-700'
-                  }`}
-                >
-                  &lt; 15 minutes
-                </button>
-                <button 
-                  onClick={() => changeDurationFilter('between15And60')}
-                  className={`block w-full text-left px-4 py-1 text-xs ${
-                    durationFilter === 'between15And60' ? 'bg-slate-700 text-amber-300' : 'text-slate-300 hover:bg-slate-700'
-                  }`}
-                >
-                  15 - 60 minutes
-                </button>
-                <button 
-                  onClick={() => changeDurationFilter('moreThan60')}
-                  className={`block w-full text-left px-4 py-1 text-xs ${
-                    durationFilter === 'moreThan60' ? 'bg-slate-700 text-amber-300' : 'text-slate-300 hover:bg-slate-700'
-                  }`}
-                >
-                  &gt; 1 heure
-                </button>
+            {isDurationDropdownOpen && (
+              <div className="absolute left-0 mt-1 w-32 bg-slate-800 border border-slate-700 rounded-md shadow-lg z-10">
+                <div className="py-1">
+                  <button 
+                    onClick={() => changeDurationFilter('all')}
+                    className={`block w-full text-left px-4 py-1 text-xs ${
+                      durationFilter === 'all' ? 'bg-slate-700 text-white' : 'text-slate-300 hover:bg-slate-700'
+                    }`}
+                  >
+                    Toutes durées
+                  </button>
+                  <button 
+                    onClick={() => changeDurationFilter('lessThan15')}
+                    className={`block w-full text-left px-4 py-1 text-xs ${
+                      durationFilter === 'lessThan15' ? 'bg-slate-700 text-amber-300' : 'text-slate-300 hover:bg-slate-700'
+                    }`}
+                  >
+                    &lt; 15 minutes
+                  </button>
+                  <button 
+                    onClick={() => changeDurationFilter('between15And60')}
+                    className={`block w-full text-left px-4 py-1 text-xs ${
+                      durationFilter === 'between15And60' ? 'bg-slate-700 text-amber-300' : 'text-slate-300 hover:bg-slate-700'
+                    }`}
+                  >
+                    15 - 60 minutes
+                  </button>
+                  <button 
+                    onClick={() => changeDurationFilter('moreThan60')}
+                    className={`block w-full text-left px-4 py-1 text-xs ${
+                      durationFilter === 'moreThan60' ? 'bg-slate-700 text-amber-300' : 'text-slate-300 hover:bg-slate-700'
+                    }`}
+                  >
+                    &gt; 1 heure
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
           </div>
           
           {/* Contrôle pour le groupement par zone */}
