@@ -225,8 +225,8 @@ def get_problems_72h():
         zone_filter = request.args.get('zone', '')  # Pour filtrer par une zone spécifique
         debug_mode = request.args.get('debug', 'false').lower() == 'true'
         
-        # Forcer le mode debug pour diagnostiquer le problème
-        debug_mode = True
+        # Ne plus forcer le mode debug maintenant que le problème est résolu
+        # debug_mode = True
         
         # Logs détaillés pour debug
         logger.info("="*50)
@@ -289,6 +289,10 @@ def get_problems_72h():
                 mz_list = [mz.strip() for mz in mz_string.split(',')]
                 logger.info(f"Liste des MZs {dashboard_type} pour problèmes 72h: {mz_list}")
                 
+                # Log de vérification pour VFG_MZ_LIST
+                if dashboard_type == 'vfg':
+                    logger.info(f"Vérification VFG_MZ_LIST: {os.environ.get('VFG_MZ_LIST')}")
+                
                 # Récupérer tous les problèmes pour chaque MZ et les combiner
                 all_problems = []
                 
@@ -318,8 +322,33 @@ def get_problems_72h():
                     id_key = 'problemId' if 'problemId' in problem_keys else 'id'
                     logger.info(f"Utilisation de la clé '{id_key}' pour l'identification des problèmes")
                     
-                    # Utilisez la bonne clé pour la déduplication
+                    # Vérification des managementZones pour s'assurer que tous les problèmes sont bien associés à une MZ de la liste
+                    filtered_problems = []
                     for problem in all_problems:
+                        # Vérifier si le problème appartient à une des management zones de notre liste
+                        is_in_mz_list = False
+                        
+                        # Récupérer les management zones du problème
+                        problem_mzs = []
+                        if 'managementZones' in problem:
+                            problem_mzs = [mz.get('name', '') for mz in problem.get('managementZones', [])]
+                        
+                        # Vérifier si une des MZ du problème est dans notre liste
+                        for mz_name in mz_list:
+                            if mz_name in problem_mzs:
+                                is_in_mz_list = True
+                                logger.info(f"Problème {problem.get(id_key)} appartient à la MZ {mz_name}")
+                                break
+                        
+                        if is_in_mz_list:
+                            filtered_problems.append(problem)
+                        else:
+                            logger.info(f"Problème {problem.get(id_key)} ignoré car n'appartient pas aux MZs {mz_list}")
+                    
+                    logger.info(f"Après filtrage par liste de MZ: {len(filtered_problems)}/{len(all_problems)} problèmes conservés")
+                    
+                    # Utilisez la bonne clé pour la déduplication des problèmes filtrés
+                    for problem in filtered_problems:
                         problem_id = problem.get(id_key)
                         if problem_id and problem_id not in problem_ids:
                             problem_ids.add(problem_id)
@@ -418,6 +447,8 @@ def get_problems_72h():
             
             logger.info(f"Déduplication de {len(all_problems)} problèmes au total")
             
+            # D'abord filtrer les problèmes qui appartiennent aux MZ de notre liste
+            filtered_problems = []
             for i, problem in enumerate(all_problems):
                 try:
                     # Vérifier si l'objet a le bon format
@@ -431,15 +462,40 @@ def get_problems_72h():
                         logger.warning(f"Problème à l'index {i} n'a pas d'ID: {json.dumps(problem)[:200]}...")
                         invalid_problems.append(problem)
                         continue
+                    
+                    # Vérifier si le problème appartient à une des management zones de notre liste
+                    is_in_mz_list = False
+                    
+                    # Récupérer les management zones du problème
+                    problem_mzs = []
+                    if 'managementZones' in problem:
+                        problem_mzs = [mz.get('name', '') for mz in problem.get('managementZones', [])]
+                    
+                    # Vérifier si une des MZ du problème est dans notre liste
+                    for mz_name in mz_list:
+                        if mz_name in problem_mzs:
+                            is_in_mz_list = True
+                            logger.info(f"Problème {problem.get('id')} appartient à la MZ {mz_name}")
+                            break
+                    
+                    if is_in_mz_list:
+                        filtered_problems.append(problem)
+                    else:
+                        logger.info(f"Problème {problem.get('id')} ignoré car n'appartient pas aux MZs {mz_list}")
                         
-                    # Vérifier si l'ID est unique
-                    if problem['id'] not in problem_ids:
-                        problem_ids.add(problem['id'])
-                        unique_problems.append(problem)
                 except Exception as e:
                     logger.error(f"Erreur lors du traitement du problème à l'index {i}: {e}")
                     logger.error(traceback.format_exc())
                     invalid_problems.append(problem)
+            
+            logger.info(f"Après filtrage par liste de MZ: {len(filtered_problems)}/{len(all_problems)} problèmes conservés")
+            
+            # Ensuite dédupliquer les problèmes filtrés
+            for problem in filtered_problems:   
+                # Vérifier si l'ID est unique
+                if problem['id'] not in problem_ids:
+                    problem_ids.add(problem['id'])
+                    unique_problems.append(problem)
             
             logger.info(f"Récupéré {len(unique_problems)} problèmes uniques sur 72h pour {dashboard_type.upper()}")
             logger.info(f"Problèmes invalides ignorés: {len(invalid_problems)}")
