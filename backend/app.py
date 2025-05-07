@@ -334,14 +334,21 @@ def get_problems_72h():
                             problem_mzs = [mz.get('name', '') for mz in problem.get('managementZones', [])]
                         
                         # Vérifier si une des MZ du problème correspond EXACTEMENT à une MZ de notre liste
+                        # Et stocker la MZ correspondante pour l'affichage
+                        matching_mz = None
                         for mz_name in mz_list:
                             # Journaliser les MZs pour débogage
                             logger.info(f"Comparaison: problème {problem.get(id_key)} a MZs={problem_mzs}, comparé avec {mz_name}")
                             # Vérification stricte d'égalité complète, pas de correspondance partielle
                             if any(problem_mz == mz_name for problem_mz in problem_mzs):
                                 is_in_mz_list = True
+                                matching_mz = mz_name  # Stocker la MZ correspondante
                                 logger.info(f"MATCH EXACT: Problème {problem.get(id_key)} appartient à la MZ {mz_name}")
                                 break
+                        
+                        # Stocker la MZ correspondante dans le problème pour l'utiliser plus tard
+                        if is_in_mz_list and matching_mz:
+                            problem['matching_mz'] = matching_mz
                         
                         if is_in_mz_list:
                             filtered_problems.append(problem)
@@ -475,14 +482,21 @@ def get_problems_72h():
                         problem_mzs = [mz.get('name', '') for mz in problem.get('managementZones', [])]
                     
                     # Vérifier si une des MZ du problème correspond EXACTEMENT à une MZ de notre liste
+                    # Et stocker la MZ correspondante pour l'affichage
+                    matching_mz = None
                     for mz_name in mz_list:
                         # Journaliser les MZs pour débogage
                         logger.info(f"Comparaison: problème {problem.get('id')} a MZs={problem_mzs}, comparé avec {mz_name}")
                         # Vérification stricte d'égalité complète, pas de correspondance partielle
                         if any(problem_mz == mz_name for problem_mz in problem_mzs):
                             is_in_mz_list = True
+                            matching_mz = mz_name  # Stocker la MZ correspondante
                             logger.info(f"MATCH EXACT: Problème {problem.get('id')} appartient à la MZ {mz_name}")
                             break
+                    
+                    # Stocker la MZ correspondante dans le problème pour l'utiliser plus tard
+                    if is_in_mz_list and matching_mz:
+                        problem['matching_mz'] = matching_mz
                     
                     if is_in_mz_list:
                         filtered_problems.append(problem)

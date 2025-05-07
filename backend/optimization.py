@@ -1547,6 +1547,18 @@ class OptimizedAPIClient:
         else:
             logger.info(f"Aucun nom d'hôte valide trouvé pour le problème {problem.get('problemId', 'unknown')}")
         
+        # Utiliser en priorité la MZ correspondante stockée lors du filtrage
+        display_zone = None
+        if 'matching_mz' in problem:
+            display_zone = problem['matching_mz']
+            logger.info(f"Problème {problem.get('problemId')}: utilisation de la MZ correspondante pour l'affichage: {display_zone}")
+        elif zone:
+            display_zone = zone
+            logger.info(f"Problème {problem.get('problemId')}: utilisation de la MZ fournie en paramètre: {display_zone}")
+        else:
+            display_zone = self._extract_problem_zone(problem)
+            logger.info(f"Problème {problem.get('problemId')}: utilisation de la première MZ du problème: {display_zone}")
+            
         result = {
             'id': problem.get('problemId', 'Unknown'),
             'title': problem.get('title', 'Problème inconnu'),
@@ -1557,7 +1569,7 @@ class OptimizedAPIClient:
             'end_time': end_time_str,  # Ajout de l'heure de fermeture
             'duration': duration_display,  # Ajout de la durée du problème
             'dt_url': f"{self.env_url}/#problems/problemdetails;pid={problem.get('problemId', 'Unknown')}",
-            'zone': zone or self._extract_problem_zone(problem),
+            'zone': display_zone,
             'resolved': is_resolved,
             'host': host_name,  # Ajout du champ host explicite
             'impacted': host_name  # Ajout pour compatibilité avec le frontend actuel
