@@ -816,15 +816,32 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
     }
   }, [state.selectedZone, state.vitalForGroupMZs, state.vitalForEntrepriseMZs, loadZoneData, apiClient, optimized, getZoneIcon, getZoneColor]);
 
+  // Drapeau pour éviter les appels multiples à refreshData
+  const refreshInProgressRef = useRef(false);
+
   // Fonction pour rafraîchir les données - version non bloquante améliorée
   const refreshData = useCallback(async (dashboardType?: 'vfg' | 'vfe', refreshProblemsOnly?: boolean): Promise<void> => {
+    // Éviter les appels multiples simultanés
+    if (refreshInProgressRef.current) {
+      console.log("Un rafraîchissement est déjà en cours, nouvelle demande ignorée");
+      return;
+    }
+    
+    // Marquer le début du rafraîchissement
+    refreshInProgressRef.current = true;
+    
     console.log(`Refreshing data for dashboard type: ${dashboardType || 'none'} ${refreshProblemsOnly ? '(problèmes uniquement)' : ''}`);
     setState(prev => ({ ...prev, error: null }));
+    
+    // Définir un timeout maximum pour éviter que le drapeau reste bloqué
+    const timeoutId = setTimeout(() => {
+      console.log("Timeout de sécurité pour refreshData : réinitialisation du drapeau");
+      refreshInProgressRef.current = false;
+    }, 60000); // 60 secondes maximum
     
     // Gérer les erreurs dans la fonction
     try {
       // Exécuter loadAllData de manière non bloquante si on est dans un contexte de zone détaillée
-      // CORRECTION: vérifier si une zone est sélectionnée plutôt que de se baser sur le chemin URL
       if (refreshProblemsOnly && state.selectedZone) {
         console.log("Mode de rafraîchissement non bloquant activé pour les problèmes en zone");
         
@@ -871,16 +888,23 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
         },
         error: "Erreur lors du rafraîchissement des données"
       }));
+    } finally {
+      // Réinitialiser le drapeau et nettoyer le timeout
+      refreshInProgressRef.current = false;
+      clearTimeout(timeoutId);
     }
   }, [loadAllData, state.selectedZone]); // Ajout de state.selectedZone comme dépendance
 
-  // Charger les données initiales
+  // Charger les données initiales et configurer le rafraîchissement automatique
   useEffect(() => {
     if (!initialLoadRef.current) {
       console.log("Initial data load");
       initialLoadRef.current = true;
       loadAllData(undefined, false);
     }
+    
+    // Variable pour suivre si un rafraîchissement est en cours
+    let isRefreshInProgress = false;
     
     // Rafraîchir automatiquement les problèmes actifs toutes les 5 minutes
     const refreshInterval = 300000; // 5 minutes en millisecondes
@@ -889,12 +913,18 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
     
     // Configurer l'intervalle
     const intervalId = setInterval(() => {
-      console.log("Rafraîchissement automatique des problèmes actifs");
-      // Récupérer le type de dashboard actuel (vfg ou vfe)
-      // Utilisons un indicateur visuel pour montrer que nous rafraîchissons sans bloquer
-      console.log("Démarrage d'un rafraîchissement en arrière-plan des problèmes");
+      // Éviter les rafraîchissements multiples simultanés
+      if (isRefreshInProgress) {
+        console.log("Rafraîchissement déjà en cours, nouvelle tentative ignorée");
+        return;
+      }
       
-      // Rafraîchissement asynchrone pour éviter de bloquer l'interface
+      console.log("Rafraîchissement automatique des problèmes actifs");
+      
+      // Marquer le début du rafraîchissement
+      isRefreshInProgress = true;
+      
+      // Récupérer le type de dashboard actuel (vfg ou vfe)
       const currentDashboardType = window.location.pathname.includes('vfe') ? 'vfe' : 'vfg';
       
       // Vérifier si on est sur une page de détail de zone
@@ -909,11 +939,10 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
       const timeoutId = setTimeout(() => {
         console.log("Timeout de sécurité déclenché pour le rafraîchissement des problèmes");
         setState(prev => ({ ...prev, isLoading: { ...prev.isLoading, problems: false }}));
+        isRefreshInProgress = false; // Réinitialiser le drapeau
       }, 30000); // 30 secondes maximum
       
       // Utiliser un microtask pour exécuter le rafraîchissement
-      // Cela permet de s'assurer que l'interface reste réactive
-      // tout en évitant de retarder inutilement le rafraîchissement
       Promise.resolve().then(async () => {
         try {
           await refreshData(currentDashboardType as 'vfg' | 'vfe', true);
@@ -925,6 +954,8 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
           setState(prev => ({ ...prev, isLoading: { ...prev.isLoading, problems: false }}));
           // Nettoyer le timeout
           clearTimeout(timeoutId);
+          // Marquer la fin du rafraîchissement
+          isRefreshInProgress = false;
         }
       });
     }, refreshInterval);
