@@ -104,12 +104,10 @@ const AllProblemsView: React.FC = () => {
         "Erreur lors de la récupération des problèmes actifs VFG:"
       );
       
-      // Problèmes récents VFG
+      // Problèmes récents VFG - Utilisation de problems-72h
       const vfgRecentResponse = await safeRequest(
-        `${API_BASE_URL}/problems`,
+        `${API_BASE_URL}/problems-72h`,
         {
-          status: "ALL",
-          from: "now-72h",
           type: "vfg",
           debug: "true"
         },
@@ -133,12 +131,10 @@ const AllProblemsView: React.FC = () => {
         "Erreur lors de la récupération des problèmes actifs VFE:"
       );
       
-      // Problèmes récents VFE
+      // Problèmes récents VFE - Utilisation de problems-72h
       const vfeRecentResponse = await safeRequest(
-        `${API_BASE_URL}/problems`,
+        `${API_BASE_URL}/problems-72h`,
         {
-          status: "ALL",
-          from: "now-72h",
           type: "vfe",
           debug: "true"
         },
