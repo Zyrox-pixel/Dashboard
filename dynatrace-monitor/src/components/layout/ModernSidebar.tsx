@@ -83,8 +83,14 @@ const ModernSidebar: React.FC<ModernSidebarProps> = ({
         <ul className="space-y-1">
           {/* Section principale */}
           <li>
-            <Link to="/dashboard/vfg" className={getLinkClasses('/dashboard/vfg')}>
+            <Link to="/overview" className={getLinkClasses('/overview')}>
               <LayoutDashboard size={20} />
+              {!collapsed && <span>Vue d'ensemble</span>}
+            </Link>
+          </li>
+          <li>
+            <Link to="/dashboard/vfg" className={getLinkClasses('/dashboard/vfg')}>
+              <BarChart3 size={20} />
               {!collapsed && <span>Dashboard VFG</span>}
             </Link>
           </li>

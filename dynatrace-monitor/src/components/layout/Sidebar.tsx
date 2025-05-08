@@ -162,7 +162,7 @@ const Sidebar: React.FC = () => {
           <nav className="space-y-1">
             {/* Bouton Accueil */}
             <Link 
-              to="/"
+              to="/overview"
               onClick={() => setActiveItem('home')}
               className={getMenuItemClass('home')}
             >

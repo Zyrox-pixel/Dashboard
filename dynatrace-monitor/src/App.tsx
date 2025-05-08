@@ -5,6 +5,7 @@ import UnifiedDashboard from './pages/UnifiedDashboard';
 import ActiveProblemsPage from './pages/ActiveProblemsPage';
 import RecentProblemsPage from './pages/RecentProblemsPage';
 import UnifiedProblemsPage from './pages/UnifiedProblemsPage';
+import OverviewDashboard from './pages/OverviewDashboard';
 import { AppProvider } from './contexts/AppContext';
 
 function App() {
@@ -13,8 +14,11 @@ function App() {
       <AppProvider>
         <Router>
           <Routes>
-            {/* Route par défaut - Redirige vers VFG */}
-            <Route path="/" element={<Navigate to="/dashboard/vfg" replace />} />
+            {/* Route par défaut - Redirige vers la vue d'ensemble */}
+            <Route path="/" element={<Navigate to="/overview" replace />} />
+            
+            {/* Route pour la page d'aperçu global */}
+            <Route path="/overview" element={<OverviewDashboard />} />
             
             {/* Routes vers le tableau de bord unifié */}
             <Route path="/dashboard/:type" element={<UnifiedDashboard />} />
