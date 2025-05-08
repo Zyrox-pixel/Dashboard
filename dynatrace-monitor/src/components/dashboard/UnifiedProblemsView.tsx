@@ -8,15 +8,24 @@ import { useApp } from '../../contexts/AppContext';
 interface UnifiedProblemsViewProps {
   /** Titre principal de la vue */
   title: string;
-  /** Variante du dashboard (vfg ou vfe) */
-  variant: 'vfg' | 'vfe';
+  /** Variante du dashboard (vfg, vfe ou combined) */
+  variant: 'vfg' | 'vfe' | 'combined';
+  /** Problèmes combinés pour la vue unifiée (optionnel) */
+  allProblems?: Problem[];
+  /** Problèmes récents (72h) combinés pour la vue unifiée (optionnel) */
+  allRecent72hProblems?: Problem[];
 }
 
 /**
  * Composant de vue unifiée des problèmes combinant problèmes actifs et récents (72h)
  * dans une interface à onglets moderne et interactive
  */
-const UnifiedProblemsView: React.FC<UnifiedProblemsViewProps> = ({ title, variant }) => {
+const UnifiedProblemsView: React.FC<UnifiedProblemsViewProps> = ({ 
+  title, 
+  variant, 
+  allProblems, 
+  allRecent72hProblems 
+}) => {
   const navigate = useNavigate();
   const { activeProblems, problemsLast72h, isLoading, refreshData } = useApp();
   
@@ -27,8 +36,10 @@ const UnifiedProblemsView: React.FC<UnifiedProblemsViewProps> = ({ title, varian
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [lastRefreshTime, setLastRefreshTime] = useState<Date>(new Date());
   
-  // Problèmes à afficher selon l'onglet actif
-  const problemsToDisplay = activeTab === 'active' ? activeProblems : problemsLast72h;
+  // Problèmes à afficher selon l'onglet actif et la variante
+  const problemsToDisplay = activeTab === 'active' 
+    ? (variant === 'combined' ? allProblems : activeProblems) 
+    : (variant === 'combined' ? allRecent72hProblems : problemsLast72h);
   
   // Gérer le changement d'onglet
   const handleTabChange = (tab: 'active' | 'recent') => {
@@ -41,7 +52,14 @@ const UnifiedProblemsView: React.FC<UnifiedProblemsViewProps> = ({ title, varian
     
     setIsRefreshing(true);
     try {
-      await refreshData(variant, activeTab === 'active');
+      if (variant === 'combined') {
+        // Pour la vue combinée, rafraîchir les deux types de problèmes
+        await refreshData('vfg', activeTab === 'active');
+        await refreshData('vfe', activeTab === 'active');
+      } else {
+        // Pour les vues spécifiques, comportement normal
+        await refreshData(variant, activeTab === 'active');
+      }
       setLastRefreshTime(new Date());
     } catch (error) {
       console.error('Erreur lors du rafraîchissement des données:', error);
@@ -54,7 +72,13 @@ const UnifiedProblemsView: React.FC<UnifiedProblemsViewProps> = ({ title, varian
   
   // Retour au tableau de bord
   const handleBackClick = () => {
-    navigate(`/dashboard/${variant}`);
+    if (variant === 'combined') {
+      // Pour la vue combinée, retourner à la page d'accueil
+      navigate('/');
+    } else {
+      // Pour les vues spécifiques, comportement normal
+      navigate(`/${variant}`);
+    }
   };
   
   // Classes CSS pour les onglets
