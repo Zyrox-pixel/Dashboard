@@ -181,7 +181,7 @@ const Sidebar: React.FC = () => {
             
             {/* Bouton Problèmes */}
             <Link 
-              to="/problems"
+              to="/problems/unified"
               onClick={() => setActiveItem('problems')}
               className={getMenuItemClass('problems')}
             >
@@ -196,7 +196,7 @@ const Sidebar: React.FC = () => {
               <div className={`${sidebarCollapsed ? 'absolute -top-1 -right-1' : 'ml-auto'} 
                               px-1.5 py-0.5 rounded-full text-xs font-medium
                               ${isDarkTheme ? 'bg-red-900/70 text-red-300' : 'bg-red-100 text-red-700'}`}>
-                12
+                Tous
               </div>
             </Link>
           </nav>
@@ -287,44 +287,8 @@ const Sidebar: React.FC = () => {
           </nav>
         </div>
         
-        {/* Configuration et autres éléments */}
-        <div className="mt-auto px-4 mb-6">
-          {!sidebarCollapsed && (
-            <div className={`text-xs font-semibold uppercase tracking-wider mb-3 mt-2 ${
-              isDarkTheme ? 'text-slate-500' : 'text-slate-400'
-            }`}>
-              Système
-            </div>
-          )}
-          
-          <nav className="space-y-1">
-            {/* Activité */}
-            <Link 
-              to="/activity"
-              onClick={() => setActiveItem('activity')}
-              className={getMenuItemClass('activity')}
-            >
-              <Activity size={18} className={getIconClass('activity')} />
-              
-              {!sidebarCollapsed && (
-                <span className="text-sm font-medium whitespace-nowrap">Activité</span>
-              )}
-            </Link>
-            
-            {/* Settings */}
-            <Link 
-              to="/settings"
-              onClick={() => setActiveItem('settings')}
-              className={getMenuItemClass('settings')}
-            >
-              <Settings size={18} className={getIconClass('settings')} />
-              
-              {!sidebarCollapsed && (
-                <span className="text-sm font-medium whitespace-nowrap">Paramètres</span>
-              )}
-            </Link>
-          </nav>
-        </div>
+        {/* Espace supplémentaire pour l'esthétique */}
+        <div className="flex-grow"></div>
         
         {/* Footer avec version */}
         <div className={`px-4 py-3 mt-auto ${
