@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Layout from '../layout/Layout';
 import ProblemsList from './ProblemsList';
 import ManagementZoneList from './ManagementZoneList';
+import ModernManagementZoneList from './ModernManagementZoneList';
 import ZoneDetails from './ZoneDetails';
 import { AppContextType } from '../../contexts/AppContext';
 import { Shield, Loader, AlertTriangle, RefreshCw, Clock, BarChart, ChevronLeft, Check, Server } from 'lucide-react';
@@ -447,10 +448,14 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
             </div>
           </div>
           
-          {/* Liste des zones */}
-          <ManagementZoneList 
+          {/* Liste des zones avec design moderne */}
+          <ModernManagementZoneList 
             zones={zones} 
-            onZoneClick={handleZoneClick} 
+            onZoneClick={handleZoneClick}
+            title={variant === 'vfg' ? "Management Zones Vital for Group" : "Management Zones Vital for Enterprise"}
+            variant={variant}
+            loading={isLoading.dashboardData}
+            onRefresh={() => refreshData(variant, false)}
           />
         </>
       )}
