@@ -26,6 +26,40 @@ const AllProblemsView: React.FC = () => {
   // Problèmes à afficher selon l'onglet actif
   const problemsToDisplay = activeTab === 'active' ? activeProblems : recentProblems;
   
+  // Définition de l'interface pour les réponses API
+  interface ApiResponse {
+    data: any;
+    status?: number;
+    statusText?: string;
+  }
+  
+  // Fonction utilitaire pour extraire les données d'une réponse avec vérification de type
+  const extractData = (responseData: any): any[] => {
+    if (Array.isArray(responseData)) {
+      return responseData;
+    }
+    
+    if (responseData && typeof responseData === 'object') {
+      // Vérifier chaque propriété possible qui pourrait contenir les données
+      const possibleDataProps = ['data', 'problems', 'items', 'results'];
+      
+      for (const prop of possibleDataProps) {
+        if (prop in responseData && Array.isArray(responseData[prop])) {
+          return responseData[prop];
+        }
+      }
+      
+      // Si aucune propriété attendue n'est trouvée mais que c'est un objet non vide
+      if (Object.keys(responseData).length > 0) {
+        console.log('Tentative de transformation de l\'objet en tableau');
+        return [responseData];
+      }
+    }
+    
+    // Par défaut, retourner un tableau vide
+    return [];
+  };
+  
   // Charger les problèmes directement depuis l'API (sans passer par le context)
   const loadProblems = async () => {
     // Éviter les requêtes simultanées
@@ -38,40 +72,126 @@ const AllProblemsView: React.FC = () => {
     setIsRefreshing(true);
     setError(null);
     
+    // Fonction utilitaire pour faire des requêtes sécurisées
+    const safeRequest = async (url: string, params: any, errorMsg: string): Promise<ApiResponse> => {
+      try {
+        return await axios.get(url, {
+          params,
+          timeout: 15000
+        });
+      } catch (err) {
+        console.error(errorMsg, err);
+        // Retourner un résultat vide mais valide pour permettre la continuation
+        return { data: [] };
+      }
+    };
+    
     try {
       console.log('Chargement de tous les problèmes (VFG et VFE)...');
       
-      // Utiliser Promise.all pour les deux requêtes parallèles
-      const [activeResponse, recentResponse] = await Promise.all([
-        // Problèmes actifs avec timeout pour éviter les requêtes bloquantes
-        axios.get(`${API_BASE_URL}/problems`, {
-          params: {
-            status: "OPEN",
-            from: "-60d",
-            debug: "true"
-          },
-          timeout: 30000 // 30 secondes max
-        }),
-        
-        // Problèmes récents des 72 dernières heures
-        axios.get(`${API_BASE_URL}/problems`, {
-          params: {
-            status: "ALL", // Récupérer tous les problèmes (ouverts et résolus)
-            from: "now-72h", // Des dernières 72 heures
-            debug: "true"
-          },
-          timeout: 30000 // 30 secondes max
-        })
-      ]);
+      // Récupération des problèmes VFG avec gestion individuelle des erreurs
+      console.log("Récupération des problèmes VFG...");
       
-      console.log('Réponses reçues:', {
-        active: activeResponse.data?.length || 0,
-        recent: recentResponse.data?.length || 0
-      });
+      // Problèmes actifs VFG
+      const vfgActiveResponse = await safeRequest(
+        `${API_BASE_URL}/problems`,
+        {
+          status: "OPEN",
+          from: "-60d",
+          type: "vfg",
+          debug: "true"
+        },
+        "Erreur lors de la récupération des problèmes actifs VFG:"
+      );
+      
+      // Problèmes récents VFG
+      const vfgRecentResponse = await safeRequest(
+        `${API_BASE_URL}/problems`,
+        {
+          status: "ALL",
+          from: "now-72h",
+          type: "vfg",
+          debug: "true"
+        },
+        "Erreur lors de la récupération des problèmes récents VFG:"
+      );
+      
+      console.log("Traitement des problèmes VFG terminé.");
+      
+      // Récupération des problèmes VFE
+      console.log("Récupération des problèmes VFE...");
+      
+      // Problèmes actifs VFE
+      const vfeActiveResponse = await safeRequest(
+        `${API_BASE_URL}/problems`,
+        {
+          status: "OPEN",
+          from: "-60d",
+          type: "vfe",
+          debug: "true"
+        },
+        "Erreur lors de la récupération des problèmes actifs VFE:"
+      );
+      
+      // Problèmes récents VFE
+      const vfeRecentResponse = await safeRequest(
+        `${API_BASE_URL}/problems`,
+        {
+          status: "ALL",
+          from: "now-72h",
+          type: "vfe",
+          debug: "true"
+        },
+        "Erreur lors de la récupération des problèmes récents VFE:"
+      );
+      
+      console.log("Traitement des problèmes VFE terminé.");
+      
+      // Fonction pour dédupliquer les problèmes par ID
+      const dedupProblems = (problems: any[]): any[] => {
+        if (!Array.isArray(problems)) return [];
+        
+        const uniqueProblems: any[] = [];
+        const seenIds = new Set();
+        
+        for (const problem of problems) {
+          if (!problem || !problem.id) continue;
+          
+          if (!seenIds.has(problem.id)) {
+            seenIds.add(problem.id);
+            uniqueProblems.push(problem);
+          }
+        }
+        
+        return uniqueProblems;
+      };
+      
+      // Extraire les données de chaque réponse en utilisant la fonction utilitaire
+      const vfgActiveProblems = extractData(vfgActiveResponse.data);
+      const vfeActiveProblems = extractData(vfeActiveResponse.data);
+      const vfgRecentProblems = extractData(vfgRecentResponse.data);
+      const vfeRecentProblems = extractData(vfeRecentResponse.data);
+      
+      // Afficher des informations sur le nombre de problèmes récupérés
+      console.log(`Problèmes récupérés - VFG: ${vfgActiveProblems.length} actifs, ${vfgRecentProblems.length} récents`);
+      console.log(`Problèmes récupérés - VFE: ${vfeActiveProblems.length} actifs, ${vfeRecentProblems.length} récents`);
+      
+      // Combiner et dédupliquer
+      const combinedActiveProblems = dedupProblems([...vfgActiveProblems, ...vfeActiveProblems]);
+      const combinedRecentProblems = dedupProblems([...vfgRecentProblems, ...vfeRecentProblems]);
+      
+      console.log(`Avant déduplication: ${vfgActiveProblems.length + vfeActiveProblems.length} problèmes actifs, ${vfgRecentProblems.length + vfeRecentProblems.length} problèmes récents`);
+      console.log(`Après déduplication: ${combinedActiveProblems.length} problèmes actifs, ${combinedRecentProblems.length} problèmes récents`);
+      
+      // Utiliser directement les problèmes combinés et dédupliqués
+      console.log(`Combinaison terminée: ${combinedActiveProblems.length} problèmes actifs, ${combinedRecentProblems.length} problèmes récents`);
       
       // Transformer les données
-      const formattedActiveProblems = formatProblems(activeResponse.data || [], false);
-      const formattedRecentProblems = formatProblems(recentResponse.data || [], true);
+      const formattedActiveProblems = formatProblems(combinedActiveProblems, false);
+      const formattedRecentProblems = formatProblems(combinedRecentProblems, true);
+      
+      console.log('Problèmes actifs formatés:', formattedActiveProblems.length);
+      console.log('Problèmes récents formatés:', formattedRecentProblems.length);
       
       // Mettre à jour les états
       setActiveProblems(formattedActiveProblems);
@@ -99,9 +219,14 @@ const AllProblemsView: React.FC = () => {
     
     console.log(`Formatage de ${problems.length} problèmes${is72h ? ' (72h)' : ''}`);
     
-    // Afficher un exemple de problème pour le debug
-    if (problems.length > 0) {
-      console.log(`Exemple de problème brut:`, problems[0]);
+    // Afficher un exemple de problème pour le debug (seulement en mode développement)
+    if (problems.length > 0 && process.env.NODE_ENV === 'development') {
+      const sampleProblem = problems[0];
+      // Utiliser juste le logging sans formater pour éviter les erreurs TypeScript
+      console.log(`Exemple de problème (premières propriétés):`, 
+                 'id:', sampleProblem.id,
+                 'title:', sampleProblem.title,
+                 'status:', sampleProblem.status);
     }
     
     return problems.map((problem) => {
@@ -243,12 +368,44 @@ const AllProblemsView: React.FC = () => {
     // Configurer un intervalle de rafraîchissement toutes les 5 minutes
     const intervalId = setInterval(() => {
       console.log('Rafraîchissement automatique des problèmes...');
-      loadProblems();
+      // Vérifier si une requête est déjà en cours
+      if (!requestInProgress.current) {
+        loadProblems();
+      } else {
+        console.log('Rafraîchissement automatique ignoré, une requête est déjà en cours');
+      }
     }, 300000); // 5 minutes
     
-    // Nettoyer l'intervalle lors du démontage du composant
+    // Nettoyer l'intervalle et les marqueurs lors du démontage du composant
     return () => {
       clearInterval(intervalId);
+      // S'assurer que le marqueur de requête est réinitialisé
+      requestInProgress.current = false;
+    };
+  }, []);
+  
+  // Écouter les événements réseau pour arrêter les timers si l'utilisateur est hors-ligne
+  useEffect(() => {
+    const handleOffline = () => {
+      console.log('Utilisateur hors-ligne, suspension des requêtes automatiques');
+      setError('Connexion réseau perdue. Les données ne seront pas rafraîchies automatiquement.');
+    };
+    
+    const handleOnline = () => {
+      console.log('Utilisateur en ligne, reprise des requêtes');
+      setError(null);
+      // Rafraîchir immédiatement les données
+      loadProblems();
+    };
+    
+    // Ajouter les écouteurs d'événements
+    window.addEventListener('offline', handleOffline);
+    window.addEventListener('online', handleOnline);
+    
+    // Nettoyer les écouteurs
+    return () => {
+      window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('online', handleOnline);
     };
   }, []);
   
@@ -302,12 +459,12 @@ const AllProblemsView: React.FC = () => {
           <AlertTriangle size={24} className="text-purple-400" />
           <div>
             <h2 className="text-xl font-semibold text-white mb-1">
-              Tous les Problèmes {activeTab === 'active' ? 'Actifs' : 'des 72 dernières heures'}
+              Tous les Problèmes {activeTab === 'active' ? 'Actifs' : 'des 72 dernières heures'} (VFG + VFE)
             </h2>
             <p className="text-slate-300">
               {activeTab === 'active' 
-                ? "Suivi en temps réel de tous les incidents et anomalies actuellement actifs (VFG et VFE)"
-                : "Historique consolidé de tous les incidents survenus durant les 72 dernières heures (VFG et VFE)"}
+                ? "Suivi en temps réel de tous les incidents et anomalies combinés des environnements Vital for Group et Vital for Enterprise"
+                : "Historique consolidé de tous les incidents survenus durant les 72 dernières heures sur tous les environnements critiques"}
             </p>
           </div>
           <div className="ml-auto flex flex-col items-end">
@@ -373,7 +530,7 @@ const AllProblemsView: React.FC = () => {
         ) : problemsToDisplay.length > 0 ? (
           <ProblemsList 
             problems={problemsToDisplay || []} 
-            title={activeTab === 'active' ? "Tous les problèmes actifs" : "Tous les problèmes des 72 dernières heures"}
+            title={activeTab === 'active' ? "Tous les problèmes actifs (VFG + VFE)" : "Tous les problèmes des 72 dernières heures (VFG + VFE)"}
             showRefreshButton={true}
             onRefresh={loadProblems}
           />
