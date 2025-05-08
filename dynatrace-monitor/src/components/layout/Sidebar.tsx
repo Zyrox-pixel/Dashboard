@@ -196,7 +196,7 @@ const Sidebar: React.FC = () => {
               <div className={`${sidebarCollapsed ? 'absolute -top-1 -right-1' : 'ml-auto'} 
                               px-1.5 py-0.5 rounded-full text-xs font-medium
                               ${isDarkTheme ? 'bg-red-900/70 text-red-300' : 'bg-red-100 text-red-700'}`}>
-                Tous
+                VFG+VFE
               </div>
             </Link>
           </nav>

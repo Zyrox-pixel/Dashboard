@@ -44,7 +44,7 @@ const AllProblemsView: React.FC = () => {
       // Utiliser Promise.all pour les deux requêtes parallèles
       const [activeResponse, recentResponse] = await Promise.all([
         // Problèmes actifs avec timeout pour éviter les requêtes bloquantes
-        axios.get(`${API_BASE_URL}/problems/all`, {
+        axios.get(`${API_BASE_URL}/problems`, {
           params: {
             status: "OPEN",
             from: "-60d",
@@ -54,7 +54,12 @@ const AllProblemsView: React.FC = () => {
         }),
         
         // Problèmes récents des 72 dernières heures
-        axios.get(`${API_BASE_URL}/problems/last-72h/all`, {
+        axios.get(`${API_BASE_URL}/problems`, {
+          params: {
+            status: "ALL", // Récupérer tous les problèmes (ouverts et résolus)
+            from: "now-72h", // Des dernières 72 heures
+            debug: "true"
+          },
           timeout: 30000 // 30 secondes max
         })
       ]);
@@ -92,6 +97,13 @@ const AllProblemsView: React.FC = () => {
       return [];
     }
     
+    console.log(`Formatage de ${problems.length} problèmes${is72h ? ' (72h)' : ''}`);
+    
+    // Afficher un exemple de problème pour le debug
+    if (problems.length > 0) {
+      console.log(`Exemple de problème brut:`, problems[0]);
+    }
+    
     return problems.map((problem) => {
       // Extraire le nom de l'hôte à partir des entités impactées (priorité)
       let hostName = '';
@@ -114,27 +126,105 @@ const AllProblemsView: React.FC = () => {
         }
       }
       
+      // PRIORITÉ 3: Si toujours pas trouvé, chercher dans le titre ou d'autres propriétés
+      if (!hostName && problem.title) {
+        // Parfois le nom d'hôte est dans le titre avec format "Host X is..."
+        const hostMatch = problem.title.match(/Host\s+([^\s]+)/i);
+        if (hostMatch && hostMatch[1]) {
+          hostName = hostMatch[1];
+        }
+      }
+      
       // Adapter le format d'affichage du temps en fonction du contexte (problèmes récents vs actifs)
-      const timeDisplay = is72h 
-        ? (problem.start_time ? `Détecté le ${problem.start_time}` : "Récent")
-        : (problem.start_time ? `Depuis ${problem.start_time}` : "Récent");
+      let timeDisplay = "Récent";
       
-      const impact = problem.impact === "INFRASTRUCTURE" ? "ÉLEVÉ" : 
-                   problem.impact === "SERVICE" ? "MOYEN" : "FAIBLE";
+      if (problem.start_time) {
+        // Format standard de start_time
+        timeDisplay = is72h ? `Détecté le ${problem.start_time}` : `Depuis ${problem.start_time}`;
+      } else if (problem.startTime) {
+        // Conversion timestamp en date si nécessaire
+        try {
+          const startDate = new Date(problem.startTime);
+          const formattedDate = startDate.toLocaleString('fr-FR');
+          timeDisplay = is72h ? `Détecté le ${formattedDate}` : `Depuis ${formattedDate}`;
+        } catch (e) {
+          console.error('Erreur de conversion de startTime:', e);
+        }
+      }
       
-      const problemStatus = problem.status === "OPEN" ? "critical" : "warning";
+      // Détermination de l'impact
+      let impact: "ÉLEVÉ" | "MOYEN" | "FAIBLE" = "MOYEN";
+      if (problem.impact) {
+        if (typeof problem.impact === 'string') {
+          if (problem.impact.toUpperCase() === "INFRASTRUCTURE") {
+            impact = "ÉLEVÉ";
+          } else if (problem.impact.toUpperCase() === "SERVICE") {
+            impact = "MOYEN";
+          } else if (problem.impact.toUpperCase() === "APPLICATION") {
+            impact = "FAIBLE";
+          }
+        }
+      } else if (problem.severityLevel) {
+        // Essayer avec severityLevel si impact n'est pas disponible
+        if (problem.severityLevel.toUpperCase() === "AVAILABILITY") {
+          impact = "ÉLEVÉ";
+        } else if (problem.severityLevel.toUpperCase() === "ERROR") {
+          impact = "MOYEN";
+        } else if (problem.severityLevel.toUpperCase() === "PERFORMANCE") {
+          impact = "MOYEN";
+        } else {
+          impact = "FAIBLE";
+        }
+      }
+      
+      // Détermination du statut
+      let problemStatus: "critical" | "warning" | "low" = "warning";
+      if (problem.status) {
+        if (problem.status === "OPEN") {
+          problemStatus = "critical";
+        } else {
+          problemStatus = "warning";
+        }
+      } else {
+        // Si pas de statut, utiliser resolved
+        problemStatus = problem.resolved ? "warning" : "critical";
+      }
+      
+      // Zone - parfois dans problem.zone, parfois dans managementZones
+      let zone = "Non spécifié";
+      if (problem.zone) {
+        zone = problem.zone;
+      } else if (problem.managementZones && problem.managementZones.length > 0) {
+        // Prendre la première management zone
+        zone = problem.managementZones[0].name;
+      } else if (problem.matching_mz) {
+        // Si le backend a déjà trouvé et ajouté la MZ correspondante
+        zone = problem.matching_mz;
+      }
+      
+      // Services impactés
+      let servicesImpacted = "0";
+      if (problem.affected_entities !== undefined) {
+        servicesImpacted = problem.affected_entities.toString();
+      } else if (problem.affectedEntities !== undefined) {
+        servicesImpacted = problem.affectedEntities.toString();
+      } else if (problem.impactedEntities && Array.isArray(problem.impactedEntities)) {
+        const serviceEntities = problem.impactedEntities.filter((entity: any) => 
+          entity.entityId && entity.entityId.type === 'SERVICE');
+        servicesImpacted = serviceEntities.length.toString();
+      }
       
       return {
         id: problem.id || `PROB-${Math.random().toString(36).substr(2, 9)}`,
         title: problem.title || "Problème inconnu",
         code: problem.id ? problem.id.substring(0, 7) : "UNKNOWN",
-        subtitle: `${problem.zone || "Non spécifié"} - Impact: ${problem.impact || "INCONNU"}`,
+        subtitle: `${zone} - Impact: ${impact}`,
         time: timeDisplay,
-        type: problem.impact === "INFRASTRUCTURE" ? "Problème d'Infrastructure" : "Problème de Service",
-        status: problemStatus as "critical" | "warning" | "low",
-        impact: impact as "ÉLEVÉ" | "MOYEN" | "FAIBLE",
-        zone: problem.zone || "Non spécifié",
-        servicesImpacted: problem.affected_entities ? problem.affected_entities.toString() : "0",
+        type: impact === "ÉLEVÉ" ? "Problème d'Infrastructure" : "Problème de Service",
+        status: problemStatus,
+        impact: impact,
+        zone: zone,
+        servicesImpacted: servicesImpacted,
         dt_url: problem.dt_url || "#",
         duration: problem.duration || "",
         resolved: problem.resolved || false,
