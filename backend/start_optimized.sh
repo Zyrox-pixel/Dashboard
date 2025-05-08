@@ -45,17 +45,23 @@ SCHEDULER_INTERVAL_MINUTES=5
 VERIFY_SSL=False
 
 # Durée de cache (en secondes)
-CACHE_DURATION=300" > .env
+CACHE_DURATION=300
+
+# Optimisation des requêtes
+REQUEST_CHUNK_SIZE=20
+MAX_WORKERS=30
+MAX_CONNECTIONS=60
+PROBLEMS_CACHE_DURATION=60" > .env
     echo "Veuillez configurer votre fichier .env avec vos informations Dynatrace."
 fi
 
 # Lancer le serveur avec Gunicorn si disponible
 if command -v gunicorn &> /dev/null; then
     echo "Démarrage avec Gunicorn (production)..."
-    gunicorn --bind 0.0.0.0:5000 --workers 4 app_optimized:app
+    gunicorn --bind 0.0.0.0:5000 --workers 4 --timeout 120 app:app
 else
     echo "Démarrage avec Flask (développement)..."
-    export FLASK_APP=app_optimized.py
+    export FLASK_APP=app.py
     export FLASK_DEBUG=True
     python3 -m flask run --host=0.0.0.0
 fi
