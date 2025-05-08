@@ -3,6 +3,13 @@ import { Layers, Search, CheckCircle2, AlertTriangle, LayoutGrid, List, ArrowDow
 import ZoneCard from '../common/ZoneCard';
 import { ManagementZone } from '../../api/types';
 
+// Type pour les filtres
+interface ZoneFilters {
+  showProblemsOnly: boolean;
+  showDegradedOnly: boolean;
+  sortBy: 'name' | 'problems' | 'hosts' | 'services' | 'availability';
+}
+
 interface ModernManagementZoneListProps {
   zones: ManagementZone[];
   onZoneClick: (zoneId: string) => void;
@@ -26,21 +33,37 @@ const ModernManagementZoneList: React.FC<ModernManagementZoneListProps> = ({
   loading = false,
   onRefresh
 }) => {
-  // État pour le mode d'affichage (grid ou liste)
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  // Mode d'affichage fixé en grille
+  const viewMode = 'grid';
   
-  // État pour le design des cartes
-  const [cardDesign, setCardDesign] = useState<'modern' | 'glass' | 'neumorph' | '3d'>('modern');
+  // Design fixé en neumorphique
+  const cardDesign = 'neumorph';
   
-  // État pour le filtre de recherche
-  const [searchTerm, setSearchTerm] = useState('');
-  
-  // État pour les filtres
-  const [filters, setFilters] = useState({
-    showProblemsOnly: false,
-    showDegradedOnly: false,
-    sortBy: 'name' as 'name' | 'problems' | 'hosts' | 'services' | 'availability'
+  // État pour le filtre de recherche avec persistance
+  const [searchTerm, setSearchTerm] = useState(() => {
+    return localStorage.getItem('managementZoneSearch') || '';
   });
+
+  // Sauvegarder le terme de recherche dans localStorage
+  useEffect(() => {
+    localStorage.setItem('managementZoneSearch', searchTerm);
+  }, [searchTerm]);
+  
+  // État pour les filtres avec persistance via localStorage
+  const [filters, setFilters] = useState<ZoneFilters>(() => {
+    // Récupérer les préférences stockées ou utiliser les valeurs par défaut
+    const savedFilters = localStorage.getItem('managementZoneFilters');
+    return savedFilters ? JSON.parse(savedFilters) : {
+      showProblemsOnly: false,
+      showDegradedOnly: false,
+      sortBy: 'name'
+    };
+  });
+  
+  // Sauvegarder les filtres dans localStorage quand ils changent
+  useEffect(() => {
+    localStorage.setItem('managementZoneFilters', JSON.stringify(filters));
+  }, [filters]);
   
   // État pour contrôler l'animation de défilement
   const [scrolling, setScrolling] = useState(false);
@@ -150,84 +173,7 @@ const ModernManagementZoneList: React.FC<ModernManagementZoneListProps> = ({
               </button>
             )}
             
-            {/* Changement de mode d'affichage */}
-            <div className="flex items-center rounded-lg overflow-hidden border border-slate-600">
-              <button 
-                onClick={() => setViewMode('grid')}
-                className={`p-2 flex items-center justify-center ${
-                  viewMode === 'grid' 
-                    ? `bg-${themeColor}-600 text-white` 
-                    : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                }`}
-                title="Vue en grille"
-              >
-                <LayoutGrid size={18} />
-              </button>
-              <button 
-                onClick={() => setViewMode('list')}
-                className={`p-2 flex items-center justify-center ${
-                  viewMode === 'list' 
-                    ? `bg-${themeColor}-600 text-white` 
-                    : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                }`}
-                title="Vue en liste"
-              >
-                <List size={18} />
-              </button>
-            </div>
-            
-            {/* Mode de design des cartes */}
-            <div className="relative group ml-2">
-              <button 
-                className="p-2 bg-slate-700 rounded-lg text-slate-300 hover:bg-slate-600 flex items-center gap-1"
-                title="Changer le style des cartes"
-              >
-                <span className="text-xs hidden sm:inline">Style</span>
-                <span className="w-3 h-3 rounded-full bg-indigo-500 shadow-sm shadow-indigo-400"></span>
-              </button>
-              
-              {/* Menu de sélection du design */}
-              <div className="absolute right-0 mt-2 w-40 bg-slate-800 border border-slate-700 rounded-md shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10">
-                <div className="py-1">
-                  <button 
-                    onClick={() => setCardDesign('modern')}
-                    className={`flex items-center w-full px-4 py-2 text-sm ${
-                      cardDesign === 'modern' ? `text-${themeColor}-400` : 'text-slate-300 hover:bg-slate-700'
-                    }`}
-                  >
-                    <span className={`w-2 h-2 rounded-full mr-2 ${cardDesign === 'modern' ? `bg-${themeColor}-500` : 'bg-transparent'}`}></span>
-                    Moderne
-                  </button>
-                  <button 
-                    onClick={() => setCardDesign('glass')}
-                    className={`flex items-center w-full px-4 py-2 text-sm ${
-                      cardDesign === 'glass' ? `text-${themeColor}-400` : 'text-slate-300 hover:bg-slate-700'
-                    }`}
-                  >
-                    <span className={`w-2 h-2 rounded-full mr-2 ${cardDesign === 'glass' ? `bg-${themeColor}-500` : 'bg-transparent'}`}></span>
-                    Verre
-                  </button>
-                  <button 
-                    onClick={() => setCardDesign('neumorph')}
-                    className={`flex items-center w-full px-4 py-2 text-sm ${
-                      cardDesign === 'neumorph' ? `text-${themeColor}-400` : 'text-slate-300 hover:bg-slate-700'
-                    }`}
-                  >
-                    <span className={`w-2 h-2 rounded-full mr-2 ${cardDesign === 'neumorph' ? `bg-${themeColor}-500` : 'bg-transparent'}`}></span>
-                    Neumorphique
-                  </button>
-                  <button 
-                    onClick={() => setCardDesign('3d')}
-                    className={`flex items-center w-full px-4 py-2 text-sm ${
-                      cardDesign === '3d' ? `text-${themeColor}-400` : 'text-slate-300 hover:bg-slate-700'
-                    }`}
-                  >
-                    <span className={`w-2 h-2 rounded-full mr-2 ${cardDesign === '3d' ? `bg-${themeColor}-500` : 'bg-transparent'}`}></span>
-                    3D
-                  </button>
-                </div>
-              </div>
-            </div>
+            {/* Les contrôles de changement de mode d'affichage et de design ont été retirés */}
           </div>
         </div>
         
@@ -263,7 +209,7 @@ const ModernManagementZoneList: React.FC<ModernManagementZoneListProps> = ({
                 id="problems-filter" 
                 className="h-4 w-4 rounded border-slate-600 text-indigo-600 focus:ring-indigo-500 bg-slate-700"
                 checked={filters.showProblemsOnly}
-                onChange={() => setFilters(prev => ({ ...prev, showProblemsOnly: !prev.showProblemsOnly }))} 
+                onChange={() => setFilters((prev: ZoneFilters) => ({ ...prev, showProblemsOnly: !prev.showProblemsOnly }))} 
               />
               <label htmlFor="problems-filter" className="ml-2 text-sm text-slate-300">
                 Avec problèmes
@@ -276,7 +222,7 @@ const ModernManagementZoneList: React.FC<ModernManagementZoneListProps> = ({
                 id="degraded-filter" 
                 className="h-4 w-4 rounded border-slate-600 text-indigo-600 focus:ring-indigo-500 bg-slate-700"
                 checked={filters.showDegradedOnly}
-                onChange={() => setFilters(prev => ({ ...prev, showDegradedOnly: !prev.showDegradedOnly }))} 
+                onChange={() => setFilters((prev: ZoneFilters) => ({ ...prev, showDegradedOnly: !prev.showDegradedOnly }))} 
               />
               <label htmlFor="degraded-filter" className="ml-2 text-sm text-slate-300">
                 État dégradé
@@ -301,7 +247,7 @@ const ModernManagementZoneList: React.FC<ModernManagementZoneListProps> = ({
                   ].map(option => (
                     <button 
                       key={option.id}
-                      onClick={() => setFilters(prev => ({ ...prev, sortBy: option.id as any }))}
+                      onClick={() => setFilters((prev: ZoneFilters) => ({ ...prev, sortBy: option.id as ZoneFilters['sortBy'] }))}
                       className={`flex items-center w-full px-4 py-2 text-sm ${
                         filters.sortBy === option.id ? `text-${themeColor}-400` : 'text-slate-300 hover:bg-slate-700'
                       }`}
@@ -361,12 +307,16 @@ const ModernManagementZoneList: React.FC<ModernManagementZoneListProps> = ({
             <p className="text-slate-500 text-sm">Essayez de modifier vos filtres ou votre recherche</p>
             <button 
               onClick={() => {
+                // Réinitialiser les filtres et les sauvegarder
                 setSearchTerm('');
-                setFilters({
+                const defaultFilters: ZoneFilters = {
                   showProblemsOnly: false,
                   showDegradedOnly: false,
                   sortBy: 'name'
-                });
+                };
+                setFilters(defaultFilters);
+                localStorage.setItem('managementZoneFilters', JSON.stringify(defaultFilters));
+                localStorage.setItem('managementZoneSearch', '');
               }}
               className="mt-4 px-3 py-1.5 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white text-sm"
             >
@@ -375,13 +325,13 @@ const ModernManagementZoneList: React.FC<ModernManagementZoneListProps> = ({
           </div>
         </div>
       ) : (
-        <div className={`p-5 ${viewMode === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5' : 'space-y-4'}`}>
+        <div className="p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {filteredZones.map(zone => (
             <div key={zone.id} id={`zone-${zone.id}`}>
               <ZoneCard 
                 zone={zone} 
                 onZoneClick={onZoneClick}
-                variant={viewMode === 'grid' ? 'standard' : 'expanded'}
+                variant="standard"
                 design={cardDesign}
               />
             </div>
