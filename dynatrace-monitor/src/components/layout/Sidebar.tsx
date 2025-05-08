@@ -181,7 +181,7 @@ const Sidebar: React.FC = () => {
             
             {/* Bouton Problèmes */}
             <Link 
-              to="/problems/unified"
+              to="/problems/unified?dashboard=all"
               onClick={() => setActiveItem('problems')}
               className={getMenuItemClass('problems')}
             >
