@@ -5,7 +5,6 @@ import ProblemsList from './ProblemsList';
 import ManagementZoneList from './ManagementZoneList';
 import ModernManagementZoneList from './ModernManagementZoneList';
 import ZoneDetails from './ZoneDetails';
-import CriticalAppsSummary from '../common/CriticalAppsSummary';
 import { AppContextType } from '../../contexts/AppContext';
 import { Shield, Loader, AlertTriangle, RefreshCw, Clock, BarChart, ChevronLeft, Check, Server } from 'lucide-react';
 
@@ -414,23 +413,6 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
               </div>
             </div>
           </div>
-          
-          {/* Vue comparative des applications critiques */}
-          <CriticalAppsSummary
-            vfgZones={vitalForGroupMZs}
-            vfeZones={vitalForEntrepriseMZs}
-            activeProblems={activeProblems}
-            onZoneClick={(zoneId, type) => {
-              // Si on est déjà sur le bon dashboard, on sélectionne la zone
-              if ((type === 'vfg' && variant === 'vfg') || (type === 'vfe' && variant === 'vfe')) {
-                handleZoneClick(zoneId);
-              } else {
-                // Sinon on navigue vers le bon dashboard avec l'ID de la zone
-                navigate(`/${type}?zoneId=${zoneId}`);
-              }
-            }}
-            className="mb-6"
-          />
           
           {/* Cartes des problèmes avec navigation */}
           {/* Carte unifiée des problèmes avec Vue 3D stylisée */}
