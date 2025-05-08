@@ -1,0 +1,150 @@
+/* 
+   Thème de couleurs moderne pour le dashboard Dynatrace
+   Rend l'interface plus professionnelle et cohérente
+*/
+
+:root {
+  /* Palette principale */
+  --color-primary: 79, 70, 229; /* Indigo-600 */
+  --color-primary-light: 99, 102, 241; /* Indigo-500 */
+  --color-primary-dark: 55, 48, 163; /* Indigo-700 */
+  
+  --color-secondary: 14, 165, 233; /* Sky-500 */
+  --color-secondary-light: 56, 189, 248; /* Sky-400 */
+  --color-secondary-dark: 2, 132, 199; /* Sky-600 */
+  
+  /* Palette d'accentuation */
+  --color-success: 16, 185, 129; /* Emerald-500 */
+  --color-warning: 245, 158, 11; /* Amber-500 */
+  --color-error: 239, 68, 68; /* Red-500 */
+  --color-info: 59, 130, 246; /* Blue-500 */
+  
+  /* Nuances de gris pour le fond et borders */
+  --color-gray-50: 249, 250, 251;
+  --color-gray-100: 243, 244, 246;
+  --color-gray-200: 229, 231, 235;
+  --color-gray-300: 209, 213, 219;
+  --color-gray-400: 156, 163, 175;
+  --color-gray-500: 107, 114, 128;
+  --color-gray-600: 75, 85, 99;
+  --color-gray-700: 55, 65, 81;
+  --color-gray-800: 31, 41, 55;
+  --color-gray-900: 17, 24, 39;
+  --color-gray-950: 9, 12, 24;
+  
+  /* Variantes pour le mode sombre */
+  --color-dark-bg: 15, 23, 42; /* Slate-900 */
+  --color-dark-card: 30, 41, 59; /* Slate-800 */
+  --color-dark-card-hover: 51, 65, 85; /* Slate-700 */
+  --color-dark-border: 71, 85, 105; /* Slate-600 */
+  
+  /* Couleurs pour les graphiques et visualisations */
+  --color-chart-1: 79, 70, 229; /* Indigo */
+  --color-chart-2: 14, 165, 233; /* Sky */
+  --color-chart-3: 16, 185, 129; /* Emerald */
+  --color-chart-4: 245, 158, 11; /* Amber */
+  --color-chart-5: 239, 68, 68; /* Red */
+  --color-chart-6: 168, 85, 247; /* Purple */
+  --color-chart-7: 236, 72, 153; /* Pink */
+  
+  /* Dérivés avec différentes opacités */
+  --color-primary-100: rgba(var(--color-primary), 0.1);
+  --color-primary-200: rgba(var(--color-primary), 0.2);
+  --color-primary-300: rgba(var(--color-primary), 0.3);
+  --color-primary-400: rgba(var(--color-primary), 0.4);
+  --color-primary-500: rgba(var(--color-primary), 0.5);
+  --color-primary-600: rgba(var(--color-primary), 0.6);
+  --color-primary-700: rgba(var(--color-primary), 0.7);
+  --color-primary-800: rgba(var(--color-primary), 0.8);
+  --color-primary-900: rgba(var(--color-primary), 0.9);
+}
+
+/* Classes utilitaires pour les éléments d'interface communs */
+.card {
+  @apply bg-slate-800 border border-slate-700 rounded-lg shadow-lg transition-all duration-200;
+}
+
+.card-hover {
+  @apply hover:bg-slate-700 hover:border-slate-600 hover:shadow-xl;
+}
+
+.btn-primary {
+  @apply px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md shadow-md transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed; 
+}
+
+.btn-secondary {
+  @apply px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-md shadow-md transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed;
+}
+
+.btn-outline {
+  @apply px-4 py-2 border border-slate-600 text-slate-300 hover:bg-slate-700 rounded-md transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed;
+}
+
+.badge-primary {
+  @apply px-2.5 py-0.5 bg-indigo-900/60 text-indigo-200 border border-indigo-700/30 rounded-md text-xs font-medium;
+}
+
+.badge-success {
+  @apply px-2.5 py-0.5 bg-emerald-900/60 text-emerald-200 border border-emerald-700/30 rounded-md text-xs font-medium;
+}
+
+.badge-warning {
+  @apply px-2.5 py-0.5 bg-amber-900/60 text-amber-200 border border-amber-700/30 rounded-md text-xs font-medium;
+}
+
+.badge-error {
+  @apply px-2.5 py-0.5 bg-red-900/60 text-red-200 border border-red-700/30 rounded-md text-xs font-medium;
+}
+
+.badge-info {
+  @apply px-2.5 py-0.5 bg-blue-900/60 text-blue-200 border border-blue-700/30 rounded-md text-xs font-medium;
+}
+
+/* Animations */
+@keyframes pulse-custom {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.animate-pulse-custom {
+  animation: pulse-custom 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* 3D effects */
+.card-3d {
+  @apply bg-gradient-to-br from-slate-800 via-slate-900 to-slate-800 border border-slate-700/50 shadow-lg;
+  transform-style: preserve-3d;
+  perspective: 1000px;
+}
+
+.btn-3d {
+  @apply relative overflow-hidden;
+  transform-style: preserve-3d;
+  transition: all 0.2s ease;
+}
+
+.btn-3d:active {
+  transform: translateY(2px);
+}
+
+/* Glassmorphism */
+.glass {
+  @apply bg-slate-800/80 backdrop-blur-md border border-white/10 shadow-xl;
+}
+
+/* Neumorphism */
+.card-neu {
+  @apply bg-slate-800 border border-slate-700;
+  box-shadow: 5px 5px 10px rgba(0, 0, 0, 0.3), 
+             -5px -5px 10px rgba(255, 255, 255, 0.05);
+}
+
+.btn-neu {
+  @apply bg-slate-800 border border-slate-700;
+  box-shadow: 3px 3px 6px rgba(0, 0, 0, 0.2), 
+             -3px -3px 6px rgba(255, 255, 255, 0.05);
+}
