@@ -1,12 +1,20 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
-import { ChevronLeft, Home, AlertTriangle, Star, Award, Grid, Server, Code, Layers } from 'lucide-react';
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { ChevronLeft, Home, AlertTriangle, Star, Award, Grid, Server, Code, Layers, Eye, ExternalLink } from 'lucide-react';
 import { useApp } from '../../contexts/AppContext';
 import { useTheme } from '../../contexts/ThemeContext';
 
 const Sidebar: React.FC = () => {
-  const { sidebarCollapsed, setSidebarCollapsed } = useApp();
+  const { sidebarCollapsed, setSidebarCollapsed, vitalForGroupMZs, vitalForEntrepriseMZs } = useApp();
   const { isDarkTheme } = useTheme();
+  const navigate = useNavigate();
+  
+  // État pour le menu flottant des applications critiques
+  const [showVitalAppsMenu, setShowVitalAppsMenu] = useState(false);
+  
+  // Statistiques rapides
+  const vfgProblems = vitalForGroupMZs ? vitalForGroupMZs.reduce((total, zone) => total + zone.problemCount, 0) : 0;
+  const vfeProblems = vitalForEntrepriseMZs ? vitalForEntrepriseMZs.reduce((total, zone) => total + zone.problemCount, 0) : 0;
 
   const toggleSidebar = () => {
     setSidebarCollapsed(!sidebarCollapsed);
@@ -162,7 +170,139 @@ const Sidebar: React.FC = () => {
         </ul>
       </div>
       
-      <div className={`mt-auto p-4 border-t ${isDarkTheme ? 'border-slate-700' : 'border-slate-200'}`}>
+      {/* Nouveau raccourci flottant pour les applications critiques */}
+      <div className="relative group">
+        <div 
+          className={`mt-auto p-4 border-t ${isDarkTheme ? 'border-slate-700' : 'border-slate-200'} cursor-pointer`}
+          onMouseEnter={() => setShowVitalAppsMenu(true)}
+          onMouseLeave={() => setShowVitalAppsMenu(false)}
+        >
+          <div className={`flex items-center justify-between gap-2 px-3 py-2 rounded-md ${
+            isDarkTheme 
+              ? 'bg-purple-900/30 text-purple-400 hover:bg-purple-900/40' 
+              : 'bg-purple-100 text-purple-700 hover:bg-purple-200'
+          }`}>
+            <div className="flex items-center gap-2">
+              <Star size={16} />
+              {!sidebarCollapsed && <span className="text-sm font-medium whitespace-nowrap overflow-hidden text-ellipsis">Applications Critiques</span>}
+            </div>
+            {!sidebarCollapsed && (
+              <div className="flex items-center">
+                <Eye size={14} />
+              </div>
+            )}
+          </div>
+          
+          {/* Indicateurs d'état rapides */}
+          {!sidebarCollapsed && (
+            <div className="flex items-center justify-between mt-2 px-1">
+              <div className="flex items-center">
+                <div className={`w-2 h-2 rounded-full ${vfgProblems > 0 ? 'bg-red-500' : 'bg-green-500'}`}></div>
+                <span className="ml-2 text-xs text-slate-400">VFG</span>
+              </div>
+              <div className="flex items-center">
+                <div className={`w-2 h-2 rounded-full ${vfeProblems > 0 ? 'bg-red-500' : 'bg-green-500'}`}></div>
+                <span className="ml-2 text-xs text-slate-400">VFE</span>
+              </div>
+            </div>
+          )}
+          
+          {/* Menu flottant des applications critiques */}
+          {showVitalAppsMenu && (
+            <div 
+              className="absolute z-50 bottom-20 left-full ml-2 w-64 bg-slate-800 border border-slate-700 rounded-lg shadow-xl"
+              onMouseEnter={() => setShowVitalAppsMenu(true)}
+              onMouseLeave={() => setShowVitalAppsMenu(false)}
+            >
+              <div className="p-3 border-b border-slate-700">
+                <h4 className="text-sm font-semibold text-white">Applications Critiques</h4>
+                <p className="text-xs text-slate-400 mt-1">Aperçu de l'état de vos applications</p>
+              </div>
+              
+              {/* VFG Section */}
+              <div className="p-3 border-b border-slate-700">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <div className="w-6 h-6 flex items-center justify-center rounded-full bg-indigo-900/30 text-indigo-400 border border-indigo-800/30">
+                      <Star size={12} />
+                    </div>
+                    <span className="ml-2 text-sm font-medium text-indigo-300">Vital for Group</span>
+                  </div>
+                  {vfgProblems > 0 && (
+                    <div className="px-1.5 py-0.5 bg-red-900/20 border border-red-800/30 rounded text-xs text-red-400">
+                      {vfgProblems} problème{vfgProblems > 1 ? 's' : ''}
+                    </div>
+                  )}
+                </div>
+                
+                {/* Liste des zones VFG avec problèmes (max 3) */}
+                {vitalForGroupMZs && vitalForGroupMZs.filter(zone => zone.problemCount > 0).slice(0, 3).map(zone => (
+                  <div 
+                    key={zone.id}
+                    className="mt-2 p-1.5 bg-red-900/10 border border-red-800/20 rounded-md text-xs cursor-pointer hover:bg-red-900/20"
+                    onClick={() => navigate(`/vfg?zoneId=${zone.id}`)}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-white truncate max-w-[150px]">{zone.name}</span>
+                      <span className="text-red-400">{zone.problemCount}</span>
+                    </div>
+                  </div>
+                ))}
+                
+                <div 
+                  className="mt-2 text-xs flex items-center justify-end text-slate-400 hover:text-white cursor-pointer"
+                  onClick={() => navigate('/vfg')}
+                >
+                  <span>Voir toutes les zones</span>
+                  <ExternalLink size={10} className="ml-1" />
+                </div>
+              </div>
+              
+              {/* VFE Section */}
+              <div className="p-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <div className="w-6 h-6 flex items-center justify-center rounded-full bg-amber-900/30 text-amber-400 border border-amber-800/30">
+                      <Award size={12} />
+                    </div>
+                    <span className="ml-2 text-sm font-medium text-amber-300">Vital for Enterprise</span>
+                  </div>
+                  {vfeProblems > 0 && (
+                    <div className="px-1.5 py-0.5 bg-red-900/20 border border-red-800/30 rounded text-xs text-red-400">
+                      {vfeProblems} problème{vfeProblems > 1 ? 's' : ''}
+                    </div>
+                  )}
+                </div>
+                
+                {/* Liste des zones VFE avec problèmes (max 3) */}
+                {vitalForEntrepriseMZs && vitalForEntrepriseMZs.filter(zone => zone.problemCount > 0).slice(0, 3).map(zone => (
+                  <div 
+                    key={zone.id}
+                    className="mt-2 p-1.5 bg-red-900/10 border border-red-800/20 rounded-md text-xs cursor-pointer hover:bg-red-900/20"
+                    onClick={() => navigate(`/vfe?zoneId=${zone.id}`)}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-white truncate max-w-[150px]">{zone.name}</span>
+                      <span className="text-red-400">{zone.problemCount}</span>
+                    </div>
+                  </div>
+                ))}
+                
+                <div 
+                  className="mt-2 text-xs flex items-center justify-end text-slate-400 hover:text-white cursor-pointer"
+                  onClick={() => navigate('/vfe')}
+                >
+                  <span>Voir toutes les zones</span>
+                  <ExternalLink size={10} className="ml-1" />
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+      
+      {/* Vue globale */}
+      <div className={`p-4 border-t ${isDarkTheme ? 'border-slate-700' : 'border-slate-200'}`}>
         <div className={`flex items-center gap-2 px-3 py-2 rounded-md ${
           isDarkTheme 
             ? 'bg-indigo-900/20 text-indigo-400' 

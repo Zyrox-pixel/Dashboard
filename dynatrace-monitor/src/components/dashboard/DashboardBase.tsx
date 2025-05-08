@@ -5,6 +5,7 @@ import ProblemsList from './ProblemsList';
 import ManagementZoneList from './ManagementZoneList';
 import ModernManagementZoneList from './ModernManagementZoneList';
 import ZoneDetails from './ZoneDetails';
+import CriticalAppsSummary from '../common/CriticalAppsSummary';
 import { AppContextType } from '../../contexts/AppContext';
 import { Shield, Loader, AlertTriangle, RefreshCw, Clock, BarChart, ChevronLeft, Check, Server } from 'lucide-react';
 
@@ -52,6 +53,26 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
   // État pour suivre la progression du chargement
   const [loadingProgress, setLoadingProgress] = useState(0);
   
+  // Déterminer les zones à afficher selon la variante
+  const zones = variant === 'vfg' ? vitalForGroupMZs : vitalForEntrepriseMZs;
+
+  // Vérifier si une zone est spécifiée dans l'URL
+  useEffect(() => {
+    const queryParams = new URLSearchParams(window.location.search);
+    const zoneId = queryParams.get('zoneId');
+    
+    if (zoneId && !selectedZone) {
+      // Vérifier si cette zone existe dans la liste actuelle
+      const zoneExists = zones.some(zone => zone.id === zoneId);
+      if (zoneExists) {
+        console.log(`Setting zone from URL: ${zoneId}`);
+        setSelectedZone(zoneId);
+        // Naviguer à #details pour s'assurer que l'utilisateur voit les détails
+        window.location.hash = 'details';
+      }
+    }
+  }, [zones, selectedZone, setSelectedZone]);
+  
   // Effet pour simuler la progression du chargement
   useEffect(() => {
     // Seulement si nous sommes en chargement et que la progression n'est pas à 100%
@@ -86,9 +107,6 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
       setLoadingProgress(0);
     }
   }, [isLoading.zoneDetails, selectedZone, loadingProgress]);
-  
-  // Déterminer les zones à afficher selon la variante
-  const zones = variant === 'vfg' ? vitalForGroupMZs : vitalForEntrepriseMZs;
   
   // Déterminer les classes CSS selon la variante (pas de template strings dynamiques)
   const cssClasses = {
@@ -396,6 +414,23 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
               </div>
             </div>
           </div>
+          
+          {/* Vue comparative des applications critiques */}
+          <CriticalAppsSummary
+            vfgZones={vitalForGroupMZs}
+            vfeZones={vitalForEntrepriseMZs}
+            activeProblems={activeProblems}
+            onZoneClick={(zoneId, type) => {
+              // Si on est déjà sur le bon dashboard, on sélectionne la zone
+              if ((type === 'vfg' && variant === 'vfg') || (type === 'vfe' && variant === 'vfe')) {
+                handleZoneClick(zoneId);
+              } else {
+                // Sinon on navigue vers le bon dashboard avec l'ID de la zone
+                navigate(`/${type}?zoneId=${zoneId}`);
+              }
+            }}
+            className="mb-6"
+          />
           
           {/* Cartes des problèmes avec navigation */}
           {/* Carte unifiée des problèmes avec Vue 3D stylisée */}
