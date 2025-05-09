@@ -114,11 +114,9 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
   const handleRefreshedProblems = useCallback((refreshedProblems: Problem[]) => {
     // Filtrer les problèmes rafraîchis pour cette zone spécifique
     const zoneRefreshedProblems = refreshedProblems.filter(problem => problem.zone === zone.name);
-    
+
     // Mettre à jour l'état local des problèmes filtrés
     setFilteredProblems(zoneRefreshedProblems);
-    
-    console.log(`Mise à jour des problèmes pour la zone ${zone.name}: ${zoneRefreshedProblems.length} problèmes trouvés`);
   }, [zone.name]);
   
   // 4. Modifiez l'appel à ProblemsList pour utiliser filteredProblems au lieu de zoneProblems
@@ -1085,11 +1083,9 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
   // Obtenir l'état de chargement des problèmes depuis le contexte
   const appContext = useApp();
   
-  // Log pour vérifier les valeurs
+  // Effet sans logs pour le suivi des comptages réels
   useEffect(() => {
-    if (!isLoading) {
-      console.log(`Comptages réels pour ${zone.name}:`, realCounts);
-    }
+    // Pas de logs nécessaires pour les comptages
   }, [isLoading, realCounts, zone.name]);
   
   // Mettre à jour l'état local quand l'état de chargement des problèmes change
@@ -1097,13 +1093,12 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
   useEffect(() => {
     if (appContext.isLoading.problems) {
       setIsRefreshingProblems(true);
-      
+
       // Définir un timeout pour masquer l'indicateur après 20 secondes maximum
       const timeoutId = setTimeout(() => {
-        console.log("Timeout de sécurité pour l'indicateur de chargement des problèmes");
         setIsRefreshingProblems(false);
       }, 20000);
-      
+
       // Nettoyer le timeout si l'état change avant
       return () => clearTimeout(timeoutId);
     } else {
@@ -1202,9 +1197,8 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
                 // Rafraîchir les données avec le paramètre refreshProblemsOnly à false pour tout rafraîchir
                 // et forcer le timeframe à 60 jours (défini dans le backend)
                 await appContext.refreshData(dashboardType as 'vfg' | 'vfe', false);
-                console.log("Rafraîchissement global terminé avec succès");
               } catch (error) {
-                console.error("Erreur lors du rafraîchissement global:", error);
+                // Erreur silencieusement gérée
               }
             }}
             disabled={appContext.isLoading.problems || appContext.isLoading.zoneDetails}

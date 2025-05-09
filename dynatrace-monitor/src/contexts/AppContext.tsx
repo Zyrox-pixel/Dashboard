@@ -141,7 +141,7 @@ const checkBackendStatus = async (): Promise<boolean> => {
     const statusResponse = await api.getStatus();
     return !statusResponse.error;
   } catch (error) {
-    console.error('Erreur lors de la vérification du statut du backend:', error);
+    // Error checking backend status
     return false;
   }
 };
@@ -191,7 +191,6 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
 
   // Fonction optimisée pour charger les données d'une zone
   const loadZoneData = useCallback(async (zoneId: string) => {
-    console.log(`Loading zone data for zoneId: ${zoneId}`);
     setState(prev => ({ ...prev, isLoading: { ...prev.isLoading, zoneDetails: true } }));
     const startTime = performance.now();
     
@@ -201,7 +200,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
                            state.vitalForEntrepriseMZs.find(zone => zone.id === zoneId);
       
       if (!selectedZoneObj) {
-        console.error(`Zone not found with id: ${zoneId}`);
+        // Zone not found error handled in state update
         setState(prev => ({ 
           ...prev, 
           error: `Zone introuvable (ID: ${zoneId})`,
@@ -215,7 +214,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
         const setMzResponse = await apiClient.setManagementZone(selectedZoneObj.name);
         
         if (setMzResponse.error) {
-          console.error('Erreur lors de la définition de la MZ:', setMzResponse.error);
+          // MZ definition error handled in state update
           setState(prev => ({ 
             ...prev, 
             error: `Erreur lors de la définition de la MZ: ${setMzResponse.error}`,
@@ -224,7 +223,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
           return;
         }
       } catch (error) {
-        console.error('Exception lors de la définition de la MZ:', error);
+        // MZ exception handled in state update
         setState(prev => ({ 
           ...prev, 
           error: 'Erreur réseau lors de la définition de la zone',
@@ -313,7 +312,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
           }
           
         } catch (error) {
-          console.error('Erreur lors du chargement des données du dashboard:', error);
+          // Dashboard data loading error
         }
       } else {
         // Mode standard: charger les données séparément
@@ -395,7 +394,6 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
       }
       
       const endTime = performance.now();
-      console.log(`Zone data loaded in ${endTime - startTime}ms`);
       
       if (optimized) {
         setPerformanceMetrics(prev => ({
@@ -406,7 +404,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
       }
       
     } catch (error: any) {
-      console.error('Erreur globale lors du chargement des données de la zone:', error);
+      // Global zone data loading error handled in state update
       setState(prev => ({ 
         ...prev, 
         error: 'Erreur lors du chargement des données pour la zone sélectionnée.'
@@ -419,7 +417,6 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
   // Fonction pour charger toutes les données
   const loadAllData = useCallback(async (dashboardType?: 'vfg' | 'vfe', refreshProblemsOnly?: boolean, silentMode: boolean = false, timeframe?: string) => {
     // Modification de la fonction pour utiliser async/await avec Promise.all
-    console.log(`Loading all data for dashboard type: ${dashboardType || 'none'} ${refreshProblemsOnly ? '(problèmes uniquement)' : ''} ${silentMode ? '(mode silencieux)' : ''}`);
     const startTime = performance.now();
     
     // Ne mettre à jour les indicateurs de chargement que si nous ne sommes pas en mode silencieux
@@ -493,8 +490,6 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
         problemsResponse = responses[3] as ApiResponse<ProblemResponse[]>;
         problemsLast72hResponse = responses[4] as ApiResponse<ProblemResponse[]>;
       }
-      console.log('Réponse problèmes 72h (dashboard type):', dashboardType, problemsLast72hResponse);
-      console.log('Réponse problèmes 72h:', problemsLast72hResponse);
 
       // Traiter les données du résumé si disponibles et si ce n'est pas un rafraîchissement des problèmes uniquement
       if (!refreshProblemsOnly && summaryResponse && !summaryResponse.error && summaryResponse.data) {
@@ -511,15 +506,13 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
           // Obtenir les comptages pour chaque zone en parallèle
           const mzPromises = vfgResponse.data.mzs.map(async (mzName) => {
             try {
-              console.log(`Récupération des comptages pour la MZ VFG: ${mzName}`);
-              
+                      
               // Récupérer les comptages depuis l'API
               const response = await fetch(`${API_BASE_URL}/management-zones/counts?zone=${encodeURIComponent(mzName)}`);
               
               if (response.ok) {
                 const data = await response.json();
                 const counts = data.counts || { hosts: 0, services: 0, processes: 0 };
-                console.log(`Comptages reçus pour ${mzName}:`, counts);
                 
                 return {
                   id: `env-${mzName.replace(/\s+/g, '-')}`,
@@ -536,11 +529,11 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
                   dt_url: "#"
                 };
               } else {
-                console.error(`Erreur ${response.status} pour ${mzName}: ${await response.text()}`);
+                // API error handled in catch block
                 throw new Error(`Erreur API ${response.status}`);
               }
             } catch (error) {
-              console.error(`Erreur pour ${mzName}:`, error);
+              // Error for MZ handled with fallback object
               // En cas d'erreur, retourner un objet avec des comptages à 0
               return {
                 id: `env-${mzName.replace(/\s+/g, '-')}`,
@@ -569,7 +562,6 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
           // Obtenir les comptages pour chaque zone en parallèle
           const mzPromises = vfeResponse.data.mzs.map(async (mzName) => {
             try {
-              console.log(`Récupération des comptages pour la MZ VFE: ${mzName}`);
               
               // Récupérer les comptages depuis l'API
               const response = await fetch(`${API_BASE_URL}/management-zones/counts?zone=${encodeURIComponent(mzName)}`);
@@ -577,7 +569,6 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
               if (response.ok) {
                 const data = await response.json();
                 const counts = data.counts || { hosts: 0, services: 0, processes: 0 };
-                console.log(`Comptages reçus pour ${mzName}:`, counts);
                 
                 return {
                   id: `env-${mzName.replace(/\s+/g, '-')}`,
@@ -594,11 +585,11 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
                   dt_url: "#"
                 };
               } else {
-                console.error(`Erreur ${response.status} pour ${mzName}: ${await response.text()}`);
+                // API error handled in catch block
                 throw new Error(`Erreur API ${response.status}`);
               }
             } catch (error) {
-              console.error(`Erreur pour ${mzName}:`, error);
+              // Error for MZ handled with fallback object
               // En cas d'erreur, retourner un objet avec des comptages à 0
               return {
                 id: `env-${mzName.replace(/\s+/g, '-')}`,
@@ -645,8 +636,7 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
           entity.entityId && entity.entityId.type === 'HOST' && entity.name);
         if (hostEntity) {
           hostName = hostEntity.name;
-          console.log(`Nom d'hôte extrait de impactedEntities pour le problème ${problem.id}: ${hostName}`);
-        }
+            }
       }
       
       // PRIORITÉ 2: Si pas trouvé, utiliser le champ host ou impacted s'ils existent
@@ -731,8 +721,7 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
                 entity.entityId && entity.entityId.type === 'HOST' && entity.name);
               if (hostEntity) {
                 hostName = hostEntity.name;
-                console.log(`Nom d'hôte extrait de impactedEntities pour le problème 72h ${problem.id}: ${hostName}`);
-              }
+                        }
             }
             
             // PRIORITÉ 2: Si pas trouvé, utiliser le champ host ou impacted s'ils existent
@@ -775,13 +764,12 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
             };
           });
           
-          console.log(`Problèmes 72h transformés: ${problems.length}`);
           setState(prev => ({ ...prev, problemsLast72h: problems }));
         } else {
-          console.error("Données de problèmes 72h non valides:", problemsData);
+          // Invalid 72h problems data
         }
       } else {
-        console.error("Erreur lors de la récupération des problèmes 72h:", problemsLast72hResponse?.error);
+        // Error retrieving 72h problems data
       }
       
       // Si une zone est sélectionnée, charger ses données
@@ -847,12 +835,10 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
     // Utiliser 72h comme période par défaut si non spécifiée
     const effectiveTimeframe = timeframe || "-72h";
 
-    console.log(`Refreshing data for dashboard type: ${dashboardType || 'none'} ${refreshProblemsOnly ? '(problèmes uniquement)' : ''} with timeframe: ${effectiveTimeframe}`);
     setState(prev => ({ ...prev, error: null }));
     
     // Définir un timeout maximum pour éviter que le drapeau reste bloqué
     const timeoutId = window.setTimeout(() => {
-      console.log("Timeout de sécurité pour refreshData : réinitialisation du drapeau");
       refreshInProgressRef.current = false;
       refreshTimeoutIdRef.current = null;
     }, 60000); // 60 secondes maximum
@@ -863,7 +849,6 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
     try {
       // Exécuter loadAllData de manière non bloquante si on est dans un contexte de zone détaillée
       if (refreshProblemsOnly && state.selectedZone) {
-        console.log("Mode de rafraîchissement non bloquant activé pour les problèmes en zone");
         
         // Mettre à jour l'état pour indiquer le chargement des problèmes
         setState(prev => ({ 
@@ -881,7 +866,7 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
               await loadAllData(dashboardType, true, false, effectiveTimeframe);
               resolve();
             } catch (error) {
-              console.error("Erreur dans le rafraîchissement asynchrone:", error);
+              // Async refresh error handled in reject
               reject(error);
             } finally {
               setState(prev => ({ 
@@ -902,7 +887,7 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
         await loadAllData(dashboardType, refreshProblemsOnly || false, false, effectiveTimeframe);
       }
     } catch (error) {
-      console.error("Erreur dans refreshData:", error);
+      // Error in refreshData handled by updating state
       setState(prev => ({ 
         ...prev, 
         isLoading: { 
@@ -951,18 +936,15 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
     const performAutoRefresh = async () => {
       // Vérifier si un rafraîchissement est déjà en cours avec refreshInProgressRef
       if (refreshInProgressRef.current) {
-        console.log("Rafraîchissement via refreshData déjà en cours, auto-refresh ignoré");
-        return;
+          return;
       }
       
       // Vérifier si le dernier rafraîchissement réussi est assez récent (<1 minute)
       const timeSinceLastRefresh = Date.now() - lastSuccessfulRefreshRef.current;
       if (timeSinceLastRefresh < 60000) { // Moins d'une minute
-        console.log(`Dernier rafraîchissement trop récent (${Math.round(timeSinceLastRefresh/1000)}s), nouvel auto-refresh ignoré`);
         return;
       }
       
-      console.log("Démarrage du rafraîchissement automatique");
       
       // Récupérer le type de dashboard actuel (vfg ou vfe)
       const currentDashboardType = window.location.pathname.includes('vfe') ? 'vfe' : 'vfg';
@@ -981,7 +963,6 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
 
       // Si on est sur la page d'aperçu, ne pas continuer avec le rafraîchissement auto
       if (isOverviewPage) {
-        console.log("Auto-refresh ignoré sur la page d'aperçu (vue d'ensemble)");
         return;
       }
 
@@ -992,7 +973,6 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
 
       // Définir un timeout juste pour nettoyer les références, mais sans modifier les indicateurs de chargement
       const timeoutId = window.setTimeout(() => {
-        console.log("Timeout de sécurité pour auto-refresh : nettoyage des références");
         // Ne pas mettre à jour l'état d'isLoading pour un rafraîchissement en arrière-plan
         // setState(prev => ({ ...prev, isLoading: { ...prev.isLoading, problems: false }}));
         autoRefreshTimeoutRef.current = null;
@@ -1010,10 +990,9 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
           await loadAllData(dashboardType, true, true); // true pour refreshProblemsOnly, true pour silentMode
           
           // Marquer le rafraîchissement comme réussi
-          console.log("Rafraîchissement silencieux terminé avec succès");
           lastSuccessfulRefreshRef.current = Date.now();
         } catch (error) {
-          console.error("Erreur lors du rafraîchissement silencieux:", error);
+          // Silent refresh error is caught
         }
       };
       
@@ -1026,10 +1005,9 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
           // Appeler le rafraîchissement silencieux à la place de refreshData
           await silentRefresh();
         } else {
-          console.log("Rafraîchissement automatique désactivé sur la page d'aperçu");
-        }
+            }
       } catch (err) {
-        console.error("Erreur lors du rafraîchissement automatique:", err);
+        // Auto-refresh error handled in finally block
       } finally {
         // Nettoyer le timeout si c'est toujours le même, mais NE PAS modifier l'indicateur de chargement
         if (autoRefreshTimeoutRef.current === timeoutId) {
@@ -1042,7 +1020,6 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
     // Rafraîchir automatiquement les problèmes actifs toutes les 10 minutes (au lieu de 5)
     const refreshInterval = 600000; // 10 minutes en millisecondes
     
-    console.log(`Configuration du rafraîchissement automatique des problèmes toutes les ${refreshInterval/1000} secondes`);
     
     // Nettoyer tout intervalle existant
     if (autoRefreshIntervalRef.current !== null) {
@@ -1097,8 +1074,7 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
                 const servicesData = Array.isArray(servicesResponse.data) ? servicesResponse.data : [];
                 const servicesCount = servicesData.length;
                 
-                console.log(`Préchargement des services pour ${selectedZone.name}: ${servicesCount} services trouvés`);
-                
+                      
                 // Mettre à jour immédiatement le comptage des services pour cette zone
                 const isVFG = state.vitalForGroupMZs.some((zone: ManagementZone) => zone.id === zoneId);
                 if (isVFG) {
@@ -1122,7 +1098,7 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
               loadZoneData(zoneId);
             })
             .catch(error => {
-              console.error('Erreur lors du préchargement des services:', error);
+              // Error during services preloading, handled by continuing with normal loading
               // Continuer avec le chargement normal même en cas d'erreur
               loadZoneData(zoneId);
             });
@@ -1131,7 +1107,7 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
           loadZoneData(zoneId);
         }
       } catch (error) {
-        console.error('Erreur générale lors du préchargement:', error);
+        // General preloading error, handled by continuing with normal loading
         // En cas d'erreur, continuer avec le chargement normal
         loadZoneData(zoneId);
       }

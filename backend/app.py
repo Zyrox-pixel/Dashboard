@@ -225,26 +225,18 @@ def get_problems_72h():
         zone_filter = request.args.get('zone', '')  # Pour filtrer par une zone spécifique
         timeframe = request.args.get('timeframe', 'now-72h')  # Période (72h par défaut)
         debug_mode = request.args.get('debug', 'false').lower() == 'true'
-        
-        # Ne plus forcer le mode debug maintenant que le problème est résolu
-        # debug_mode = True
-        
-        
+
         # Créer une clé de cache unique pour cette requête qui inclut la période
         specific_cache_key = f"problems-72h:{dashboard_type}:{zone_filter}:{timeframe}"
-        
+
         # En mode debug, toujours vider le cache
         if debug_mode:
             if specific_cache_key in api_client.cache:
-                logger.info(f"Vidage du cache pour la clé: {specific_cache_key}")
                 api_client.cache.pop(specific_cache_key, None)
-            else:
-                logger.info(f"Aucun cache existant pour la clé: {specific_cache_key}")
         # Sinon, vérifier le cache
         else:
             cached_data = api_client.get_cached(specific_cache_key)
             if cached_data is not None:
-                logger.info(f"Retour des données en cache pour problems-72h")
                 return jsonify(cached_data)
         
         # MODIFICATION IMPORTANTE: Utilisation du script test qui fonctionne
@@ -257,9 +249,7 @@ def get_problems_72h():
             if dashboard_type in ['vfg', 'vfe']:
                 # Si un filtre de zone est fourni, l'utiliser au lieu de toutes les zones
                 if zone_filter:
-                    logger.info(f"Filtrage par zone spécifique: {zone_filter}")
                     problems = test_get_problems(management_zone_name=zone_filter, time_from=timeframe, status="OPEN,CLOSED")
-                    logger.info(f"Zone {zone_filter}: {len(problems)} problèmes trouvés sur 72h avec test_get_problems")
                     
                     # Formater chaque problème pour ajouter les informations d'entité impactée
                     formatted_problems = []
@@ -291,9 +281,7 @@ def get_problems_72h():
                 
                 for mz_name in mz_list:
                     try:
-                        logger.info(f"Récupération des problèmes 72h pour MZ: {mz_name} avec test_get_problems")
                         mz_problems = test_get_problems(management_zone_name=mz_name, time_from=timeframe, status="OPEN,CLOSED")
-                        logger.info(f"MZ {mz_name}: {len(mz_problems)} problèmes trouvés sur 72h avec test_get_problems")
                         all_problems.extend(mz_problems)
                     except Exception as mz_error:
                         logger.error(f"Erreur lors de la récupération des problèmes 72h pour MZ {mz_name}: {mz_error}")

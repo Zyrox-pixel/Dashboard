@@ -121,12 +121,11 @@ export const ProblemsProvider: React.FC<{children: React.ReactNode}> = ({ childr
             cacheRef.current.vfeProblems72h = parsedData.vfeProblems72h;
           }
 
-          console.log("💾 Données chargées depuis le cache local");
           return true;
         }
       }
     } catch (error) {
-      console.error("Erreur lors du chargement des données du cache:", error);
+      // Silent error for cache loading failure
     }
     return false;
   };
@@ -143,9 +142,8 @@ export const ProblemsProvider: React.FC<{children: React.ReactNode}> = ({ childr
       };
 
       localStorage.setItem('problemsData', JSON.stringify(dataToCache));
-      console.log("💾 Données sauvegardées dans le cache local");
     } catch (error) {
-      console.error("Erreur lors de la sauvegarde des données dans le cache:", error);
+      // Silent error for cache saving failure
     }
   };
   
@@ -154,7 +152,6 @@ export const ProblemsProvider: React.FC<{children: React.ReactNode}> = ({ childr
     // Vérifier si un chargement récent a eu lieu (moins de 10 secondes - optimisé)
     const now = Date.now();
     if (!force && now - lastFetchTimeRef.current.vfg < 10000) {
-      console.log("🔵 Utilisation du cache pour VFG (récent)");
       return;
     }
 
@@ -167,7 +164,6 @@ export const ProblemsProvider: React.FC<{children: React.ReactNode}> = ({ childr
     setIsLoading(prev => ({ ...prev, vfg: true }));
     
     try {
-      console.log("🔵 Chargement des données VFG...");
       
       // Récupérer les problèmes actifs
       const activeProblemsResponse = await api.getProblems("OPEN", "-60d", "vfg", force);
@@ -176,7 +172,6 @@ export const ProblemsProvider: React.FC<{children: React.ReactNode}> = ({ childr
           ? activeProblemsResponse.data.map(transformProblemData)
           : [];
         
-        console.log(`🔵 Problèmes actifs VFG récupérés: ${transformedProblems.length}`);
         setVfgProblems(transformedProblems);
       }
       
@@ -187,7 +182,6 @@ export const ProblemsProvider: React.FC<{children: React.ReactNode}> = ({ childr
           ? problems72hResponse.data.map(transformProblemData)
           : [];
         
-        console.log(`🔵 Problèmes 72h VFG récupérés: ${transformedProblems.length}`);
         setVfgProblems72h(transformedProblems);
       }
       
@@ -195,7 +189,7 @@ export const ProblemsProvider: React.FC<{children: React.ReactNode}> = ({ childr
       lastFetchTimeRef.current.vfg = now;
       
     } catch (error) {
-      console.error("❌ Erreur lors de la récupération des problèmes VFG:", error);
+      // Error handled in finally block
     } finally {
       setIsLoading(prev => ({ ...prev, vfg: false }));
     }
@@ -206,7 +200,6 @@ export const ProblemsProvider: React.FC<{children: React.ReactNode}> = ({ childr
     // Vérifier si un chargement récent a eu lieu (moins de 10 secondes - optimisé)
     const now = Date.now();
     if (!force && now - lastFetchTimeRef.current.vfe < 10000) {
-      console.log("🟠 Utilisation du cache pour VFE (récent)");
       return;
     }
 
@@ -219,7 +212,6 @@ export const ProblemsProvider: React.FC<{children: React.ReactNode}> = ({ childr
     setIsLoading(prev => ({ ...prev, vfe: true }));
     
     try {
-      console.log("🟠 Chargement des données VFE...");
       
       // Récupérer les problèmes actifs
       const activeProblemsResponse = await api.getProblems("OPEN", "-60d", "vfe", force);
@@ -228,7 +220,6 @@ export const ProblemsProvider: React.FC<{children: React.ReactNode}> = ({ childr
           ? activeProblemsResponse.data.map(transformProblemData)
           : [];
         
-        console.log(`🟠 Problèmes actifs VFE récupérés: ${transformedProblems.length}`);
         setVfeProblems(transformedProblems);
       }
       
@@ -239,7 +230,6 @@ export const ProblemsProvider: React.FC<{children: React.ReactNode}> = ({ childr
           ? problems72hResponse.data.map(transformProblemData)
           : [];
         
-        console.log(`🟠 Problèmes 72h VFE récupérés: ${transformedProblems.length}`);
         setVfeProblems72h(transformedProblems);
       }
       
@@ -247,7 +237,7 @@ export const ProblemsProvider: React.FC<{children: React.ReactNode}> = ({ childr
       lastFetchTimeRef.current.vfe = now;
       
     } catch (error) {
-      console.error("❌ Erreur lors de la récupération des problèmes VFE:", error);
+      // Error handled in finally block
     } finally {
       setIsLoading(prev => ({ ...prev, vfe: false }));
     }
@@ -255,7 +245,6 @@ export const ProblemsProvider: React.FC<{children: React.ReactNode}> = ({ childr
   
   // Rafraîchir tous les problèmes - version optimisée avec types corrigés
   const refreshAll = async (force = false): Promise<boolean | void> => {
-    console.log("🔄 Rafraîchissement de tous les problèmes...");
 
     // Optimisation: utiliser AbortController pour annuler les requêtes trop longues
     const controller = new AbortController();
@@ -275,10 +264,9 @@ export const ProblemsProvider: React.FC<{children: React.ReactNode}> = ({ childr
       // Sauvegarder les données mise à jour dans le cache local
       setTimeout(saveToCache, 300);
 
-      console.log("✅ Rafraîchissement complet terminé avec succès");
       return true;
     } catch (error) {
-      console.error("❌ Erreur lors du rafraîchissement:", error);
+      // Error handled in recovery logic
 
       // En cas d'erreur, revenir aux données précédentes si disponibles
       if (vfgProblems.length === 0 && cacheRef.current.vfgProblems) {
@@ -293,10 +281,9 @@ export const ProblemsProvider: React.FC<{children: React.ReactNode}> = ({ childr
       try {
         await refreshVFG(force);
         await refreshVFE(force);
-        console.log("✅ Rafraîchissement séquentiel terminé");
         return true;
       } catch (fallbackError) {
-        console.error("❌ Échec complet du rafraîchissement:", fallbackError);
+        // Failure is returned as false
         return false;
       }
     } finally {
@@ -340,7 +327,6 @@ export const ProblemsProvider: React.FC<{children: React.ReactNode}> = ({ childr
   
   // Charger les données initiales avec système de cache optimisé
   useEffect(() => {
-    console.log("Initialisation du ProblemsContext - avec cache optimisé");
 
     // D'abord, essayer de charger les données depuis le cache local
     const cacheLoaded = loadFromCache();

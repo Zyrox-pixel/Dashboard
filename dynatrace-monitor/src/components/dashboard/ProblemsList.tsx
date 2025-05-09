@@ -52,10 +52,8 @@ const ProblemsList: React.FC<ProblemsListProps> = ({
   // mais seulement si nous ne sommes pas en train de rafraîchir pour éviter des mises à jour conflictuelles
   useEffect(() => {
     if (!isRefreshing) {
-      console.log(`Mise à jour des problèmes locaux depuis les props (${problems.length} problèmes)`);
       setLocalProblems(problems);
     } else {
-      console.log('Mise à jour des props ignorée car un rafraîchissement est en cours');
     }
   }, [problems, isRefreshing]);
   
@@ -66,7 +64,6 @@ const ProblemsList: React.FC<ProblemsListProps> = ({
   const handleRefreshProblems = async () => {
     // Éviter les rafraîchissements multiples simultanés
     if (isRefreshing) {
-      console.log("Un rafraîchissement est déjà en cours, opération ignorée");
       return;
     }
     
@@ -83,7 +80,6 @@ const ProblemsList: React.FC<ProblemsListProps> = ({
       const status = is72h ? "ALL" : "OPEN";
       const timeframe = is72h ? "-72h" : "-60d"; // Utiliser -60d au lieu de "all" pour les problèmes actifs
       
-      console.log(`Rafraîchissement des problèmes: ${status} avec timeframe ${timeframe}, is72h=${is72h}`);
       
       const params: any = {
         status: status,
@@ -95,9 +91,6 @@ const ProblemsList: React.FC<ProblemsListProps> = ({
       // Si un filtre de zone est fourni, l'ajouter aux paramètres pour filtrer côté serveur
       if (zoneFilter) {
         params.zone = zoneFilter;
-        console.log(`Rafraîchissement direct des problèmes pour la zone: ${zoneFilter}`);
-      } else {
-        console.log("Rafraîchissement direct des problèmes...");
       }
       
       // Appel direct à l'API backend avec les paramètres incluant la zone
@@ -112,7 +105,6 @@ const ProblemsList: React.FC<ProblemsListProps> = ({
           throw new Error("Format de données invalide reçu");
         }
         
-        console.log(`Données brutes reçues: ${refreshedProblems.length} problèmes`);
         
         // Transformer les données si nécessaire pour correspondre au format Problem
         const formattedProblems: Problem[] = refreshedProblems.map((problem: any) => {
@@ -172,19 +164,15 @@ const ProblemsList: React.FC<ProblemsListProps> = ({
         
         // Vérifier si nous avons reçu des données valides
         if (formattedProblems.length === 0) {
-          console.log("Aucun problème trouvé lors du rafraîchissement.");
-          
           // Si nous sommes sur l'écran des problèmes actifs, vérifier que c'est bien normal
           if (!title.toLowerCase().includes('72h')) {
             // Effectuer une seconde vérification avant de vider la liste
             const verificationParams = {...params, bypass_cache: 'true'};
-            console.log("Double vérification pour confirmer l'absence de problèmes actifs...");
             
             try {
               const verificationResponse = await axios.get(`${API_BASE_URL}/problems`, { params: verificationParams });
               
               if (verificationResponse.data && Array.isArray(verificationResponse.data) && verificationResponse.data.length > 0) {
-                console.log("La vérification a retourné des problèmes, utilisation de ces données.");
                 
                 // Formater ces problèmes
                 const verifiedProblems = verificationResponse.data.map((problem: any) => {
@@ -248,10 +236,8 @@ const ProblemsList: React.FC<ProblemsListProps> = ({
                   onRefresh(verifiedProblems);
                 }
                 
-                console.log(`Vérification secondaire terminée. ${verifiedProblems.length} problèmes trouvés.`);
                 return; // Sortir de la fonction ici
               } else {
-                console.log("La double vérification confirme qu'il n'y a pas de problèmes actifs.");
               }
             } catch (verificationError) {
               console.error("Erreur lors de la double vérification des problèmes:", verificationError);
@@ -268,7 +254,6 @@ const ProblemsList: React.FC<ProblemsListProps> = ({
           onRefresh(formattedProblems);
         }
         
-        console.log(`Rafraîchissement direct terminé. ${formattedProblems.length} problèmes trouvés.`);
       }
     } catch (error) {
       console.error("Erreur lors du rafraîchissement direct des problèmes:", error);
