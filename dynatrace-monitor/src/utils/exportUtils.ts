@@ -1,4 +1,4 @@
-import { Problem } from '../api/types';
+import { Problem, Host, Service, ProcessGroup } from '../api/types';
 
 /**
  * Convertit un tableau de problèmes en format CSV
@@ -122,25 +122,171 @@ export const exportProblemsToCSV = (
 export const downloadCSV = (csvContent: string, filename: string): void => {
   // Créer un Blob avec le contenu CSV et spécifier l'encodage UTF-8
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8' });
-  
+
   // Créer un lien de téléchargement
   const link = document.createElement('a');
-  
+
   // Créer une URL pour le Blob
   const url = URL.createObjectURL(blob);
-  
+
   // Configurer le lien
   link.setAttribute('href', url);
   link.setAttribute('download', filename);
   link.style.visibility = 'hidden';
-  
+
   // Ajouter le lien au document
   document.body.appendChild(link);
-  
+
   // Cliquer sur le lien pour déclencher le téléchargement
   link.click();
-  
+
   // Nettoyer
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
+};
+
+/**
+ * Convertit un tableau d'hôtes en format CSV
+ * @param hosts Tableau d'hôtes à exporter
+ * @param zoneName Nom de la zone de management
+ * @returns Un objet contenant le contenu CSV et le nom du fichier
+ */
+export const exportHostsToCSV = (
+  hosts: Host[],
+  zoneName: string
+): { csv: string; filename: string } => {
+  // Créer l'en-tête du CSV
+  const headers = [
+    'Nom de la machine',
+    'Système d\'exploitation',
+    'CPU (%)',
+    'RAM (%)'
+  ];
+
+  // Mapper les hôtes au format CSV
+  const rows = hosts.map(host => [
+    host.name,                                // Nom de la machine
+    host.os_version || 'Non spécifié',        // OS
+    host.cpu !== null ? `${host.cpu}%` : 'N/A', // CPU
+    host.ram !== null ? `${host.ram}%` : 'N/A'  // RAM
+  ]);
+
+  // Ajouter BOM (Byte Order Mark) pour l'encodage UTF-8 correct
+  const BOM = '\uFEFF';
+  const csvContent = BOM + [
+    // Utiliser des guillemets pour chaque cellule et échapper les guillemets doubles
+    headers.map(header => `"${header.replace(/"/g, '""')}"`).join(';'),
+    ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(';'))
+  ].join('\n');
+
+  // Générer le nom du fichier avec la date du jour
+  const today = new Date();
+  const datePrefix = today.toISOString().slice(0, 10).replace(/-/g, '');
+
+  // Nettoyer le nom de la zone pour le nom de fichier
+  const safeZoneName = zoneName.replace(/[^a-z0-9]/gi, '_');
+
+  const filename = `hosts_${safeZoneName}_${datePrefix}.csv`;
+
+  return { csv: csvContent, filename };
+};
+
+/**
+ * Convertit un tableau de services en format CSV
+ * @param services Tableau de services à exporter
+ * @param zoneName Nom de la zone de management
+ * @returns Un objet contenant le contenu CSV et le nom du fichier
+ */
+export const exportServicesToCSV = (
+  services: Service[],
+  zoneName: string
+): { csv: string; filename: string } => {
+  // Créer l'en-tête du CSV
+  const headers = [
+    'Nom du service',
+    'Technologie',
+    'Temps de réponse (s)',
+    'Taux d\'erreur (%)',
+    'Nombre de requêtes'
+  ];
+
+  // Mapper les services au format CSV
+  const rows = services.map(service => [
+    service.name,                                             // Nom du service
+    service.technology || 'Non spécifié',                     // Technologie
+    service.response_time !== null ? service.response_time.toString() : 'N/A', // Temps de réponse
+    service.error_rate !== null ? service.error_rate.toString() : 'N/A',       // Taux d'erreur
+    service.requests !== null ? service.requests.toString() : 'N/A'            // Nombre de requêtes
+  ]);
+
+  // Ajouter BOM (Byte Order Mark) pour l'encodage UTF-8 correct
+  const BOM = '\uFEFF';
+  const csvContent = BOM + [
+    // Utiliser des guillemets pour chaque cellule et échapper les guillemets doubles
+    headers.map(header => `"${header.replace(/"/g, '""')}"`).join(';'),
+    ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(';'))
+  ].join('\n');
+
+  // Générer le nom du fichier avec la date du jour
+  const today = new Date();
+  const datePrefix = today.toISOString().slice(0, 10).replace(/-/g, '');
+
+  // Nettoyer le nom de la zone pour le nom de fichier
+  const safeZoneName = zoneName.replace(/[^a-z0-9]/gi, '_');
+
+  const filename = `services_${safeZoneName}_${datePrefix}.csv`;
+
+  return { csv: csvContent, filename };
+};
+
+/**
+ * Convertit un tableau de process groups en format CSV
+ * @param processGroups Tableau de process groups à exporter
+ * @param zoneName Nom de la zone de management
+ * @returns Un objet contenant le contenu CSV et le nom du fichier
+ */
+export const exportProcessGroupsToCSV = (
+  processGroups: ProcessGroup[],
+  zoneName: string
+): { csv: string; filename: string } => {
+  // Créer l'en-tête du CSV
+  const headers = [
+    'Nom du process group',
+    'Technologie',
+    'Type de process'
+  ];
+
+  // Mapper les process groups au format CSV
+  const rows = processGroups.map(process => {
+    // Convertir le type de process en libellé lisible
+    let processType = 'Autre';
+    if (process.type === 'technology') processType = 'Technologie';
+    else if (process.type === 'database') processType = 'Base de données';
+    else if (process.type === 'server') processType = 'Serveur';
+
+    return [
+      process.name,                    // Nom du process group
+      process.technology || 'Non spécifié', // Technologie
+      processType                      // Type de process
+    ];
+  });
+
+  // Ajouter BOM (Byte Order Mark) pour l'encodage UTF-8 correct
+  const BOM = '\uFEFF';
+  const csvContent = BOM + [
+    // Utiliser des guillemets pour chaque cellule et échapper les guillemets doubles
+    headers.map(header => `"${header.replace(/"/g, '""')}"`).join(';'),
+    ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(';'))
+  ].join('\n');
+
+  // Générer le nom du fichier avec la date du jour
+  const today = new Date();
+  const datePrefix = today.toISOString().slice(0, 10).replace(/-/g, '');
+
+  // Nettoyer le nom de la zone pour le nom de fichier
+  const safeZoneName = zoneName.replace(/[^a-z0-9]/gi, '_');
+
+  const filename = `process_groups_${safeZoneName}_${datePrefix}.csv`;
+
+  return { csv: csvContent, filename };
 };

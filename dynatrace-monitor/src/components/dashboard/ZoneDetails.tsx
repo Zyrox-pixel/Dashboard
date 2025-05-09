@@ -1338,18 +1338,18 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
                 <span>Hôtes</span>
                 <span className="text-xs text-slate-400 ml-2">({filteredHosts.length})</span>
               </h2>
-              
-              {/* Barre de recherche et bouton de filtre pour les hôtes */}
+
+              {/* Barre de recherche et boutons d'actions pour les hôtes */}
               <div className="flex items-center gap-3">
                 <div className="relative">
-                  <input 
-                    type="text" 
+                  <input
+                    type="text"
                     value={hostSearchTerm}
                     onChange={(e) => setHostSearchTerm(e.target.value)}
                     placeholder="Rechercher un hôte..."
                     className={`w-64 h-8 pl-8 pr-4 rounded-md ${
-                      isDarkTheme 
-                        ? 'bg-slate-700 border-slate-600 text-white placeholder-slate-400' 
+                      isDarkTheme
+                        ? 'bg-slate-700 border-slate-600 text-white placeholder-slate-400'
                         : 'bg-slate-100 border-slate-200 text-slate-900 placeholder-slate-500'
                     } border focus:outline-none focus:ring-1 focus:ring-indigo-500`}
                   />
@@ -1363,19 +1363,36 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
                     </button>
                   )}
                 </div>
-                
-                <button 
+
+                {/* Bouton d'export CSV */}
+                <button
+                  onClick={() => {
+                    const { csv, filename } = exportHostsToCSV(filteredHosts, zone.name);
+                    downloadCSV(csv, filename);
+                  }}
+                  className={`flex items-center gap-1 px-3 py-1 rounded-md border text-sm
+                    ${isDarkTheme
+                      ? 'border-green-600 bg-green-700/30 text-green-400 hover:bg-green-700/40'
+                      : 'border-green-600 bg-green-100 text-green-600 hover:bg-green-200'
+                    }`}
+                  title="Télécharger la liste des hôtes au format CSV"
+                >
+                  <FileDown size={14} />
+                  <span>Télécharger CSV</span>
+                </button>
+
+                <button
                   onClick={() => {
                     setFilterType('os');
                     setShowAdvancedFilter(true);
                   }}
                   className={`flex items-center gap-1 px-3 py-1 rounded-md border text-sm ${
-                    isDarkTheme 
-                      ? osFilters.length > 0 
-                        ? 'border-indigo-600 bg-indigo-700/30 text-indigo-400' 
-                        : 'border-slate-600 text-slate-300 hover:bg-slate-700' 
-                      : osFilters.length > 0 
-                        ? 'border-indigo-600 bg-indigo-100 text-indigo-600' 
+                    isDarkTheme
+                      ? osFilters.length > 0
+                        ? 'border-indigo-600 bg-indigo-700/30 text-indigo-400'
+                        : 'border-slate-600 text-slate-300 hover:bg-slate-700'
+                      : osFilters.length > 0
+                        ? 'border-indigo-600 bg-indigo-100 text-indigo-600'
                         : 'border-slate-300 text-slate-600 hover:bg-slate-100'
                   }`}
                 >
@@ -1423,18 +1440,18 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
                 Dernières 30 minutes
               </span>
             </h2>
-            
-            {/* Barre de recherche pour les services */}
+
+            {/* Barre de recherche et boutons d'actions pour les services */}
             <div className="flex items-center gap-3">
               <div className="relative">
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   value={serviceSearchTerm}
                   onChange={(e) => setServiceSearchTerm(e.target.value)}
                   placeholder="Rechercher un service..."
                   className={`w-64 h-8 pl-8 pr-4 rounded-md ${
-                    isDarkTheme 
-                      ? 'bg-slate-700 border-slate-600 text-white placeholder-slate-400' 
+                    isDarkTheme
+                      ? 'bg-slate-700 border-slate-600 text-white placeholder-slate-400'
                       : 'bg-slate-100 border-slate-200 text-slate-900 placeholder-slate-500'
                   } border focus:outline-none focus:ring-1 focus:ring-indigo-500`}
                 />
@@ -1448,19 +1465,36 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
                   </button>
                 )}
               </div>
-              
-              <button 
+
+              {/* Bouton d'export CSV pour les services */}
+              <button
+                onClick={() => {
+                  const { csv, filename } = exportServicesToCSV(filteredServices, zone.name);
+                  downloadCSV(csv, filename);
+                }}
+                className={`flex items-center gap-1 px-3 py-1 rounded-md border text-sm
+                  ${isDarkTheme
+                    ? 'border-green-600 bg-green-700/30 text-green-400 hover:bg-green-700/40'
+                    : 'border-green-600 bg-green-100 text-green-600 hover:bg-green-200'
+                  }`}
+                title="Télécharger la liste des services au format CSV"
+              >
+                <FileDown size={14} />
+                <span>Télécharger CSV</span>
+              </button>
+
+              <button
                 onClick={() => {
                   setFilterType('service');
                   setShowAdvancedFilter(true);
                 }}
                 className={`flex items-center gap-1 px-3 py-1 rounded-md border text-sm ${
-                  isDarkTheme 
-                    ? serviceFilters.length > 0 
-                      ? 'border-indigo-600 bg-indigo-700/30 text-indigo-400' 
-                      : 'border-slate-600 text-slate-300 hover:bg-slate-700' 
-                    : serviceFilters.length > 0 
-                      ? 'border-indigo-600 bg-indigo-100 text-indigo-600' 
+                  isDarkTheme
+                    ? serviceFilters.length > 0
+                      ? 'border-indigo-600 bg-indigo-700/30 text-indigo-400'
+                      : 'border-slate-600 text-slate-300 hover:bg-slate-700'
+                    : serviceFilters.length > 0
+                      ? 'border-indigo-600 bg-indigo-100 text-indigo-600'
                       : 'border-slate-300 text-slate-600 hover:bg-slate-100'
                 }`}
               >
@@ -1511,24 +1545,43 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
               <span>Process Groups</span>
               <span className="text-xs text-slate-400 ml-2">({filteredProcessGroups.length})</span>
             </h2>
-            <button 
-              onClick={() => {
-                setFilterType('process');
-                setShowAdvancedFilter(true);
-              }}
-              className={`flex items-center gap-1 px-3 py-1 rounded-md border text-sm ${
-                isDarkTheme 
-                  ? processFilters.length > 0 
-                    ? 'border-indigo-600 bg-indigo-700/30 text-indigo-400' 
-                    : 'border-slate-600 text-slate-300 hover:bg-slate-700' 
-                  : processFilters.length > 0 
-                    ? 'border-indigo-600 bg-indigo-100 text-indigo-600' 
-                    : 'border-slate-300 text-slate-600 hover:bg-slate-100'
-              }`}
-            >
-              <Filter size={14} />
-              <span>Filtres avancés {processFilters.length > 0 && `(${processFilters.length})`}</span>
-            </button>
+            <div className="flex items-center gap-3">
+              {/* Bouton d'export CSV pour les process groups */}
+              <button
+                onClick={() => {
+                  const { csv, filename } = exportProcessGroupsToCSV(filteredProcessGroups, zone.name);
+                  downloadCSV(csv, filename);
+                }}
+                className={`flex items-center gap-1 px-3 py-1 rounded-md border text-sm
+                  ${isDarkTheme
+                    ? 'border-green-600 bg-green-700/30 text-green-400 hover:bg-green-700/40'
+                    : 'border-green-600 bg-green-100 text-green-600 hover:bg-green-200'
+                  }`}
+                title="Télécharger la liste des process groups au format CSV"
+              >
+                <FileDown size={14} />
+                <span>Télécharger CSV</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setFilterType('process');
+                  setShowAdvancedFilter(true);
+                }}
+                className={`flex items-center gap-1 px-3 py-1 rounded-md border text-sm ${
+                  isDarkTheme
+                    ? processFilters.length > 0
+                      ? 'border-indigo-600 bg-indigo-700/30 text-indigo-400'
+                      : 'border-slate-600 text-slate-300 hover:bg-slate-700'
+                    : processFilters.length > 0
+                      ? 'border-indigo-600 bg-indigo-100 text-indigo-600'
+                      : 'border-slate-300 text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                <Filter size={14} />
+                <span>Filtres avancés {processFilters.length > 0 && `(${processFilters.length})`}</span>
+              </button>
+            </div>
           </div>
 
           {/* Afficher les badges de filtres actifs */}
