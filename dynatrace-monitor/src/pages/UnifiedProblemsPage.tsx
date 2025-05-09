@@ -1,6 +1,6 @@
 import React from 'react';
 import { useLocation } from 'react-router-dom';
-import Layout from '../components/layout/Layout';
+import ModernLayout from '../components/layout/ModernLayout';
 import UnifiedProblemsView from '../components/dashboard/UnifiedProblemsView';
 import AllProblemsView from '../components/common/AllProblemsView';
 
@@ -26,16 +26,16 @@ const UnifiedProblemsPage: React.FC = () => {
   
   // Utiliser le AllProblemsView lorsque dashboard=all pour éviter les problèmes de requêtes en boucle
   return (
-    <Layout title={title}>
+    <ModernLayout title={title} subtitle="Analyse et gestion des alertes système">
       {dashboardType === 'all' ? (
         <AllProblemsView />
       ) : (
-        <UnifiedProblemsView 
+        <UnifiedProblemsView
           title={title}
           variant={dashboardType as 'vfg' | 'vfe'}
         />
       )}
-    </Layout>
+    </ModernLayout>
   );
 };
 

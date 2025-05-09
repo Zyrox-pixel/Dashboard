@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Shield, AlertTriangle, Clock, Server, Database, BarChart } from 'lucide-react';
-import Layout from '../components/layout/Layout';
+import ModernLayout from '../components/layout/ModernLayout';
 import { useApp } from '../contexts/AppContext';
 import { useProblems } from '../contexts/ProblemsContext';
 import { ManagementZone } from '../api/types';
@@ -232,28 +232,31 @@ const OverviewDashboard: React.FC = () => {
   }, [loading, vfgProblems.length, vfeProblems.length]);
 
   return (
-    <Layout title="Vue d'Ensemble" subtitle="Supervision globale des applications critiques">
+    <ModernLayout title="Vue d'Ensemble" subtitle="Supervision globale des applications critiques">
       {/* Bannière d'introduction */}
-      <div className="mb-6 p-5 bg-slate-800/50 border border-slate-700 rounded-lg">
+      <div className="mb-6 p-5 bg-[#14152e]/80 border border-indigo-900/30 rounded-xl card-3d">
         <div className="flex items-center gap-4">
-          <div className="p-3 rounded-full bg-indigo-900/30 border border-indigo-700/30 text-indigo-400">
+          <div className="p-3 rounded-xl bg-gradient-to-br from-indigo-900/40 to-blue-900/20 border border-indigo-700/30 text-indigo-400 animate-pulse-cosmic">
             <BarChart size={24} />
           </div>
           <div className="flex-1">
             <h2 className="text-xl font-semibold text-white mb-1">Tableau de Bord Global</h2>
-            <p className="text-slate-300">
+            <p className="text-indigo-300">
               Vue d'ensemble unifiée des systèmes critiques pour le groupe et l'entreprise
             </p>
           </div>
           <button
             onClick={handleRefresh}
             disabled={loading}
-            className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700
-              disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200
+            className="btn-primary relative overflow-hidden rounded-lg py-2 px-4
+              disabled:opacity-50 disabled:cursor-not-allowed
               flex items-center gap-2"
           >
             <Clock size={16} className={loading ? 'animate-spin' : ''} />
             <span>{loading ? 'Chargement...' : 'Rafraîchir'}</span>
+
+            {/* Effet de particules au clic */}
+            <span className="absolute inset-0 w-full h-full bg-gradient-to-r from-indigo-500/0 via-indigo-500/20 to-indigo-500/0 -translate-x-full hover:translate-x-full transition-all duration-1000"></span>
           </button>
         </div>
       </div>
@@ -261,12 +264,13 @@ const OverviewDashboard: React.FC = () => {
       {/* Section problèmes globaux - DÉPLACÉE EN HAUT */}
       <div
         onClick={() => navigate('/problems/unified')}
-        className="p-5 mb-6 rounded-lg border cursor-pointer transition-all
-                  hover:shadow-lg border-slate-700 bg-gradient-to-br from-slate-800 via-slate-900 to-slate-800
-                  hover:bg-gradient-to-br hover:from-slate-700 hover:via-slate-800 hover:to-slate-700"
+        className="p-5 mb-6 rounded-xl border cursor-pointer transition-all duration-300
+                  hover:shadow-lg border-indigo-900/30 glass hover:scale-[1.02]
+                  bg-gradient-to-br from-[#14152e]/80 via-[#191a3a]/80 to-[#14152e]/80
+                  hover:bg-gradient-to-br hover:from-[#1b1c3b]/80 hover:via-[#232447]/80 hover:to-[#1b1c3b]/80"
       >
         <div className="flex items-start gap-4">
-          <div className="p-3 rounded-full bg-gradient-to-br from-indigo-600/30 to-blue-900/30 border border-blue-500/30 shadow-md">
+          <div className="p-3 rounded-xl bg-gradient-to-br from-red-900/30 to-pink-900/20 border border-red-700/30 shadow-lg animate-pulse-cosmic">
             <AlertTriangle className="text-red-400" size={24} />
           </div>
           <div className="flex-1">
@@ -569,7 +573,7 @@ const OverviewDashboard: React.FC = () => {
           </div>
         </div>
       </div>
-    </Layout>
+    </ModernLayout>
   );
 };
 
