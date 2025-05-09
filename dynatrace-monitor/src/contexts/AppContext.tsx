@@ -973,11 +973,20 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
       }
       */
       
+      // Vérifier si on est sur la page d'aperçu pour éviter les rafraîchissements automatiques
+      const isOverviewPage = window.location.pathname === '/' || window.location.pathname === '/overview';
+
+      // Si on est sur la page d'aperçu, ne pas continuer avec le rafraîchissement auto
+      if (isOverviewPage) {
+        console.log("Auto-refresh ignoré sur la page d'aperçu (vue d'ensemble)");
+        return;
+      }
+
       // Annuler tout timeout précédent
       if (autoRefreshTimeoutRef.current !== null) {
         clearTimeout(autoRefreshTimeoutRef.current);
       }
-      
+
       // Définir un timeout juste pour nettoyer les références, mais sans modifier les indicateurs de chargement
       const timeoutId = window.setTimeout(() => {
         console.log("Timeout de sécurité pour auto-refresh : nettoyage des références");
@@ -1006,8 +1015,16 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
       };
       
       try {
-        // Appeler le rafraîchissement silencieux à la place de refreshData
-        await silentRefresh();
+        // Vérifier si on est sur la page d'aperçu pour éviter les rafraîchissements automatiques
+        const isOverviewPage = window.location.pathname === '/' || window.location.pathname === '/overview';
+
+        // Ne pas faire de rafraîchissement silencieux si on est sur la page d'aperçu
+        if (!isOverviewPage) {
+          // Appeler le rafraîchissement silencieux à la place de refreshData
+          await silentRefresh();
+        } else {
+          console.log("Rafraîchissement automatique désactivé sur la page d'aperçu");
+        }
       } catch (err) {
         console.error("Erreur lors du rafraîchissement automatique:", err);
       } finally {
@@ -1019,8 +1036,8 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
       }
     };
     
-    // Rafraîchir automatiquement les problèmes actifs toutes les 5 minutes
-    const refreshInterval = 300000; // 5 minutes en millisecondes
+    // Rafraîchir automatiquement les problèmes actifs toutes les 10 minutes (au lieu de 5)
+    const refreshInterval = 600000; // 10 minutes en millisecondes
     
     console.log(`Configuration du rafraîchissement automatique des problèmes toutes les ${refreshInterval/1000} secondes`);
     

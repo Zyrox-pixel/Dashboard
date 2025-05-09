@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Shield, AlertTriangle, Clock, Server, Database, BarChart } from 'lucide-react';
 import Layout from '../components/layout/Layout';
@@ -22,14 +22,19 @@ const OverviewDashboard: React.FC = () => {
   // État pour suivre le dernier rafraîchissement
   const [lastRefreshTime, setLastRefreshTime] = useState(new Date());
 
-  // Effet pour charger les données initiales
+  // Effet pour charger les données initiales une seule fois
+  const initialLoadDoneRef = useRef(false);
+
   useEffect(() => {
     const loadInitialData = async () => {
-      // Charger les données pour VFG et VFE
-      await refreshData();
-      setLastRefreshTime(new Date());
+      // Charger les données pour VFG et VFE uniquement si pas déjà chargées
+      if (!initialLoadDoneRef.current) {
+        await refreshData();
+        setLastRefreshTime(new Date());
+        initialLoadDoneRef.current = true;
+      }
     };
-    
+
     loadInitialData();
   }, [refreshData]);
 
