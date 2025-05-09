@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AlertTriangle, Clock, RefreshCw, Filter, CalendarRange, Shield, BarChart } from 'lucide-react';
+import { AlertTriangle, Clock, RefreshCw, Filter, CalendarRange, Shield, BarChart, Calendar } from 'lucide-react';
 import ProblemsList from './ProblemsList';
 import { Problem } from '../../api/types';
 import { useApp } from '../../contexts/AppContext';
@@ -22,7 +22,20 @@ const UnifiedProblemsView: React.FC<UnifiedProblemsViewProps> = ({ title, varian
   
   // État local pour l'onglet actif (actifs ou récents)
   const [activeTab, setActiveTab] = useState<'active' | 'recent'>('active');
-  
+
+  // Options prédéfinies pour la sélection de période
+  const timeframeOptions = [
+    { value: "-24h", label: "24 heures" },
+    { value: "-48h", label: "48 heures" },
+    { value: "-72h", label: "72 heures" }, // Option par défaut
+    { value: "-7d", label: "7 jours" },
+    { value: "-14d", label: "14 jours" },
+    { value: "-30d", label: "30 jours" }
+  ];
+
+  // État local pour la période sélectionnée
+  const [selectedTimeframe, setSelectedTimeframe] = useState<string>("-72h"); // 72h par défaut
+
   // Marqueur pour le rafraîchissement manuel
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [lastRefreshTime, setLastRefreshTime] = useState<Date>(new Date());
@@ -36,15 +49,27 @@ const UnifiedProblemsView: React.FC<UnifiedProblemsViewProps> = ({ title, varian
     setActiveTab(tab);
   };
   
+  // Fonction pour obtenir le libellé de la période sélectionnée
+  const getTimeframeLabel = (value: string) => {
+    const option = timeframeOptions.find(opt => opt.value === value);
+    return option ? option.label : "72 heures"; // Fallback à 72h si non trouvé
+  };
+
+  // Gestion du changement de période
+  const handleTimeframeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setSelectedTimeframe(e.target.value);
+  };
+
   // Gérer le rafraîchissement manuel des données
   const handleRefresh = async () => {
     if (isRefreshing) return;
-    
+
     setIsRefreshing(true);
     try {
       // Utilise le variant spécifié (vfg ou vfe), ou null pour 'all' (comportement par défaut)
       const dashboardType = variant === 'all' ? null : variant;
-      await refreshData(dashboardType as 'vfg' | 'vfe' | undefined, activeTab === 'active');
+      // Passer la période sélectionnée comme troisième paramètre
+      await refreshData(dashboardType as 'vfg' | 'vfe' | undefined, activeTab === 'active', selectedTimeframe);
       setLastRefreshTime(new Date());
     } catch (error) {
       console.error('Erreur lors du rafraîchissement des données:', error);
@@ -120,13 +145,31 @@ const UnifiedProblemsView: React.FC<UnifiedProblemsViewProps> = ({ title, varian
           {cssVariant.icon}
           <div>
             <h2 className="text-xl font-semibold text-white mb-1">
-              Problèmes {activeTab === 'active' ? 'Actifs' : 'des 72 dernières heures'}
+              Problèmes {activeTab === 'active' ? 'Actifs' : `des ${getTimeframeLabel(selectedTimeframe)}`}
             </h2>
             <p className="text-slate-300">
-              {activeTab === 'active' 
+              {activeTab === 'active'
                 ? "Suivi en temps réel des incidents et anomalies actuellement actifs"
-                : "Historique consolidé de tous les incidents survenus durant les 72 dernières heures"}
+                : `Historique consolidé de tous les incidents survenus durant les ${getTimeframeLabel(selectedTimeframe)}`}
             </p>
+
+            {/* Sélecteur de période - uniquement visible dans l'onglet "récents" */}
+            {activeTab === 'recent' && (
+              <div className="mt-3 flex items-center">
+                <Calendar className="text-amber-500 mr-2" size={16} />
+                <label htmlFor="timeframeSelector" className="text-white mr-2">Période:</label>
+                <select
+                  id="timeframeSelector"
+                  className="bg-slate-800 text-white py-1 px-2 rounded border border-amber-700 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  value={selectedTimeframe}
+                  onChange={handleTimeframeChange}
+                >
+                  {timeframeOptions.map(option => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
           <div className="ml-auto flex flex-col items-end">
             <div className="flex items-center gap-2 text-sm text-slate-400">
@@ -161,7 +204,7 @@ const UnifiedProblemsView: React.FC<UnifiedProblemsViewProps> = ({ title, varian
             className={getTabClasses('recent')}
           >
             <Clock size={16} className="text-amber-500" />
-            <span>Récents (72h)</span>
+            <span>Récents ({getTimeframeLabel(selectedTimeframe)})</span>
             {problemsLast72h?.length > 0 && (
               <span className="ml-2 bg-amber-900/60 text-amber-200 rounded-full px-2 py-0.5 text-xs">
                 {problemsLast72h.length}
@@ -179,9 +222,11 @@ const UnifiedProblemsView: React.FC<UnifiedProblemsViewProps> = ({ title, varian
             <span className="ml-3 text-slate-400">Chargement des problèmes...</span>
           </div>
         ) : (
-          <ProblemsList 
-            problems={problemsToDisplay || []} 
-            title={activeTab === 'active' ? "Tous les problèmes actifs" : "Tous les problèmes des 72 dernières heures"}
+          <ProblemsList
+            problems={problemsToDisplay || []}
+            title={activeTab === 'active'
+              ? "Tous les problèmes actifs"
+              : `Tous les problèmes des ${getTimeframeLabel(selectedTimeframe)}`}
             showRefreshButton={true}
             onRefresh={handleRefresh}
           />

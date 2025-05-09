@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Shield, AlertTriangle, Clock, RefreshCw, CheckCircle2 } from 'lucide-react';
+import { Shield, AlertTriangle, Clock, RefreshCw, CheckCircle2, Calendar } from 'lucide-react';
 import ProblemsList from '../dashboard/ProblemsList';
 import { Problem } from '../../api/types';
 import axios from 'axios';
@@ -22,6 +22,19 @@ const AllProblemsView: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'active' | 'recent'>('active');
   const [lastRefreshTime, setLastRefreshTime] = useState<Date>(new Date());
   const [error, setError] = useState<string | null>(null);
+
+  // Options prédéfinies pour la sélection de période
+  const timeframeOptions = [
+    { value: "-24h", label: "24 heures" },
+    { value: "-48h", label: "48 heures" },
+    { value: "-72h", label: "72 heures" }, // Option par défaut
+    { value: "-7d", label: "7 jours" },
+    { value: "-14d", label: "14 jours" },
+    { value: "-30d", label: "30 jours" }
+  ];
+
+  // État local pour la période sélectionnée
+  const [selectedTimeframe, setSelectedTimeframe] = useState<string>("-72h"); // 72h par défaut
   
   // Problèmes à afficher selon l'onglet actif
   const problemsToDisplay = activeTab === 'active' ? activeProblems : recentProblems;
@@ -60,6 +73,21 @@ const AllProblemsView: React.FC = () => {
     return [];
   };
   
+  // Fonction pour obtenir le libellé de la période sélectionnée
+  const getTimeframeLabel = (value: string) => {
+    const option = timeframeOptions.find(opt => opt.value === value);
+    return option ? option.label : "72 heures"; // Fallback à 72h si non trouvé
+  };
+
+  // Gestion du changement de période
+  const handleTimeframeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setSelectedTimeframe(e.target.value);
+    // Rechargement automatique des problèmes si on est dans l'onglet récent
+    if (activeTab === 'recent') {
+      loadProblems();
+    }
+  };
+
   // Charger les problèmes directement depuis l'API (sans passer par le context)
   const loadProblems = async () => {
     // Éviter les requêtes simultanées
@@ -67,7 +95,7 @@ const AllProblemsView: React.FC = () => {
       console.log('Une requête est déjà en cours, annulation...');
       return;
     }
-    
+
     requestInProgress.current = true;
     setIsRefreshing(true);
     setError(null);
@@ -104,12 +132,13 @@ const AllProblemsView: React.FC = () => {
         "Erreur lors de la récupération des problèmes actifs VFG:"
       );
       
-      // Problèmes récents VFG - Utilisation de problems-72h
+      // Problèmes récents VFG - Utilisation de problems-72h avec la période sélectionnée
       const vfgRecentResponse = await safeRequest(
         `${API_BASE_URL}/problems-72h`,
         {
           type: "vfg",
-          debug: "true"
+          debug: "true",
+          timeframe: selectedTimeframe // Utiliser la période sélectionnée
         },
         "Erreur lors de la récupération des problèmes récents VFG:"
       );
@@ -131,12 +160,13 @@ const AllProblemsView: React.FC = () => {
         "Erreur lors de la récupération des problèmes actifs VFE:"
       );
       
-      // Problèmes récents VFE - Utilisation de problems-72h
+      // Problèmes récents VFE - Utilisation de problems-72h avec la période sélectionnée
       const vfeRecentResponse = await safeRequest(
         `${API_BASE_URL}/problems-72h`,
         {
           type: "vfe",
-          debug: "true"
+          debug: "true",
+          timeframe: selectedTimeframe // Utiliser la période sélectionnée
         },
         "Erreur lors de la récupération des problèmes récents VFE:"
       );
@@ -455,13 +485,31 @@ const AllProblemsView: React.FC = () => {
           <AlertTriangle size={24} className="text-purple-400" />
           <div>
             <h2 className="text-xl font-semibold text-white mb-1">
-              Tous les Problèmes {activeTab === 'active' ? 'Actifs' : 'des 72 dernières heures'} (VFG + VFE)
+              Tous les Problèmes {activeTab === 'active' ? 'Actifs' : `des ${getTimeframeLabel(selectedTimeframe)}`} (VFG + VFE)
             </h2>
             <p className="text-slate-300">
-              {activeTab === 'active' 
+              {activeTab === 'active'
                 ? "Suivi en temps réel de tous les incidents et anomalies combinés des environnements Vital for Group et Vital for Enterprise"
-                : "Historique consolidé de tous les incidents survenus durant les 72 dernières heures sur tous les environnements critiques"}
+                : `Historique consolidé de tous les incidents survenus durant les ${getTimeframeLabel(selectedTimeframe)} sur tous les environnements critiques`}
             </p>
+
+            {/* Sélecteur de période - uniquement visible dans l'onglet "récents" */}
+            {activeTab === 'recent' && (
+              <div className="mt-3 flex items-center">
+                <Calendar className="text-amber-500 mr-2" size={16} />
+                <label htmlFor="timeframeSelector" className="text-white mr-2">Période:</label>
+                <select
+                  id="timeframeSelector"
+                  className="bg-slate-800 text-white py-1 px-2 rounded border border-amber-700 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  value={selectedTimeframe}
+                  onChange={handleTimeframeChange}
+                >
+                  {timeframeOptions.map(option => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
           <div className="ml-auto flex flex-col items-end">
             <div className="flex items-center gap-2 text-sm text-slate-400">
@@ -506,7 +554,7 @@ const AllProblemsView: React.FC = () => {
             className={getTabClasses('recent')}
           >
             <Clock size={16} className="text-amber-500" />
-            <span>Récents (72h)</span>
+            <span>Récents ({getTimeframeLabel(selectedTimeframe)})</span>
             {recentProblems?.length > 0 && (
               <span className="ml-2 bg-amber-900/60 text-amber-200 rounded-full px-2 py-0.5 text-xs">
                 {recentProblems.length}
@@ -524,9 +572,11 @@ const AllProblemsView: React.FC = () => {
             <span className="ml-3 text-slate-400">Chargement des problèmes...</span>
           </div>
         ) : problemsToDisplay.length > 0 ? (
-          <ProblemsList 
-            problems={problemsToDisplay || []} 
-            title={activeTab === 'active' ? "Tous les problèmes actifs (VFG + VFE)" : "Tous les problèmes des 72 dernières heures (VFG + VFE)"}
+          <ProblemsList
+            problems={problemsToDisplay || []}
+            title={activeTab === 'active'
+              ? "Tous les problèmes actifs (VFG + VFE)"
+              : `Tous les problèmes des ${getTimeframeLabel(selectedTimeframe)} (VFG + VFE)`}
             showRefreshButton={true}
             onRefresh={loadProblems}
           />
