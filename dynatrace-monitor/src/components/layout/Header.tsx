@@ -1,6 +1,4 @@
 import React from 'react';
-import { RefreshCw, Search, Moon, Sun } from 'lucide-react';
-import { useApp } from '../../contexts/AppContext';
 import { useTheme } from '../../contexts/ThemeContext';
 
 interface HeaderProps {
@@ -9,13 +7,12 @@ interface HeaderProps {
 }
 
 const Header: React.FC<HeaderProps> = ({ title, subtitle }) => {
-  const { refreshData } = useApp();
-  const { isDarkTheme, toggleTheme } = useTheme();
+  const { isDarkTheme } = useTheme();
 
   return (
     <header className={`h-14 px-6 flex items-center justify-between sticky top-0 z-20 ${
-      isDarkTheme 
-        ? 'bg-slate-800/90 border-slate-700' 
+      isDarkTheme
+        ? 'bg-slate-800/90 border-slate-700'
         : 'bg-white/90 border-slate-200'
     } border-b shadow-sm backdrop-blur-sm`}>
       <h1 className="font-semibold text-lg">
@@ -29,19 +26,20 @@ const Header: React.FC<HeaderProps> = ({ title, subtitle }) => {
           title
         )}
       </h1>
-      
+
       <div className="flex items-center">
-        <button 
-          onClick={toggleTheme}
-          className={`w-9 h-9 rounded-full flex items-center justify-center ${
-            isDarkTheme 
-              ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' 
-              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-          }`} 
-          title="Changer de thème"
+        {/* Beta feedback badge */}
+        <a
+          href="mailto:Rayane.Bennasr@externe.bnpparibas.com"
+          className={`flex items-center text-xs px-3 py-1.5 rounded-full transition-all duration-300 ${
+            isDarkTheme
+              ? 'bg-blue-900/50 text-blue-300 hover:bg-blue-800/70'
+              : 'bg-blue-100 text-blue-800 hover:bg-blue-200'
+          }`}
         >
-          {isDarkTheme ? <Sun size={14} /> : <Moon size={14} />}
-        </button>
+          <span className="font-bold mr-1.5">BETA</span>
+          <span className={isDarkTheme ? 'text-blue-400' : 'text-blue-600'}>Envoyer un feedback</span>
+        </a>
       </div>
     </header>
   );

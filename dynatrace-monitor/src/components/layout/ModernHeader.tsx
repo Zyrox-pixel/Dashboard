@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { RefreshCw, Moon, Sun, Menu, X, Bell, Search, ChevronDown, Settings } from 'lucide-react';
+import { RefreshCw, Menu, X, Bell, Search, ChevronDown, Settings, MessageCircle } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useApp } from '../../contexts/AppContext';
 
@@ -19,7 +19,7 @@ const ModernHeader: React.FC<ModernHeaderProps> = ({
   onRefresh,
   isLoading = false
 }) => {
-  const { isDarkTheme, toggleTheme } = useTheme();
+  const { isDarkTheme } = useTheme();
   const { activeProblems } = useApp();
   
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -115,14 +115,15 @@ const ModernHeader: React.FC<ModernHeaderProps> = ({
               </button>
             </div>
             
-            {/* Thème */}
-            <button 
-              onClick={toggleTheme} 
-              className="text-slate-400 hover:text-white"
-              aria-label={isDarkTheme ? 'Passer au thème clair' : 'Passer au thème sombre'}
+            {/* Feedback link */}
+            <a
+              href="mailto:Rayane.Bennasr@externe.bnpparibas.com"
+              className="text-slate-400 hover:text-white flex items-center gap-1.5 py-1.5 px-3 rounded-md text-sm transition-all duration-200 hover:bg-indigo-800/30"
+              title="Envoyer un feedback"
             >
-              {isDarkTheme ? <Sun size={18} /> : <Moon size={18} />}
-            </button>
+              <MessageCircle size={16} />
+              <span className="hidden sm:inline bg-blue-700/70 text-blue-100 px-1.5 py-0.5 rounded text-xs font-semibold">BETA</span>
+            </a>
             
             {/* Refresh button with animation */}
             {onRefresh && (
