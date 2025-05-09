@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Shield, AlertTriangle, Clock, Server, Database, BarChart } from 'lucide-react';
 import Layout from '../components/layout/Layout';
 import { useApp } from '../contexts/AppContext';
 import { useProblems } from '../contexts/ProblemsContext';
+import { ManagementZone } from '../api/types';
 
 /**
  * Composant de Vue d'Ensemble qui présente un récapitulatif des dashboards VFG et VFE
@@ -24,19 +25,108 @@ const OverviewDashboard: React.FC = () => {
     vfeProblems72h,
     refreshAll,
     getAggregatedProblems,
-    getAggregatedProblems72h
+    getAggregatedProblems72h,
+    isLoading: problemsLoading
   } = useProblems();
+  
+  const [lastRefreshTime, setLastRefreshTime] = useState(new Date());
+  
+  // États pour stocker les zones avec leurs comptages de problèmes
+  const [vfgZonesWithProblemCount, setVfgZonesWithProblemCount] = useState<Array<ManagementZone & { problemCount: number }>>([]);
+  const [vfeZonesWithProblemCount, setVfeZonesWithProblemCount] = useState<Array<ManagementZone & { problemCount: number }>>([]);
   
   // Récupérer les problèmes agrégés
   const aggregatedActiveProblems = getAggregatedProblems();
   const aggregatedProblems72h = getAggregatedProblems72h();
+  
+  // Effet pour forcer le chargement initial des données
+  useEffect(() => {
+    const loadInitialData = async () => {
+      console.log("Chargement initial des données depuis OverviewDashboard");
+
+      try {
+        // Forcer le rechargement complet des données
+        await refreshAll(true);
+        console.log("Chargement initial terminé avec succès");
+
+        // S'assurer que même sans problèmes, les zones sont initialisées
+        if (vitalForGroupMZs.length > 0 && vfgZonesWithProblemCount.length === 0) {
+          console.log("Initialisation forcée des zones VFG");
+          setVfgZonesWithProblemCount(vitalForGroupMZs.map(zone => ({
+            ...zone,
+            problemCount: vfgProblems.filter(p =>
+              p.zone && p.zone.includes(zone.name)
+            ).length
+          })));
+        }
+
+        if (vitalForEntrepriseMZs.length > 0 && vfeZonesWithProblemCount.length === 0) {
+          console.log("Initialisation forcée des zones VFE");
+          setVfeZonesWithProblemCount(vitalForEntrepriseMZs.map(zone => ({
+            ...zone,
+            problemCount: vfeProblems.filter(p =>
+              p.zone && p.zone.includes(zone.name)
+            ).length
+          })));
+        }
+
+        setLastRefreshTime(new Date());
+      } catch (error) {
+        console.error("Erreur lors du chargement initial des données:", error);
+      }
+    };
+
+    loadInitialData();
+  }, []); // Exécuté uniquement au montage du composant
+  
+  // Effet pour calculer les problèmes par zone pour VFG, y compris au chargement initial
+  useEffect(() => {
+    console.log(`Mise à jour des zones VFG avec ${vfgProblems.length} problèmes (même s'il n'y en a pas)`);
+
+    if (vitalForGroupMZs.length > 0) {
+      const updatedZones = vitalForGroupMZs.map(zone => {
+        // Compter les problèmes pour cette zone
+        const problemCount = vfgProblems.filter(p =>
+          p.zone && p.zone.includes(zone.name)
+        ).length;
+
+        return {
+          ...zone,
+          problemCount
+        };
+      });
+
+      setVfgZonesWithProblemCount(updatedZones);
+    }
+  }, [vfgProblems, vitalForGroupMZs]);
+
+  // Effet pour calculer les problèmes par zone pour VFE, y compris au chargement initial
+  useEffect(() => {
+    console.log(`Mise à jour des zones VFE avec ${vfeProblems.length} problèmes (même s'il n'y en a pas)`);
+
+    if (vitalForEntrepriseMZs.length > 0) {
+      const updatedZones = vitalForEntrepriseMZs.map(zone => {
+        // Compter les problèmes pour cette zone
+        const problemCount = vfeProblems.filter(p =>
+          p.zone && p.zone.includes(zone.name)
+        ).length;
+
+        return {
+          ...zone,
+          problemCount
+        };
+      });
+
+      setVfeZonesWithProblemCount(updatedZones);
+    }
+  }, [vfeProblems, vitalForEntrepriseMZs]);
   
   // Calcul des statistiques VFG
   const vfgStats = {
     totalZones: vitalForGroupMZs.length,
     activeProblems: vfgProblems.length,
     recentProblems: vfgProblems72h.length,
-    criticalZones: vitalForGroupMZs.filter(zone => zone.problemCount > 0).length,
+    criticalZones: vfgZonesWithProblemCount.filter(zone => zone.problemCount > 0).length,
   };
 
   // Calcul des statistiques VFE
@@ -44,16 +134,16 @@ const OverviewDashboard: React.FC = () => {
     totalZones: vitalForEntrepriseMZs.length,
     activeProblems: vfeProblems.length,
     recentProblems: vfeProblems72h.length,
-    criticalZones: vitalForEntrepriseMZs.filter(zone => zone.problemCount > 0).length,
+    criticalZones: vfeZonesWithProblemCount.filter(zone => zone.problemCount > 0).length,
   };
 
   // Déterminer les zones critiques (top 3)
-  const topVfgCriticalZones = vitalForGroupMZs
+  const topVfgCriticalZones = vfgZonesWithProblemCount
     .filter(zone => zone.problemCount > 0)
     .sort((a, b) => b.problemCount - a.problemCount)
     .slice(0, 3);
 
-  const topVfeCriticalZones = vitalForEntrepriseMZs
+  const topVfeCriticalZones = vfeZonesWithProblemCount
     .filter(zone => zone.problemCount > 0)
     .sort((a, b) => b.problemCount - a.problemCount)
     .slice(0, 3);
@@ -61,8 +151,12 @@ const OverviewDashboard: React.FC = () => {
   // Fonction de rafraîchissement manuel
   const handleRefresh = async () => {
     console.log("Rafraîchissement manuel des données depuis OverviewDashboard");
-    await refreshAll(true); // force=true pour ignorer le cache
+    await refreshAll(true);
+    setLastRefreshTime(new Date());
   };
+
+  // Afficher un indicateur de chargement si nécessaire
+  const loading = isLoading.problems || problemsLoading.vfg || problemsLoading.vfe;
 
   return (
     <Layout title="Vue d'Ensemble" subtitle="Supervision globale des applications critiques">
@@ -80,12 +174,12 @@ const OverviewDashboard: React.FC = () => {
           </div>
           <button 
             onClick={handleRefresh}
-            disabled={isLoading.problems}
+            disabled={loading}
             className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 
               disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200
               flex items-center gap-2"
           >
-            <Clock size={16} className={isLoading.problems ? 'animate-spin' : ''} />
+            <Clock size={16} className={loading ? 'animate-spin' : ''} />
             <span>Rafraîchir</span>
           </button>
         </div>
@@ -131,15 +225,15 @@ const OverviewDashboard: React.FC = () => {
             </div>
           </div>
 
-          {/* Zones critiques */}
-          {topVfgCriticalZones.length > 0 && (
-            <div>
-              <h4 className="text-white font-semibold mb-2 flex items-center gap-2">
-                <AlertTriangle size={16} className="text-red-400" />
-                Zones critiques à surveiller
-              </h4>
-              <div className="space-y-2">
-                {topVfgCriticalZones.map(zone => (
+          {/* Zones critiques - toujours afficher la section */}
+          <div>
+            <h4 className="text-white font-semibold mb-2 flex items-center gap-2">
+              <AlertTriangle size={16} className="text-red-400" />
+              Zones critiques à surveiller
+            </h4>
+            <div className="space-y-2">
+              {topVfgCriticalZones.length > 0 ? (
+                topVfgCriticalZones.map(zone => (
                   <div key={zone.id} className="bg-red-900/20 border border-red-900/30 p-2 rounded-md flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <span className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center border border-slate-700">
@@ -151,10 +245,14 @@ const OverviewDashboard: React.FC = () => {
                       {zone.problemCount} problème{zone.problemCount > 1 ? 's' : ''}
                     </span>
                   </div>
-                ))}
-              </div>
+                ))
+              ) : (
+                <div className="bg-slate-800/70 border border-slate-700 p-3 rounded-md text-slate-400 text-center">
+                  Aucune zone critique actuellement
+                </div>
+              )}
             </div>
-          )}
+          </div>
 
           {/* Bouton voir plus */}
           <div className="mt-4 flex justify-end">
@@ -205,15 +303,15 @@ const OverviewDashboard: React.FC = () => {
             </div>
           </div>
 
-          {/* Zones critiques */}
-          {topVfeCriticalZones.length > 0 && (
-            <div>
-              <h4 className="text-white font-semibold mb-2 flex items-center gap-2">
-                <AlertTriangle size={16} className="text-red-400" />
-                Zones critiques à surveiller
-              </h4>
-              <div className="space-y-2">
-                {topVfeCriticalZones.map(zone => (
+          {/* Zones critiques - toujours afficher la section */}
+          <div>
+            <h4 className="text-white font-semibold mb-2 flex items-center gap-2">
+              <AlertTriangle size={16} className="text-red-400" />
+              Zones critiques à surveiller
+            </h4>
+            <div className="space-y-2">
+              {topVfeCriticalZones.length > 0 ? (
+                topVfeCriticalZones.map(zone => (
                   <div key={zone.id} className="bg-red-900/20 border border-red-900/30 p-2 rounded-md flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <span className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center border border-slate-700">
@@ -225,10 +323,14 @@ const OverviewDashboard: React.FC = () => {
                       {zone.problemCount} problème{zone.problemCount > 1 ? 's' : ''}
                     </span>
                   </div>
-                ))}
-              </div>
+                ))
+              ) : (
+                <div className="bg-slate-800/70 border border-slate-700 p-3 rounded-md text-slate-400 text-center">
+                  Aucune zone critique actuellement
+                </div>
+              )}
             </div>
-          )}
+          </div>
 
           {/* Bouton voir plus */}
           <div className="mt-4 flex justify-end">

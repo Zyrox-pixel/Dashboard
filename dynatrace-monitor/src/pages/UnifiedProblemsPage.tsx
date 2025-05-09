@@ -1,19 +1,16 @@
 import React from 'react';
-import { useParams, useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import Layout from '../components/layout/Layout';
 import UnifiedProblemsView from '../components/dashboard/UnifiedProblemsView';
 import AllProblemsView from '../components/common/AllProblemsView';
 
-interface ProblemsPageParams {
-  [key: string]: string | undefined;
-}
 
 /**
  * Page dédiée à l'affichage unifié des problèmes (actifs et récents)
  * Remplace les pages séparées ActiveProblemsPage et RecentProblemsPage
  */
 const UnifiedProblemsPage: React.FC = () => {
-  const params = useParams<ProblemsPageParams>();
+  // Nous n'utilisons pas directement les paramètres d'URL, seulement location
   const location = useLocation();
   
   // Récupérer le paramètre de type de dashboard depuis l'URL

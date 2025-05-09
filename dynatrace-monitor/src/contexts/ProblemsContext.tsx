@@ -85,9 +85,9 @@ export const ProblemsProvider: React.FC<{children: React.ReactNode}> = ({ childr
   
   // Rafraîchir les problèmes VFG
   const refreshVFG = async (force = false) => {
-    // Vérifier si un chargement récent a eu lieu (moins de 30 secondes)
+    // Vérifier si un chargement récent a eu lieu (moins de 15 secondes)
     const now = Date.now();
-    if (!force && now - lastFetchTimeRef.current.vfg < 30000) {
+    if (!force && now - lastFetchTimeRef.current.vfg < 15000) {
       console.log("🔵 Utilisation du cache pour VFG (récent)");
       return;
     }
@@ -131,9 +131,9 @@ export const ProblemsProvider: React.FC<{children: React.ReactNode}> = ({ childr
   
   // Rafraîchir les problèmes VFE
   const refreshVFE = async (force = false) => {
-    // Vérifier si un chargement récent a eu lieu (moins de 30 secondes)
+    // Vérifier si un chargement récent a eu lieu (moins de 15 secondes)
     const now = Date.now();
-    if (!force && now - lastFetchTimeRef.current.vfe < 30000) {
+    if (!force && now - lastFetchTimeRef.current.vfe < 15000) {
       console.log("🟠 Utilisation du cache pour VFE (récent)");
       return;
     }
@@ -222,9 +222,11 @@ export const ProblemsProvider: React.FC<{children: React.ReactNode}> = ({ childr
     return Array.from(problemMap.values());
   };
   
-  // Charger les données initiales
+  // Charger les données initiales immédiatement
   useEffect(() => {
-    refreshAll();
+    console.log("Initialisation du ProblemsContext - chargement immédiat des données");
+    // Forcer le rechargement complet des données
+    refreshAll(true);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   
   const contextValue: ProblemsContextType = {
