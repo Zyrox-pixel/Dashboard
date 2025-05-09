@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   RefreshCw, Menu, X, Bell, Search, ChevronDown, Settings,
   MessageCircle, Moon, Sun, Zap, Globe, AlertTriangle,
@@ -121,7 +121,7 @@ const ModernHeader: React.FC<ModernHeaderProps> = ({
   }, [showSearch]);
 
   // Animation du titre
-  const animatedTitle = useMemo(() => {
+  const renderAnimatedTitle = () => {
     return (
       <div className="relative flex items-center">
         <h1 className="text-lg font-bold text-white relative">{title}
@@ -131,12 +131,12 @@ const ModernHeader: React.FC<ModernHeaderProps> = ({
         {subtitle && (
           <p className="text-xs text-indigo-300 ml-2 opacity-80">{subtitle}</p>
         )}
-        
+
         {/* Particules d'arrière-plan du titre */}
         <div className="absolute inset-0 -z-10 overflow-hidden" aria-hidden="true">
           {Array.from({ length: 3 }).map((_, i) => (
-            <div 
-              key={`particle-${i}`} 
+            <div
+              key={`particle-${i}`}
               className="absolute w-1 h-1 rounded-full bg-indigo-500/70"
               style={{
                 top: `${Math.random() * 100}%`,
@@ -148,7 +148,7 @@ const ModernHeader: React.FC<ModernHeaderProps> = ({
         </div>
       </div>
     );
-  }, [title, subtitle]);
+  };
   
   return (
     <header 
@@ -193,7 +193,7 @@ const ModernHeader: React.FC<ModernHeaderProps> = ({
             </div>
             
             {/* Titre et sous-titre */}
-            {animatedTitle}
+            {renderAnimatedTitle()}
           </div>
           
           {/* Actions */}
