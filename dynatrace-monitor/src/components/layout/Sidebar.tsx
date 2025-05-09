@@ -128,7 +128,7 @@ const Sidebar: React.FC = () => {
                   PRODSEC Monitor
                 </span>
                 <span className="text-xs text-slate-500">
-                  Enterprise Edition
+                  SEC06
                 </span>
               </div>
             </div>
@@ -285,13 +285,17 @@ const Sidebar: React.FC = () => {
               ? 'bg-gradient-to-r from-indigo-900/20 via-blue-900/20 to-indigo-900/10 shadow-inner shadow-black/20' 
               : 'bg-gradient-to-r from-indigo-50 to-blue-50 shadow-inner shadow-blue-100/30'
           }`}>
-            <Command size={16} className={isDarkTheme ? 'text-indigo-400' : 'text-indigo-600'} />
+            {/* BNP Paribas Logo */}
+            <div className="relative flex-shrink-0">
+              <div className={`absolute inset-0 w-5 h-5 bg-green-500 rounded-full blur-md opacity-60 ${isDarkTheme ? 'animate-pulse-slow' : ''}`}></div>
+              <div className="relative z-10 text-green-600 font-bold text-xs">BNP</div>
+            </div>
             {!sidebarCollapsed && (
               <div className="flex flex-col">
                 <span className={`text-xs font-medium ${isDarkTheme ? 'text-slate-300' : 'text-slate-700'}`}>
-                  Enterprise Edition
+                  BNP Paribas
                 </span>
-                <span className="text-[10px] text-slate-500">v2.3.8</span>
+                <span className="text-[10px] text-slate-500">v1.0.0</span>
               </div>
             )}
           </div>
