@@ -172,10 +172,10 @@ const OverviewDashboard: React.FC = () => {
               Vue d'ensemble unifiée des systèmes critiques pour le groupe et l'entreprise
             </p>
           </div>
-          <button 
+          <button
             onClick={handleRefresh}
             disabled={loading}
-            className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 
+            className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700
               disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200
               flex items-center gap-2"
           >
@@ -185,10 +185,57 @@ const OverviewDashboard: React.FC = () => {
         </div>
       </div>
 
+      {/* Section problèmes globaux - DÉPLACÉE EN HAUT */}
+      <div
+        onClick={() => navigate('/problems/unified')}
+        className="p-5 mb-6 rounded-lg border cursor-pointer transition-all
+                  hover:shadow-lg border-slate-700 bg-gradient-to-br from-slate-800 via-slate-900 to-slate-800
+                  hover:bg-gradient-to-br hover:from-slate-700 hover:via-slate-800 hover:to-slate-700"
+      >
+        <div className="flex items-start gap-4">
+          <div className="p-3 rounded-full bg-gradient-to-br from-indigo-600/30 to-blue-900/30 border border-blue-500/30 shadow-md">
+            <AlertTriangle className="text-red-400" size={24} />
+          </div>
+          <div className="flex-1">
+            <h3 className="font-semibold text-lg text-white flex items-center gap-2">
+              PROBLÈMES ACTIFS
+            </h3>
+            <p className="text-slate-400 mt-1">
+              Vue globale de tous les incidents actifs sur l'ensemble des systèmes
+            </p>
+
+            <div className="flex flex-wrap mt-3 gap-3">
+              <div className="flex items-center gap-2 bg-red-900/20 border border-red-800/30 rounded-md px-3 py-1.5">
+                <AlertTriangle size={14} className="text-red-400" />
+                <span className="text-red-300 text-sm font-medium">
+                  {aggregatedActiveProblems.length} actif{aggregatedActiveProblems.length !== 1 ? 's' : ''}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2 bg-amber-900/20 border border-amber-800/30 rounded-md px-3 py-1.5">
+                <Clock size={14} className="text-amber-400" />
+                <span className="text-amber-300 text-sm font-medium">
+                  {aggregatedProblems72h.length} récent{aggregatedProblems72h.length !== 1 ? 's' : ''} (72h)
+                </span>
+              </div>
+
+              <div className="ml-auto flex items-center">
+                <span className="px-3 py-1 text-sm text-slate-400">Voir tous les problèmes</span>
+                <div className="w-8 h-8 rounded-full bg-blue-900/40 flex items-center justify-center border border-blue-600/30">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-400">
+                    <path d="M9 18l6-6-6-6"/>
+                  </svg>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Grille des deux dashboards */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Carte VFG */}
-        <div 
+        <div
           onClick={() => navigate('/vfg')}
           className="p-5 rounded-lg border border-blue-700 bg-gradient-to-br from-slate-800 via-slate-900 to-blue-900/20
             cursor-pointer transition-all hover:shadow-lg hover:from-slate-700 hover:via-slate-800 hover:to-blue-800/20"
@@ -266,7 +313,7 @@ const OverviewDashboard: React.FC = () => {
         </div>
 
         {/* Carte VFE */}
-        <div 
+        <div
           onClick={() => navigate('/vfe')}
           className="p-5 rounded-lg border border-amber-700 bg-gradient-to-br from-slate-800 via-slate-900 to-amber-900/20
             cursor-pointer transition-all hover:shadow-lg hover:from-slate-700 hover:via-slate-800 hover:to-amber-800/20"
@@ -340,53 +387,6 @@ const OverviewDashboard: React.FC = () => {
                 <path d="M9 18l6-6-6-6"/>
               </svg>
             </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Section problèmes globaux */}
-      <div 
-        onClick={() => navigate('/problems/unified')}
-        className="p-5 mt-6 rounded-lg border cursor-pointer transition-all
-                  hover:shadow-lg border-slate-700 bg-gradient-to-br from-slate-800 via-slate-900 to-slate-800 
-                  hover:bg-gradient-to-br hover:from-slate-700 hover:via-slate-800 hover:to-slate-700"
-      >
-        <div className="flex items-start gap-4">
-          <div className="p-3 rounded-full bg-gradient-to-br from-indigo-600/30 to-blue-900/30 border border-blue-500/30 shadow-md">
-            <AlertTriangle className="text-red-400" size={24} />
-          </div>
-          <div className="flex-1">
-            <h3 className="font-semibold text-lg text-white flex items-center gap-2">
-              PROBLÈMES ACTIFS
-            </h3>
-            <p className="text-slate-400 mt-1">
-              Vue globale de tous les incidents actifs sur l'ensemble des systèmes
-            </p>
-            
-            <div className="flex flex-wrap mt-3 gap-3">
-              <div className="flex items-center gap-2 bg-red-900/20 border border-red-800/30 rounded-md px-3 py-1.5">
-                <AlertTriangle size={14} className="text-red-400" />
-                <span className="text-red-300 text-sm font-medium">
-                  {aggregatedActiveProblems.length} actif{aggregatedActiveProblems.length !== 1 ? 's' : ''}
-                </span>
-              </div>
-              
-              <div className="flex items-center gap-2 bg-amber-900/20 border border-amber-800/30 rounded-md px-3 py-1.5">
-                <Clock size={14} className="text-amber-400" />
-                <span className="text-amber-300 text-sm font-medium">
-                  {aggregatedProblems72h.length} récent{aggregatedProblems72h.length !== 1 ? 's' : ''} (72h)
-                </span>
-              </div>
-              
-              <div className="ml-auto flex items-center">
-                <span className="px-3 py-1 text-sm text-slate-400">Voir tous les problèmes</span>
-                <div className="w-8 h-8 rounded-full bg-blue-900/40 flex items-center justify-center border border-blue-600/30">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-400">
-                    <path d="M9 18l6-6-6-6"/>
-                  </svg>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
       </div>
