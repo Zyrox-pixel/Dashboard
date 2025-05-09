@@ -12,58 +12,37 @@ export const exportProblemsToCSV = (
   filterType: 'vfg' | 'vfe' | 'all',
   mgmtZone?: string
 ): { csv: string; filename: string } => {
-  // Créer l'en-tête du CSV
+  // Créer l'en-tête du CSV selon les nouvelles exigences
   const headers = [
-    'Identifiant',
-    'Date de création',
-    'Zone (VFE/VFG)',
-    'Sous-zone',
-    'Statut',
-    'Priorité',
-    'Description'
+    'Management Zone',
+    'Contenu du problème',
+    'Entité impactée',
+    'Date',
+    'Durée'
   ];
 
   // Mapper les problèmes au format CSV
   const rows = problems.map(problem => {
-    // Déterminer la zone (VFE/VFG)
-    const zoneType = problem.zone.toLowerCase().includes('vfg') 
-      ? 'VFG' 
-      : problem.zone.toLowerCase().includes('vfe') 
-        ? 'VFE' 
-        : 'N/A';
-    
     // Extraire la date depuis le champ time (ex: "Depuis 2023-04-15 14:30")
     let creationDate = 'N/A';
     const dateMatch = problem.time?.match(/(\d{4}-\d{2}-\d{2})/);
     if (dateMatch && dateMatch[1]) {
       creationDate = dateMatch[1];
     }
-    
-    // Obtenir le statut formaté
-    const status = problem.resolved 
-      ? 'Résolu' 
-      : problem.status === 'critical' 
-        ? 'Critique' 
-        : problem.status === 'warning' 
-          ? 'Avertissement' 
-          : 'Bas';
-    
-    // Mapper la priorité
-    const priority = problem.impact === 'ÉLEVÉ'
-      ? 'Haute'
-      : problem.impact === 'MOYEN'
-        ? 'Moyenne'
-        : 'Basse';
-    
-    // Construire la ligne CSV
+
+    // Déterminer l'entité impactée - utiliser en priorité host/impacted
+    const impactedEntity = problem.host || problem.impacted || 'Non spécifiée';
+
+    // Utiliser la durée si disponible, sinon N/A
+    const duration = problem.duration || 'N/A';
+
+    // Construire la ligne CSV avec le nouveau format
     return [
-      problem.id,
-      creationDate,
-      zoneType,
-      problem.zone,
-      status,
-      priority,
-      problem.title
+      problem.zone,                 // Management Zone
+      problem.title,                // Contenu du problème (description)
+      impactedEntity,               // Entité impactée
+      creationDate,                 // Date
+      duration                      // Durée
     ];
   });
 
