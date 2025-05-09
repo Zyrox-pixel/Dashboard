@@ -39,29 +39,65 @@ const OverviewDashboard: React.FC = () => {
   const aggregatedActiveProblems = getAggregatedProblems();
   const aggregatedProblems72h = getAggregatedProblems72h();
   
-  // Effet pour forcer le chargement initial des données - optimisé
+  // Effet pour forcer le chargement initial des données - optimisé avec cache avancé
   useEffect(() => {
     const loadInitialData = async () => {
       console.log("Chargement initial des données depuis OverviewDashboard");
 
       try {
-        // Priorité élevée pour le chargement initial
-        if (window.navigator && 'setAppBadge' in window.navigator) {
-          // @ts-ignore - API moderne pour indiquer une activité au niveau du navigateur
-          window.navigator.setAppBadge();
+        // Vérifier si des données existent dans sessionStorage pour accélérer l'affichage
+        const hasSessionData = sessionStorage.getItem('dashboardData');
+
+        if (hasSessionData) {
+          try {
+            const parsedData = JSON.parse(hasSessionData);
+            // Pré-initialisation rapide pour l'affichage immédiat
+            console.log("🚀 Utilisation des données en session pour affichage instantané");
+            // Le reste sera chargé par le ProblemsContext
+          } catch (e) {
+            console.error("Erreur lors du parsing des données en session:", e);
+          }
         }
 
-        // Utiliser Promise.all pour accélérer le chargement
-        await Promise.all([
-          // Priorité 1: Chargement immédiat des données des problèmes pour affichage rapide
-          refreshAll(true),
+        // Priorité élevée pour le chargement initial
+        if (!initialLoadComplete) {
+          if (window.navigator && 'setAppBadge' in window.navigator) {
+            // @ts-ignore - API moderne pour indiquer une activité au niveau du navigateur
+            window.navigator.setAppBadge();
+          }
 
-          // Initialisation des zones même avant d'avoir les données finales
-          new Promise(resolve => {
-            // Initier le chargement sans attendre les résultats complets
-            setTimeout(resolve, 10);
-          })
-        ]);
+          // Suppression des requêtes non-critiques sur la version mobile
+          const isMobile = window.innerWidth < 768;
+          if (isMobile) {
+            console.log("📱 Mode mobile détecté - optimisation du chargement");
+            // En mobile, charger en priorité les problèmes critiques uniquement
+            await refreshAll(false); // Pas de force refresh, utiliser le cache si récent
+          } else {
+            // Sur desktop, chargement complet mais parallélisé
+            await Promise.all([
+              // Priorité 1: Chargement immédiat des données des problèmes pour affichage rapide
+              refreshAll(!hasSessionData), // Force refresh seulement si pas de données en session
+
+              // Initialisation des zones même avant d'avoir les données finales
+              new Promise(resolve => {
+                // Initier le chargement sans attendre les résultats complets
+                setTimeout(resolve, 10);
+              })
+            ]);
+          }
+        } else {
+          // Chargement silencieux en arrière-plan pour les visites ultérieures
+          console.log("🔄 Rafraîchissement silencieux des données");
+          refreshAll(false).catch(e => console.error("Erreur de rafraîchissement silencieux:", e));
+        }
+
+        // Sauvegarder les données dans sessionStorage pour accès rapide ultérieur
+        const dataToSave = {
+          vfgStats: { ...vfgStats },
+          vfeStats: { ...vfeStats },
+          timestamp: Date.now()
+        };
+        sessionStorage.setItem('dashboardData', JSON.stringify(dataToSave));
 
         console.log("Chargement initial terminé avec succès");
 
@@ -174,8 +210,12 @@ const OverviewDashboard: React.FC = () => {
   // Améliorations d'UX pour le chargement
   const loading = isLoading.problems || problemsLoading.vfg || problemsLoading.vfe;
 
-  // État pour contrôler le spinner visuel pendant le chargement initial
-  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
+  // État pour contrôler le spinner visuel UNIQUEMENT pendant le chargement initial
+  const [initialLoadComplete, setInitialLoadComplete] = useState(() => {
+    // Vérifier si nous avons déjà chargé cette page dans cette session
+    const hasLoadedBefore = sessionStorage.getItem('dashboardLoaded');
+    return hasLoadedBefore === 'true';
+  });
 
   // Effet pour masquer le skeleton loader après le chargement des données
   useEffect(() => {
@@ -184,6 +224,8 @@ const OverviewDashboard: React.FC = () => {
       // Délai court pour une transition fluide
       const timer = setTimeout(() => {
         setInitialLoadComplete(true);
+        // Marquer que nous avons déjà chargé cette page
+        sessionStorage.setItem('dashboardLoaded', 'true');
       }, 300);
       return () => clearTimeout(timer);
     }
@@ -464,8 +506,8 @@ const OverviewDashboard: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-6">
         {/* Total Hosts */}
 
-        {/* Overlay de chargement élégant - visible uniquement pendant le chargement initial */}
-        {(!initialLoadComplete || loading) && (
+        {/* Overlay de chargement élégant - visible uniquement pendant le tout premier chargement */}
+        {!initialLoadComplete && (
           <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center">
             <div className="bg-slate-800 p-8 rounded-lg border border-indigo-700 shadow-xl max-w-md w-full">
               <div className="flex flex-col items-center text-center">

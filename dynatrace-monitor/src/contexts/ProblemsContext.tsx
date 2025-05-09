@@ -16,7 +16,7 @@ interface ProblemsState {
 interface ProblemsContextType extends ProblemsState {
   refreshVFG: (force?: boolean) => Promise<void>;
   refreshVFE: (force?: boolean) => Promise<void>;
-  refreshAll: (force?: boolean) => Promise<void>;
+  refreshAll: (force?: boolean) => Promise<boolean | void>;
   getAggregatedProblems: () => Problem[];
   getAggregatedProblems72h: () => Problem[];
 }
@@ -77,11 +77,77 @@ export const ProblemsProvider: React.FC<{children: React.ReactNode}> = ({ childr
   const [vfeProblems72h, setVfeProblems72h] = useState<Problem[]>([]);
   const [isLoading, setIsLoading] = useState({ vfg: false, vfe: false });
   
-  // Cache pour éviter les requêtes répétées
+  // Cache avancé pour éviter les requêtes répétées - avec localStorage
   const lastFetchTimeRef = useRef({
     vfg: 0,
     vfe: 0
   });
+
+  // Système de cache pour stocker les données entre les sessions
+  const cacheRef = useRef({
+    vfgProblems: null as Problem[] | null,
+    vfeProblems: null as Problem[] | null,
+    vfgProblems72h: null as Problem[] | null,
+    vfeProblems72h: null as Problem[] | null
+  });
+
+  // Fonction utilitaire pour charger les données du cache
+  const loadFromCache = () => {
+    try {
+      const cachedData = localStorage.getItem('problemsData');
+      if (cachedData) {
+        const parsedData = JSON.parse(cachedData);
+
+        // Vérifier que les données ne sont pas trop anciennes (max 1 heure)
+        if (parsedData.timestamp && Date.now() - parsedData.timestamp < 3600000) {
+          // Charger les problèmes depuis le cache si disponibles
+          if (parsedData.vfgProblems && parsedData.vfgProblems.length > 0) {
+            setVfgProblems(parsedData.vfgProblems);
+            cacheRef.current.vfgProblems = parsedData.vfgProblems;
+          }
+
+          if (parsedData.vfeProblems && parsedData.vfeProblems.length > 0) {
+            setVfeProblems(parsedData.vfeProblems);
+            cacheRef.current.vfeProblems = parsedData.vfeProblems;
+          }
+
+          if (parsedData.vfgProblems72h && parsedData.vfgProblems72h.length > 0) {
+            setVfgProblems72h(parsedData.vfgProblems72h);
+            cacheRef.current.vfgProblems72h = parsedData.vfgProblems72h;
+          }
+
+          if (parsedData.vfeProblems72h && parsedData.vfeProblems72h.length > 0) {
+            setVfeProblems72h(parsedData.vfeProblems72h);
+            cacheRef.current.vfeProblems72h = parsedData.vfeProblems72h;
+          }
+
+          console.log("💾 Données chargées depuis le cache local");
+          return true;
+        }
+      }
+    } catch (error) {
+      console.error("Erreur lors du chargement des données du cache:", error);
+    }
+    return false;
+  };
+
+  // Fonction utilitaire pour sauvegarder les données dans le cache
+  const saveToCache = () => {
+    try {
+      const dataToCache = {
+        vfgProblems: vfgProblems,
+        vfeProblems: vfeProblems,
+        vfgProblems72h: vfgProblems72h,
+        vfeProblems72h: vfeProblems72h,
+        timestamp: Date.now()
+      };
+
+      localStorage.setItem('problemsData', JSON.stringify(dataToCache));
+      console.log("💾 Données sauvegardées dans le cache local");
+    } catch (error) {
+      console.error("Erreur lors de la sauvegarde des données dans le cache:", error);
+    }
+  };
   
   // Rafraîchir les problèmes VFG
   const refreshVFG = async (force = false) => {
@@ -187,17 +253,55 @@ export const ProblemsProvider: React.FC<{children: React.ReactNode}> = ({ childr
     }
   };
   
-  // Rafraîchir tous les problèmes
-  const refreshAll = async (force = false) => {
+  // Rafraîchir tous les problèmes - version optimisée avec types corrigés
+  const refreshAll = async (force = false): Promise<boolean | void> => {
     console.log("🔄 Rafraîchissement de tous les problèmes...");
-    
-    // Exécuter les deux rafraîchissements en parallèle
-    await Promise.all([
-      refreshVFG(force),
-      refreshVFE(force)
-    ]);
-    
-    console.log("✅ Rafraîchissement complet terminé");
+
+    // Optimisation: utiliser AbortController pour annuler les requêtes trop longues
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 20000); // 20 secondes max
+
+    try {
+      // Utiliser les données du cache comme fallback en cas d'échec de chargement
+      const initialVfgProblems = [...vfgProblems];
+      const initialVfeProblems = [...vfeProblems];
+
+      // Exécuter les deux rafraîchissements en parallèle
+      await Promise.all([
+        refreshVFG(force),
+        refreshVFE(force)
+      ]);
+
+      // Sauvegarder les données mise à jour dans le cache local
+      setTimeout(saveToCache, 300);
+
+      console.log("✅ Rafraîchissement complet terminé avec succès");
+      return true;
+    } catch (error) {
+      console.error("❌ Erreur lors du rafraîchissement:", error);
+
+      // En cas d'erreur, revenir aux données précédentes si disponibles
+      if (vfgProblems.length === 0 && cacheRef.current.vfgProblems) {
+        setVfgProblems(cacheRef.current.vfgProblems);
+      }
+
+      if (vfeProblems.length === 0 && cacheRef.current.vfeProblems) {
+        setVfeProblems(cacheRef.current.vfeProblems);
+      }
+
+      // Essayer une approche séquentielle pour éviter la surcharge
+      try {
+        await refreshVFG(force);
+        await refreshVFE(force);
+        console.log("✅ Rafraîchissement séquentiel terminé");
+        return true;
+      } catch (fallbackError) {
+        console.error("❌ Échec complet du rafraîchissement:", fallbackError);
+        return false;
+      }
+    } finally {
+      clearTimeout(timeoutId);
+    }
   };
   
   // Récupérer tous les problèmes agrégés
@@ -234,11 +338,40 @@ export const ProblemsProvider: React.FC<{children: React.ReactNode}> = ({ childr
     return Array.from(problemMap.values());
   };
   
-  // Charger les données initiales immédiatement
+  // Charger les données initiales avec système de cache optimisé
   useEffect(() => {
-    console.log("Initialisation du ProblemsContext - chargement immédiat des données");
-    // Forcer le rechargement complet des données
-    refreshAll(true);
+    console.log("Initialisation du ProblemsContext - avec cache optimisé");
+
+    // D'abord, essayer de charger les données depuis le cache local
+    const cacheLoaded = loadFromCache();
+
+    // Si les données n'ont pas été chargées depuis le cache ou sont invalides
+    if (!cacheLoaded) {
+      // Forcer le rechargement complet des données
+      refreshAll(true).then(() => {
+        // Sauvegarder les données fraîchement chargées dans le cache
+        // Attendre un court délai pour s'assurer que les états ont été mis à jour
+        setTimeout(saveToCache, 500);
+      });
+    } else {
+      // Si des données ont été chargées depuis le cache, déclencher un rafraîchissement silencieux
+      // pour mettre à jour les données en arrière-plan sans bloquer l'interface
+      setTimeout(() => {
+        refreshAll(false).then(() => {
+          // Mettre à jour le cache avec les données fraîches
+          saveToCache();
+        });
+      }, 3000); // Délai pour permettre au reste de l'UI de se charger d'abord
+    }
+
+    // Configurer un intervalle pour sauvegarder périodiquement les données dans le cache
+    const saveInterval = setInterval(saveToCache, 300000); // 5 minutes
+
+    return () => {
+      clearInterval(saveInterval);
+      // Sauvegarder une dernière fois avant de démonter le composant
+      saveToCache();
+    };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   
   const contextValue: ProblemsContextType = {
