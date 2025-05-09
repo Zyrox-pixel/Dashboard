@@ -109,15 +109,13 @@ const Sidebar: React.FC = () => {
       <div className={`h-20 flex items-center px-5 ${
         isDarkTheme ? 'border-b border-slate-700/50' : 'border-b border-slate-200/70'
       }`}>
-        <div className="flex items-center gap-4 overflow-hidden">
-          {/* Logo amélioré avec meilleur contraste et espacement */}
-          <div className="relative flex items-center justify-center">
-            <div className={`absolute inset-0 w-8 h-8 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-full blur-sm opacity-80 ${
+        <div className="flex items-center gap-3 overflow-hidden">
+          {/* Logo avec effet de lueur */}
+          <div className="relative">
+            <div className={`absolute inset-0 w-9 h-9 bg-blue-500 rounded-full blur-md opacity-60 ${
               isDarkTheme ? 'animate-pulse-slow' : ''
             }`}></div>
-            <div className="relative z-10 w-7 h-7 flex items-center justify-center rounded-full bg-slate-800/80 border border-indigo-500/50 shadow-md">
-              <Shield className="text-indigo-400 drop-shadow-md" size={16} strokeWidth={2.5} />
-            </div>
+            <Shield className="text-indigo-500 relative z-10 flex-shrink-0" size={22} />
           </div>
           
           {/* Titre avec animation d'apparition */}
