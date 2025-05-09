@@ -1,15 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AlertTriangle, Clock, RefreshCw, Filter, CalendarRange, Shield, BarChart, Calendar } from 'lucide-react';
+import { AlertTriangle, Clock, RefreshCw, Filter, CalendarRange, Shield, BarChart, Calendar, FileDown } from 'lucide-react';
 import ProblemsList from './ProblemsList';
 import { Problem } from '../../api/types';
 import { useApp } from '../../contexts/AppContext';
+import { exportProblemsToCSV, downloadCSV } from '../../utils/exportUtils';
 
 interface UnifiedProblemsViewProps {
   /** Titre principal de la vue */
   title: string;
   /** Variante du dashboard (vfg, vfe ou all) */
   variant: 'vfg' | 'vfe' | 'all';
+  /** Filtre de zone optionnel (pour les sous-zones de management) */
+  zoneFilter?: string;
 }
 
 // Clé de session storage pour mémoriser les données
@@ -21,7 +24,7 @@ const CACHE_LIFETIME = 10 * 60 * 1000; // 10 minutes en millisecondes
  * Composant de vue unifiée des problèmes combinant problèmes actifs et récents (72h)
  * dans une interface à onglets moderne et interactive
  */
-const UnifiedProblemsView: React.FC<UnifiedProblemsViewProps> = ({ title, variant }) => {
+const UnifiedProblemsView: React.FC<UnifiedProblemsViewProps> = ({ title, variant, zoneFilter }) => {
   const navigate = useNavigate();
   const { activeProblems, problemsLast72h, isLoading, refreshData } = useApp();
 
@@ -353,6 +356,28 @@ const UnifiedProblemsView: React.FC<UnifiedProblemsViewProps> = ({ title, varian
     } flex items-center gap-2`;
   };
 
+  // Fonction pour exporter les problèmes en CSV
+  const handleExportCSV = () => {
+    // Déterminer quels problèmes exporter en fonction de l'onglet actif
+    const problemsToExport = activeTab === 'active' ? cachedActiveProblems : cachedProblemsLast72h;
+
+    // Si aucun problème, ne rien faire
+    if (!problemsToExport || problemsToExport.length === 0) {
+      alert('Aucun problème à exporter.');
+      return;
+    }
+
+    // Générer le CSV
+    const { csv, filename } = exportProblemsToCSV(
+      problemsToExport,
+      variant,
+      zoneFilter // Passer le filtre de zone si présent (undefined par défaut)
+    );
+
+    // Télécharger le fichier
+    downloadCSV(csv, filename);
+  };
+
   // Déterminer les couleurs d'accentuation en fonction de la variante
   const accentColor = variant === 'vfg' ? 'blue' : 'amber';
 
@@ -464,6 +489,18 @@ const UnifiedProblemsView: React.FC<UnifiedProblemsViewProps> = ({ title, varian
                 {cachedProblemsLast72h.length}
               </span>
             )}
+          </button>
+
+          {/* Bouton d'export CSV */}
+          <button
+            onClick={handleExportCSV}
+            className={`px-4 py-3 text-sm font-medium rounded-t-lg transition-all duration-200
+              bg-slate-900 text-slate-400 hover:bg-slate-800/50 hover:text-green-300 border-b border-slate-700
+              flex items-center gap-2 ml-auto`}
+            title="Télécharger les problèmes au format CSV"
+          >
+            <FileDown size={16} className="text-green-500" />
+            <span>Télécharger CSV</span>
           </button>
         </div>
       </div>

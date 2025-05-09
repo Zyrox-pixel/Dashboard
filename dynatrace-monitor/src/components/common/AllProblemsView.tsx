@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Shield, AlertTriangle, Clock, RefreshCw, CheckCircle2, Calendar } from 'lucide-react';
+import { Shield, AlertTriangle, Clock, RefreshCw, CheckCircle2, Calendar, FileDown } from 'lucide-react';
 import ProblemsList from '../dashboard/ProblemsList';
 import { Problem } from '../../api/types';
 import axios from 'axios';
 import { API_BASE_URL } from '../../api/endpoints';
+import { exportProblemsToCSV, downloadCSV } from '../../utils/exportUtils';
 
 // Clé de session storage pour mémoriser les données
 const PROBLEMS_CACHE_KEY = 'allProblemsViewData';
@@ -500,7 +501,28 @@ const AllProblemsView: React.FC = () => {
   const handleTabChange = (tab: 'active' | 'recent') => {
     setActiveTab(tab);
   };
-  
+
+  // Fonction pour exporter les problèmes en CSV
+  const handleExportCSV = () => {
+    // Déterminer quels problèmes exporter en fonction de l'onglet actif
+    const problemsToExport = activeTab === 'active' ? activeProblems : recentProblems;
+
+    // Si aucun problème, ne rien faire
+    if (!problemsToExport || problemsToExport.length === 0) {
+      alert('Aucun problème à exporter.');
+      return;
+    }
+
+    // Générer le CSV
+    const { csv, filename } = exportProblemsToCSV(
+      problemsToExport,
+      'all' // Type 'all' pour indiquer qu'il s'agit de la vue combinée VFE + VFG
+    );
+
+    // Télécharger le fichier
+    downloadCSV(csv, filename);
+  };
+
   // Retour au tableau de bord
   const handleBackClick = () => {
     // Sauvegarder l'état avant la navigation
@@ -603,8 +625,8 @@ const AllProblemsView: React.FC = () => {
       {/* Navigation par onglets */}
       <div className="border-b border-slate-700 mb-4">
         <div className="flex space-x-1">
-          <button 
-            onClick={() => handleTabChange('active')} 
+          <button
+            onClick={() => handleTabChange('active')}
             className={getTabClasses('active')}
           >
             <AlertTriangle size={16} className="text-red-500" />
@@ -615,9 +637,9 @@ const AllProblemsView: React.FC = () => {
               </span>
             )}
           </button>
-          
-          <button 
-            onClick={() => handleTabChange('recent')} 
+
+          <button
+            onClick={() => handleTabChange('recent')}
             className={getTabClasses('recent')}
           >
             <Clock size={16} className="text-amber-500" />
@@ -627,6 +649,18 @@ const AllProblemsView: React.FC = () => {
                 {recentProblems.length}
               </span>
             )}
+          </button>
+
+          {/* Bouton d'export CSV */}
+          <button
+            onClick={handleExportCSV}
+            className={`px-4 py-3 text-sm font-medium rounded-t-lg transition-all duration-200
+              bg-slate-900 text-slate-400 hover:bg-slate-800/50 hover:text-green-300 border-b border-slate-700
+              flex items-center gap-2 ml-auto`}
+            title="Télécharger les problèmes au format CSV"
+          >
+            <FileDown size={16} className="text-green-500" />
+            <span>Télécharger CSV</span>
           </button>
         </div>
       </div>
