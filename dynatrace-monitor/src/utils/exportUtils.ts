@@ -32,7 +32,7 @@ export const exportProblemsToCSV = (
 
     // Déterminer l'entité impactée de la même façon que ProblemCard.tsx
     let impactedEntity = 'Non spécifiée';
-
+    
     // PRIORITÉ 1: Utiliser le champ impacted
     if (problem.impacted && problem.impacted !== "Non spécifié") {
       impactedEntity = problem.impacted;
@@ -44,19 +44,19 @@ export const exportProblemsToCSV = (
     // PRIORITÉ 3: Utiliser impactedEntities s'il existe et contient des entités
     else if (problem.impactedEntities && Array.isArray(problem.impactedEntities)) {
       // Chercher d'abord un HOST
-      const hostEntity = problem.impactedEntities.find(entity =>
+      const hostEntity = problem.impactedEntities.find(entity => 
         entity.entityId && entity.entityId.type === 'HOST' && entity.name
       );
-
+      
       if (hostEntity) {
         impactedEntity = hostEntity.name;
       }
       // Si aucun HOST, chercher tout autre type d'entité
       else {
-        const anyEntity = problem.impactedEntities.find(entity =>
+        const anyEntity = problem.impactedEntities.find(entity => 
           entity.entityId && entity.name
         );
-
+        
         if (anyEntity) {
           impactedEntity = anyEntity.name;
         }
@@ -69,7 +69,7 @@ export const exportProblemsToCSV = (
 
     // Utiliser la durée si disponible, sinon N/A
     const duration = problem.duration || 'N/A';
-
+    
     // Construire la ligne CSV avec le nouveau format
     return [
       problem.zone,                 // Management Zone
@@ -80,10 +80,25 @@ export const exportProblemsToCSV = (
     ];
   });
 
-  // Combiner l'en-tête et les lignes avec séparateur de colonnes approprié
+  // Créer un en-tête informatif avec la zone et l'heure d'extraction
+  const now = new Date();
+  const formattedDateTime = now.toLocaleDateString('fr-FR') + ' ' + now.toLocaleTimeString('fr-FR');
+  
+  // Créer un en-tête encadré pour le CSV
+  const headerFrame = [
+    '"=========================================="',
+    `"       EXPORT PROBLEMES DYNATRACE        "`,
+    '"=========================================="',
+    `"Management Zone: ${mgmtZone || (filterType === 'all' ? 'VFE + VFG' : filterType.toUpperCase())}"`,
+    `"Date d'extraction: ${formattedDateTime}"`,
+    '"=========================================="',
+    '""',  // Ligne vide pour séparer l'en-tête des données
+  ];
+
   // Ajouter BOM (Byte Order Mark) pour l'encodage UTF-8 correct
   const BOM = '\uFEFF';
   const csvContent = BOM + [
+    ...headerFrame,
     // Utiliser des guillemets pour chaque cellule et échapper les guillemets doubles
     headers.map(header => `"${header.replace(/"/g, '""')}"`).join(';'),
     ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(';'))
@@ -92,6 +107,7 @@ export const exportProblemsToCSV = (
   // Générer le nom du fichier
   const today = new Date();
   const datePrefix = today.toISOString().slice(0, 10).replace(/-/g, '');
+  
   let zoneLabel = '';
   
   switch (filterType) {
@@ -122,24 +138,24 @@ export const exportProblemsToCSV = (
 export const downloadCSV = (csvContent: string, filename: string): void => {
   // Créer un Blob avec le contenu CSV et spécifier l'encodage UTF-8
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8' });
-
+  
   // Créer un lien de téléchargement
   const link = document.createElement('a');
-
+  
   // Créer une URL pour le Blob
   const url = URL.createObjectURL(blob);
-
+  
   // Configurer le lien
   link.setAttribute('href', url);
   link.setAttribute('download', filename);
   link.style.visibility = 'hidden';
-
+  
   // Ajouter le lien au document
   document.body.appendChild(link);
-
+  
   // Cliquer sur le lien pour déclencher le téléchargement
   link.click();
-
+  
   // Nettoyer
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
@@ -171,9 +187,25 @@ export const exportHostsToCSV = (
     host.ram !== null ? `${host.ram}%` : 'N/A'  // RAM
   ]);
 
+  // Créer un en-tête informatif avec la zone et l'heure d'extraction
+  const now = new Date();
+  const formattedDateTime = now.toLocaleDateString('fr-FR') + ' ' + now.toLocaleTimeString('fr-FR');
+  
+  // Créer un en-tête encadré pour le CSV
+  const headerFrame = [
+    '"=========================================="',
+    `"          EXPORT HOSTS DYNATRACE         "`,
+    '"=========================================="',
+    `"Management Zone: ${zoneName}"`,
+    `"Date d'extraction: ${formattedDateTime}"`,
+    '"=========================================="',
+    '""',  // Ligne vide pour séparer l'en-tête des données
+  ];
+
   // Ajouter BOM (Byte Order Mark) pour l'encodage UTF-8 correct
   const BOM = '\uFEFF';
   const csvContent = BOM + [
+    ...headerFrame,
     // Utiliser des guillemets pour chaque cellule et échapper les guillemets doubles
     headers.map(header => `"${header.replace(/"/g, '""')}"`).join(';'),
     ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(';'))
@@ -182,10 +214,10 @@ export const exportHostsToCSV = (
   // Générer le nom du fichier avec la date du jour
   const today = new Date();
   const datePrefix = today.toISOString().slice(0, 10).replace(/-/g, '');
-
+  
   // Nettoyer le nom de la zone pour le nom de fichier
   const safeZoneName = zoneName.replace(/[^a-z0-9]/gi, '_');
-
+  
   const filename = `hosts_${safeZoneName}_${datePrefix}.csv`;
 
   return { csv: csvContent, filename };
@@ -219,9 +251,25 @@ export const exportServicesToCSV = (
     service.requests !== null ? service.requests.toString() : 'N/A'            // Nombre de requêtes
   ]);
 
+  // Créer un en-tête informatif avec la zone et l'heure d'extraction
+  const now = new Date();
+  const formattedDateTime = now.toLocaleDateString('fr-FR') + ' ' + now.toLocaleTimeString('fr-FR');
+  
+  // Créer un en-tête encadré pour le CSV
+  const headerFrame = [
+    '"=========================================="',
+    `"        EXPORT SERVICES DYNATRACE        "`,
+    '"=========================================="',
+    `"Management Zone: ${zoneName}"`,
+    `"Date d'extraction: ${formattedDateTime}"`,
+    '"=========================================="',
+    '""',  // Ligne vide pour séparer l'en-tête des données
+  ];
+
   // Ajouter BOM (Byte Order Mark) pour l'encodage UTF-8 correct
   const BOM = '\uFEFF';
   const csvContent = BOM + [
+    ...headerFrame,
     // Utiliser des guillemets pour chaque cellule et échapper les guillemets doubles
     headers.map(header => `"${header.replace(/"/g, '""')}"`).join(';'),
     ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(';'))
@@ -230,10 +278,10 @@ export const exportServicesToCSV = (
   // Générer le nom du fichier avec la date du jour
   const today = new Date();
   const datePrefix = today.toISOString().slice(0, 10).replace(/-/g, '');
-
+  
   // Nettoyer le nom de la zone pour le nom de fichier
   const safeZoneName = zoneName.replace(/[^a-z0-9]/gi, '_');
-
+  
   const filename = `services_${safeZoneName}_${datePrefix}.csv`;
 
   return { csv: csvContent, filename };
@@ -263,7 +311,7 @@ export const exportProcessGroupsToCSV = (
     if (process.type === 'technology') processType = 'Technologie';
     else if (process.type === 'database') processType = 'Base de données';
     else if (process.type === 'server') processType = 'Serveur';
-
+    
     return [
       process.name,                    // Nom du process group
       process.technology || 'Non spécifié', // Technologie
@@ -271,9 +319,25 @@ export const exportProcessGroupsToCSV = (
     ];
   });
 
+  // Créer un en-tête informatif avec la zone et l'heure d'extraction
+  const now = new Date();
+  const formattedDateTime = now.toLocaleDateString('fr-FR') + ' ' + now.toLocaleTimeString('fr-FR');
+  
+  // Créer un en-tête encadré pour le CSV
+  const headerFrame = [
+    '"=========================================="',
+    `"    EXPORT PROCESS GROUPS DYNATRACE      "`,
+    '"=========================================="',
+    `"Management Zone: ${zoneName}"`,
+    `"Date d'extraction: ${formattedDateTime}"`,
+    '"=========================================="',
+    '""',  // Ligne vide pour séparer l'en-tête des données
+  ];
+
   // Ajouter BOM (Byte Order Mark) pour l'encodage UTF-8 correct
   const BOM = '\uFEFF';
   const csvContent = BOM + [
+    ...headerFrame,
     // Utiliser des guillemets pour chaque cellule et échapper les guillemets doubles
     headers.map(header => `"${header.replace(/"/g, '""')}"`).join(';'),
     ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(';'))
@@ -282,10 +346,10 @@ export const exportProcessGroupsToCSV = (
   // Générer le nom du fichier avec la date du jour
   const today = new Date();
   const datePrefix = today.toISOString().slice(0, 10).replace(/-/g, '');
-
+  
   // Nettoyer le nom de la zone pour le nom de fichier
   const safeZoneName = zoneName.replace(/[^a-z0-9]/gi, '_');
-
+  
   const filename = `process_groups_${safeZoneName}_${datePrefix}.csv`;
 
   return { csv: csvContent, filename };
