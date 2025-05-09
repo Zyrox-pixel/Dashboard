@@ -1,0 +1,470 @@
+/* 
+   Animations.css - Bibliothèque d'animations et micro-interactions
+   Ajoute des effets visuels sophistiqués à l'interface utilisateur
+*/
+
+/* === TRANSITIONS DE PAGE === */
+
+/* Entrée de page avec fondu et montée */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+/* Transition de page avec effet de zoom */
+@keyframes zoomInFade {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-zoom-in-fade {
+  animation: zoomInFade 0.6s cubic-bezier(0.165, 0.84, 0.44, 1) forwards;
+}
+
+/* Transition de page avec effet de glissement latéral */
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-slide-in-right {
+  animation: slideInRight 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-slide-in-left {
+  animation: slideInLeft 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+/* Animation staggered pour les listes d'éléments */
+.staggered-item {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+.staggered-item-visible {
+  animation: fadeInUp 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+/* === EFFETS COSMIQUES ET FUTURISTES === */
+
+/* Pulse cosmique pour accentuation visuelle */
+@keyframes pulseGlow {
+  0%, 100% {
+    box-shadow: 0 0 8px rgba(125, 39, 255, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 16px rgba(125, 39, 255, 0.7);
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulseGlow 2s infinite;
+}
+
+/* Version cyan du pulse */
+@keyframes pulseCyanGlow {
+  0%, 100% {
+    box-shadow: 0 0 8px rgba(0, 224, 255, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 16px rgba(0, 224, 255, 0.7);
+  }
+}
+
+.animate-pulse-cyan {
+  animation: pulseCyanGlow 2s infinite;
+}
+
+/* Particules flottantes */
+@keyframes floatParticle {
+  0%, 100% {
+    transform: translateY(0) translateX(0);
+  }
+  25% {
+    transform: translateY(-5px) translateX(3px);
+  }
+  50% {
+    transform: translateY(3px) translateX(-2px);
+  }
+  75% {
+    transform: translateY(-2px) translateX(-5px);
+  }
+}
+
+.particle {
+  position: absolute;
+  width: 2px;
+  height: 2px;
+  border-radius: 50%;
+  background-color: rgba(125, 39, 255, 0.6);
+  animation: floatParticle 8s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.particle-cyan {
+  background-color: rgba(0, 224, 255, 0.6);
+  animation-duration: 7s;
+}
+
+.particle-emerald {
+  background-color: rgba(0, 255, 170, 0.6);
+  animation-duration: 10s;
+}
+
+/* Effet de glitch futuriste */
+@keyframes glitchEffect {
+  0% {
+    transform: translate(0);
+  }
+  20% {
+    transform: translate(-3px, 3px);
+  }
+  40% {
+    transform: translate(-3px, -3px);
+  }
+  60% {
+    transform: translate(3px, 3px);
+  }
+  80% {
+    transform: translate(3px, -3px);
+  }
+  100% {
+    transform: translate(0);
+  }
+}
+
+.animate-glitch {
+  animation: glitchEffect 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+/* Effet de scintillement néon */
+@keyframes neonFlicker {
+  0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% {
+    opacity: 1;
+    text-shadow: 0 0 5px rgba(125, 39, 255, 0.5), 0 0 10px rgba(125, 39, 255, 0.3);
+  }
+  20%, 22%, 24%, 55% {
+    opacity: 0.7;
+    text-shadow: none;
+  }
+}
+
+.animate-neon-flicker {
+  animation: neonFlicker 3s infinite alternate;
+}
+
+.animate-neon-flicker-cyan {
+  animation: neonFlicker 3s infinite alternate;
+  text-shadow: 0 0 5px rgba(0, 224, 255, 0.5), 0 0 10px rgba(0, 224, 255, 0.3);
+}
+
+/* Animation de déplacement du gradient */
+@keyframes gradientShift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.animate-gradient-shift {
+  background-size: 200% 200%;
+  animation: gradientShift 5s ease infinite;
+}
+
+/* === MICRO-INTERACTIONS === */
+
+/* Effet d'ondulation pour les boutons */
+@keyframes rippleEffect {
+  from {
+    transform: scale(0);
+    opacity: 0.5;
+  }
+  to {
+    transform: scale(2);
+    opacity: 0;
+  }
+}
+
+.ripple {
+  position: absolute;
+  border-radius: 50%;
+  background-color: rgba(255, 255, 255, 0.2);
+  transform: scale(0);
+  animation: rippleEffect 0.6s linear;
+  pointer-events: none;
+}
+
+/* Effet de hover avec rotation subtile */
+.hover-rotate {
+  transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.hover-rotate:hover {
+  transform: rotate(3deg) translateY(-2px);
+}
+
+/* Effet de surlignage progressif */
+@keyframes highlightLine {
+  from {
+    width: 0;
+  }
+  to {
+    width: 100%;
+  }
+}
+
+.highlight-effect {
+  position: relative;
+}
+
+.highlight-effect::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 0;
+  height: 2px;
+  background: rgb(125, 39, 255);
+  transition: width 0.3s ease;
+}
+
+.highlight-effect:hover::after {
+  width: 100%;
+}
+
+/* Effet d'expansion */
+@keyframes expandEffect {
+  from {
+    letter-spacing: normal;
+  }
+  to {
+    letter-spacing: 0.05em;
+  }
+}
+
+.expand-on-hover {
+  transition: all 0.3s ease;
+}
+
+.expand-on-hover:hover {
+  letter-spacing: 0.05em;
+}
+
+/* Animation de battement de cœur */
+@keyframes heartbeat {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+.animate-heartbeat {
+  animation: heartbeat 1.5s ease infinite;
+}
+
+/* === LOADERS ET INDICATEURS === */
+
+/* Loader avec rotation et pulse */
+@keyframes loaderSpin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.loader-cosmic {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  border: 2px solid rgba(125, 39, 255, 0.1);
+  border-top: 2px solid rgb(125, 39, 255);
+  animation: loaderSpin 1s linear infinite;
+}
+
+.loader-cosmic-large {
+  width: 3rem;
+  height: 3rem;
+}
+
+/* Progress avec animation remplie */
+@keyframes fillProgress {
+  from {
+    width: 0;
+  }
+}
+
+.progress-bar {
+  height: 4px;
+  width: 100%;
+  background-color: rgba(125, 39, 255, 0.1);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.progress-bar-value {
+  height: 100%;
+  background: linear-gradient(90deg, rgba(125, 39, 255, 0.8), rgba(0, 224, 255, 0.8));
+  background-size: 200% 200%;
+  animation: gradientShift 5s ease infinite, fillProgress 2s ease-out forwards;
+}
+
+/* === ANIMATIONS POUR LES TABLEAUX DE BORD === */
+
+/* Animation de remplissage de données */
+@keyframes fillHeight {
+  from {
+    height: 0;
+  }
+}
+
+.chart-bar {
+  width: 100%;
+  background: linear-gradient(to top, rgba(125, 39, 255, 0.8), rgba(0, 224, 255, 0.8));
+  border-radius: 3px 3px 0 0;
+  animation: fillHeight 1s ease-out forwards;
+}
+
+/* Animation de déplacement des notifications */
+@keyframes slideInNotification {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.notification-item {
+  animation: slideInNotification 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+/* Animation de suppression de notification */
+@keyframes slideOutNotification {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+.notification-item-exiting {
+  animation: slideOutNotification 0.3s cubic-bezier(0.55, 0.085, 0.68, 0.53) forwards;
+}
+
+/* === CLASSES UTILITAIRES === */
+
+/* Délais d'animation pour les effets séquentiels */
+.delay-100 { animation-delay: 100ms; }
+.delay-200 { animation-delay: 200ms; }
+.delay-300 { animation-delay: 300ms; }
+.delay-400 { animation-delay: 400ms; }
+.delay-500 { animation-delay: 500ms; }
+.delay-600 { animation-delay: 600ms; }
+.delay-700 { animation-delay: 700ms; }
+.delay-800 { animation-delay: 800ms; }
+.delay-900 { animation-delay: 900ms; }
+.delay-1000 { animation-delay: 1000ms; }
+
+/* Durées d'animation */
+.duration-300 { animation-duration: 300ms; }
+.duration-500 { animation-duration: 500ms; }
+.duration-700 { animation-duration: 700ms; }
+.duration-1000 { animation-duration: 1000ms; }
+.duration-1500 { animation-duration: 1500ms; }
+.duration-2000 { animation-duration: 2000ms; }
+
+/* Fonction d'animation personnalisées */
+.ease-bounce { animation-timing-function: cubic-bezier(0.68, -0.55, 0.265, 1.55); }
+.ease-smooth { animation-timing-function: cubic-bezier(0.25, 0.46, 0.45, 0.94); }
+.ease-sharp { animation-timing-function: cubic-bezier(0.165, 0.84, 0.44, 1); }
+
+/* Classes spécifiques pour les composants */
+.transition-timing-function {
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.neu-shadow {
+  box-shadow: 8px 8px 16px rgba(0, 0, 0, 0.4),
+             -8px -8px 16px rgba(125, 39, 255, 0.05);
+}
+
+.shadow-glow {
+  transition: box-shadow 0.3s ease-in-out;
+}
+
+.glow-effect {
+  box-shadow: 0 0 10px rgba(125, 39, 255, 0.7), 0 0 20px rgba(125, 39, 255, 0.4);
+  animation: glow-pulse 2s infinite;
+}
+
+.menu-animating * {
+  transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Styles pour les scrollbars personnalisées */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(20, 21, 46, 0.7);
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(125, 39, 255, 0.5);
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(125, 39, 255, 0.7);
+}
+
+/* Le code JavaScript pour les micro-interactions
+   a été déplacé dans le fichier utils/interactionUtils.ts */

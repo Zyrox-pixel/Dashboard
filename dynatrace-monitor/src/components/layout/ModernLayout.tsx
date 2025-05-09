@@ -57,7 +57,7 @@ const ModernLayout: React.FC<ModernLayoutProps> = ({
   };
   
   return (
-    <div className="flex h-screen bg-slate-900 text-white">
+    <div className="flex h-screen bg-[#0d0d23] text-white">
       {/* Sidebar */}
       <ModernSidebar 
         collapsed={sidebarCollapsed} 
@@ -67,7 +67,7 @@ const ModernLayout: React.FC<ModernLayoutProps> = ({
       {/* Main content */}
       <div 
         className={`flex-1 transition-all duration-300 ${
-          sidebarCollapsed ? 'ml-16' : 'ml-64'
+          sidebarCollapsed ? 'ml-20' : 'ml-72'
         } flex flex-col`}
       >
         {/* Header */}
@@ -80,48 +80,19 @@ const ModernLayout: React.FC<ModernLayoutProps> = ({
         
         {/* Main content */}
         <main className="flex-1 p-6 overflow-y-auto custom-scrollbar">
-          {/* Page transition animation */}
-          <div className="animate-fade-in-up max-w-7xl mx-auto">
+          {/* Page transition animation avec effets avancés */}
+          <div className="animate-zoom-in-fade max-w-7xl mx-auto">
             {children}
           </div>
         </main>
         
         {/* Footer */}
-        <footer className="bg-slate-900 border-t border-slate-800 py-3 px-6 text-center text-xs text-slate-500">
-          <p>Dynatrace Dashboard &copy; {new Date().getFullYear()} - Version 2.0.0</p>
+        <footer className="bg-[#0d0d23] border-t border-indigo-900/30 py-3 px-6 text-center text-xs text-indigo-500">
+          <p>Dynatrace Dashboard &copy; {new Date().getFullYear()} - Version Nova</p>
         </footer>
       </div>
     </div>
   );
 };
-
-// Animation nécessaire pour la transition des pages
-const keyframes = `
-  @keyframes fadeInUp {
-    from {
-      opacity: 0;
-      transform: translateY(10px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-`;
-
-const style = document.createElement('style');
-style.innerHTML = keyframes;
-document.head.appendChild(style);
-
-// Ajouter la classe d'animation au tailwind
-if (typeof window !== 'undefined') {
-  const originalStyles = window.getComputedStyle(document.documentElement);
-  const originalContent = originalStyles.getPropertyValue('content') || '';
-  
-  document.documentElement.style.setProperty(
-    'content', 
-    originalContent + ' .animate-fade-in-up{animation:fadeInUp 0.3s ease-out forwards;}'
-  );
-}
 
 export default ModernLayout;

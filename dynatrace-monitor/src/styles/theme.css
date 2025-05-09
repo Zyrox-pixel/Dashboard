@@ -1,25 +1,25 @@
 /* 
-   Thème de couleurs moderne pour le dashboard Dynatrace
-   Rend l'interface plus professionnelle et cohérente
+   Thème Nova - Une expérience utilisateur transcendante
+   Une palette de couleurs futuriste et immersive pour une expérience visuelle exceptionnelle
 */
 
 :root {
-  /* Palette principale */
-  --color-primary: 79, 70, 229; /* Indigo-600 */
-  --color-primary-light: 99, 102, 241; /* Indigo-500 */
-  --color-primary-dark: 55, 48, 163; /* Indigo-700 */
+  /* Palette principale - Cosmos */
+  --color-primary: 125, 39, 255; /* Violet électrique */
+  --color-primary-light: 157, 78, 255; /* Violet-lavande */
+  --color-primary-dark: 92, 21, 196; /* Violet profond */
   
-  --color-secondary: 14, 165, 233; /* Sky-500 */
-  --color-secondary-light: 56, 189, 248; /* Sky-400 */
-  --color-secondary-dark: 2, 132, 199; /* Sky-600 */
+  --color-secondary: 0, 224, 255; /* Cyan électrique */
+  --color-secondary-light: 99, 230, 255; /* Cyan brillant */
+  --color-secondary-dark: 0, 169, 199; /* Cyan profond */
   
-  /* Palette d'accentuation */
-  --color-success: 16, 185, 129; /* Emerald-500 */
-  --color-warning: 245, 158, 11; /* Amber-500 */
-  --color-error: 239, 68, 68; /* Red-500 */
-  --color-info: 59, 130, 246; /* Blue-500 */
+  /* Palette d'accentuation - Aurora */
+  --color-success: 0, 255, 170; /* Émeraude néon */
+  --color-warning: 255, 165, 0; /* Ambre doré */
+  --color-error: 255, 53, 94; /* Rouge cosmos */
+  --color-info: 0, 158, 255; /* Bleu électrique */
   
-  /* Nuances de gris pour le fond et borders */
+  /* Nuances de fond - Deep Space */
   --color-gray-50: 249, 250, 251;
   --color-gray-100: 243, 244, 246;
   --color-gray-200: 229, 231, 235;
@@ -32,20 +32,20 @@
   --color-gray-900: 17, 24, 39;
   --color-gray-950: 9, 12, 24;
   
-  /* Variantes pour le mode sombre */
-  --color-dark-bg: 15, 23, 42; /* Slate-900 */
-  --color-dark-card: 30, 41, 59; /* Slate-800 */
-  --color-dark-card-hover: 51, 65, 85; /* Slate-700 */
-  --color-dark-border: 71, 85, 105; /* Slate-600 */
+  /* Variantes pour le mode sombre - Nebula */
+  --color-dark-bg: 13, 13, 35; /* Bleu nuit profond */
+  --color-dark-card: 20, 21, 46; /* Bleu-violet sombre */
+  --color-dark-card-hover: 27, 28, 59; /* Bleu-violet hover */
+  --color-dark-border: 48, 49, 85; /* Bleu-violet clair */
   
-  /* Couleurs pour les graphiques et visualisations */
-  --color-chart-1: 79, 70, 229; /* Indigo */
-  --color-chart-2: 14, 165, 233; /* Sky */
-  --color-chart-3: 16, 185, 129; /* Emerald */
-  --color-chart-4: 245, 158, 11; /* Amber */
-  --color-chart-5: 239, 68, 68; /* Red */
-  --color-chart-6: 168, 85, 247; /* Purple */
-  --color-chart-7: 236, 72, 153; /* Pink */
+  /* Couleurs pour les graphiques et visualisations - Spectrum */
+  --color-chart-1: 125, 39, 255; /* Violet électrique */
+  --color-chart-2: 0, 224, 255; /* Cyan électrique */
+  --color-chart-3: 0, 255, 170; /* Émeraude néon */
+  --color-chart-4: 255, 165, 0; /* Ambre doré */
+  --color-chart-5: 255, 53, 94; /* Rouge cosmos */
+  --color-chart-6: 251, 43, 255; /* Rose néon */
+  --color-chart-7: 0, 158, 255; /* Bleu électrique */
   
   /* Dérivés avec différentes opacités */
   --color-primary-100: rgba(var(--color-primary), 0.1);
@@ -57,94 +57,348 @@
   --color-primary-700: rgba(var(--color-primary), 0.7);
   --color-primary-800: rgba(var(--color-primary), 0.8);
   --color-primary-900: rgba(var(--color-primary), 0.9);
+  
+  /* Gradients cosmiques */
+  --gradient-cosmic: linear-gradient(135deg, rgba(125, 39, 255, 0.8) 0%, rgba(0, 224, 255, 0.8) 100%);
+  --gradient-aurora: linear-gradient(135deg, rgba(0, 255, 170, 0.8) 0%, rgba(0, 224, 255, 0.8) 100%);
+  --gradient-sunset: linear-gradient(135deg, rgba(255, 53, 94, 0.8) 0%, rgba(251, 43, 255, 0.8) 100%);
+  --gradient-golden: linear-gradient(135deg, rgba(255, 165, 0, 0.8) 0%, rgba(255, 53, 94, 0.8) 100%);
+  
+  /* Ombres et effets spéciaux */
+  --shadow-neon: 0 0 15px rgba(125, 39, 255, 0.5), 0 0 30px rgba(125, 39, 255, 0.3);
+  --shadow-glow-cyan: 0 0 15px rgba(0, 224, 255, 0.5), 0 0 30px rgba(0, 224, 255, 0.3);
+  --shadow-glow-emerald: 0 0 15px rgba(0, 255, 170, 0.5), 0 0 30px rgba(0, 255, 170, 0.3);
+  --shadow-glow-red: 0 0 15px rgba(255, 53, 94, 0.5), 0 0 30px rgba(255, 53, 94, 0.3);
 }
 
 /* Classes utilitaires pour les éléments d'interface communs */
 .card {
-  @apply bg-slate-800 border border-slate-700 rounded-lg shadow-lg transition-all duration-200;
+  @apply bg-[#14152e] border border-indigo-900/30 rounded-xl shadow-lg transition-all duration-300;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4), 0 0 15px rgba(125, 39, 255, 0.1);
+  backdrop-filter: blur(10px);
 }
 
 .card-hover {
-  @apply hover:bg-slate-700 hover:border-slate-600 hover:shadow-xl;
+  @apply hover:bg-[#1b1c3b] hover:border-indigo-700/30 hover:shadow-xl;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.card-hover:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5), 0 0 20px rgba(125, 39, 255, 0.15);
 }
 
 .btn-primary {
-  @apply px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md shadow-md transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed; 
+  @apply px-4 py-2 rounded-lg shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed;
+  background: linear-gradient(135deg, rgba(125, 39, 255, 0.9) 0%, rgba(92, 21, 196, 0.9) 100%);
+  color: white;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-primary:hover {
+  background: linear-gradient(135deg, rgba(157, 78, 255, 0.9) 0%, rgba(125, 39, 255, 0.9) 100%);
+  box-shadow: 0 5px 15px rgba(125, 39, 255, 0.3), 0 0 10px rgba(125, 39, 255, 0.2);
+}
+
+.btn-primary:before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: 0.5s;
+}
+
+.btn-primary:hover:before {
+  left: 100%;
 }
 
 .btn-secondary {
-  @apply px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-md shadow-md transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed;
+  @apply px-4 py-2 rounded-lg shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed;
+  background: linear-gradient(135deg, rgba(0, 224, 255, 0.9) 0%, rgba(0, 169, 199, 0.9) 100%);
+  color: white;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-secondary:hover {
+  background: linear-gradient(135deg, rgba(99, 230, 255, 0.9) 0%, rgba(0, 224, 255, 0.9) 100%);
+  box-shadow: 0 5px 15px rgba(0, 224, 255, 0.3), 0 0 10px rgba(0, 224, 255, 0.2);
+}
+
+.btn-secondary:before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: 0.5s;
+}
+
+.btn-secondary:hover:before {
+  left: 100%;
 }
 
 .btn-outline {
-  @apply px-4 py-2 border border-slate-600 text-slate-300 hover:bg-slate-700 rounded-md transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed;
+  @apply px-4 py-2 border-2 border-indigo-700/50 text-indigo-400 rounded-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed;
+  background: rgba(20, 21, 46, 0.7);
+  backdrop-filter: blur(6px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.btn-outline:hover {
+  @apply border-indigo-500/80 text-indigo-300 bg-indigo-900/30;
+  box-shadow: 0 5px 15px rgba(125, 39, 255, 0.15);
+  transform: translateY(-2px);
 }
 
 .badge-primary {
   @apply px-2.5 py-0.5 bg-indigo-900/60 text-indigo-200 border border-indigo-700/30 rounded-md text-xs font-medium;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2), 0 0 4px rgba(125, 39, 255, 0.3);
 }
 
 .badge-success {
   @apply px-2.5 py-0.5 bg-emerald-900/60 text-emerald-200 border border-emerald-700/30 rounded-md text-xs font-medium;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2), 0 0 4px rgba(0, 255, 170, 0.3);
 }
 
 .badge-warning {
   @apply px-2.5 py-0.5 bg-amber-900/60 text-amber-200 border border-amber-700/30 rounded-md text-xs font-medium;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2), 0 0 4px rgba(255, 165, 0, 0.3);
 }
 
 .badge-error {
   @apply px-2.5 py-0.5 bg-red-900/60 text-red-200 border border-red-700/30 rounded-md text-xs font-medium;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2), 0 0 4px rgba(255, 53, 94, 0.3);
 }
 
 .badge-info {
   @apply px-2.5 py-0.5 bg-blue-900/60 text-blue-200 border border-blue-700/30 rounded-md text-xs font-medium;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2), 0 0 4px rgba(0, 158, 255, 0.3);
 }
 
 /* Animations */
-@keyframes pulse-custom {
+@keyframes pulse-cosmic {
   0%, 100% {
-    opacity: 1;
+    box-shadow: 0 0 15px rgba(125, 39, 255, 0.5);
   }
   50% {
+    box-shadow: 0 0 25px rgba(125, 39, 255, 0.8);
+  }
+}
+
+@keyframes gradient-shift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes glow-float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes neon-flicker {
+  0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% {
+    opacity: 1;
+  }
+  20%, 22%, 24%, 55% {
     opacity: 0.5;
   }
 }
 
-.animate-pulse-custom {
-  animation: pulse-custom 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+.animate-pulse-cosmic {
+  animation: pulse-cosmic 2s infinite;
+}
+
+.animate-gradient-shift {
+  background-size: 200% 200%;
+  animation: gradient-shift 5s ease infinite;
+}
+
+.animate-glow-float {
+  animation: glow-float 6s ease-in-out infinite;
+}
+
+.animate-neon-flicker {
+  animation: neon-flicker 2.5s infinite alternate;
 }
 
 /* 3D effects */
 .card-3d {
-  @apply bg-gradient-to-br from-slate-800 via-slate-900 to-slate-800 border border-slate-700/50 shadow-lg;
+  @apply bg-gradient-to-br from-[#14152e] via-[#191a3a] to-[#14152e] border border-indigo-900/30 shadow-lg rounded-xl;
   transform-style: preserve-3d;
-  perspective: 1000px;
+  perspective: 1500px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.card-3d:hover {
+  transform: translateY(-5px) rotateX(5deg) rotateY(5deg);
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5), 0 0 15px rgba(125, 39, 255, 0.2);
 }
 
 .btn-3d {
   @apply relative overflow-hidden;
   transform-style: preserve-3d;
-  transition: all 0.2s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .btn-3d:active {
-  transform: translateY(2px);
+  transform: translateY(3px) scale(0.98);
 }
 
 /* Glassmorphism */
 .glass {
-  @apply bg-slate-800/80 backdrop-blur-md border border-white/10 shadow-xl;
+  @apply bg-[#14152e]/80 backdrop-blur-xl border border-white/10 shadow-xl rounded-xl;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+}
+
+.glass-primary {
+  background: rgba(20, 21, 46, 0.7);
+  border: 1px solid rgba(125, 39, 255, 0.2);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37), 0 0 10px rgba(125, 39, 255, 0.1);
+  backdrop-filter: blur(10px);
+}
+
+.glass-success {
+  background: rgba(20, 21, 46, 0.7);
+  border: 1px solid rgba(0, 255, 170, 0.2);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37), 0 0 10px rgba(0, 255, 170, 0.1);
+  backdrop-filter: blur(10px);
+}
+
+.glass-warning {
+  background: rgba(20, 21, 46, 0.7);
+  border: 1px solid rgba(255, 165, 0, 0.2);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37), 0 0 10px rgba(255, 165, 0, 0.1);
+  backdrop-filter: blur(10px);
+}
+
+.glass-error {
+  background: rgba(20, 21, 46, 0.7);
+  border: 1px solid rgba(255, 53, 94, 0.2);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37), 0 0 10px rgba(255, 53, 94, 0.1);
+  backdrop-filter: blur(10px);
 }
 
 /* Neumorphism */
 .card-neu {
-  @apply bg-slate-800 border border-slate-700;
-  box-shadow: 5px 5px 10px rgba(0, 0, 0, 0.3), 
-             -5px -5px 10px rgba(255, 255, 255, 0.05);
+  @apply bg-[#14152e] border border-indigo-900/30 rounded-xl;
+  box-shadow: 8px 8px 16px rgba(0, 0, 0, 0.4), 
+             -8px -8px 16px rgba(125, 39, 255, 0.05);
 }
 
 .btn-neu {
-  @apply bg-slate-800 border border-slate-700;
-  box-shadow: 3px 3px 6px rgba(0, 0, 0, 0.2), 
-             -3px -3px 6px rgba(255, 255, 255, 0.05);
+  @apply bg-[#14152e] border border-indigo-900/30 text-indigo-300 rounded-lg;
+  box-shadow: 5px 5px 10px rgba(0, 0, 0, 0.3), 
+             -5px -5px 10px rgba(125, 39, 255, 0.05);
+}
+
+/* Holographic Effect */
+.holo-card {
+  background: linear-gradient(135deg, rgba(20, 21, 46, 0.7), rgba(27, 28, 59, 0.7));
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(10px);
+}
+
+.holo-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, 
+    rgba(125, 39, 255, 0) 0%, 
+    rgba(0, 224, 255, 0.05) 25%,
+    rgba(251, 43, 255, 0.05) 50%,
+    rgba(255, 165, 0, 0.05) 75%,
+    rgba(125, 39, 255, 0) 100%
+  );
+  background-size: 400% 400%;
+  animation: gradient-shift 5s ease infinite;
+  pointer-events: none;
+}
+
+.holo-card:hover::before {
+  opacity: 0.8;
+}
+
+/* Interactive elements */
+.interactive-hover {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.interactive-hover:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-neon);
+}
+
+/* Progress bars */
+.progress-bar {
+  @apply relative h-2 rounded-full overflow-hidden bg-slate-800;
+}
+
+.progress-bar-value {
+  @apply absolute top-0 left-0 h-full rounded-full;
+  background: linear-gradient(90deg, rgba(125, 39, 255, 0.8) 0%, rgba(0, 224, 255, 0.8) 100%);
+  background-size: 200% 200%;
+  animation: gradient-shift 5s ease infinite;
+}
+
+/* Loaders */
+.loader-cosmic {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(125, 39, 255, 0.8) 0%, rgba(0, 224, 255, 0.8) 100%);
+  box-shadow: 0 0 15px rgba(125, 39, 255, 0.5);
+  position: relative;
+  animation: pulse-cosmic 2s infinite;
+}
+
+.loader-cosmic::before {
+  content: '';
+  position: absolute;
+  inset: 5px;
+  border-radius: 50%;
+  background: #14152e;
+}
+
+/* Tooltips deluxe */
+.tooltip-deluxe {
+  @apply absolute invisible opacity-0 py-2 px-3 bg-[#191a3a] text-xs text-white rounded-lg border border-indigo-800/50 shadow-xl transition-all duration-300 z-50;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.4), 0 0 10px rgba(125, 39, 255, 0.2);
+  transform: translateY(10px);
+}
+
+.tooltip-trigger:hover .tooltip-deluxe {
+  @apply visible opacity-100;
+  transform: translateY(0);
+}
+
+/* Focus effects */
+.focus-ring:focus-visible {
+  @apply outline-none;
+  box-shadow: 0 0 0 3px rgba(125, 39, 255, 0.5), 0 0 0 6px rgba(125, 39, 255, 0.2);
 }

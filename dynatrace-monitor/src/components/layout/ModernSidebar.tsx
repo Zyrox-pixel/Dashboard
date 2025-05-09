@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, 
@@ -11,7 +11,13 @@ import {
   ShieldCheck,
   Users,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Home,
+  Zap,
+  Database,
+  Network,
+  Layers,
+  Sparkles
 } from 'lucide-react';
 import { useApp } from '../../contexts/AppContext';
 
@@ -21,7 +27,7 @@ interface ModernSidebarProps {
 }
 
 /**
- * Sidebar modernisée avec design amélioré et nouvelles fonctionnalités
+ * Sidebar futuriste avec design immersif, effets 3D et animations
  */
 const ModernSidebar: React.FC<ModernSidebarProps> = ({ 
   collapsed = false,
@@ -29,6 +35,30 @@ const ModernSidebar: React.FC<ModernSidebarProps> = ({
 }) => {
   const location = useLocation();
   const { activeProblems } = useApp();
+  
+  const [hoveredItem, setHoveredItem] = useState<string | null>(null);
+  const [isAnimating, setIsAnimating] = useState(false);
+  
+  // Effet sonore pour les boutons
+  const playButtonSound = () => {
+    try {
+      const audio = new Audio('data:audio/mp3;base64,SUQzAwAAAAAAJlRQRTEAAAAcAAAAU291bmRKYXkuY29tIFNvdW5kIEVmZmVjdHMA//uQxAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAADAAAGhgBVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVWqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqr///////////////////////////////////////////8AAAA8TEFNRTMuMTAwAZYAAAAAAAAAABSAJAJAQgAAgAAAA+alYZAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA//vQxAADwAABpAAAACAAADSAAAAETEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVQ==');
+      audio.volume = 0.1;
+      audio.play();
+    } catch (e) {
+      console.log('Sound effect not supported');
+    }
+  };
+
+  // Gestion des effets de transition lors du toggle
+  useEffect(() => {
+    if (isAnimating) {
+      const timer = setTimeout(() => {
+        setIsAnimating(false);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [isAnimating]);
   
   // Déterminer si un lien est actif
   const isActive = (path: string) => {
@@ -38,140 +68,306 @@ const ModernSidebar: React.FC<ModernSidebarProps> = ({
   // Classes pour les liens
   const getLinkClasses = (path: string) => {
     const active = isActive(path);
+    const isHovered = hoveredItem === path;
+    
     return `
-      flex items-center gap-3 py-3 px-4 rounded-md text-sm font-medium transition-all duration-200
+      relative flex items-center gap-3 py-3 px-4 rounded-lg text-sm font-medium transition-all duration-300
       ${active 
-        ? 'bg-indigo-600/20 text-indigo-400 border-l-2 border-indigo-500' 
-        : 'text-slate-400 hover:text-slate-300 hover:bg-slate-800'}
+        ? 'text-white bg-indigo-600/20 border-l-2 border-indigo-500' 
+        : 'text-indigo-300 hover:text-white hover:bg-indigo-800/30 border-l-2 border-transparent'}
       ${collapsed ? 'justify-center' : ''}
+      ${isHovered ? 'transform scale-105' : ''}
     `;
   };
+
+  // Structure des sections et éléments de menu
+  const menuSections = [
+    {
+      id: 'main',
+      title: 'PRINCIPAL',
+      items: [
+        {
+          path: '/overview',
+          icon: <Home size={20} />,
+          label: 'Vue d\'ensemble',
+          badge: null
+        },
+        {
+          path: '/dashboard/vfg',
+          icon: <BarChart3 size={20} />,
+          label: 'Dashboard VFG',
+          badge: null
+        },
+        {
+          path: '/dashboard/vfe',
+          icon: <BarChart3 size={20} />,
+          label: 'Dashboard VFE',
+          badge: null
+        },
+        {
+          path: '/problems',
+          icon: <AlertTriangle size={20} />,
+          label: 'Problèmes',
+          badge: activeProblems.length || null
+        }
+      ]
+    },
+    {
+      id: 'resources',
+      title: 'RESSOURCES',
+      items: [
+        {
+          path: '/hosts',
+          icon: <Server size={20} />,
+          label: 'Hosts',
+          badge: null
+        },
+        {
+          path: '/services',
+          icon: <Activity size={20} />,
+          label: 'Services',
+          badge: null
+        },
+        {
+          path: '/processes',
+          icon: <ShieldCheck size={20} />,
+          label: 'Process Groups',
+          badge: null
+        },
+        {
+          path: '/network',
+          icon: <Network size={20} />,
+          label: 'Réseau',
+          badge: null
+        }
+      ]
+    },
+    {
+      id: 'analytics',
+      title: 'ANALYTIQUES',
+      items: [
+        {
+          path: '/problems/recent',
+          icon: <Clock size={20} />,
+          label: 'Historique (72h)',
+          badge: null
+        },
+        {
+          path: '/metrics',
+          icon: <Sparkles size={20} />,
+          label: 'Métriques avancées',
+          badge: null
+        },
+        {
+          path: '/capacity',
+          icon: <Layers size={20} />,
+          label: 'Capacité système',
+          badge: null
+        }
+      ]
+    }
+  ];
   
   return (
-    <aside className={`h-screen bg-slate-900 border-r border-slate-800 fixed top-0 left-0 z-20 transition-all duration-300 ${
-      collapsed ? 'w-16' : 'w-64'
-    }`}>
+    <aside 
+      className={`h-screen bg-[#0d0d23] border-r border-indigo-900/30 fixed top-0 left-0 z-20 transition-all duration-500 
+        ${collapsed ? 'w-20' : 'w-72'} 
+        ${isAnimating ? 'menu-animating' : ''}`}
+    >
       {/* Logo */}
-      <div className="flex items-center justify-between h-16 px-5 border-b border-slate-800">
-        {!collapsed && (
-          <Link to="/" className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-md bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center shadow-lg">
-              <span className="text-white font-bold text-sm">DT</span>
+      <div className="flex items-center justify-between h-[72px] px-5 border-b border-indigo-900/30">
+        {!collapsed ? (
+          <Link 
+            to="/" 
+            className="flex items-center gap-3 transition-all duration-300 transform hover:scale-105"
+            onMouseEnter={() => playButtonSound()}
+          >
+            <div className="h-10 w-10 relative group">
+              {/* Effet d'arrière-plan animé */}
+              <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-indigo-600 via-indigo-500 to-blue-600 animate-gradient-shift"></div>
+              
+              {/* Effet de lueur */}
+              <div className="absolute inset-0 rounded-xl blur-md bg-indigo-500/50 group-hover:bg-indigo-500/70 transition-all duration-500 animate-pulse-cosmic"></div>
+              
+              {/* Logo principal */}
+              <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-indigo-600 to-blue-600 flex items-center justify-center shadow-lg border border-indigo-500/30 backdrop-blur-md">
+                <Zap className="text-white w-5 h-5" />
+              </div>
             </div>
-            <span className="text-lg font-bold text-white">Dynatrace</span>
+            <div className="flex flex-col">
+              <span className="text-lg font-bold text-white">Dynatrace</span>
+              <span className="text-xs text-indigo-400">Moniteur Avancé</span>
+            </div>
           </Link>
-        )}
-        {collapsed && (
-          <div className="h-8 w-8 rounded-md bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center shadow-lg mx-auto">
-            <span className="text-white font-bold text-sm">DT</span>
+        ) : (
+          <div className="h-10 w-10 relative mx-auto">
+            {/* Effet d'arrière-plan animé */}
+            <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-indigo-600 via-indigo-500 to-blue-600 animate-gradient-shift"></div>
+            
+            {/* Effet de lueur */}
+            <div className="absolute inset-0 rounded-xl blur-md bg-indigo-500/50 transition-all duration-500 animate-pulse-cosmic"></div>
+            
+            {/* Logo principal */}
+            <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-indigo-600 to-blue-600 flex items-center justify-center shadow-lg border border-indigo-500/30 backdrop-blur-md">
+              <Zap className="text-white w-5 h-5" />
+            </div>
           </div>
         )}
         
         {/* Bouton de toggle */}
         {onToggle && (
           <button 
-            onClick={onToggle}
-            className="text-slate-400 hover:text-white p-1 rounded-md hover:bg-slate-800"
+            onClick={() => {
+              onToggle();
+              setIsAnimating(true);
+              playButtonSound();
+            }}
+            className="text-indigo-400 hover:text-indigo-300 w-8 h-8 flex items-center justify-center rounded-lg border border-indigo-800/30 bg-indigo-900/20 hover:bg-indigo-800/30 transition-all duration-300"
+            aria-label={collapsed ? "Étendre le menu" : "Réduire le menu"}
           >
-            {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+            {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
           </button>
         )}
       </div>
       
-      {/* Navigation */}
-      <nav className="py-6 px-2">
-        <ul className="space-y-1">
-          {/* Section principale */}
-          <li>
-            <Link to="/overview" className={getLinkClasses('/overview')}>
-              <LayoutDashboard size={20} />
-              {!collapsed && <span>Vue d'ensemble</span>}
-            </Link>
-          </li>
-          <li>
-            <Link to="/dashboard/vfg" className={getLinkClasses('/dashboard/vfg')}>
-              <BarChart3 size={20} />
-              {!collapsed && <span>Dashboard VFG</span>}
-            </Link>
-          </li>
-          <li>
-            <Link to="/dashboard/vfe" className={getLinkClasses('/dashboard/vfe')}>
-              <BarChart3 size={20} />
-              {!collapsed && <span>Dashboard VFE</span>}
-            </Link>
-          </li>
-          <li>
-            <Link to="/problems/unified" className={getLinkClasses('/problems')}>
-              <div className="relative">
-                <AlertTriangle size={20} />
-                {activeProblems.length > 0 && (
-                  <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-red-500 text-white text-xs flex items-center justify-center">
-                    {activeProblems.length > 9 ? '9+' : activeProblems.length}
-                  </span>
-                )}
+      {/* Navigation - Corps du menu */}
+      <div className={`py-5 px-3 h-[calc(100vh-72px)] flex flex-col overflow-hidden ${collapsed ? 'overflow-visible' : 'overflow-y-auto custom-scrollbar'}`}>
+        {menuSections.map((section) => (
+          <div key={section.id} className="mb-6">
+            {/* Titre de section - visible uniquement en mode étendu */}
+            {!collapsed && (
+              <div className="flex items-center px-4 mb-2">
+                <div className="h-px flex-grow bg-indigo-900/50"></div>
+                <span className="text-xs text-indigo-500 font-medium mx-2">{section.title}</span>
+                <div className="h-px flex-grow bg-indigo-900/50"></div>
               </div>
-              {!collapsed && (
-                <div className="flex items-center justify-between flex-1">
-                  <span>Problèmes</span>
-                  {activeProblems.length > 0 && (
-                    <span className="px-2 py-0.5 rounded-full bg-red-900/40 text-red-300 text-xs border border-red-700/30">
-                      {activeProblems.length}
-                    </span>
-                  )}
-                </div>
-              )}
-            </Link>
-          </li>
-          
-          {/* Séparateur */}
-          <li className="my-4">
-            <div className={`h-px bg-slate-800 ${!collapsed ? 'mx-3' : 'mx-auto w-8'}`}></div>
-            {!collapsed && <span className="text-xs text-slate-600 px-3 mt-3 block">RESSOURCES</span>}
-          </li>
-          
-          {/* Ressources */}
-          <li>
-            <Link to="/hosts" className={getLinkClasses('/hosts')}>
-              <Server size={20} />
-              {!collapsed && <span>Hosts</span>}
-            </Link>
-          </li>
-          <li>
-            <Link to="/services" className={getLinkClasses('/services')}>
-              <Activity size={20} />
-              {!collapsed && <span>Services</span>}
-            </Link>
-          </li>
-          <li>
-            <Link to="/processes" className={getLinkClasses('/processes')}>
-              <ShieldCheck size={20} />
-              {!collapsed && <span>Process Groups</span>}
-            </Link>
-          </li>
-          
-          {/* Séparateur */}
-          <li className="my-4">
-            <div className={`h-px bg-slate-800 ${!collapsed ? 'mx-3' : 'mx-auto w-8'}`}></div>
-            {!collapsed && <span className="text-xs text-slate-600 px-3 mt-3 block">HISTORIQUE</span>}
-          </li>
-          
-          {/* Historique */}
-          <li>
-            <Link to="/problems/recent" className={getLinkClasses('/problems/recent')}>
-              <Clock size={20} />
-              {!collapsed && <span>Problèmes récents (72h)</span>}
-            </Link>
-          </li>
-          
-          {/* Profil et paramètres (en bas) */}
-          <li className="fixed bottom-8 left-0 right-0 px-2">
-            <Link to="/settings" className={getLinkClasses('/settings')}>
+            )}
+            
+            {/* Séparation en mode réduit */}
+            {collapsed && section.id !== 'main' && (
+              <div className="h-px bg-indigo-900/50 w-10 mx-auto my-4"></div>
+            )}
+            
+            {/* Items de menu */}
+            <ul className="space-y-1">
+              {section.items.map((item) => (
+                <li key={item.path}>
+                  <Link
+                    to={item.path}
+                    className={getLinkClasses(item.path)}
+                    onMouseEnter={() => {
+                      setHoveredItem(item.path);
+                      playButtonSound();
+                    }}
+                    onMouseLeave={() => setHoveredItem(null)}
+                  >
+                    {/* Conteneur de l'icône avec effets */}
+                    <div className={`relative ${isActive(item.path) ? 'text-indigo-400' : 'text-indigo-400'}`}>
+                      {/* Indicateur de badge */}
+                      {item.badge && item.badge > 0 && (
+                        <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-gradient-to-br from-red-500 to-pink-600 text-white text-xs flex items-center justify-center border border-red-900/30 shadow-lg animate-pulse-cosmic">
+                          {item.badge > 9 ? '9+' : item.badge}
+                        </span>
+                      )}
+                      
+                      {/* Effet de halo pour les items actifs ou survolés */}
+                      {(isActive(item.path) || hoveredItem === item.path) && (
+                        <span className="absolute inset-0 bg-indigo-500/20 blur-md rounded-full -z-10"></span>
+                      )}
+                      
+                      {item.icon}
+                    </div>
+                    
+                    {/* Label - uniquement visible en mode étendu */}
+                    {!collapsed && (
+                      <div className="flex items-center justify-between flex-1">
+                        <span className={`${isActive(item.path) ? 'text-white' : ''} transition-all duration-300`}>
+                          {item.label}
+                        </span>
+                        
+                        {/* Badge pour les problèmes actifs */}
+                        {item.badge && item.badge > 0 && (
+                          <span className="px-2 py-0.5 rounded-full bg-red-900/40 text-red-300 text-xs border border-red-800/30 min-w-[24px] text-center">
+                            {item.badge}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                    
+                    {/* Effet de lueur pour les items actifs */}
+                    {isActive(item.path) && !collapsed && (
+                      <div className="absolute right-2 top-1/2 -translate-y-1/2 w-1.5 h-8 rounded-full bg-indigo-500 opacity-70 glow-effect"></div>
+                    )}
+                    
+                    {/* Tooltip pour mode réduit */}
+                    {collapsed && (
+                      <div className={`absolute left-full ml-3 rounded-lg py-1.5 px-3 bg-[#191a3a]/95 backdrop-blur-xl border border-indigo-800/30 shadow-xl 
+                        whitespace-nowrap z-50 flex items-center gap-2 text-white text-sm
+                        transition-all duration-300 
+                        ${hoveredItem === item.path ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-2 pointer-events-none'}`}
+                      >
+                        {item.label}
+                        {item.badge && item.badge > 0 && (
+                          <span className="px-1.5 py-0.5 rounded-full bg-red-900/40 text-red-300 text-xs border border-red-800/30 min-w-[20px] text-center">
+                            {item.badge}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+        
+        {/* Profil et paramètres (en bas) */}
+        <div className="mt-auto px-2">
+          <Link
+            to="/settings"
+            className={getLinkClasses('/settings')}
+            onMouseEnter={() => {
+              setHoveredItem('/settings');
+              playButtonSound();
+            }}
+            onMouseLeave={() => setHoveredItem(null)}
+          >
+            <div className="relative text-indigo-400">
               <Settings size={20} />
-              {!collapsed && <span>Paramètres</span>}
-            </Link>
-          </li>
-        </ul>
-      </nav>
+            </div>
+            {!collapsed && <span>Paramètres</span>}
+            
+            {/* Tooltip pour mode réduit */}
+            {collapsed && (
+              <div className={`absolute left-full ml-3 rounded-lg py-1.5 px-3 bg-[#191a3a]/95 backdrop-blur-xl border border-indigo-800/30 shadow-xl 
+                whitespace-nowrap z-50 flex items-center gap-2 text-white text-sm
+                transition-all duration-300 
+                ${hoveredItem === '/settings' ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-2 pointer-events-none'}`}
+              >
+                Paramètres
+              </div>
+            )}
+          </Link>
+          
+          {/* Profil utilisateur - uniquement en mode étendu */}
+          {!collapsed && (
+            <div className="flex items-center gap-3 mt-3 px-4 pt-3 border-t border-indigo-900/30">
+              <div className="relative h-10 w-10 rounded-lg overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-indigo-600 via-purple-600 to-indigo-600 animate-gradient-shift"></div>
+                <div className="absolute inset-0 flex items-center justify-center text-white font-medium shadow-inner">
+                  AP
+                </div>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-sm font-medium text-white">Admin</span>
+                <span className="text-xs text-indigo-400">administrateur</span>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+      
+      {/* Les styles pour les animations avancées ont été déplacés dans animations.css */}
     </aside>
   );
 };
