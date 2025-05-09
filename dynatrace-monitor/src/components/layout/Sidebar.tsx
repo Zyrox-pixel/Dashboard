@@ -137,16 +137,16 @@ const Sidebar: React.FC = () => {
           )}
         </div>
         
-        {/* Bouton de collapse avec animation - position ajustée */}
+        {/* Bouton de collapse avec animation */}
         <button
           onClick={toggleSidebar}
-          className={`ml-auto w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300 mr-3 ${
+          className={`ml-auto w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300 ${
             isDarkTheme
               ? 'bg-slate-800 text-slate-300 hover:bg-indigo-900 hover:text-indigo-400 hover:shadow-md hover:shadow-indigo-900/30'
               : 'bg-slate-100 text-slate-500 hover:bg-indigo-100 hover:text-indigo-600 hover:shadow-sm hover:shadow-indigo-300/30'
           }`}
         >
-          <ChevronLeft size={14} className={sidebarCollapsed ? 'rotate-180' : ''} />
+          <ChevronLeft size={16} className={sidebarCollapsed ? 'rotate-180' : ''} />
         </button>
       </div>
       
