@@ -30,8 +30,42 @@ export const exportProblemsToCSV = (
       creationDate = dateMatch[1];
     }
 
-    // Déterminer l'entité impactée - utiliser en priorité host/impacted
-    const impactedEntity = problem.host || problem.impacted || 'Non spécifiée';
+    // Déterminer l'entité impactée de la même façon que ProblemCard.tsx
+    let impactedEntity = 'Non spécifiée';
+
+    // PRIORITÉ 1: Utiliser le champ impacted
+    if (problem.impacted && problem.impacted !== "Non spécifié") {
+      impactedEntity = problem.impacted;
+    }
+    // PRIORITÉ 2: Utiliser le champ host s'il existe
+    else if (problem.host && problem.host !== "Non spécifié") {
+      impactedEntity = problem.host;
+    }
+    // PRIORITÉ 3: Utiliser impactedEntities s'il existe et contient des entités
+    else if (problem.impactedEntities && Array.isArray(problem.impactedEntities)) {
+      // Chercher d'abord un HOST
+      const hostEntity = problem.impactedEntities.find(entity =>
+        entity.entityId && entity.entityId.type === 'HOST' && entity.name
+      );
+
+      if (hostEntity) {
+        impactedEntity = hostEntity.name;
+      }
+      // Si aucun HOST, chercher tout autre type d'entité
+      else {
+        const anyEntity = problem.impactedEntities.find(entity =>
+          entity.entityId && entity.name
+        );
+
+        if (anyEntity) {
+          impactedEntity = anyEntity.name;
+        }
+      }
+    }
+    // PRIORITÉ 4: Vérifier rootCauseEntity
+    else if (problem.rootCauseEntity && problem.rootCauseEntity.name) {
+      impactedEntity = problem.rootCauseEntity.name;
+    }
 
     // Utiliser la durée si disponible, sinon N/A
     const duration = problem.duration || 'N/A';
