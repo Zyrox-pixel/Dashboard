@@ -46,10 +46,13 @@ export const exportProblemsToCSV = (
     ];
   });
 
-  // Combiner l'en-tête et les lignes
-  const csvContent = [
-    headers.join(','),
-    ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+  // Combiner l'en-tête et les lignes avec séparateur de colonnes approprié
+  // Ajouter BOM (Byte Order Mark) pour l'encodage UTF-8 correct
+  const BOM = '\uFEFF';
+  const csvContent = BOM + [
+    // Utiliser des guillemets pour chaque cellule et échapper les guillemets doubles
+    headers.map(header => `"${header.replace(/"/g, '""')}"`).join(';'),
+    ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(';'))
   ].join('\n');
 
   // Générer le nom du fichier
@@ -83,8 +86,8 @@ export const exportProblemsToCSV = (
  * @param filename Nom du fichier
  */
 export const downloadCSV = (csvContent: string, filename: string): void => {
-  // Créer un Blob avec le contenu CSV
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  // Créer un Blob avec le contenu CSV et spécifier l'encodage UTF-8
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8' });
   
   // Créer un lien de téléchargement
   const link = document.createElement('a');
