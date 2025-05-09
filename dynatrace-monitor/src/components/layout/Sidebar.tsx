@@ -315,7 +315,7 @@ const Sidebar: React.FC = () => {
                     isDarkTheme ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-800'
                   }`}
                 >
-                  Rayane Bennasr
+                  Rayane Ben Nasr
                 </a>
                 <div className="flex items-center mt-2 bg-blue-600/20 px-2 py-0.5 rounded">
                   <span className="text-[10px] font-bold text-blue-500 mr-1">BETA</span>
