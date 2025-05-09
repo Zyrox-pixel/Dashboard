@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 import logging
 import threading
 from optimization import OptimizedAPIClient, time_execution
+import traceback
 
 # Configuration du logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -210,6 +211,371 @@ def set_management_zone():
         logger.error(f"Erreur lors de la définition de la MZ: {e}")
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/problems-72h', methods=['GET'])
+@time_execution
+def get_problems_72h():
+    """
+    Endpoint dédié pour récupérer tous les problèmes des 72 dernières heures.
+    Basé sur l'approche du script Python qui fonctionne correctement,
+    avec gestion de la pagination et filtrage précis.
+    """
+    try:
+        # Récupérer les paramètres de requête
+        dashboard_type = request.args.get('type', '')  # Pour identifier VFG ou VFE
+        zone_filter = request.args.get('zone', '')  # Pour filtrer par une zone spécifique
+        debug_mode = request.args.get('debug', 'false').lower() == 'true'
+        
+        # Ne plus forcer le mode debug maintenant que le problème est résolu
+        # debug_mode = True
+        
+        # Logs détaillés pour debug
+        logger.info("="*50)
+        logger.info("DIAGNOSTIC: Appel endpoint /api/problems-72h")
+        logger.info(f"Paramètres: dashboard_type={dashboard_type}, zone_filter={zone_filter}")
+        logger.info(f"Variables d'environnement: DT_ENV_URL={DT_ENV_URL}")
+        logger.info(f"Token API: {'présent' if API_TOKEN else 'MANQUANT!'} (longueur: {len(API_TOKEN) if API_TOKEN else 0})")
+        logger.info(f"VFG_MZ_LIST: {os.environ.get('VFG_MZ_LIST', 'NON DÉFINI!')}")
+        logger.info("="*50)
+        
+        # Créer une clé de cache unique pour cette requête
+        specific_cache_key = f"problems-72h:{dashboard_type}:{zone_filter}"
+        
+        # En mode debug, toujours vider le cache
+        if debug_mode:
+            if specific_cache_key in api_client.cache:
+                logger.info(f"Vidage du cache pour la clé: {specific_cache_key}")
+                api_client.cache.pop(specific_cache_key, None)
+            else:
+                logger.info(f"Aucun cache existant pour la clé: {specific_cache_key}")
+        # Sinon, vérifier le cache
+        else:
+            cached_data = api_client.get_cached(specific_cache_key)
+            if cached_data is not None:
+                logger.info(f"Retour des données en cache pour problems-72h")
+                return jsonify(cached_data)
+        
+        # MODIFICATION IMPORTANTE: Utilisation du script test qui fonctionne
+        # Utiliser la fonction de test_problems_api.py qui fonctionne, adaptée pour notre endpoint
+        try:
+            from test_problems_api import test_get_problems
+            logger.info("TENTATIVE ALTERNATIVE: Utilisation directe de la fonction test_get_problems qui fonctionne")
+            
+            # Si c'est un type de dashboard spécifique, récupérer les problèmes pour toutes les zones
+            if dashboard_type in ['vfg', 'vfe']:
+                # Si un filtre de zone est fourni, l'utiliser au lieu de toutes les zones
+                if zone_filter:
+                    logger.info(f"Filtrage par zone spécifique: {zone_filter}")
+                    problems = test_get_problems(management_zone_name=zone_filter, time_from="now-72h", status="OPEN,CLOSED")
+                    logger.info(f"Zone {zone_filter}: {len(problems)} problèmes trouvés sur 72h avec test_get_problems")
+                    
+                    # Formater chaque problème pour ajouter les informations d'entité impactée
+                    formatted_problems = []
+                    for problem in problems:
+                        formatted_problem = api_client._format_problem(problem, zone_filter)
+                        formatted_problems.append(formatted_problem)
+                    
+                    # Mettre en cache le résultat
+                    api_client.set_cache(specific_cache_key, formatted_problems)
+                    return jsonify(formatted_problems)
+                
+                # Récupérer la liste des MZs pour ce dashboard type
+                mz_list_var = 'VFG_MZ_LIST' if dashboard_type == 'vfg' else 'VFE_MZ_LIST'
+                mz_string = os.environ.get(mz_list_var, '')
+                
+                if not mz_string:
+                    logger.warning(f"{mz_list_var} est vide ou non définie dans .env")
+                    return jsonify([])
+                    
+                mz_list = [mz.strip() for mz in mz_string.split(',')]
+                logger.info(f"Liste des MZs {dashboard_type} pour problèmes 72h: {mz_list}")
+                
+                # Log de vérification pour VFG_MZ_LIST
+                if dashboard_type == 'vfg':
+                    logger.info(f"Vérification VFG_MZ_LIST: {os.environ.get('VFG_MZ_LIST')}")
+                
+                # Récupérer tous les problèmes pour chaque MZ et les combiner
+                all_problems = []
+                
+                for mz_name in mz_list:
+                    try:
+                        logger.info(f"Récupération des problèmes 72h pour MZ: {mz_name} avec test_get_problems")
+                        mz_problems = test_get_problems(management_zone_name=mz_name, time_from="now-72h", status="OPEN,CLOSED")
+                        logger.info(f"MZ {mz_name}: {len(mz_problems)} problèmes trouvés sur 72h avec test_get_problems")
+                        all_problems.extend(mz_problems)
+                    except Exception as mz_error:
+                        logger.error(f"Erreur lors de la récupération des problèmes 72h pour MZ {mz_name}: {mz_error}")
+                
+                # Dédupliquer les problèmes
+                unique_problems = []
+                problem_ids = set()
+                
+                # Vérifier la structure des problèmes et la clé d'identification
+                logger.info(f"Déduplication: examen de {len(all_problems)} problèmes")
+                
+                # Vérifier la structure du premier problème si disponible
+                if all_problems and len(all_problems) > 0:
+                    logger.info(f"Structure du premier problème:")
+                    problem_keys = list(all_problems[0].keys())
+                    logger.info(f"Clés disponibles: {problem_keys}")
+                    
+                    # Déterminer la bonne clé d'ID (problemId ou id)
+                    id_key = 'problemId' if 'problemId' in problem_keys else 'id'
+                    logger.info(f"Utilisation de la clé '{id_key}' pour l'identification des problèmes")
+                    
+                    # Vérification des managementZones pour s'assurer que tous les problèmes sont bien associés à une MZ de la liste
+                    filtered_problems = []
+                    for problem in all_problems:
+                        # Vérifier si le problème appartient à une des management zones de notre liste
+                        is_in_mz_list = False
+                        
+                        # Récupérer les management zones du problème
+                        problem_mzs = []
+                        if 'managementZones' in problem:
+                            problem_mzs = [mz.get('name', '') for mz in problem.get('managementZones', [])]
+                        
+                        # Vérifier si une des MZ du problème correspond EXACTEMENT à une MZ de notre liste
+                        # Et stocker la MZ correspondante pour l'affichage
+                        matching_mz = None
+                        for mz_name in mz_list:
+                            # Journaliser les MZs pour débogage
+                            logger.info(f"Comparaison: problème {problem.get(id_key)} a MZs={problem_mzs}, comparé avec {mz_name}")
+                            # Vérification stricte d'égalité complète, pas de correspondance partielle
+                            if any(problem_mz == mz_name for problem_mz in problem_mzs):
+                                is_in_mz_list = True
+                                matching_mz = mz_name  # Stocker la MZ correspondante
+                                logger.info(f"MATCH EXACT: Problème {problem.get(id_key)} appartient à la MZ {mz_name}")
+                                break
+                        
+                        # Stocker la MZ correspondante dans le problème pour l'utiliser plus tard
+                        if is_in_mz_list and matching_mz:
+                            problem['matching_mz'] = matching_mz
+                        
+                        if is_in_mz_list:
+                            filtered_problems.append(problem)
+                        else:
+                            logger.info(f"Problème {problem.get(id_key)} ignoré car n'appartient pas aux MZs {mz_list}")
+                    
+                    logger.info(f"Après filtrage par liste de MZ: {len(filtered_problems)}/{len(all_problems)} problèmes conservés")
+                    
+                    # Utilisez la bonne clé pour la déduplication des problèmes filtrés
+                    for problem in filtered_problems:
+                        problem_id = problem.get(id_key)
+                        if problem_id and problem_id not in problem_ids:
+                            problem_ids.add(problem_id)
+                            unique_problems.append(problem)
+                            logger.info(f"Problème ajouté: {problem_id}")
+                else:
+                    logger.warning("Aucun problème à dédupliquer")
+                
+                logger.info(f"Déduplication terminée: {len(unique_problems)} problèmes uniques sur {len(all_problems)} au total")
+                
+                logger.info(f"Récupéré {len(unique_problems)} problèmes uniques sur 72h pour {dashboard_type.upper()} avec test_get_problems")
+                
+                # Formater chaque problème pour ajouter les informations d'entité impactée
+                formatted_problems = []
+                for problem in unique_problems:
+                    formatted_problem = api_client._format_problem(problem, zone_filter)
+                    formatted_problems.append(formatted_problem)
+                
+                # Mettre en cache le résultat
+                api_client.set_cache(specific_cache_key, formatted_problems)
+                return jsonify(formatted_problems)
+            
+            # En cas de dashboard type non reconnu, essayer la méthode normale
+            logger.info("Retour à l'implémentation standard")
+            
+        except ImportError:
+            logger.warning("Module test_problems_api non trouvé, utilisation de l'implémentation standard")
+        except Exception as test_error:
+            logger.error(f"Erreur lors de l'utilisation de test_get_problems: {test_error}")
+            logger.error(traceback.format_exc())
+        
+        # SI MÉTHODE ALTERNATIVE ÉCHOUE, ON REVIENT À L'IMPLÉMENTATION STANDARD
+        logger.info("Utilisation de l'implémentation standard")
+        
+        # Si un type de dashboard est spécifié (vfg ou vfe)
+        if dashboard_type in ['vfg', 'vfe']:
+            # Si un filtre de zone est fourni, l'utiliser au lieu de toutes les zones
+            if zone_filter:
+                logger.info(f"Filtrage par zone spécifique: {zone_filter} pour dashboard {dashboard_type}")
+                try:
+                    # Utiliser le moteur spécifique qui gère la pagination
+                    logger.info(f"Appel get_all_problems_with_pagination pour zone: {zone_filter}")
+                    problems = get_all_problems_with_pagination(zone_filter, "now-72h", "OPEN,CLOSED")
+                    logger.info(f"Zone {zone_filter}: {len(problems)} problèmes trouvés sur 72h")
+                    
+                    # Afficher un exemple de problème s'il y en a
+                    if problems:
+                        logger.info(f"Exemple de premier problème: {json.dumps(problems[0])[:200]}...")
+                    else:
+                        logger.info("Aucun problème trouvé pour cette zone")
+                    
+                    # Mettre en cache le résultat
+                    api_client.set_cache(specific_cache_key, problems)
+                    return jsonify(problems)
+                except Exception as zone_error:
+                    logger.error(f"Erreur lors de la récupération des problèmes pour zone {zone_filter}: {zone_error}")
+                    logger.error(traceback.format_exc())
+                    return jsonify([])
+            
+            # Récupérer la liste des MZs pour ce dashboard type
+            mz_list_var = 'VFG_MZ_LIST' if dashboard_type == 'vfg' else 'VFE_MZ_LIST'
+            mz_string = os.environ.get(mz_list_var, '')
+            
+            logger.info(f"Valeur de {mz_list_var}: '{mz_string}'")
+            
+            if not mz_string:
+                logger.warning(f"{mz_list_var} est vide ou non définie dans .env")
+                return jsonify([])
+                
+            mz_list = [mz.strip() for mz in mz_string.split(',')]
+            logger.info(f"Liste des MZs {dashboard_type} pour problèmes 72h: {mz_list}")
+            
+            # Récupérer les problèmes pour chaque MZ et les combiner
+            all_problems = []
+            
+            for mz_name in mz_list:
+                try:
+                    logger.info(f"Récupération des problèmes 72h pour MZ: {mz_name}")
+                    # Utiliser la nouvelle fonction qui gère la pagination
+                    mz_problems = get_all_problems_with_pagination(mz_name, "now-72h", "OPEN,CLOSED")
+                    logger.info(f"MZ {mz_name}: {len(mz_problems)} problèmes trouvés sur 72h")
+                    
+                    # Afficher un exemple de problème s'il y en a
+                    if mz_problems:
+                        logger.info(f"Exemple pour MZ {mz_name}: {json.dumps(mz_problems[0])[:200]}...")
+                    
+                    all_problems.extend(mz_problems)
+                except Exception as mz_error:
+                    logger.error(f"Erreur lors de la récupération des problèmes 72h pour MZ {mz_name}: {mz_error}")
+                    logger.error(traceback.format_exc())
+            
+            # Dédupliquer les problèmes (un même problème peut affecter plusieurs MZs)
+            unique_problems = []
+            problem_ids = set()
+            invalid_problems = []
+            
+            logger.info(f"Déduplication de {len(all_problems)} problèmes au total")
+            
+            # D'abord filtrer les problèmes qui appartiennent aux MZ de notre liste
+            filtered_problems = []
+            for i, problem in enumerate(all_problems):
+                try:
+                    # Vérifier si l'objet a le bon format
+                    if not isinstance(problem, dict):
+                        logger.warning(f"Problème à l'index {i} n'est pas un dictionnaire: {type(problem)}")
+                        invalid_problems.append(problem)
+                        continue
+                    
+                    # Vérifier si l'objet a un ID
+                    if 'id' not in problem:
+                        logger.warning(f"Problème à l'index {i} n'a pas d'ID: {json.dumps(problem)[:200]}...")
+                        invalid_problems.append(problem)
+                        continue
+                    
+                    # Vérifier si le problème appartient à une des management zones de notre liste
+                    is_in_mz_list = False
+                    
+                    # Récupérer les management zones du problème
+                    problem_mzs = []
+                    if 'managementZones' in problem:
+                        problem_mzs = [mz.get('name', '') for mz in problem.get('managementZones', [])]
+                    
+                    # Vérifier si une des MZ du problème correspond EXACTEMENT à une MZ de notre liste
+                    # Et stocker la MZ correspondante pour l'affichage
+                    matching_mz = None
+                    for mz_name in mz_list:
+                        # Journaliser les MZs pour débogage
+                        logger.info(f"Comparaison: problème {problem.get('id')} a MZs={problem_mzs}, comparé avec {mz_name}")
+                        # Vérification stricte d'égalité complète, pas de correspondance partielle
+                        if any(problem_mz == mz_name for problem_mz in problem_mzs):
+                            is_in_mz_list = True
+                            matching_mz = mz_name  # Stocker la MZ correspondante
+                            logger.info(f"MATCH EXACT: Problème {problem.get('id')} appartient à la MZ {mz_name}")
+                            break
+                    
+                    # Stocker la MZ correspondante dans le problème pour l'utiliser plus tard
+                    if is_in_mz_list and matching_mz:
+                        problem['matching_mz'] = matching_mz
+                    
+                    if is_in_mz_list:
+                        filtered_problems.append(problem)
+                    else:
+                        logger.info(f"Problème {problem.get('id')} ignoré car n'appartient pas aux MZs {mz_list}")
+                        
+                except Exception as e:
+                    logger.error(f"Erreur lors du traitement du problème à l'index {i}: {e}")
+                    logger.error(traceback.format_exc())
+                    invalid_problems.append(problem)
+            
+            logger.info(f"Après filtrage par liste de MZ: {len(filtered_problems)}/{len(all_problems)} problèmes conservés")
+            
+            # Ensuite dédupliquer les problèmes filtrés
+            for problem in filtered_problems:   
+                # Vérifier si l'ID est unique
+                if problem['id'] not in problem_ids:
+                    problem_ids.add(problem['id'])
+                    unique_problems.append(problem)
+            
+            logger.info(f"Récupéré {len(unique_problems)} problèmes uniques sur 72h pour {dashboard_type.upper()}")
+            logger.info(f"Problèmes invalides ignorés: {len(invalid_problems)}")
+            
+            # En mode debug, afficher les problèmes pour investigation
+            if debug_mode and unique_problems:
+                logger.info(f"Exemples de problèmes trouvés:")
+                for i, prob in enumerate(unique_problems[:5]):  # Limiter à 5 pour éviter de saturer les logs
+                    try:
+                        logger.info(f"Problème 72h #{i+1}: {prob.get('id', 'SANS_ID')} - {prob.get('title', 'Sans titre')} - Status: {prob.get('status', 'Inconnu')}")
+                    except Exception as e:
+                        logger.error(f"Erreur lors de l'affichage du problème {i}: {e}")
+            
+            # Formater chaque problème pour ajouter les informations d'entité impactée
+            formatted_problems = []
+            for problem in unique_problems:
+                formatted_problem = api_client._format_problem(problem, zone_filter)
+                formatted_problems.append(formatted_problem)
+            
+            # Mettre en cache le résultat
+            api_client.set_cache(specific_cache_key, formatted_problems)
+            
+            logger.info(f"Fin du traitement - {len(formatted_problems)} problèmes formatés et retournés")
+            return jsonify(formatted_problems)
+            
+        else:
+            # Pour une MZ spécifique ou sans filtrage
+            if zone_filter:
+                logger.info(f"Filtrage par zone spécifique: {zone_filter} pour problèmes 72h")
+                effective_mz = zone_filter
+            else:
+                # Utiliser la MZ courante ou aucune MZ si filtrage désactivé
+                current_mz = get_current_mz()
+                effective_mz = current_mz
+                
+            # Utiliser la nouvelle fonction qui gère la pagination
+            problems = get_all_problems_with_pagination(effective_mz, "now-72h", "OPEN,CLOSED")
+            
+            # En mode debug, afficher les problèmes pour investigation
+            if debug_mode:
+                for i, prob in enumerate(problems):
+                    logger.info(f"Problème 72h #{i+1}: {prob['id']} - {prob['title']} - Status: {prob['status']}")
+            
+            # Formater chaque problème pour ajouter les informations d'entité impactée
+            formatted_problems = []
+            for problem in problems:
+                formatted_problem = api_client._format_problem(problem, effective_mz)
+                formatted_problems.append(formatted_problem)
+            
+            # Mettre en cache le résultat
+            api_client.set_cache(specific_cache_key, formatted_problems)
+            
+            logger.info(f"MZ {effective_mz}: {len(formatted_problems)} problèmes récupérés et formatés sur 72h")
+            return jsonify(formatted_problems)
+            
+    except Exception as e:
+        logger.error(f"Erreur lors de la récupération des problèmes 72h: {e}")
+        logger.error(traceback.format_exc())
+        return jsonify({'error': str(e)})
+
 @app.route('/api/problems', methods=['GET'])
 # Retiré le décorateur de cache pour les problèmes pour garantir des données en temps réel
 @time_execution
@@ -217,10 +583,15 @@ def get_problems():
     try:
         # Récupérer les paramètres de requête
         status = request.args.get('status', 'OPEN')  # Par défaut "OPEN"
-        time_from = request.args.get('from', '-30d')  # Par défaut "-30d" pour inclure les problèmes plus anciens
-        # Nous n'avons plus besoin de ce paramètre, car nous voulons toujours filtrer par les management zones spécifiées
-        # disable_mz_filter = request.args.get('disable_mz_filter', 'false').lower() == 'true'
+        time_from = request.args.get('from', '-30d')  # Par défaut "-30d" pour l'historique standard
+        # Utiliser une période plus longue pour les problèmes actifs
+        if status == 'OPEN' and 'from' not in request.args:
+            time_from = '-60d'  # Augmenté à 60 jours pour voir les problèmes actifs plus anciens
         dashboard_type = request.args.get('type', '')  # Pour identifier VFG ou VFE
+        zone_filter = request.args.get('zone', '')  # Pour filtrer par une zone spécifique
+        
+        # Désactiver le filtrage par MZ n'est plus nécessaire, car on filtre toujours par MZ
+        disable_mz_filter = request.args.get('disable_mz_filter', 'false').lower() == 'true'
         
         # Débogage approfondi - à activer temporairement
         debug_mode = request.args.get('debug', 'false').lower() == 'true'
@@ -231,7 +602,7 @@ def get_problems():
             use_cache = False  # Forcer les problèmes actifs à être toujours à jour
         
         # Créer une clé de cache unique qui inclut tous les paramètres
-        specific_cache_key = f"problems:{get_current_mz()}:{time_from}:{status}:{dashboard_type}"
+        specific_cache_key = f"problems:{get_current_mz()}:{time_from}:{status}:{dashboard_type}:{zone_filter}"
         
         # Si le mode debug est activé, vider le cache pour cette requête
         if debug_mode:
@@ -253,9 +624,33 @@ def get_problems():
         # Log pour debug
         logger.info(f"Requête problèmes: status={status}, time_from={time_from}, dashboard_type={dashboard_type}, debug={debug_mode}")
         
+        # Ajouter des détails sur l'état de l'environnement pour le débogage
+        logger.info(f"Variables d'environnement: DT_ENV_URL={DT_ENV_URL}, API_TOKEN={'présent' if API_TOKEN else 'manquant'}")
+        
         # Si un type de dashboard est spécifié (vfg ou vfe)
         if dashboard_type in ['vfg', 'vfe']:
-            # Récupérer la liste des MZ correspondantes
+            # Si un filtre de zone est fourni, l'utiliser à la place de la liste complète
+            if zone_filter:
+                logger.info(f"Filtrage par zone spécifique: {zone_filter} pour dashboard {dashboard_type}")
+                try:
+                    # Récupérer les problèmes pour la zone spécifique
+                    problems = api_client.get_problems_filtered(zone_filter, time_from, use_status)
+                    logger.info(f"Zone {zone_filter}: {len(problems)} problèmes trouvés")
+                    
+                    # Ajouter le champ 'resolved' pour les requêtes ALL
+                    for problem in problems:
+                        if status == 'ALL' and 'resolved' not in problem:
+                            problem['resolved'] = problem.get('status') != 'OPEN'
+                    
+                    # Mettre en cache le résultat avec la clé spécifique
+                    api_client.set_cache(specific_cache_key, problems)
+                    return problems
+                    
+                except Exception as zone_error:
+                    logger.error(f"Erreur lors de la récupération des problèmes pour zone {zone_filter}: {zone_error}")
+                    return []
+            
+            # Comportement normal pour tous les problèmes du dashboard
             mz_list_var = 'VFG_MZ_LIST' if dashboard_type == 'vfg' else 'VFE_MZ_LIST'
             mz_string = os.environ.get(mz_list_var, '')
             
@@ -311,9 +706,18 @@ def get_problems():
             if not current_mz:
                 return {'error': 'Aucune Management Zone définie'}
             
-            # Utiliser la méthode optimisée pour récupérer les problèmes filtrés
-            # Si on désactive le filtrage par MZ, on passe None pour mz_name
-            effective_mz = None if disable_mz_filter else current_mz
+            # Si un filtre de zone est fourni, l'utiliser à la place de la MZ courante
+            if zone_filter:
+                logger.info(f"Filtrage par zone spécifique: {zone_filter}")
+                effective_mz = zone_filter
+            # Sinon si le filtrage MZ est désactivé
+            elif disable_mz_filter:
+                effective_mz = None
+            # Sinon, utiliser la MZ courante
+            else:
+                effective_mz = current_mz
+                
+            # Récupérer les problèmes avec la MZ effective
             problems = api_client.get_problems_filtered(effective_mz, time_from, use_status)
             
             # En mode debug, afficher les problèmes pour investigation
@@ -380,10 +784,12 @@ def get_hosts():
         # Utiliser la fonction build_entity_selector
         entity_selector = build_entity_selector("HOST", current_mz)
         
-        # Récupérer les entités hôtes
+        # Récupérer les entités hôtes avec une taille de page augmentée
+        logger.info(f"Récupération des hôtes pour {current_mz} avec une taille de page de 1000")
         hosts_data = api_client.query_api("entities", {
             "entitySelector": entity_selector,
-            "fields": "+properties,+fromRelationships"
+            "fields": "+properties,+fromRelationships",
+            "pageSize": 1000  # Augmenter la taille de la page pour récupérer jusqu'à 1000 hôtes
         })
         
         # Extraire les IDs des hôtes
@@ -400,26 +806,40 @@ def get_hosts():
         return {'error': str(e)}
 
 @app.route('/api/services', methods=['GET'])
-@cached('services')
+@cached('services')  # Le décorateur @cached utilise déjà le cache standard
 @time_execution
 def get_services():
     try:
-        now = datetime.now()
-        from_time = int((now - timedelta(minutes=30)).timestamp() * 1000)  # Récupération des 30 dernières minutes
-        to_time = int(now.timestamp() * 1000)
-        
-        # Récupérer la Management Zone actuelle
+        # Vérifier si nous avons un cache persistant pour cette management zone
         current_mz = get_current_mz()
         if not current_mz:
             return {'error': 'Aucune Management Zone définie'}
         
+        # Clé de cache persistant spécifique à cette MZ
+        persistent_cache_key = f"persistent_services:{current_mz}"
+        
+        # Vérifier si nous avons des données en cache persistant et si le cache n'est pas explicitement désactivé
+        refresh_cache = request.args.get('refresh', 'false').lower() == 'true'
+        if not refresh_cache:
+            cached_services = api_client.get_cached(persistent_cache_key)
+            if cached_services is not None:
+                logger.info(f"Utilisation du cache persistant pour les services de {current_mz}")
+                return cached_services
+        
+        # Continuer avec le traitement normal si pas de cache ou refresh demandé
+        now = datetime.now()
+        from_time = int((now - timedelta(minutes=30)).timestamp() * 1000)  # Récupération des 30 dernières minutes
+        to_time = int(now.timestamp() * 1000)
+        
         # Utiliser la fonction build_entity_selector
         entity_selector = build_entity_selector("SERVICE", current_mz)
         
-        # Récupérer les entités services
+        # Récupérer les entités services avec une taille de page augmentée
+        logger.info(f"Récupération des services pour {current_mz} avec une taille de page de 1000")
         services_data = api_client.query_api("entities", {
             "entitySelector": entity_selector,
-            "fields": "+properties,+fromRelationships"
+            "fields": "+properties,+fromRelationships",
+            "pageSize": 1000  # Augmenter la taille de la page pour récupérer jusqu'à 1000 services
         })
         
         # Extraire les IDs des services
@@ -430,7 +850,12 @@ def get_services():
             return []
         
         # Récupérer les métriques pour tous les services en parallèle
-        return api_client.get_service_metrics_parallel(service_ids, from_time, to_time)
+        services_result = api_client.get_service_metrics_parallel(service_ids, from_time, to_time)
+        
+        # Stocker le résultat dans un cache persistant avec une durée plus longue (4 heures)
+        api_client.set_persistent_cache(persistent_cache_key, services_result, duration=14400)  # 4 heures en secondes
+        
+        return services_result
     except Exception as e:
         logger.error(f"Erreur lors de la récupération des services: {e}")
         return {'error': str(e)}
@@ -444,14 +869,27 @@ def get_processes():
         current_mz = get_current_mz()
         if not current_mz:
             return {'error': 'Aucune Management Zone définie'}
+            
+        # Clé de cache persistant spécifique à cette MZ
+        persistent_cache_key = f"persistent_processes:{current_mz}"
+        
+        # Vérifier si nous avons des données en cache persistant et si le cache n'est pas explicitement désactivé
+        refresh_cache = request.args.get('refresh', 'false').lower() == 'true'
+        if not refresh_cache:
+            cached_processes = api_client.get_cached(persistent_cache_key)
+            if cached_processes is not None:
+                logger.info(f"Utilisation du cache persistant pour les process groups de {current_mz}")
+                return cached_processes
         
         # Utiliser la fonction build_entity_selector
         entity_selector = build_entity_selector("PROCESS_GROUP", current_mz)
         
-        # Récupérer les groupes de processus
+        # Récupérer les groupes de processus sans limite (augmenter pageSize)
+        logger.info(f"Récupération des process groups pour {current_mz} avec une taille de page de 1000")
         process_groups_data = api_client.query_api("entities", {
             "entitySelector": entity_selector,
-            "fields": "+properties,+fromRelationships"
+            "fields": "+properties,+fromRelationships",
+            "pageSize": 1000  # Augmenter la taille de la page pour récupérer jusqu'à 1000 process groups
         })
         
         process_metrics = []
@@ -474,7 +912,7 @@ def get_processes():
                 tech_info = api_client.extract_technology(pg_id)
                 
                 # Récupérer l'URL Dynatrace de l'entité
-                dt_url = f"{DT_ENV_URL}/#entity/{pg_id}"
+                dt_url = f"{DT_ENV_URL}/ui/entity/{pg_id}"
                 
                 process_metrics.append({
                     'id': pg_id,
@@ -484,10 +922,129 @@ def get_processes():
                     'dt_url': dt_url
                 })
         
+        # Stocker le résultat dans un cache persistant avec une durée plus longue (4 heures)
+        api_client.set_persistent_cache(persistent_cache_key, process_metrics, duration=14400)  # 4 heures en secondes
+        
         return process_metrics
     except Exception as e:
         logger.error(f"Erreur lors de la récupération des processus: {e}")
         return {'error': str(e)}
+
+
+@app.route('/api/management-zones/counts', methods=['GET'])
+@time_execution
+def get_management_zone_counts():
+    try:
+        # Récupérer la zone spécifiée dans les paramètres de requête
+        zone_name = request.args.get('zone')
+        if not zone_name:
+            return jsonify({'error': 'Le paramètre "zone" est requis'}), 400
+            
+        logger.info(f"Récupération des comptages pour la management zone: {zone_name}")
+        
+        # Fonction pour récupérer le nombre d'entités par type
+        def get_entity_count(entity_type, mz_name):
+            # Paramètres importants pour les retries
+            max_retries = 3
+            retry_delay = 2  # secondes
+            
+            for attempt in range(max_retries):
+                try:
+                    # Construire l'URL API
+                    api_url = f"{DT_ENV_URL}/api/v2/entities"
+                    headers = {
+                        'Authorization': f'Api-Token {API_TOKEN}',
+                        'Accept': 'application/json'
+                    }
+                    
+                    # Paramètres pour ne récupérer que le comptage
+                    # On définit une taille de page à 1 car on a seulement besoin du comptage total
+                    # Mais on s'assure que les résultats ne sont pas limités avec pageSize=0 qui retourne tous les résultats
+                    params = {
+                        'entitySelector': f'type({entity_type}),mzName("{mz_name}")',
+                        'pageSize': 1,
+                        'totalCount': 'true'
+                    }
+                    
+                    logger.info(f"Requête API (tentative {attempt+1}/{max_retries}): {api_url} avec sélecteur: {params['entitySelector']}")
+                    
+                    # Effectuer la requête HTTP avec un timeout plus long
+                    # Augmenter le timeout proportionnellement au nombre de tentatives
+                    timeout = 30 * (attempt + 1)
+                    response = requests.get(api_url, headers=headers, params=params, verify=False, timeout=timeout)
+                    response.raise_for_status()
+                    data = response.json()
+                    
+                    # Retourner le nombre total
+                    count = data.get('totalCount', 0)
+                    logger.info(f"Comptage pour {entity_type} dans {mz_name}: {count}")
+                    
+                    # Mise en cache du résultat pour réduire la charge sur l'API
+                    key = f"count:{entity_type}:{mz_name}"
+                    api_client.set_cache(key, count)
+                    
+                    return count
+                    
+                except requests.exceptions.Timeout:
+                    logger.warning(f"Timeout lors du comptage des {entity_type} pour {mz_name} (tentative {attempt+1}/{max_retries})")
+                    if attempt < max_retries - 1:
+                        logger.info(f"Attente de {retry_delay} secondes avant la prochaine tentative...")
+                        time.sleep(retry_delay)
+                    else:
+                        # Dernière tentative, vérifier si nous avons une valeur en cache
+                        key = f"count:{entity_type}:{mz_name}"
+                        cached = api_client.get_cached(key)
+                        if cached is not None:
+                            logger.info(f"Utilisation de la valeur en cache pour {entity_type} dans {mz_name}: {cached}")
+                            return cached
+                        logger.error(f"Échec de toutes les tentatives pour {entity_type}")
+                        return 0
+                        
+                except Exception as e:
+                    logger.error(f"Erreur lors du comptage des {entity_type} pour {mz_name}: {e}")
+                    if attempt < max_retries - 1:
+                        logger.info(f"Attente de {retry_delay} secondes avant la prochaine tentative...")
+                        time.sleep(retry_delay)
+                    else:
+                        # Dernière tentative, vérifier si nous avons une valeur en cache
+                        key = f"count:{entity_type}:{mz_name}"
+                        cached = api_client.get_cached(key)
+                        if cached is not None:
+                            logger.info(f"Utilisation de la valeur en cache pour {entity_type} dans {mz_name}: {cached}")
+                            return cached
+                        return 0
+            
+            # Nous ne devrions jamais arriver ici, mais au cas où
+            return 0
+        
+        # Récupérer les comptages en parallèle avec threads
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+            # Soumettre les tâches
+            host_future = executor.submit(get_entity_count, "HOST", zone_name)
+            service_future = executor.submit(get_entity_count, "SERVICE", zone_name)
+            process_future = executor.submit(get_entity_count, "PROCESS_GROUP", zone_name)
+            
+            # Récupérer les résultats
+            hosts_count = host_future.result()
+            services_count = service_future.result()
+            processes_count = process_future.result()
+        
+        logger.info(f"Comptages pour {zone_name}: hosts={hosts_count}, services={services_count}, processes={processes_count}")
+        
+        # Retourner les comptages
+        return jsonify({
+            'counts': {
+                'hosts': hosts_count,
+                'services': services_count,
+                'processes': processes_count
+            },
+            'zone': zone_name
+        })
+            
+    except Exception as e:
+        logger.error(f"Erreur lors de la récupération des comptages de MZ: {e}")
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/management-zones', methods=['GET'])
@@ -509,7 +1066,7 @@ def get_management_zones():
                 management_zones.append({
                     'id': f"env-{i}",
                     'name': mz_name,
-                    'dt_url': f"{DT_ENV_URL}/#settings/managementzones"
+                    'dt_url': f"{DT_ENV_URL}/ui/settings/managementzones"
                 })
             
             logger.info(f"Trouvé {len(management_zones)} management zones depuis le fichier .env")
@@ -532,7 +1089,7 @@ def get_management_zones():
             management_zones.append({
                 'id': mz.get('id'),
                 'name': mz.get('name'),
-                'dt_url': f"{DT_ENV_URL}/#settings/managementzones;id={mz.get('id')}"
+                'dt_url': f"{DT_ENV_URL}/ui/settings/managementzones;id={mz.get('id')}"
             })
         
         logger.info(f"Trouvé {len(management_zones)} management zones")
@@ -560,6 +1117,126 @@ def get_management_zones():
             logger.error(f"Erreur lors du fallback sur .env: {fallback_error}")
         
         return {'error': str(e)}
+
+# Fonction pour obtenir tous les problèmes avec pagination
+def get_all_problems_with_pagination(management_zone_name=None, time_from="now-72h", status="OPEN,CLOSED"):
+    """
+    Récupère tous les problèmes avec pagination complète, en suivant l'approche du script Python qui fonctionne.
+    
+    Args:
+        management_zone_name (str, optional): Nom de la Management Zone pour filtrer les problèmes.
+        time_from (str, optional): Point de départ temporel (ex: "now-72h"). 
+        status (str, optional): Statut des problèmes à récupérer ("OPEN", "CLOSED", ou "OPEN,CLOSED").
+        
+    Returns:
+        list: Liste des problèmes récupérés.
+    """
+    # Construction des headers pour l'API Dynatrace
+    headers = {
+        'Authorization': f'Api-Token {API_TOKEN}',
+        'Accept': 'application/json; charset=utf-8'
+    }
+    
+    api_url = DT_ENV_URL.rstrip('/')
+    problems_url = f"{api_url}/api/v2/problems"
+    
+    all_problems = []
+    
+    # Échapper les guillemets doubles dans le nom de la MZ pour le sélecteur
+    problem_selector = ""
+    if management_zone_name:
+        escaped_mz_name = management_zone_name.replace('"', '\\"')
+        problem_selector = f'managementZones("{escaped_mz_name}")'
+        logger.info(f"Requête de problèmes avec sélecteur MZ: '{problem_selector}'")
+    
+    # Paramètres initiaux pour la première requête
+    current_params = {
+        'from': time_from,
+        'status': status,
+        'pageSize': 500  # Demander le maximum par page pour réduire le nombre d'appels
+    }
+    
+    # Ajouter le sélecteur de problèmes si défini
+    if problem_selector:
+        current_params['problemSelector'] = problem_selector
+    
+    page_num = 1
+    logger.info(f"Début de la récupération des problèmes pour timeframe: {time_from}, status: {status}" + 
+                (f", MZ: '{management_zone_name}'" if management_zone_name else ""))
+    
+    while True:
+        if 'nextPageKey' in current_params:
+            logger.info(f"Récupération de la page {page_num} avec nextPageKey: {current_params['nextPageKey'][:20]}...")
+        else:
+            logger.info(f"Récupération de la page {page_num} avec les paramètres initiaux: {current_params}")
+        
+        try:
+            verify_ssl = os.environ.get('VERIFY_SSL', 'False').lower() in ('true', '1', 't')
+            response = requests.get(
+                problems_url, 
+                headers=headers, 
+                params=current_params, 
+                verify=verify_ssl,
+                timeout=30
+            )
+            response.raise_for_status()
+            
+            data = response.json()
+            problems_on_page = data.get('problems', [])
+            
+            # Vérifier la structure des problèmes et exclure les invalides
+            valid_problems = []
+            for prob in problems_on_page:
+                if not isinstance(prob, dict):
+                    logger.warning(f"Problème ignoré: format inattendu (non-dictionnaire): {type(prob)}")
+                    continue
+                    
+                if 'id' not in prob:
+                    logger.warning(f"Problème ignoré: pas d'ID trouvé: {json.dumps(prob)[:200]}...")
+                    continue
+                    
+                valid_problems.append(prob)
+            
+            # Si des problèmes ont été ignorés, enregistrer un avertissement
+            if len(valid_problems) < len(problems_on_page):
+                logger.warning(f"Page {page_num}: {len(problems_on_page) - len(valid_problems)} problèmes invalides ignorés")
+                
+            all_problems.extend(valid_problems)
+            
+            logger.info(f"Page {page_num}: {len(valid_problems)} problèmes valides récupérés. Total jusqu'à présent: {len(all_problems)}.")
+            
+            next_page_key = data.get("nextPageKey")
+            if next_page_key:
+                # Pour les pages suivantes, seuls nextPageKey et pageSize sont nécessaires
+                current_params = {'nextPageKey': next_page_key, 'pageSize': 500}
+                page_num += 1
+                # Petite pause pour ne pas surcharger l'API
+                time.sleep(0.2)
+            else:
+                # Plus de pages à récupérer
+                break
+                
+        except requests.exceptions.HTTPError as http_err:
+            logger.error(f"Erreur HTTP lors de la récupération des problèmes (page {page_num}): {http_err}")
+            logger.error(f"Réponse du serveur: {response.text if response and hasattr(response, 'text') else 'Pas de réponse détaillée'}")
+            break
+        except requests.exceptions.Timeout as timeout_err:
+            logger.error(f"Timeout lors de la requête (page {page_num}): {timeout_err}")
+            break
+        except requests.exceptions.RequestException as req_err:
+            logger.error(f"Erreur de requête générique (page {page_num}): {req_err}")
+            break
+        except json.JSONDecodeError as json_err:
+            logger.error(f"Erreur de décodage JSON (page {page_num}): {json_err}")
+            logger.error(f"Réponse brute reçue: {response.text if response and hasattr(response, 'text') else 'Pas de réponse détaillée'}")
+            break
+        except Exception as e:
+            logger.error(f"Erreur inattendue: {e}")
+            logger.error(traceback.format_exc())
+            break
+    
+    logger.info(f"Récupération terminée. Nombre total de problèmes: {len(all_problems)}")
+    return all_problems
 
 @app.route('/api/status', methods=['GET'])
 def get_status():

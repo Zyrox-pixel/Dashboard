@@ -409,6 +409,7 @@ class ApiClient {
   public async loadDashboardData(managementZone: string): Promise<{
     summary: ApiResponse<SummaryData>;
     problems: ApiResponse<ProblemResponse[]>;
+    problems72h: ApiResponse<ProblemResponse[]>;  // Ajout des problèmes 72h
     hosts: ApiResponse<Host[]>;
     services: ApiResponse<Service[]>;
     processes: ApiResponse<ProcessResponse[]>;
@@ -422,7 +423,7 @@ class ApiClient {
       await this.post(ENDPOINTS.SET_MANAGEMENT_ZONE, { name: managementZone });
       
       // Charger toutes les données en parallèle
-      const [summaryResponse, problemsResponse, hostsResponse, servicesResponse, processesResponse] = await Promise.all([
+      const [summaryResponse, problemsResponse, problems72hResponse, hostsResponse, servicesResponse, processesResponse] = await Promise.all([
         this.get<SummaryData>(ENDPOINTS.SUMMARY),
         this.get<ProblemResponse[]>(ENDPOINTS.PROBLEMS, { 
           params: { 
@@ -431,6 +432,11 @@ class ApiClient {
             debug: 'true' // Force le rafraîchissement
           } 
         }, false), // Ne pas utiliser le cache
+        this.get<ProblemResponse[]>(ENDPOINTS.PROBLEMS_72H, {
+          params: {
+            debug: 'true' // Force le rafraîchissement
+          }
+        }, false), // Ne pas utiliser le cache pour les problèmes 72h
         this.get<Host[]>(ENDPOINTS.HOSTS),
         this.get<Service[]>(ENDPOINTS.SERVICES),
         this.get<ProcessResponse[]>(ENDPOINTS.PROCESSES)
@@ -439,6 +445,7 @@ class ApiClient {
       return {
         summary: summaryResponse,
         problems: problemsResponse,
+        problems72h: problems72hResponse, // Retourner les problèmes 72h
         hosts: hostsResponse,
         services: servicesResponse,
         processes: processesResponse
@@ -455,6 +462,7 @@ class ApiClient {
       return {
         summary: { ...errorResponse, data: {} as SummaryData },
         problems: { ...errorResponse, data: [] as ProblemResponse[] },
+        problems72h: { ...errorResponse, data: [] as ProblemResponse[] }, // Ajout des problèmes 72h
         hosts: { ...errorResponse, data: [] as Host[] },
         services: { ...errorResponse, data: [] as Service[] },
         processes: { ...errorResponse, data: [] as ProcessResponse[] }
@@ -542,6 +550,42 @@ class ApiClient {
     const useCache = !(status === "OPEN" || forceRefresh);
     
     return this.get<ProblemResponse[]>(ENDPOINTS.PROBLEMS, { params }, useCache);
+  }
+  
+  /**
+   * Récupérer spécifiquement les problèmes des 72 dernières heures
+   * Utilise l'endpoint dédié basé sur l'implémentation du script Python
+   * @param dashboardType Le type de dashboard (vfg, vfe)
+   * @param zoneFilter Filtre optionnel pour une MZ spécifique
+   * @param forceRefresh Si true, force le rafraîchissement (ignore le cache)
+   */
+  public getProblems72h(
+    dashboardType?: string,
+    zoneFilter?: string,
+    forceRefresh: boolean = false
+  ) {
+    const params: any = {};
+    
+    // Ajouter le type de dashboard s'il est spécifié
+    if (dashboardType) {
+      params.type = dashboardType;
+    }
+    
+    // Ajouter le filtre de zone s'il est spécifié
+    if (zoneFilter) {
+      params.zone = zoneFilter;
+    }
+    
+    // Si on force le rafraîchissement, ajouter le paramètre debug
+    if (forceRefresh) {
+      params.debug = 'true';
+      console.log(`Forçage du rafraîchissement des problèmes 72h (dashboard: ${dashboardType || 'none'}, zone: ${zoneFilter || 'none'})`);
+    }
+    
+    // Ne pas utiliser le cache si on force le rafraîchissement
+    const useCache = !forceRefresh;
+    
+    return this.get<ProblemResponse[]>(ENDPOINTS.PROBLEMS_72H, { params }, useCache);
   }
 
   /**

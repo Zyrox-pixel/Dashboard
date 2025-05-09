@@ -11,6 +11,7 @@ import {
   VitalForGroupMZsResponse,
   ProblemResponse
 } from '../api/types';
+import { API_BASE_URL } from '../api/endpoints';
 import { Database, Shield, Key, Globe, Server, Grid, Building, CreditCard } from 'lucide-react';
 
 // Types unifiés pour les contextes
@@ -258,11 +259,48 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
           
           // Mettre à jour les hosts
           if (dashboardData.hosts.data) {
-            setState(prev => ({ ...prev, hosts: dashboardData.hosts.data }));
+            // Mettre à jour les hosts
+            const hostsData = dashboardData.hosts.data;
+            setState(prev => ({ ...prev, hosts: hostsData }));
             setPerformanceMetrics(prev => ({
               ...prev,
-              dataSizes: { ...prev.dataSizes, hosts: dashboardData.hosts.data.length }
+              dataSizes: { ...prev.dataSizes, hosts: hostsData.length }
             }));
+            
+            // Mettre à jour les comptages dans la liste des MZs
+            const hostsCount = hostsData.length;
+            const servicesCount = dashboardData.services.data ? dashboardData.services.data.length : 0;
+            const processesCount = dashboardData.processes.data ? dashboardData.processes.data.length : 0;
+            
+            // Chercher la zone dans la collection appropriée et mettre à jour les comptages
+            const isVFG = state.vitalForGroupMZs.some(zone => zone.id === zoneId);
+            if (isVFG) {
+              const updatedVFGMZs = state.vitalForGroupMZs.map(zone => {
+                if (zone.id === zoneId) {
+                  return {
+                    ...zone,
+                    hosts: hostsCount,
+                    services: servicesCount,
+                    apps: processesCount
+                  };
+                }
+                return zone;
+              });
+              setState(prev => ({ ...prev, vitalForGroupMZs: updatedVFGMZs }));
+            } else {
+              const updatedVFEMZs = state.vitalForEntrepriseMZs.map(zone => {
+                if (zone.id === zoneId) {
+                  return {
+                    ...zone,
+                    hosts: hostsCount,
+                    services: servicesCount,
+                    apps: processesCount
+                  };
+                }
+                return zone;
+              });
+              setState(prev => ({ ...prev, vitalForEntrepriseMZs: updatedVFEMZs }));
+            }
           }
           
           // Mettre à jour les services
@@ -312,6 +350,41 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
         if (!hostsResponse.error && hostsResponse.data) {
           hostsData = Array.isArray(hostsResponse.data) ? hostsResponse.data : [];
           setState(prev => ({ ...prev, hosts: hostsData }));
+          
+          // Récupérer les comptages pour mettre à jour la liste des MZs
+          const hostsCount = hostsData.length;
+          const servicesCount = Array.isArray(servicesData) ? servicesData.length : 0;
+          const processCount = Array.isArray(processData) ? processData.length : 0;
+            
+          // Mettre à jour les comptages dans la liste des MZs
+          const isVFG = state.vitalForGroupMZs.some(zone => zone.id === zoneId);
+          if (isVFG) {
+            const updatedVFGMZs = state.vitalForGroupMZs.map(zone => {
+              if (zone.id === zoneId) {
+                return {
+                  ...zone,
+                  hosts: hostsCount,
+                  services: servicesCount,
+                  apps: processCount
+                };
+              }
+              return zone;
+            });
+            setState(prev => ({ ...prev, vitalForGroupMZs: updatedVFGMZs }));
+          } else {
+            const updatedVFEMZs = state.vitalForEntrepriseMZs.map(zone => {
+              if (zone.id === zoneId) {
+                return {
+                  ...zone,
+                  hosts: hostsCount,
+                  services: servicesCount,
+                  apps: processCount
+                };
+              }
+              return zone;
+            });
+            setState(prev => ({ ...prev, vitalForEntrepriseMZs: updatedVFEMZs }));
+          }
         }
         
         // Traiter les données des services
@@ -344,22 +417,26 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
   }, [state.vitalForGroupMZs, state.vitalForEntrepriseMZs, apiClient, optimized, getProcessIcon]);
 
   // Fonction pour charger toutes les données
-  const loadAllData = useCallback(async (dashboardType?: 'vfg' | 'vfe', refreshProblemsOnly?: boolean) => {
-    console.log(`Loading all data for dashboard type: ${dashboardType || 'none'} ${refreshProblemsOnly ? '(problèmes uniquement)' : ''}`);
+  const loadAllData = useCallback(async (dashboardType?: 'vfg' | 'vfe', refreshProblemsOnly?: boolean, silentMode: boolean = false) => {
+    // Modification de la fonction pour utiliser async/await avec Promise.all
+    console.log(`Loading all data for dashboard type: ${dashboardType || 'none'} ${refreshProblemsOnly ? '(problèmes uniquement)' : ''} ${silentMode ? '(mode silencieux)' : ''}`);
     const startTime = performance.now();
     
-    setState(prev => ({ 
-      ...prev, 
-      isLoading: { 
-        ...prev.isLoading, 
-        problems: true, 
-        vitalForGroupMZs: !refreshProblemsOnly,
-        vitalForEntrepriseMZs: !refreshProblemsOnly,
-        initialLoadComplete: false,
-        dashboardData: !refreshProblemsOnly
-      },
-      error: null 
-    }));
+    // Ne mettre à jour les indicateurs de chargement que si nous ne sommes pas en mode silencieux
+    if (!silentMode) {
+      setState(prev => ({ 
+        ...prev, 
+        isLoading: { 
+          ...prev.isLoading, 
+          problems: true, 
+          vitalForGroupMZs: !refreshProblemsOnly,
+          vitalForEntrepriseMZs: !refreshProblemsOnly,
+          initialLoadComplete: false,
+          dashboardData: !refreshProblemsOnly
+        },
+        error: null 
+      }));
+    }
     
     try {
       // Vérifier si le backend est en ligne
@@ -395,8 +472,8 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
       // Si on ne rafraîchit que les problèmes, ne récupérer que les données de problèmes
       if (refreshProblemsOnly) {
         const responses = await Promise.all([
-          apiClient.getProblems("OPEN", "all", dashboardType, true),  // Force le rafraîchissement sans limite de temps pour les problèmes en cours
-          apiClient.getProblems("ALL", "-72h", dashboardType, true)   // Force le rafraîchissement pour les problèmes récents avec 72h de délai
+          apiClient.getProblems("OPEN", "-60d", dashboardType, true),  // Force le rafraîchissement pour les problèmes actifs sur 60 jours
+          apiClient.getProblems72h(dashboardType, undefined, true)   // Utilise le nouvel endpoint dédié pour les problèmes 72h
         ]);
         problemsResponse = responses[0] as ApiResponse<ProblemResponse[]>;
         problemsLast72hResponse = responses[1] as ApiResponse<ProblemResponse[]>;
@@ -407,8 +484,8 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
           apiClient.getSummary(),
           apiClient.getVitalForGroupMZs(),
           apiClient.getVitalForEntrepriseMZs(),
-          apiClient.getProblems("OPEN", "all", dashboardType, true),  // Force le rafraîchissement sans limite de temps pour les problèmes en cours
-          apiClient.getProblems("ALL", "-72h", dashboardType, true)   // Force le rafraîchissement pour les problèmes récents avec 72h de délai
+          apiClient.getProblems("OPEN", "-60d", dashboardType, true),  // Force le rafraîchissement pour les problèmes actifs sur 60 jours
+          apiClient.getProblems72h(dashboardType, undefined, true)   // Utilise le nouvel endpoint dédié pour les problèmes 72h
         ]);
         summaryResponse = responses[0] as ApiResponse<SummaryData>;
         vfgResponse = responses[1] as ApiResponse<VitalForGroupMZsResponse>;
@@ -431,39 +508,117 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
       
       if (!refreshProblemsOnly) {
         if (vfgResponse && !vfgResponse.error && vfgResponse.data?.mzs) {
-          vfgMZs = vfgResponse.data.mzs.map(mzName => ({
-            id: `env-${mzName.replace(/\s+/g, '-')}`,
-            name: mzName,
-            code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
-            icon: getZoneIcon(mzName),
-            problemCount: 0,
-            apps: Math.floor(Math.random() * 15) + 1,
-            services: Math.floor(Math.random() * 30) + 5,
-            hosts: Math.floor(Math.random() * 20) + 2,
-            availability: `${(99 + (Math.random() * 1)).toFixed(2)}%`,
-            status: "healthy" as "healthy" | "warning",
-            color: getZoneColor(mzName),
-            dt_url: "#"
-          }));
+          // Obtenir les comptages pour chaque zone en parallèle
+          const mzPromises = vfgResponse.data.mzs.map(async (mzName) => {
+            try {
+              console.log(`Récupération des comptages pour la MZ VFG: ${mzName}`);
+              
+              // Récupérer les comptages depuis l'API
+              const response = await fetch(`${API_BASE_URL}/management-zones/counts?zone=${encodeURIComponent(mzName)}`);
+              
+              if (response.ok) {
+                const data = await response.json();
+                const counts = data.counts || { hosts: 0, services: 0, processes: 0 };
+                console.log(`Comptages reçus pour ${mzName}:`, counts);
+                
+                return {
+                  id: `env-${mzName.replace(/\s+/g, '-')}`,
+                  name: mzName,
+                  code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
+                  icon: getZoneIcon(mzName),
+                  problemCount: 0,
+                  apps: counts.processes,
+                  services: counts.services,
+                  hosts: counts.hosts,
+                  availability: "99.99%", // Pour l'instant, valeur par défaut
+                  status: "healthy" as "healthy" | "warning",
+                  color: getZoneColor(mzName),
+                  dt_url: "#"
+                };
+              } else {
+                console.error(`Erreur ${response.status} pour ${mzName}: ${await response.text()}`);
+                throw new Error(`Erreur API ${response.status}`);
+              }
+            } catch (error) {
+              console.error(`Erreur pour ${mzName}:`, error);
+              // En cas d'erreur, retourner un objet avec des comptages à 0
+              return {
+                id: `env-${mzName.replace(/\s+/g, '-')}`,
+                name: mzName,
+                code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
+                icon: getZoneIcon(mzName),
+                problemCount: 0,
+                apps: 0,
+                services: 0,
+                hosts: 0,
+                availability: "99.99%",
+                status: "healthy" as "healthy" | "warning",
+                color: getZoneColor(mzName),
+                dt_url: "#"
+              };
+            }
+          });
+          
+          // Attendre la résolution de toutes les promesses
+          vfgMZs = await Promise.all(mzPromises);
           
           setState(prev => ({ ...prev, vitalForGroupMZs: vfgMZs }));
         }
         
         if (vfeResponse && !vfeResponse.error && vfeResponse.data?.mzs) {
-          vfeMZs = vfeResponse.data.mzs.map(mzName => ({
-            id: `env-${mzName.replace(/\s+/g, '-')}`,
-            name: mzName,
-            code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
-            icon: getZoneIcon(mzName),
-            problemCount: 0,
-            apps: Math.floor(Math.random() * 15) + 1,
-            services: Math.floor(Math.random() * 30) + 5,
-            hosts: Math.floor(Math.random() * 20) + 2,
-            availability: `${(99 + (Math.random() * 1)).toFixed(2)}%`,
-            status: "healthy" as "healthy" | "warning",
-            color: getZoneColor(mzName),
-            dt_url: "#"
-          }));
+          // Obtenir les comptages pour chaque zone en parallèle
+          const mzPromises = vfeResponse.data.mzs.map(async (mzName) => {
+            try {
+              console.log(`Récupération des comptages pour la MZ VFE: ${mzName}`);
+              
+              // Récupérer les comptages depuis l'API
+              const response = await fetch(`${API_BASE_URL}/management-zones/counts?zone=${encodeURIComponent(mzName)}`);
+              
+              if (response.ok) {
+                const data = await response.json();
+                const counts = data.counts || { hosts: 0, services: 0, processes: 0 };
+                console.log(`Comptages reçus pour ${mzName}:`, counts);
+                
+                return {
+                  id: `env-${mzName.replace(/\s+/g, '-')}`,
+                  name: mzName,
+                  code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
+                  icon: getZoneIcon(mzName),
+                  problemCount: 0,
+                  apps: counts.processes,
+                  services: counts.services,
+                  hosts: counts.hosts,
+                  availability: "99.99%", // Pour l'instant, valeur par défaut
+                  status: "healthy" as "healthy" | "warning",
+                  color: getZoneColor(mzName),
+                  dt_url: "#"
+                };
+              } else {
+                console.error(`Erreur ${response.status} pour ${mzName}: ${await response.text()}`);
+                throw new Error(`Erreur API ${response.status}`);
+              }
+            } catch (error) {
+              console.error(`Erreur pour ${mzName}:`, error);
+              // En cas d'erreur, retourner un objet avec des comptages à 0
+              return {
+                id: `env-${mzName.replace(/\s+/g, '-')}`,
+                name: mzName,
+                code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
+                icon: getZoneIcon(mzName),
+                problemCount: 0,
+                apps: 0,
+                services: 0,
+                hosts: 0,
+                availability: "99.99%",
+                status: "healthy" as "healthy" | "warning",
+                color: getZoneColor(mzName),
+                dt_url: "#"
+              };
+            }
+          });
+          
+          // Attendre la résolution de toutes les promesses
+          vfeMZs = await Promise.all(mzPromises);
           
           setState(prev => ({ ...prev, vitalForEntrepriseMZs: vfeMZs }));
         }
@@ -567,9 +722,30 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
         if (Array.isArray(problemsData)) {
           // Transformer les données
           const problems: Problem[] = problemsData.map((problem) => {
-            // Extraire le nom de l'hôte à partir du titre si possible
+            // Extraire le nom de l'hôte à partir des entités impactées (priorité)
             let hostName = '';
-            if (problem.title && problem.title.toLowerCase().includes('host')) {
+            
+            // PRIORITÉ 1: Utiliser directement impactedEntities
+            if (problem.impactedEntities && Array.isArray(problem.impactedEntities)) {
+              const hostEntity = problem.impactedEntities.find(entity => 
+                entity.entityId && entity.entityId.type === 'HOST' && entity.name);
+              if (hostEntity) {
+                hostName = hostEntity.name;
+                console.log(`Nom d'hôte extrait de impactedEntities pour le problème 72h ${problem.id}: ${hostName}`);
+              }
+            }
+            
+            // PRIORITÉ 2: Si pas trouvé, utiliser le champ host ou impacted s'ils existent
+            if (!hostName) {
+              if (problem.host && problem.host !== "Non spécifié") {
+                hostName = problem.host;
+              } else if (problem.impacted && problem.impacted !== "Non spécifié") {
+                hostName = problem.impacted;
+              }
+            }
+            
+            // PRIORITÉ 3: Extraire du titre si toujours rien
+            if (!hostName && problem.title && problem.title.toLowerCase().includes('host')) {
               const words = problem.title.split(' ');
               // On prend le mot après "host" s'il existe
               const hostIndex = words.findIndex(word => word.toLowerCase() === 'host');
@@ -592,7 +768,10 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
               dt_url: problem.dt_url || "#",
               duration: problem.duration || "",
               resolved: problem.resolved || false,
-              host: hostName // Ajouter le nom de l'hôte extrait
+              host: hostName, // Utiliser le nom d'hôte extrait
+              impacted: hostName, // Pour compatibilité
+              impactedEntities: problem.impactedEntities, // Transférer les entités impactées pour utilisation dans ProblemCard
+              rootCauseEntity: problem.rootCauseEntity // Transférer aussi la cause racine si disponible
             };
           });
           
@@ -626,61 +805,335 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
         error: 'Erreur lors du chargement des données. Veuillez réessayer.'
       }));
     } finally {
+      // Ne réinitialiser les indicateurs de chargement que si nous ne sommes pas en mode silencieux
+      if (!silentMode) {
+        setState(prev => ({ 
+          ...prev, 
+          isLoading: { 
+            ...prev.isLoading, 
+            problems: false, 
+            vitalForGroupMZs: !refreshProblemsOnly ? false : prev.isLoading.vitalForGroupMZs,
+            vitalForEntrepriseMZs: !refreshProblemsOnly ? false : prev.isLoading.vitalForEntrepriseMZs,
+            initialLoadComplete: !refreshProblemsOnly ? true : prev.isLoading.initialLoadComplete,
+            dashboardData: false
+          } 
+        }));
+      }
+    }
+  }, [state.selectedZone, state.vitalForGroupMZs, state.vitalForEntrepriseMZs, loadZoneData, apiClient, optimized, getZoneIcon, getZoneColor]);
+
+  // Drapeau pour éviter les appels multiples à refreshData
+  const refreshInProgressRef = useRef(false);
+  // Identifiant du dernier timeout pour éviter les collisions
+  const refreshTimeoutIdRef = useRef<number | null>(null);
+
+  // Fonction pour rafraîchir les données - version non bloquante améliorée
+  const refreshData = useCallback(async (dashboardType?: 'vfg' | 'vfe', refreshProblemsOnly?: boolean): Promise<void> => {
+    // Éviter les appels multiples simultanés
+    if (refreshInProgressRef.current) {
+      console.log("Un rafraîchissement est déjà en cours, nouvelle demande ignorée");
+      return;
+    }
+    
+    // Annuler tout timeout précédent pour éviter les collisions
+    if (refreshTimeoutIdRef.current !== null) {
+      clearTimeout(refreshTimeoutIdRef.current);
+      refreshTimeoutIdRef.current = null;
+    }
+    
+    // Marquer le début du rafraîchissement
+    refreshInProgressRef.current = true;
+    
+    console.log(`Refreshing data for dashboard type: ${dashboardType || 'none'} ${refreshProblemsOnly ? '(problèmes uniquement)' : ''}`);
+    setState(prev => ({ ...prev, error: null }));
+    
+    // Définir un timeout maximum pour éviter que le drapeau reste bloqué
+    const timeoutId = window.setTimeout(() => {
+      console.log("Timeout de sécurité pour refreshData : réinitialisation du drapeau");
+      refreshInProgressRef.current = false;
+      refreshTimeoutIdRef.current = null;
+    }, 60000); // 60 secondes maximum
+    
+    refreshTimeoutIdRef.current = timeoutId;
+    
+    // Gérer les erreurs dans la fonction
+    try {
+      // Exécuter loadAllData de manière non bloquante si on est dans un contexte de zone détaillée
+      if (refreshProblemsOnly && state.selectedZone) {
+        console.log("Mode de rafraîchissement non bloquant activé pour les problèmes en zone");
+        
+        // Mettre à jour l'état pour indiquer le chargement des problèmes
+        setState(prev => ({ 
+          ...prev, 
+          isLoading: { 
+            ...prev.isLoading, 
+            problems: true
+          }
+        }));
+        
+        // Exécuter loadAllData avec un timeout court pour s'assurer que l'UI reste réactive
+        await new Promise<void>((resolve, reject) => {
+          const asyncTimeoutId = window.setTimeout(async () => {
+            try {
+              await loadAllData(dashboardType, true);
+              resolve();
+            } catch (error) {
+              console.error("Erreur dans le rafraîchissement asynchrone:", error);
+              reject(error);
+            } finally {
+              setState(prev => ({ 
+                ...prev, 
+                isLoading: { 
+                  ...prev.isLoading, 
+                  problems: false
+                }
+              }));
+            }
+          }, 100); // Légèrement plus long pour éviter les problèmes de délai
+          
+          // Nettoyer le timeout en cas d'annulation
+          return () => clearTimeout(asyncTimeoutId);
+        });
+      } else {
+        // Dans les autres cas, exécuter normalement
+        await loadAllData(dashboardType, refreshProblemsOnly || false);
+      }
+    } catch (error) {
+      console.error("Erreur dans refreshData:", error);
       setState(prev => ({ 
         ...prev, 
         isLoading: { 
           ...prev.isLoading, 
-          problems: false, 
-          vitalForGroupMZs: !refreshProblemsOnly ? false : prev.isLoading.vitalForGroupMZs,
-          vitalForEntrepriseMZs: !refreshProblemsOnly ? false : prev.isLoading.vitalForEntrepriseMZs,
-          initialLoadComplete: !refreshProblemsOnly ? true : prev.isLoading.initialLoadComplete,
-          dashboardData: false
-        } 
+          problems: false
+        },
+        error: "Erreur lors du rafraîchissement des données"
       }));
+    } finally {
+      // Réinitialiser le drapeau et nettoyer le timeout
+      refreshInProgressRef.current = false;
+      if (refreshTimeoutIdRef.current === timeoutId) {
+        clearTimeout(timeoutId);
+        refreshTimeoutIdRef.current = null;
+      }
     }
-  }, [state.selectedZone, state.vitalForGroupMZs, state.vitalForEntrepriseMZs, loadZoneData, apiClient, optimized, getZoneIcon, getZoneColor]);
+  }, [loadAllData, state.selectedZone]); // Ajout de state.selectedZone comme dépendance
 
-  // Fonction pour rafraîchir les données - version simplifiée
-  const refreshData = useCallback(async (dashboardType?: 'vfg' | 'vfe', refreshProblemsOnly?: boolean) => {
-    console.log(`Refreshing data for dashboard type: ${dashboardType || 'none'} ${refreshProblemsOnly ? '(problèmes uniquement)' : ''}`);
-    setState(prev => ({ ...prev, error: null }));
-    await loadAllData(dashboardType, refreshProblemsOnly || false);
-  }, [loadAllData]);
-
-  // Charger les données initiales
+  // Référence à l'intervalle pour le rafraîchissement automatique
+  const autoRefreshIntervalRef = useRef<number | null>(null);
+  // Référence au dernier timeoutId pour le rafraîchissement automatique
+  const autoRefreshTimeoutRef = useRef<number | null>(null);
+  // Horodatage du dernier rafraîchissement réussi
+  const lastSuccessfulRefreshRef = useRef<number>(0);
+  
+  // Charger les données initiales et configurer le rafraîchissement automatique
   useEffect(() => {
-    if (!initialLoadRef.current) {
-      console.log("Initial data load");
-      initialLoadRef.current = true;
-      loadAllData(undefined, false);
-    }
+    // Fonction pour effectuer le chargement initial
+    const performInitialLoad = async () => {
+      if (!initialLoadRef.current) {
+        console.log("Initial data load");
+        initialLoadRef.current = true;
+        try {
+          await loadAllData(undefined, false);
+          lastSuccessfulRefreshRef.current = Date.now();
+        } catch (error) {
+          console.error("Erreur lors du chargement initial des données:", error);
+        }
+      }
+    };
     
-    // Rafraîchir automatiquement les problèmes actifs toutes les 5 minutes
-    const refreshInterval = 300000; // 5 minutes en millisecondes
+    // Lancer le chargement initial
+    performInitialLoad();
+    
+    // Fonction pour effectuer le rafraîchissement automatique
+    const performAutoRefresh = async () => {
+      // Vérifier si un rafraîchissement est déjà en cours avec refreshInProgressRef
+      if (refreshInProgressRef.current) {
+        console.log("Rafraîchissement via refreshData déjà en cours, auto-refresh ignoré");
+        return;
+      }
+      
+      // Vérifier si le dernier rafraîchissement réussi est assez récent (<1 minute)
+      const timeSinceLastRefresh = Date.now() - lastSuccessfulRefreshRef.current;
+      if (timeSinceLastRefresh < 60000) { // Moins d'une minute
+        console.log(`Dernier rafraîchissement trop récent (${Math.round(timeSinceLastRefresh/1000)}s), nouvel auto-refresh ignoré`);
+        return;
+      }
+      
+      console.log("Démarrage du rafraîchissement automatique");
+      
+      // Récupérer le type de dashboard actuel (vfg ou vfe)
+      const currentDashboardType = window.location.pathname.includes('vfe') ? 'vfe' : 'vfg';
+      
+      // NE PAS mettre à jour l'indicateur de chargement pour un rafraîchissement en arrière-plan
+      // Les rafraîchissements automatiques doivent être transparents pour l'utilisateur
+      // Le code ci-dessous est commenté intentionnellement
+      /*
+      if (!state.isLoading.problems) {
+        setState(prev => ({ ...prev, isLoading: { ...prev.isLoading, problems: true }}));
+      }
+      */
+      
+      // Vérifier si on est sur la page d'aperçu pour éviter les rafraîchissements automatiques
+      const isOverviewPage = window.location.pathname === '/' || window.location.pathname === '/overview';
+
+      // Si on est sur la page d'aperçu, ne pas continuer avec le rafraîchissement auto
+      if (isOverviewPage) {
+        console.log("Auto-refresh ignoré sur la page d'aperçu (vue d'ensemble)");
+        return;
+      }
+
+      // Annuler tout timeout précédent
+      if (autoRefreshTimeoutRef.current !== null) {
+        clearTimeout(autoRefreshTimeoutRef.current);
+      }
+
+      // Définir un timeout juste pour nettoyer les références, mais sans modifier les indicateurs de chargement
+      const timeoutId = window.setTimeout(() => {
+        console.log("Timeout de sécurité pour auto-refresh : nettoyage des références");
+        // Ne pas mettre à jour l'état d'isLoading pour un rafraîchissement en arrière-plan
+        // setState(prev => ({ ...prev, isLoading: { ...prev.isLoading, problems: false }}));
+        autoRefreshTimeoutRef.current = null;
+      }, 30000); // 30 secondes maximum
+      
+      autoRefreshTimeoutRef.current = timeoutId;
+      
+      // Fonction simplifiée pour le rafraîchissement silencieux
+      const silentRefresh = async () => {
+        try {
+          // Récupérer le type de dashboard actuel
+          const dashboardType = currentDashboardType as 'vfg' | 'vfe';
+          
+          // Utiliser la fonction loadAllData avec le mode silencieux
+          await loadAllData(dashboardType, true, true); // true pour refreshProblemsOnly, true pour silentMode
+          
+          // Marquer le rafraîchissement comme réussi
+          console.log("Rafraîchissement silencieux terminé avec succès");
+          lastSuccessfulRefreshRef.current = Date.now();
+        } catch (error) {
+          console.error("Erreur lors du rafraîchissement silencieux:", error);
+        }
+      };
+      
+      try {
+        // Vérifier si on est sur la page d'aperçu pour éviter les rafraîchissements automatiques
+        const isOverviewPage = window.location.pathname === '/' || window.location.pathname === '/overview';
+
+        // Ne pas faire de rafraîchissement silencieux si on est sur la page d'aperçu
+        if (!isOverviewPage) {
+          // Appeler le rafraîchissement silencieux à la place de refreshData
+          await silentRefresh();
+        } else {
+          console.log("Rafraîchissement automatique désactivé sur la page d'aperçu");
+        }
+      } catch (err) {
+        console.error("Erreur lors du rafraîchissement automatique:", err);
+      } finally {
+        // Nettoyer le timeout si c'est toujours le même, mais NE PAS modifier l'indicateur de chargement
+        if (autoRefreshTimeoutRef.current === timeoutId) {
+          clearTimeout(timeoutId);
+          autoRefreshTimeoutRef.current = null;
+        }
+      }
+    };
+    
+    // Rafraîchir automatiquement les problèmes actifs toutes les 10 minutes (au lieu de 5)
+    const refreshInterval = 600000; // 10 minutes en millisecondes
     
     console.log(`Configuration du rafraîchissement automatique des problèmes toutes les ${refreshInterval/1000} secondes`);
     
-    // Configurer l'intervalle
-    const intervalId = setInterval(() => {
-      console.log("Rafraîchissement automatique des problèmes actifs");
-      // Récupérer le type de dashboard actuel (vfg ou vfe)
-      const currentDashboardType = window.location.pathname.includes('vfe') ? 'vfe' : 'vfg';
-      refreshData(currentDashboardType as 'vfg' | 'vfe', true);
-    }, refreshInterval);
+    // Nettoyer tout intervalle existant
+    if (autoRefreshIntervalRef.current !== null) {
+      clearInterval(autoRefreshIntervalRef.current);
+    }
     
-    // Nettoyer l'intervalle lors du démontage du composant
+    // Configurer le nouvel intervalle
+    const intervalId = window.setInterval(performAutoRefresh, refreshInterval);
+    autoRefreshIntervalRef.current = intervalId;
+    
+    // Nettoyer l'intervalle et les timeouts lors du démontage du composant
     return () => {
-      clearInterval(intervalId);
+      if (autoRefreshIntervalRef.current !== null) {
+        clearInterval(autoRefreshIntervalRef.current);
+        autoRefreshIntervalRef.current = null;
+      }
+      
+      if (autoRefreshTimeoutRef.current !== null) {
+        clearTimeout(autoRefreshTimeoutRef.current);
+        autoRefreshTimeoutRef.current = null;
+      }
     };
-  }, [loadAllData, refreshData]);
+  }, [loadAllData, refreshData, state.isLoading.problems]);
 
   // Fonction pour définir la zone sélectionnée et charger ses données
   const setSelectedZoneAndLoadData = useCallback((zoneId: string | null) => {
-    setState(prev => ({ ...prev, selectedZone: zoneId }));
+    // Mettre d'abord l'état en chargement pour éviter tout affichage incomplet
+    setState(prev => ({ 
+      ...prev, 
+      selectedZone: zoneId,
+      isLoading: { ...prev.isLoading, zoneDetails: true }
+    }));
+    
     if (zoneId) {
-      loadZoneData(zoneId);
+      // Force le rafraîchissement complet avant de charger les données de la zone
+      try {
+        // Récupérer les comptages à jour pour la zone sélectionnée
+        console.log(`Récupération prioritaire des comptages pour ${zoneId}`);
+        
+        // Trouver la zone dans l'une des collections
+        const selectedZone = state.vitalForGroupMZs.find((z: ManagementZone) => z.id === zoneId) || 
+                           state.vitalForEntrepriseMZs.find((z: ManagementZone) => z.id === zoneId);
+        
+        if (selectedZone) {
+          // Forcer un préchargement spécifique des données de services pour cette zone
+          apiClient.setManagementZone(selectedZone.name)
+            .then(() => {
+              return apiClient.getServices();
+            })
+            .then(servicesResponse => {
+              if (!servicesResponse.error && servicesResponse.data) {
+                const servicesData = Array.isArray(servicesResponse.data) ? servicesResponse.data : [];
+                const servicesCount = servicesData.length;
+                
+                console.log(`Préchargement des services pour ${selectedZone.name}: ${servicesCount} services trouvés`);
+                
+                // Mettre à jour immédiatement le comptage des services pour cette zone
+                const isVFG = state.vitalForGroupMZs.some((zone: ManagementZone) => zone.id === zoneId);
+                if (isVFG) {
+                  setState(prev => ({
+                    ...prev,
+                    vitalForGroupMZs: prev.vitalForGroupMZs.map(zone => 
+                      zone.id === zoneId ? {...zone, services: servicesCount} : zone
+                    )
+                  }));
+                } else {
+                  setState(prev => ({
+                    ...prev,
+                    vitalForEntrepriseMZs: prev.vitalForEntrepriseMZs.map(zone => 
+                      zone.id === zoneId ? {...zone, services: servicesCount} : zone
+                    )
+                  }));
+                }
+              }
+              
+              // Continuer avec le chargement normal
+              loadZoneData(zoneId);
+            })
+            .catch(error => {
+              console.error('Erreur lors du préchargement des services:', error);
+              // Continuer avec le chargement normal même en cas d'erreur
+              loadZoneData(zoneId);
+            });
+        } else {
+          // Zone non trouvée, procéder au chargement normal
+          loadZoneData(zoneId);
+        }
+      } catch (error) {
+        console.error('Erreur générale lors du préchargement:', error);
+        // En cas d'erreur, continuer avec le chargement normal
+        loadZoneData(zoneId);
+      }
     }
-  }, [loadZoneData]);
+  }, [loadZoneData, state.vitalForGroupMZs, state.vitalForEntrepriseMZs, apiClient]);
 
   // Fonctions pour modifier l'état
   const setSidebarCollapsed = useCallback((collapsed: boolean) => {

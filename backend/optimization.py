@@ -46,11 +46,19 @@ class OptimizedAPIClient:
         self.cache = {}
         self.cache_lock = threading.Lock()
         
+        # Configuration avancée des retries
+        retry_strategy = requests.adapters.Retry(
+            total=5,  # Nombre max de retries
+            backoff_factor=0.5,  # Facteur pour le délai exponentiel
+            status_forcelist=[408, 429, 500, 502, 503, 504],  # Statuts HTTP qui déclenchent un retry
+            allowed_methods=["GET"]  # Méthodes HTTP qui déclenchent un retry
+        )
+        
         # Configuration avancée des connexions
         adapter = requests.adapters.HTTPAdapter(
             pool_connections=max_connections,
             pool_maxsize=max_connections,
-            max_retries=3,
+            max_retries=retry_strategy,
             pool_block=False  # Ne pas bloquer lorsque le pool est plein
         )
         
@@ -63,6 +71,9 @@ class OptimizedAPIClient:
             'Accept': 'application/json'
         })
         self.session.verify = self.verify_ssl
+        
+        # Définir un timeout par défaut plus long
+        self.default_timeout = (30, 120)  # (connect timeout, read timeout)
         
         # Utiliser des sémaphores pour contrôler l'accès aux ressources
         self.semaphore = threading.BoundedSemaphore(value=self.max_connections)
@@ -78,19 +89,58 @@ class OptimizedAPIClient:
         with self.cache_lock:
             if cache_key in self.cache:
                 item = self.cache[cache_key]
-                if time.time() - item['timestamp'] < self.cache_duration:
-                    logger.debug(f"Cache hit for {cache_key}")
+                
+                # Déterminer la durée de cache à utiliser (personnalisée ou standard)
+                cache_duration = item.get('duration', self.cache_duration)
+                
+                # Vérifier si le cache est encore valide
+                current_time = time.time()
+                cache_age = current_time - item['timestamp']
+                
+                if cache_age < cache_duration:
+                    # Si c'est un cache persistant, ajouter un log informatif
+                    if 'duration' in item and cache_key.startswith('persistent_'):
+                        logger.info(f"Hit du cache persistant pour {cache_key} (âge: {cache_age/60:.1f}min, expiration: {(cache_duration-cache_age)/60:.1f}min)")
+                    else:
+                        logger.debug(f"Cache hit for {cache_key}")
                     return item['data']
+                else:
+                    logger.debug(f"Cache expiré pour {cache_key} (âge: {cache_age/60:.1f}min > durée: {cache_duration/60:.1f}min)")
+        
         logger.debug(f"Cache miss for {cache_key}")
         return None
 
     def set_cache(self, cache_key, data):
-        """Met à jour le cache avec de nouvelles données"""
+        """Met à jour le cache avec de nouvelles données avec la durée standard"""
         with self.cache_lock:
             self.cache[cache_key] = {
                 'data': data,
                 'timestamp': time.time()
             }
+    
+    def set_persistent_cache(self, cache_key, data, duration=14400):
+        """
+        Met à jour le cache avec une durée personnalisée plus longue
+        Utile pour les données qui changent rarement (services, process groups)
+        
+        Args:
+            cache_key (str): Clé de cache
+            data: Données à mettre en cache
+            duration (int): Durée de vie du cache en secondes (défaut: 4 heures)
+        """
+        with self.cache_lock:
+            self.cache[cache_key] = {
+                'data': data,
+                'timestamp': time.time(),
+                'duration': duration  # Durée personnalisée
+            }
+            logger.info(f"Données mises en cache persistant ({duration/3600}h) pour la clé {cache_key}")
+            
+            # Log de debug pour la taille des données
+            if isinstance(data, list):
+                logger.info(f"Taille des données en cache: {len(data)} éléments pour {cache_key}")
+            elif isinstance(data, dict):
+                logger.info(f"Données en cache: dictionnaire avec {len(data)} clés pour {cache_key}")
 
     def clear_cache(self, pattern=None):
         """
@@ -114,12 +164,26 @@ class OptimizedAPIClient:
             with self.request_count_lock:
                 self.request_count += 1
             
+            # Utiliser le timeout par défaut si aucun n'est spécifié
+            if 'timeout' not in kwargs:
+                kwargs['timeout'] = self.default_timeout
+            
+            # Ajouter un log pour le debugging
+            logger.info(f"Requête {method} vers {url} avec timeout={kwargs.get('timeout')}")
+            
             try:
                 response = self.session.request(method, url, **kwargs)
                 response.raise_for_status()
                 return response
+            except requests.exceptions.Timeout as e:
+                logger.error(f"Timeout pour la requête {url}: {e}")
+                # Les timeouts sont gérés par la stratégie de retry configurée dans le session
+                raise
+            except requests.exceptions.ConnectionError as e:
+                logger.error(f"Erreur de connexion pour {url}: {e}")
+                raise
             except requests.exceptions.RequestException as e:
-                logger.error(f"Erreur de requête HTTP: {e}")
+                logger.error(f"Erreur de requête HTTP pour {url}: {e}")
                 raise
             finally:
                 # Libérer la connexion explicitement
@@ -153,7 +217,16 @@ class OptimizedAPIClient:
         # Exécuter la requête avec sémaphore
         url = f"{self.env_url}/api/v2/{endpoint}"
         try:
-            response = self._request_with_semaphore("GET", url, params=params, timeout=(5, 30))
+            # Si c'est une requête pour des entities, vérifier si pageSize est spécifié
+            # pour les process groups, utiliser une taille de page plus grande par défaut si non spécifié
+            if endpoint == "entities" and params and "entitySelector" in params:
+                if "type(PROCESS_GROUP)" in params["entitySelector"] and "pageSize" not in params:
+                    # Copier les paramètres pour ne pas modifier l'original
+                    params = params.copy()
+                    params["pageSize"] = 1000  # Récupérer jusqu'à 1000 process groups par défaut
+                    logger.info(f"Auto-configured pageSize=1000 for process groups query")
+            
+            response = self._request_with_semaphore("GET", url, params=params, timeout=(10, 60))  # Timeout augmenté pour les grandes requêtes
             result = response.json()
             
             # Mettre en cache le résultat
@@ -758,7 +831,7 @@ class OptimizedAPIClient:
                 'status': service_status,
                 'technology': tech_info['name'],
                 'tech_icon': tech_info['icon'],
-                'dt_url': f"{self.env_url}/#entity/{service_id}",
+                'dt_url': f"{self.env_url}/ui/entity/{service_id}",
                 'response_time_history': response_time_history,
                 'error_rate_history': error_rate_history,
                 'request_count_history': request_count_history
@@ -1017,7 +1090,7 @@ class OptimizedAPIClient:
                 'cpu': cpu_usage,
                 'ram': ram_usage,
                 'os_version': os_version,  # Ajout de la version de l'OS
-                'dt_url': f"{self.env_url}/#entity/{host_id}",
+                'dt_url': f"{self.env_url}/ui/entity/{host_id}",
                 'cpu_history': cpu_history,
                 'ram_history': ram_history
             })
@@ -1474,6 +1547,18 @@ class OptimizedAPIClient:
         else:
             logger.info(f"Aucun nom d'hôte valide trouvé pour le problème {problem.get('problemId', 'unknown')}")
         
+        # Utiliser en priorité la MZ correspondante stockée lors du filtrage
+        display_zone = None
+        if 'matching_mz' in problem:
+            display_zone = problem['matching_mz']
+            logger.info(f"Problème {problem.get('problemId')}: utilisation de la MZ correspondante pour l'affichage: {display_zone}")
+        elif zone:
+            display_zone = zone
+            logger.info(f"Problème {problem.get('problemId')}: utilisation de la MZ fournie en paramètre: {display_zone}")
+        else:
+            display_zone = self._extract_problem_zone(problem)
+            logger.info(f"Problème {problem.get('problemId')}: utilisation de la première MZ du problème: {display_zone}")
+            
         result = {
             'id': problem.get('problemId', 'Unknown'),
             'title': problem.get('title', 'Problème inconnu'),
@@ -1484,7 +1569,7 @@ class OptimizedAPIClient:
             'end_time': end_time_str,  # Ajout de l'heure de fermeture
             'duration': duration_display,  # Ajout de la durée du problème
             'dt_url': f"{self.env_url}/#problems/problemdetails;pid={problem.get('problemId', 'Unknown')}",
-            'zone': zone or self._extract_problem_zone(problem),
+            'zone': display_zone,
             'resolved': is_resolved,
             'host': host_name,  # Ajout du champ host explicite
             'impacted': host_name  # Ajout pour compatibilité avec le frontend actuel

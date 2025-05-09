@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Layout from '../layout/Layout';
 import ProblemsList from './ProblemsList';
 import ManagementZoneList from './ManagementZoneList';
+import ModernManagementZoneList from './ModernManagementZoneList';
 import ZoneDetails from './ZoneDetails';
 import { AppContextType } from '../../contexts/AppContext';
 import { Shield, Loader, AlertTriangle, RefreshCw, Clock, BarChart, ChevronLeft, Check, Server } from 'lucide-react';
@@ -51,6 +52,26 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
   // État pour suivre la progression du chargement
   const [loadingProgress, setLoadingProgress] = useState(0);
   
+  // Déterminer les zones à afficher selon la variante
+  const zones = variant === 'vfg' ? vitalForGroupMZs : vitalForEntrepriseMZs;
+
+  // Vérifier si une zone est spécifiée dans l'URL
+  useEffect(() => {
+    const queryParams = new URLSearchParams(window.location.search);
+    const zoneId = queryParams.get('zoneId');
+    
+    if (zoneId && !selectedZone) {
+      // Vérifier si cette zone existe dans la liste actuelle
+      const zoneExists = zones.some(zone => zone.id === zoneId);
+      if (zoneExists) {
+        console.log(`Setting zone from URL: ${zoneId}`);
+        setSelectedZone(zoneId);
+        // Naviguer à #details pour s'assurer que l'utilisateur voit les détails
+        window.location.hash = 'details';
+      }
+    }
+  }, [zones, selectedZone, setSelectedZone]);
+  
   // Effet pour simuler la progression du chargement
   useEffect(() => {
     // Seulement si nous sommes en chargement et que la progression n'est pas à 100%
@@ -86,9 +107,6 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
     }
   }, [isLoading.zoneDetails, selectedZone, loadingProgress]);
   
-  // Déterminer les zones à afficher selon la variante
-  const zones = variant === 'vfg' ? vitalForGroupMZs : vitalForEntrepriseMZs;
-  
   // Déterminer les classes CSS selon la variante (pas de template strings dynamiques)
   const cssClasses = {
     accent: variant === 'vfg' ? 'text-blue-500' : 'text-amber-500',
@@ -112,6 +130,15 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
   
   // Gérer le clic sur le bouton retour
   const handleBackClick = () => {
+    // Avant d'effacer la zone, s'assurer que les problèmes ne sont pas en cours de chargement
+    if (isLoading.problems) {
+      console.log("Attendez que les problèmes finissent de se charger avant de retourner...");
+      // Ajouter un délai pour éviter de revenir pendant un refresh
+      setTimeout(() => {
+        setSelectedZone(null);
+      }, 500);
+      return;
+    }
     setSelectedZone(null);
   };
   
@@ -388,58 +415,64 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
           </div>
           
           {/* Cartes des problèmes avec navigation */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            {/* Carte des problèmes actifs */}
-            <div 
-              onClick={() => navigate(`/problems/active?dashboard=${variant}`)}
-              className="p-4 rounded-lg border cursor-pointer transition-all hover:shadow-lg border-slate-700 bg-slate-800 hover:bg-slate-700"
-            >
-              <div className="flex items-start gap-3">
-                <div className="p-3 rounded-lg bg-slate-700">
-                  <AlertTriangle className="text-red-400" size={20} />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-md text-white">
-                    PROBLÈMES ACTIFS (TOUS)
-                  </h3>
-                  <p className="text-sm text-slate-400 mt-1">
-                    {activeProblems.length} problème{activeProblems.length !== 1 ? 's' : ''} en cours (sans limite de temps)
-                  </p>
-                </div>
-                <div className="ml-auto flex items-center justify-center w-10 h-10 rounded-full bg-slate-700 font-bold">
-                  {activeProblems.length}
-                </div>
+          {/* Carte unifiée des problèmes avec Vue 3D stylisée */}
+          <div 
+            onClick={() => navigate(`/problems/unified?dashboard=${variant}`)}
+            className="p-5 rounded-lg border cursor-pointer transition-all mb-6 
+                      hover:shadow-lg border-slate-700 bg-gradient-to-br from-slate-800 via-slate-900 to-slate-800 
+                      hover:bg-gradient-to-br hover:from-slate-700 hover:via-slate-800 hover:to-slate-700"
+          >
+            <div className="flex items-start gap-4">
+              <div className="p-3 rounded-full bg-gradient-to-br from-indigo-600/30 to-blue-900/30 border border-blue-500/30 shadow-md">
+                <Shield className="text-blue-400" size={24} />
               </div>
-            </div>
-            
-                        {/* Carte des problèmes des 72 dernières heures */}
-            <div 
-              onClick={() => navigate(`/problems/recent?dashboard=${variant}`)}
-              className="p-4 rounded-lg border cursor-pointer transition-all hover:shadow-lg border-slate-700 bg-slate-800 hover:bg-slate-700"
-            >
-              <div className="flex items-start gap-3">
-                <div className="p-3 rounded-lg bg-slate-700">
-                  <Clock className="text-amber-400" size={20} />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-md text-white">
-                    PROBLÈMES RÉCENTS (72h)
-                  </h3>
-                  <p className="text-sm text-slate-400 mt-1">
-                    {problemsLast72h ? problemsLast72h.length : 0} problème{(!problemsLast72h || problemsLast72h.length !== 1) ? 's' : ''} sur les 72 dernières heures
-                  </p>
-                </div>
-                <div className="ml-auto flex items-center justify-center w-10 h-10 rounded-full bg-slate-700 font-bold">
-                  {problemsLast72h ? problemsLast72h.length : 0}
+              <div className="flex-1">
+                <h3 className="font-semibold text-lg text-white flex items-center gap-2">
+                  SURVEILLANCE DES PROBLÈMES
+                  <span className="ml-2 bg-blue-900/40 text-blue-300 rounded-lg px-2 py-0.5 text-xs border border-blue-700/30">
+                    NOUVEAU
+                  </span>
+                </h3>
+                <p className="text-slate-400 mt-1">
+                  Vue unifiée des incidents actifs et passés avec analyses détaillées
+                </p>
+                
+                <div className="flex flex-wrap mt-3 gap-3">
+                  <div className="flex items-center gap-2 bg-red-900/20 border border-red-800/30 rounded-md px-3 py-1.5">
+                    <AlertTriangle size={14} className="text-red-400" />
+                    <span className="text-red-300 text-sm font-medium">
+                      {activeProblems.length} actif{activeProblems.length !== 1 ? 's' : ''}
+                    </span>
+                  </div>
+                  
+                  <div className="flex items-center gap-2 bg-amber-900/20 border border-amber-800/30 rounded-md px-3 py-1.5">
+                    <Clock size={14} className="text-amber-400" />
+                    <span className="text-amber-300 text-sm font-medium">
+                      {problemsLast72h ? problemsLast72h.length : 0} récent{(!problemsLast72h || problemsLast72h.length !== 1) ? 's' : ''} (72h)
+                    </span>
+                  </div>
+                  
+                  <div className="ml-auto flex items-center">
+                    <span className="px-3 py-1 text-sm text-slate-400">Voir tous les problèmes</span>
+                    <div className="w-8 h-8 rounded-full bg-blue-900/40 flex items-center justify-center border border-blue-600/30">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-400">
+                        <path d="M9 18l6-6-6-6"/>
+                      </svg>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
           
-          {/* Liste des zones */}
-          <ManagementZoneList 
+          {/* Liste des zones avec design moderne */}
+          <ModernManagementZoneList 
             zones={zones} 
-            onZoneClick={handleZoneClick} 
+            onZoneClick={handleZoneClick}
+            title={variant === 'vfg' ? "Management Zones Vital for Group" : "Management Zones Vital for Enterprise"}
+            variant={variant}
+            loading={isLoading.dashboardData}
+            onRefresh={() => refreshData(variant, false)}
           />
         </>
       )}

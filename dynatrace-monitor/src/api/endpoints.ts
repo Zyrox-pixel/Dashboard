@@ -16,6 +16,7 @@ export const ENDPOINTS = {
   
   // Endpoints relatifs aux problèmes
   PROBLEMS: '/problems',
+  PROBLEMS_72H: '/problems-72h', // Nouvel endpoint dédié pour les problèmes des 72 dernières heures
   
   // Endpoints relatifs aux management zones
   MANAGEMENT_ZONES: '/management-zones',

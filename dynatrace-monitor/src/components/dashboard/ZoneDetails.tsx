@@ -1,10 +1,10 @@
 import React, { useMemo, useCallback, useState, useEffect } from 'react';
 import { ChevronLeft, Clock, AlertTriangle, ExternalLink, RefreshCw, Cpu, Activity, Server, Filter, Loader, Database, Search, ArrowUp, ArrowDown, X, Check, Monitor, Sliders } from 'lucide-react';
+import { useApp } from '../../contexts/AppContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { ManagementZone, Problem, ProcessGroup, Host, Service } from '../../api/types';
 import ProblemsList from './ProblemsList';
 import PaginatedTable, { Column } from '../common/PaginatedTable';
-import { useApp } from '../../contexts/AppContext';
 import AdvancedFilter, { FilterCategory, FilterValue, FilterItem } from '../common/AdvancedFilter';
 import FilterBadges, { FilterBadge } from '../common/FilterBadges';
 
@@ -33,6 +33,7 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
 }) => {
   const { isDarkTheme } = useTheme();
   const { refreshData } = useApp();
+  const [filteredProblems, setFilteredProblems] = useState<Problem[]>([]);
   
   // États pour le tri et la recherche
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'ascending' | 'descending' | null }>({
@@ -54,10 +55,11 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
   const [processFilters, setProcessFilters] = useState<FilterValue[]>([]);
   
   // Filtrer les problèmes pour la zone courante (mémorisé)
-  const zoneProblems = useMemo(() => 
-    problems.filter(problem => problem.zone === zone.name),
-    [problems, zone.name]
-  );
+  useEffect(() => {
+    // Filtrer les problèmes pour la zone courante
+    const zoneProblemsFiltered = problems.filter(problem => problem.zone === zone.name);
+    setFilteredProblems(zoneProblemsFiltered);
+  }, [problems, zone.name]);
 
   // Déterminer les couleurs en fonction de la zone et du thème (mémorisé)
   const zoneColors = useMemo(() => {
@@ -108,6 +110,27 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
     
     return colors[zone.color] || colors.blue;
   }, [zone.color, isDarkTheme]);
+  
+  const handleRefreshedProblems = useCallback((refreshedProblems: Problem[]) => {
+    // Filtrer les problèmes rafraîchis pour cette zone spécifique
+    const zoneRefreshedProblems = refreshedProblems.filter(problem => problem.zone === zone.name);
+    
+    // Mettre à jour l'état local des problèmes filtrés
+    setFilteredProblems(zoneRefreshedProblems);
+    
+    console.log(`Mise à jour des problèmes pour la zone ${zone.name}: ${zoneRefreshedProblems.length} problèmes trouvés`);
+  }, [zone.name]);
+  
+  // 4. Modifiez l'appel à ProblemsList pour utiliser filteredProblems au lieu de zoneProblems
+  // et passez la fonction de callback
+  {filteredProblems.length > 0 && (
+    <ProblemsList 
+      problems={filteredProblems} 
+      title={`Problèmes actifs dans ${zone.name}`}
+      zoneFilter={zone.name}
+      onRefresh={handleRefreshedProblems}
+    />
+  )}
   
   // Fonction pour gérer le tri des colonnes
   const requestSort = (key: string) => {
@@ -1049,6 +1072,45 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
     });
   }, []);
 
+  // Données de comptage réelles basées sur les tableaux actuels
+  const realCounts = useMemo(() => ({
+    hosts: hosts?.length || 0,
+    services: services?.length || 0,
+    apps: processGroups?.length || 0
+  }), [hosts, services, processGroups]);
+  
+  // Afficher une notification de chargement en cours si les problèmes se rafraîchissent
+  const [isRefreshingProblems, setIsRefreshingProblems] = useState(false);
+  
+  // Obtenir l'état de chargement des problèmes depuis le contexte
+  const appContext = useApp();
+  
+  // Log pour vérifier les valeurs
+  useEffect(() => {
+    if (!isLoading) {
+      console.log(`Comptages réels pour ${zone.name}:`, realCounts);
+    }
+  }, [isLoading, realCounts, zone.name]);
+  
+  // Mettre à jour l'état local quand l'état de chargement des problèmes change
+  // Ajouter un timeout pour s'assurer que l'indicateur de chargement ne reste pas bloqué
+  useEffect(() => {
+    if (appContext.isLoading.problems) {
+      setIsRefreshingProblems(true);
+      
+      // Définir un timeout pour masquer l'indicateur après 20 secondes maximum
+      const timeoutId = setTimeout(() => {
+        console.log("Timeout de sécurité pour l'indicateur de chargement des problèmes");
+        setIsRefreshingProblems(false);
+      }, 20000);
+      
+      // Nettoyer le timeout si l'état change avant
+      return () => clearTimeout(timeoutId);
+    } else {
+      setIsRefreshingProblems(false);
+    }
+  }, [appContext.isLoading.problems]);
+
   // État de chargement pour les détails de la zone
   if (isLoading) {
     return (
@@ -1073,6 +1135,13 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
 
   return (
     <div>
+      {isRefreshingProblems && (
+        <div className="fixed bottom-5 right-5 bg-indigo-600 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 z-50 animate-pulse">
+          <RefreshCw size={16} className="animate-spin" />
+          <span>Rafraîchissement des problèmes en cours...</span>
+        </div>
+      )}
+    
       <button 
         onClick={onBackClick}
         className={`mb-5 flex items-center gap-2 px-4 py-1.5 rounded-lg border ${
@@ -1100,10 +1169,10 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
                 <span className="text-xs text-slate-400">Dernière mise à jour: {new Date().toLocaleTimeString()}</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <AlertTriangle size={12} className={zoneProblems.length > 0 ? "text-red-500" : "text-green-500"} />
-                <span className={`text-xs ${zoneProblems.length > 0 ? "text-red-400" : "text-green-400"}`}>
-                  {zoneProblems.length > 0 
-                    ? `${zoneProblems.length} problème${zoneProblems.length > 1 ? 's' : ''} actif${zoneProblems.length > 1 ? 's' : ''}` 
+                <AlertTriangle size={12} className={filteredProblems.length > 0 ? "text-red-500" : "text-green-500"} />
+                <span className={`text-xs ${filteredProblems.length > 0 ? "text-red-400" : "text-green-400"}`}>
+                  {filteredProblems.length > 0 
+                    ? `${filteredProblems.length} problème${filteredProblems.length > 1 ? 's' : ''} actif${filteredProblems.length > 1 ? 's' : ''}` 
                     : "Aucun problème"
                   }
                 </span>
@@ -1124,11 +1193,25 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
           </a>
           
           <button 
-            onClick={() => refreshData()}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 text-sm"
+            onClick={async () => {
+              // Récupérer le type de dashboard actuel (vfg ou vfe)
+              const dashboardType = window.location.pathname.includes('vfe') ? 'vfe' : 'vfg';
+              
+              try {
+                // Utiliser async/await pour gérer le rafraîchissement de manière non bloquante
+                // Rafraîchir les données avec le paramètre refreshProblemsOnly à false pour tout rafraîchir
+                // et forcer le timeframe à 60 jours (défini dans le backend)
+                await appContext.refreshData(dashboardType as 'vfg' | 'vfe', false);
+                console.log("Rafraîchissement global terminé avec succès");
+              } catch (error) {
+                console.error("Erreur lors du rafraîchissement global:", error);
+              }
+            }}
+            disabled={appContext.isLoading.problems || appContext.isLoading.zoneDetails}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:bg-indigo-800 disabled:opacity-70 text-sm"
           >
-            <RefreshCw size={14} />
-            <span>Rafraîchir</span>
+            <RefreshCw size={14} className={`${appContext.isLoading.problems || appContext.isLoading.zoneDetails ? 'animate-spin' : ''}`} />
+            <span>{appContext.isLoading.problems || appContext.isLoading.zoneDetails ? 'Rafraîchissement...' : 'Rafraîchir'}</span>
           </button>
         </div>
       </div>
@@ -1149,27 +1232,29 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
           isDarkTheme ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-slate-200'
         }`}>
           <div className="text-xs text-slate-400 mb-1">Applications</div>
-          <div className="text-xl font-bold">{zone.apps}</div>
+          <div className="text-xl font-bold">{realCounts.apps}</div>
         </div>
         <div className={`p-3 rounded-lg border ${
           isDarkTheme ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-slate-200'
         }`}>
           <div className="text-xs text-slate-400 mb-1">Services</div>
-          <div className="text-xl font-bold">{zone.services}</div>
+          <div className="text-xl font-bold">{realCounts.services}</div>
         </div>
         <div className={`p-3 rounded-lg border ${
           isDarkTheme ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-slate-200'
         }`}>
           <div className="text-xs text-slate-400 mb-1">Hôtes</div>
-          <div className="text-xl font-bold">{zone.hosts}</div>
+          <div className="text-xl font-bold">{realCounts.hosts}</div>
         </div>
       </div>
       
       {/* Problèmes actifs pour cette zone */}
-      {zoneProblems.length > 0 && (
+      {filteredProblems.length > 0 && (
         <ProblemsList 
-          problems={zoneProblems} 
-          title={`Problèmes actifs dans ${zone.name}`} 
+          problems={filteredProblems} 
+          title={`Problèmes actifs dans ${zone.name}`}
+          zoneFilter={zone.name}
+          onRefresh={handleRefreshedProblems}
         />
       )}
       

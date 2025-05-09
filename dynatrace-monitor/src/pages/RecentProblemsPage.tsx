@@ -1,9 +1,10 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useApp } from '../contexts/AppContext';
 import Layout from '../components/layout/Layout';
 import ProblemsList from '../components/dashboard/ProblemsList';
 import { ChevronLeft, Clock } from 'lucide-react';
+import { Problem } from '../api/types';
 
 /**
  * Page dédiée à l'affichage des problèmes des dernières 72 heures
@@ -13,20 +14,57 @@ const RecentProblemsPage: React.FC = () => {
   const location = useLocation();
   const { problemsLast72h, isLoading, refreshData } = useApp();
   
+  // État local pour empêcher les actualisations trop fréquentes
+  const [lastRefreshTime, setLastRefreshTime] = useState<number>(0);
+  const [localProblems, setLocalProblems] = useState<Problem[]>([]);
+  
   // Récupérer le paramètre de type de dashboard depuis l'URL
   const dashboardType = new URLSearchParams(location.search).get('dashboard') || 'vfg';
+  
+  // Synchroniser les problèmes locaux avec les problèmes globaux
+  useEffect(() => {
+    if (problemsLast72h && problemsLast72h.length > 0) {
+      console.log(`Mise à jour des problèmes 72h locaux sur la page avec ${problemsLast72h.length} problèmes`);
+      setLocalProblems(problemsLast72h);
+    }
+  }, [problemsLast72h]);
   
   // Forcer un rafraîchissement des données une seule fois au chargement
   useEffect(() => {
     // Utiliser un flag pour éviter les boucles infinies
     const loadOnce = async () => {
       console.log(`Loading recent problems with dashboard type: ${dashboardType}`);
-      await refreshData(dashboardType as 'vfg' | 'vfe');
+      try {
+        // Spécifiez false comme second paramètre pour indiquer que ce n'est pas un rafraîchissement de problèmes actifs
+        await refreshData(dashboardType as 'vfg' | 'vfe', false);
+        setLastRefreshTime(Date.now());
+      } catch (error) {
+        console.error("Erreur lors du chargement initial des problèmes 72h:", error);
+      }
     };
     
     loadOnce();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dashboardType]);
+  
+  // Gestionnaire pour les rafraîchissements manuels
+  const handleManualRefresh = useCallback(async (refreshedProblems: Problem[]) => {
+    // Mettre à jour la dernière heure de rafraîchissement
+    const now = Date.now();
+    const timeSinceLastRefresh = now - lastRefreshTime;
+    
+    // Limiter les rafraîchissements à un toutes les 5 secondes
+    if (timeSinceLastRefresh < 5000) {
+      console.log(`Rafraîchissement ignoré : dernier rafraîchissement il y a seulement ${timeSinceLastRefresh}ms`);
+      return;
+    }
+    
+    console.log(`Rafraîchissement manuel des problèmes 72h : ${refreshedProblems.length} problèmes reçus`);
+    
+    // Mettre à jour notre état local immédiatement
+    setLocalProblems(refreshedProblems);
+    setLastRefreshTime(now);
+  }, [lastRefreshTime]);
   
   // Navigation retour vers le bon tableau de bord
   const handleBackClick = () => {
@@ -63,21 +101,23 @@ const RecentProblemsPage: React.FC = () => {
               </p>
             </div>
             <div className="ml-auto flex items-center justify-center w-10 h-10 rounded-full bg-amber-950 text-white font-bold">
-              {problemsLast72h ? problemsLast72h.length : 0}
+              {localProblems.length}
             </div>
           </div>
         </div>
 
         {/* Section des problèmes */}
-        {isLoading.problems ? (
+        {isLoading.problems && localProblems.length === 0 ? (
           <div className="flex items-center justify-center h-64">
             <div className="w-12 h-12 border-t-4 border-b-4 border-amber-500 rounded-full animate-spin"></div>
             <span className="ml-3 text-slate-400">Chargement des problèmes...</span>
           </div>
-        ) : problemsLast72h && problemsLast72h.length > 0 ? (
+        ) : localProblems && localProblems.length > 0 ? (
           <ProblemsList 
-            problems={problemsLast72h} 
+            problems={localProblems} 
             title="Tous les problèmes des dernières 72h"
+            showRefreshButton={true}
+            onRefresh={handleManualRefresh}
           />
         ) : (
           <div className="p-6 rounded-lg bg-slate-800 border border-slate-700 text-center">
