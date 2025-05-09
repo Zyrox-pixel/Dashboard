@@ -5,7 +5,7 @@ import UnifiedDashboard from './pages/UnifiedDashboard';
 import ActiveProblemsPage from './pages/ActiveProblemsPage';
 import RecentProblemsPage from './pages/RecentProblemsPage';
 import UnifiedProblemsPage from './pages/UnifiedProblemsPage';
-import OverviewDashboard from './pages/OverviewDashboard';
+import OverviewDashboardLoader from './pages/OverviewDashboardLoader';
 import { AppProvider } from './contexts/AppContext';
 
 function App() {
@@ -18,7 +18,7 @@ function App() {
             <Route path="/" element={<Navigate to="/overview" replace />} />
             
             {/* Route pour la page d'aperçu global */}
-            <Route path="/overview" element={<OverviewDashboard />} />
+            <Route path="/overview" element={<OverviewDashboardLoader />} />
             
             {/* Routes vers le tableau de bord unifié */}
             <Route path="/dashboard/:type" element={<UnifiedDashboard />} />

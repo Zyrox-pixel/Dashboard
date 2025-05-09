@@ -1,74 +1,46 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Shield, AlertTriangle, Clock, Server, Database, BarChart } from 'lucide-react';
 import Layout from '../components/layout/Layout';
 import { useApp } from '../contexts/AppContext';
+import { Problem } from '../api/types';
 
 /**
  * Composant de Vue d'Ensemble qui présente un récapitulatif des dashboards VFG et VFE
  * avec des cartes interactives côte à côte
  */
-const OverviewDashboard: React.FC = () => {
+interface OverviewDashboardProps {
+  aggregatedActiveProblems: Problem[];
+  aggregatedProblems72h: Problem[];
+  lastRefreshTime: Date;
+  onRefresh: () => Promise<void>;
+}
+
+const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
+  aggregatedActiveProblems,
+  aggregatedProblems72h,
+  lastRefreshTime,
+  onRefresh
+}) => {
   const navigate = useNavigate();
-  const { 
-    vitalForGroupMZs, 
-    vitalForEntrepriseMZs, 
-    activeProblems,
-    problemsLast72h,
-    refreshData, 
-    isLoading 
+  const {
+    vitalForGroupMZs,
+    vitalForEntrepriseMZs,
+    isLoading
   } = useApp();
-  
-  // État pour suivre le dernier rafraîchissement
-  const [lastRefreshTime, setLastRefreshTime] = useState(new Date());
 
-  // Effet pour charger les données initiales une seule fois
-  const initialLoadDoneRef = useRef(false);
-
-  useEffect(() => {
-    const loadInitialData = async () => {
-      // Charger les données pour VFG et VFE uniquement si pas déjà chargées
-      if (!initialLoadDoneRef.current) {
-        console.log("Chargement initial des données pour la Vue d'ensemble");
-
-        // Charger d'abord les données VFG
-        await refreshData('vfg', false);
-
-        // Puis charger les données VFE
-        // Utiliser setTimeout pour permettre à React de mettre à jour l'état entre les deux chargements
-        setTimeout(async () => {
-          await refreshData('vfe', false);
-          setLastRefreshTime(new Date());
-        }, 100);
-
-        setLastRefreshTime(new Date());
-        initialLoadDoneRef.current = true;
-      }
-    };
-
-    loadInitialData();
-  }, [refreshData]);
-
-  // Fonction de rafraîchissement manuel qui charge à la fois VFG et VFE
+  // Fonction de rafraîchissement manuel
   const handleRefresh = async () => {
-    console.log("Rafraîchissement manuel des données pour la Vue d'ensemble");
-
-    // Charger d'abord les données VFG
-    await refreshData('vfg', false);
-
-    // Puis charger les données VFE
-    await refreshData('vfe', false);
-
-    setLastRefreshTime(new Date());
+    await onRefresh();
   };
 
   // Calcul des statistiques VFG
   const vfgStats = {
     totalZones: vitalForGroupMZs.length,
-    activeProblems: activeProblems.filter(p => 
+    activeProblems: aggregatedActiveProblems.filter(p =>
       vitalForGroupMZs.some(zone => p.zone?.includes(zone.name))
     ).length,
-    recentProblems: problemsLast72h.filter(p => 
+    recentProblems: aggregatedProblems72h.filter(p =>
       vitalForGroupMZs.some(zone => p.zone?.includes(zone.name))
     ).length,
     criticalZones: vitalForGroupMZs.filter(zone => zone.problemCount > 0).length,
@@ -77,10 +49,10 @@ const OverviewDashboard: React.FC = () => {
   // Calcul des statistiques VFE
   const vfeStats = {
     totalZones: vitalForEntrepriseMZs.length,
-    activeProblems: activeProblems.filter(p => 
+    activeProblems: aggregatedActiveProblems.filter(p =>
       vitalForEntrepriseMZs.some(zone => p.zone?.includes(zone.name))
     ).length,
-    recentProblems: problemsLast72h.filter(p => 
+    recentProblems: aggregatedProblems72h.filter(p =>
       vitalForEntrepriseMZs.some(zone => p.zone?.includes(zone.name))
     ).length,
     criticalZones: vitalForEntrepriseMZs.filter(zone => zone.problemCount > 0).length,
@@ -298,14 +270,14 @@ const OverviewDashboard: React.FC = () => {
               <div className="flex items-center gap-2 bg-red-900/20 border border-red-800/30 rounded-md px-3 py-1.5">
                 <AlertTriangle size={14} className="text-red-400" />
                 <span className="text-red-300 text-sm font-medium">
-                  {activeProblems.length} actif{activeProblems.length !== 1 ? 's' : ''}
+                  {aggregatedActiveProblems.length} actif{aggregatedActiveProblems.length !== 1 ? 's' : ''}
                 </span>
               </div>
-              
+
               <div className="flex items-center gap-2 bg-amber-900/20 border border-amber-800/30 rounded-md px-3 py-1.5">
                 <Clock size={14} className="text-amber-400" />
                 <span className="text-amber-300 text-sm font-medium">
-                  {problemsLast72h.length} récent{problemsLast72h.length !== 1 ? 's' : ''} (72h)
+                  {aggregatedProblems72h.length} récent{aggregatedProblems72h.length !== 1 ? 's' : ''} (72h)
                 </span>
               </div>
               
