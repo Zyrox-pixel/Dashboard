@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../layout/Layout';
+import ModernLayout from '../layout/ModernLayout';
 import ProblemsList from './ProblemsList';
 import ManagementZoneList from './ManagementZoneList';
 import ModernManagementZoneList from './ModernManagementZoneList';
@@ -160,26 +161,26 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
   // Afficher un écran de chargement si le chargement initial n'est pas terminé
   if (!isLoading.initialLoadComplete || (isLoading.dashboardData && optimized)) {
     return (
-      <Layout title={title}>
+      <ModernLayout title={title}>
         <div className="flex flex-col items-center justify-center h-64">
           <div className={`w-16 h-16 border-t-4 border-b-4 ${cssClasses.accent} rounded-full animate-spin mb-4`}></div>
           <p className="text-xl text-slate-400">Chargement des données...</p>
         </div>
-      </Layout>
+      </ModernLayout>
     );
   }
   
   // Afficher un message d'erreur si le backend n'est pas connecté
   if (!backendConnected) {
     return (
-      <Layout title={title}>
+      <ModernLayout title={title}>
         <div className="flex flex-col items-center justify-center h-64 p-10 mt-20 bg-red-50 border border-red-200 rounded-lg dark:bg-red-900/20 dark:border-red-800">
           <AlertTriangle className="w-16 h-16 text-red-500 mb-4" />
           <p className="text-xl text-red-600 dark:text-red-400 mb-4">Le serveur backend n'est pas accessible</p>
           <p className="text-slate-600 dark:text-slate-300 mb-8 text-center max-w-lg">
             Impossible de se connecter au serveur. Vérifiez que le backend est démarré et que votre connexion est active.
           </p>
-          <button 
+          <button
             onClick={() => refreshData()}
             className={`px-6 py-3 ${cssClasses.accentBg} text-white rounded-md ${cssClasses.hoverBg} flex items-center gap-2`}
           >
@@ -187,19 +188,19 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
             <span>Réessayer</span>
           </button>
         </div>
-      </Layout>
+      </ModernLayout>
     );
   }
   
   // Afficher un message d'erreur générale si nécessaire
   if (error) {
     return (
-      <Layout title={title}>
+      <ModernLayout title={title}>
         <div className="flex flex-col items-center justify-center h-64 p-10 mt-20 bg-red-50 border border-red-200 rounded-lg dark:bg-red-900/20 dark:border-red-800">
           <AlertTriangle className="w-16 h-16 text-red-500 mb-4" />
           <p className="text-xl text-red-600 dark:text-red-400 mb-4">Une erreur est survenue</p>
           <p className="text-slate-600 dark:text-slate-300 mb-8 text-center max-w-lg">{error}</p>
-          <button 
+          <button
             onClick={() => {
               setSelectedZone(null); // Réinitialiser la zone sélectionnée
               refreshData();
@@ -210,22 +211,22 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
             <span>Réessayer</span>
           </button>
         </div>
-      </Layout>
+      </ModernLayout>
     );
   }
   
   // Si aucune MZ n'est trouvée après le chargement
-  if (zones.length === 0 && 
+  if (zones.length === 0 &&
      (variant === 'vfg' ? !isLoading.vitalForGroupMZs : !isLoading.vitalForEntrepriseMZs)) {
     return (
-      <Layout title={title}>
+      <ModernLayout title={title}>
         <div className={`flex flex-col items-center justify-center h-64 p-10 mt-20 ${cssClasses.bgLight} border ${cssClasses.borderLight} rounded-lg dark:${cssClasses.bgDark} dark:${cssClasses.borderDark}`}>
           <Shield className={`w-16 h-16 ${cssClasses.accent} mb-4`} />
           <p className={`text-xl ${cssClasses.text} dark:${cssClasses.darkText} mb-4`}>Aucune Management Zone trouvée</p>
           <p className="text-slate-600 dark:text-slate-300 mb-8 text-center max-w-lg">
             Aucune Management Zone n'a été trouvée. Vérifiez votre configuration.
           </p>
-          <button 
+          <button
             onClick={() => refreshData()}
             className={`px-6 py-3 ${cssClasses.accentBg} text-white rounded-md ${cssClasses.hoverBg} flex items-center gap-2`}
           >
@@ -233,14 +234,14 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
             <span>Actualiser</span>
           </button>
         </div>
-      </Layout>
+      </ModernLayout>
     );
   }
   
   // Afficher l'écran de chargement des détails de zone
   if (isLoading.zoneDetails && selectedZone) {
     return (
-      <Layout title={title} subtitle={currentZone?.name}>
+      <ModernLayout title={title} subtitle={currentZone?.name}>
         <button 
           onClick={handleBackClick}
           className="mb-5 flex items-center gap-2 px-4 py-1.5 rounded-lg border border-slate-600 text-slate-300 hover:bg-slate-700"
@@ -328,7 +329,7 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
   }
   
   return (
-    <Layout
+    <ModernLayout
       title={title}
       subtitle={currentZone?.name}
     >

@@ -87,13 +87,13 @@ const ModernSidebar: React.FC<ModernSidebarProps> = ({
           badge: null
         },
         {
-          path: '/dashboard/vfg',
+          path: '/vfg',
           icon: <BarChart3 size={20} />,
           label: 'Dashboard VFG',
           badge: null
         },
         {
-          path: '/dashboard/vfe',
+          path: '/vfe',
           icon: <BarChart3 size={20} />,
           label: 'Dashboard VFE',
           badge: null

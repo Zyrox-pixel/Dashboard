@@ -469,8 +469,8 @@ const ModernHeader: React.FC<ModernHeaderProps> = ({
           }`}
         >
           <div className="flex flex-col space-y-2 mt-2">
-            <a 
-              href="/dashboard/vfg" 
+            <a
+              href="/vfg"
               className="text-indigo-300 hover:text-white py-2 px-3 rounded-lg hover:bg-indigo-800/30 transition-all duration-300 border border-transparent hover:border-indigo-800/30 flex items-center gap-2"
             >
               <span className="w-8 h-8 rounded-lg bg-indigo-900/30 flex items-center justify-center text-indigo-400">
@@ -478,8 +478,8 @@ const ModernHeader: React.FC<ModernHeaderProps> = ({
               </span>
               <span>Dashboard VFG</span>
             </a>
-            <a 
-              href="/dashboard/vfe" 
+            <a
+              href="/vfe"
               className="text-indigo-300 hover:text-white py-2 px-3 rounded-lg hover:bg-indigo-800/30 transition-all duration-300 border border-transparent hover:border-indigo-800/30 flex items-center gap-2"
             >
               <span className="w-8 h-8 rounded-lg bg-indigo-900/30 flex items-center justify-center text-indigo-400">
