@@ -74,7 +74,7 @@ const ModernSidebar: React.FC<ModernSidebarProps> = ({
     `;
   };
 
-  // Structure des sections et éléments de menu
+  // Structure simplifiée des sections et éléments de menu
   const menuSections = [
     {
       id: 'main',
@@ -103,60 +103,6 @@ const ModernSidebar: React.FC<ModernSidebarProps> = ({
           icon: <AlertTriangle size={20} />,
           label: 'Problèmes',
           badge: activeProblems.length || null
-        }
-      ]
-    },
-    {
-      id: 'resources',
-      title: 'RESSOURCES',
-      items: [
-        {
-          path: '/hosts',
-          icon: <Server size={20} />,
-          label: 'Hosts',
-          badge: null
-        },
-        {
-          path: '/services',
-          icon: <Activity size={20} />,
-          label: 'Services',
-          badge: null
-        },
-        {
-          path: '/processes',
-          icon: <ShieldCheck size={20} />,
-          label: 'Process Groups',
-          badge: null
-        },
-        {
-          path: '/network',
-          icon: <Network size={20} />,
-          label: 'Réseau',
-          badge: null
-        }
-      ]
-    },
-    {
-      id: 'analytics',
-      title: 'ANALYTIQUES',
-      items: [
-        {
-          path: '/problems/recent',
-          icon: <Clock size={20} />,
-          label: 'Historique (72h)',
-          badge: null
-        },
-        {
-          path: '/metrics',
-          icon: <Sparkles size={20} />,
-          label: 'Métriques avancées',
-          badge: null
-        },
-        {
-          path: '/capacity',
-          icon: <Layers size={20} />,
-          label: 'Capacité système',
-          badge: null
         }
       ]
     }
@@ -315,50 +261,8 @@ const ModernSidebar: React.FC<ModernSidebarProps> = ({
           </div>
         ))}
         
-        {/* Profil et paramètres (en bas) */}
-        <div className="mt-auto px-2">
-          <Link
-            to="/settings"
-            className={getLinkClasses('/settings')}
-            onMouseEnter={() => {
-              setHoveredItem('/settings');
-              playButtonSound();
-            }}
-            onMouseLeave={() => setHoveredItem(null)}
-          >
-            <div className="relative text-indigo-400">
-              <Settings size={20} />
-            </div>
-            {!collapsed && <span>Paramètres</span>}
-            
-            {/* Tooltip pour mode réduit */}
-            {collapsed && (
-              <div className={`absolute left-full ml-3 rounded-lg py-1.5 px-3 bg-[#191a3a]/95 backdrop-blur-xl border border-indigo-800/30 shadow-xl 
-                whitespace-nowrap z-50 flex items-center gap-2 text-white text-sm
-                transition-all duration-300 
-                ${hoveredItem === '/settings' ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-2 pointer-events-none'}`}
-              >
-                Paramètres
-              </div>
-            )}
-          </Link>
-          
-          {/* Profil utilisateur - uniquement en mode étendu */}
-          {!collapsed && (
-            <div className="flex items-center gap-3 mt-3 px-4 pt-3 border-t border-indigo-900/30">
-              <div className="relative h-10 w-10 rounded-lg overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-br from-indigo-600 via-purple-600 to-indigo-600 animate-gradient-shift"></div>
-                <div className="absolute inset-0 flex items-center justify-center text-white font-medium shadow-inner">
-                  AP
-                </div>
-              </div>
-              <div className="flex flex-col">
-                <span className="text-sm font-medium text-white">Admin</span>
-                <span className="text-xs text-indigo-400">administrateur</span>
-              </div>
-            </div>
-          )}
-        </div>
+        {/* Espace en bas - gardé vide pour maintenir la structure */}
+        <div className="mt-auto"></div>
       </div>
       
       {/* Les styles pour les animations avancées ont été déplacés dans animations.css */}

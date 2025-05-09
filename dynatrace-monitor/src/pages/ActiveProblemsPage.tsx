@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useApp } from '../contexts/AppContext';
-import Layout from '../components/layout/Layout';
+import ModernLayout from '../components/layout/ModernLayout';
 import ProblemsList from '../components/dashboard/ProblemsList';
 import { ChevronLeft, AlertTriangle } from 'lucide-react';
 import { Problem } from '../api/types';
@@ -78,7 +78,7 @@ const ActiveProblemsPage: React.FC = () => {
     : "Problèmes Actifs - Vital for Entreprise";
   
   return (
-    <Layout title={title}>
+    <ModernLayout title={title}>
       <div className="space-y-6">
         {/* Bouton retour */}
         <button 
@@ -122,7 +122,7 @@ const ActiveProblemsPage: React.FC = () => {
           />
         )}
       </div>
-    </Layout>
+    </ModernLayout>
   );
 };
 
