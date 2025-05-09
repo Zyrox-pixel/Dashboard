@@ -3,58 +3,47 @@ import { useNavigate } from 'react-router-dom';
 import { Shield, AlertTriangle, Clock, Server, Database, BarChart } from 'lucide-react';
 import Layout from '../components/layout/Layout';
 import { useApp } from '../contexts/AppContext';
-import { Problem } from '../api/types';
+import { useProblems } from '../contexts/ProblemsContext';
 
 /**
  * Composant de Vue d'Ensemble qui présente un récapitulatif des dashboards VFG et VFE
  * avec des cartes interactives côte à côte
  */
-interface OverviewDashboardProps {
-  aggregatedActiveProblems: Problem[];
-  aggregatedProblems72h: Problem[];
-  lastRefreshTime: Date;
-  onRefresh: () => Promise<void>;
-}
-
-const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
-  aggregatedActiveProblems,
-  aggregatedProblems72h,
-  lastRefreshTime,
-  onRefresh
-}) => {
+const OverviewDashboard: React.FC = () => {
   const navigate = useNavigate();
-  const {
-    vitalForGroupMZs,
+  const { 
+    vitalForGroupMZs, 
     vitalForEntrepriseMZs,
-    isLoading
+    isLoading 
   } = useApp();
-
-  // Fonction de rafraîchissement manuel
-  const handleRefresh = async () => {
-    await onRefresh();
-  };
-
+  
+  const {
+    vfgProblems,
+    vfeProblems,
+    vfgProblems72h,
+    vfeProblems72h,
+    refreshAll,
+    getAggregatedProblems,
+    getAggregatedProblems72h
+  } = useProblems();
+  
+  // Récupérer les problèmes agrégés
+  const aggregatedActiveProblems = getAggregatedProblems();
+  const aggregatedProblems72h = getAggregatedProblems72h();
+  
   // Calcul des statistiques VFG
   const vfgStats = {
     totalZones: vitalForGroupMZs.length,
-    activeProblems: aggregatedActiveProblems.filter(p =>
-      vitalForGroupMZs.some(zone => p.zone?.includes(zone.name))
-    ).length,
-    recentProblems: aggregatedProblems72h.filter(p =>
-      vitalForGroupMZs.some(zone => p.zone?.includes(zone.name))
-    ).length,
+    activeProblems: vfgProblems.length,
+    recentProblems: vfgProblems72h.length,
     criticalZones: vitalForGroupMZs.filter(zone => zone.problemCount > 0).length,
   };
 
   // Calcul des statistiques VFE
   const vfeStats = {
     totalZones: vitalForEntrepriseMZs.length,
-    activeProblems: aggregatedActiveProblems.filter(p =>
-      vitalForEntrepriseMZs.some(zone => p.zone?.includes(zone.name))
-    ).length,
-    recentProblems: aggregatedProblems72h.filter(p =>
-      vitalForEntrepriseMZs.some(zone => p.zone?.includes(zone.name))
-    ).length,
+    activeProblems: vfeProblems.length,
+    recentProblems: vfeProblems72h.length,
     criticalZones: vitalForEntrepriseMZs.filter(zone => zone.problemCount > 0).length,
   };
 
@@ -68,6 +57,12 @@ const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
     .filter(zone => zone.problemCount > 0)
     .sort((a, b) => b.problemCount - a.problemCount)
     .slice(0, 3);
+    
+  // Fonction de rafraîchissement manuel
+  const handleRefresh = async () => {
+    console.log("Rafraîchissement manuel des données depuis OverviewDashboard");
+    await refreshAll(true); // force=true pour ignorer le cache
+  };
 
   return (
     <Layout title="Vue d'Ensemble" subtitle="Supervision globale des applications critiques">
@@ -91,7 +86,7 @@ const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
               flex items-center gap-2"
           >
             <Clock size={16} className={isLoading.problems ? 'animate-spin' : ''} />
-            <span>Dernière MAJ: {lastRefreshTime.toLocaleTimeString()}</span>
+            <span>Rafraîchir</span>
           </button>
         </div>
       </div>
@@ -273,7 +268,7 @@ const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                   {aggregatedActiveProblems.length} actif{aggregatedActiveProblems.length !== 1 ? 's' : ''}
                 </span>
               </div>
-
+              
               <div className="flex items-center gap-2 bg-amber-900/20 border border-amber-800/30 rounded-md px-3 py-1.5">
                 <Clock size={14} className="text-amber-400" />
                 <span className="text-amber-300 text-sm font-medium">

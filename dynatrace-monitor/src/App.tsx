@@ -5,20 +5,24 @@ import UnifiedDashboard from './pages/UnifiedDashboard';
 import ActiveProblemsPage from './pages/ActiveProblemsPage';
 import RecentProblemsPage from './pages/RecentProblemsPage';
 import UnifiedProblemsPage from './pages/UnifiedProblemsPage';
-import OverviewDashboardLoader from './pages/OverviewDashboardLoader';
+import OverviewDashboard from './pages/OverviewDashboard';
 import { AppProvider } from './contexts/AppContext';
+import { ProblemsProvider } from './contexts/ProblemsContext';
+
+// L'ancien loader n'est plus nécessaire car OverviewDashboard utilise maintenant le contexte ProblemsProvider
 
 function App() {
   return (
     <ThemeProvider>
       <AppProvider>
-        <Router>
-          <Routes>
-            {/* Route par défaut - Redirige vers la vue d'ensemble */}
-            <Route path="/" element={<Navigate to="/overview" replace />} />
-            
-            {/* Route pour la page d'aperçu global */}
-            <Route path="/overview" element={<OverviewDashboardLoader />} />
+        <ProblemsProvider>
+          <Router>
+            <Routes>
+              {/* Route par défaut - Redirige vers la vue d'ensemble */}
+              <Route path="/" element={<Navigate to="/overview" replace />} />
+
+              {/* Route pour la page d'aperçu global */}
+              <Route path="/overview" element={<OverviewDashboard />} />
             
             {/* Routes vers le tableau de bord unifié */}
             <Route path="/dashboard/:type" element={<UnifiedDashboard />} />
@@ -45,6 +49,7 @@ function App() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Router>
+        </ProblemsProvider>
       </AppProvider>
     </ThemeProvider>
   );
