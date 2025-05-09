@@ -146,7 +146,7 @@ const UnifiedProblemsView: React.FC<UnifiedProblemsViewProps> = ({ title, varian
               const uniqueActiveIds = new Set();
               const uniqueRecentIds = new Set();
 
-              activeData = activeData.filter(problem => {
+              activeData = activeData.filter((problem: Problem) => {
                 if (!uniqueActiveIds.has(problem.id)) {
                   uniqueActiveIds.add(problem.id);
                   return true;
@@ -154,7 +154,7 @@ const UnifiedProblemsView: React.FC<UnifiedProblemsViewProps> = ({ title, varian
                 return false;
               });
 
-              recentData = recentData.filter(problem => {
+              recentData = recentData.filter((problem: Problem) => {
                 if (!uniqueRecentIds.has(problem.id)) {
                   uniqueRecentIds.add(problem.id);
                   return true;
