@@ -14,6 +14,7 @@ interface UnifiedProblemsViewProps {
 
 // Clé de session storage pour mémoriser les données
 const PROBLEMS_CACHE_KEY = 'problemsViewData';
+const PROBLEMS_CONTEXT_CACHE_KEY = 'problemsData'; // Clé utilisée par ProblemsContext
 const CACHE_LIFETIME = 10 * 60 * 1000; // 10 minutes en millisecondes
 
 /**
@@ -78,28 +79,103 @@ const UnifiedProblemsView: React.FC<UnifiedProblemsViewProps> = ({ title, varian
   // Méthode pour charger les données depuis le SessionStorage
   const loadDataFromSessionStorage = (): boolean => {
     try {
+      // Essayer d'abord de charger depuis notre propre cache
       const cachedData = sessionStorage.getItem(PROBLEMS_CACHE_KEY);
-      if (!cachedData) return false;
 
-      const parsedData = JSON.parse(cachedData);
+      // Si les données sont trouvées, vérifier leur validité
+      if (cachedData) {
+        const parsedData = JSON.parse(cachedData);
 
-      // Vérifier si les données sont valides, concernent la même variante et ne sont pas trop anciennes
-      if (
-        parsedData &&
-        parsedData.variant === variant &&
-        Date.now() - parsedData.timestamp < CACHE_LIFETIME
-      ) {
-        console.log(`Utilisation des données en cache pour ${variant} (${new Date(parsedData.timestamp).toLocaleTimeString()})`);
+        // Vérifier si les données sont valides, concernent la même variante et ne sont pas trop anciennes
+        if (
+          parsedData &&
+          parsedData.variant === variant &&
+          Date.now() - parsedData.timestamp < CACHE_LIFETIME
+        ) {
+          console.log(`Utilisation des données en cache sessionStorage pour ${variant} (${new Date(parsedData.timestamp).toLocaleTimeString()})`);
 
-        // Restaurer les données et la période
-        setCachedActiveProblems(parsedData.active || []);
-        setCachedProblemsLast72h(parsedData.recent || []);
-        if (parsedData.timeframe) {
-          setSelectedTimeframe(parsedData.timeframe);
+          // Restaurer les données et la période
+          setCachedActiveProblems(parsedData.active || []);
+          setCachedProblemsLast72h(parsedData.recent || []);
+          if (parsedData.timeframe) {
+            setSelectedTimeframe(parsedData.timeframe);
+          }
+
+          setLastRefreshTime(new Date(parsedData.timestamp));
+          return true;
         }
+      }
 
-        setLastRefreshTime(new Date(parsedData.timestamp));
-        return true;
+      // Si aucune donnée n'est trouvée dans notre cache ou si elles ne sont pas valides,
+      // essayer de charger depuis le cache du ProblemsContext
+      const contextCache = localStorage.getItem(PROBLEMS_CONTEXT_CACHE_KEY);
+      if (contextCache) {
+        try {
+          const parsedContextData = JSON.parse(contextCache);
+
+          // Vérifier si les données du contexte sont récentes
+          if (parsedContextData && parsedContextData.timestamp &&
+              Date.now() - parsedContextData.timestamp < CACHE_LIFETIME) {
+
+            console.log(`Utilisation des données du cache ProblemsContext pour ${variant}`);
+
+            // Déterminer les données appropriées selon le variant
+            let activeData = [];
+            let recentData = [];
+
+            if (variant === 'all') {
+              // Pour le variant 'all', prendre toutes les données
+              activeData = [
+                ...(parsedContextData.vfgProblems || []),
+                ...(parsedContextData.vfeProblems || [])
+              ];
+              recentData = [
+                ...(parsedContextData.vfgProblems72h || []),
+                ...(parsedContextData.vfeProblems72h || [])
+              ];
+            } else if (variant === 'vfg') {
+              activeData = parsedContextData.vfgProblems || [];
+              recentData = parsedContextData.vfgProblems72h || [];
+            } else if (variant === 'vfe') {
+              activeData = parsedContextData.vfeProblems || [];
+              recentData = parsedContextData.vfeProblems72h || [];
+            }
+
+            // Dédupliquer les données si nécessaire (pour variant 'all')
+            if (variant === 'all') {
+              const uniqueActiveIds = new Set();
+              const uniqueRecentIds = new Set();
+
+              activeData = activeData.filter(problem => {
+                if (!uniqueActiveIds.has(problem.id)) {
+                  uniqueActiveIds.add(problem.id);
+                  return true;
+                }
+                return false;
+              });
+
+              recentData = recentData.filter(problem => {
+                if (!uniqueRecentIds.has(problem.id)) {
+                  uniqueRecentIds.add(problem.id);
+                  return true;
+                }
+                return false;
+              });
+            }
+
+            // Mettre à jour nos états avec les données du contexte
+            setCachedActiveProblems(activeData);
+            setCachedProblemsLast72h(recentData);
+            setLastRefreshTime(new Date(parsedContextData.timestamp));
+
+            // Sauvegarder ces données dans notre propre cache pour une utilisation future
+            saveDataToSessionStorage(activeData, recentData);
+
+            return true;
+          }
+        } catch (e) {
+          console.error('Erreur lors du parsing du cache ProblemsContext:', e);
+        }
       }
 
       return false;
@@ -158,21 +234,46 @@ const UnifiedProblemsView: React.FC<UnifiedProblemsViewProps> = ({ title, varian
 
   // Effet pour charger les données depuis le cache ou les récupérer au premier chargement
   useEffect(() => {
+    // Récupérer les préférences sauvegardées (onglet actif et période)
+    const lastTab = sessionStorage.getItem('lastActiveTab') as 'active' | 'recent' | null;
+    const lastTimeframe = sessionStorage.getItem('lastTimeframe');
+
+    if (lastTab) {
+      setActiveTab(lastTab);
+    }
+
+    if (lastTimeframe) {
+      setSelectedTimeframe(lastTimeframe);
+    }
+
     // Si les données ont déjà été chargées, ne pas recharger
     if (dataHasBeenLoadedRef.current) {
       return;
     }
 
+    // Vérifier si on navigue depuis une autre page avec un cache récent
+    const lastNavTime = sessionStorage.getItem('lastNavigation');
+    const isRecentNavigation = lastNavTime && (Date.now() - parseInt(lastNavTime)) < 5000; // 5 secondes
+
+    if (isRecentNavigation) {
+      console.log('Navigation récente détectée, utilisation prioritaire du cache');
+    }
+
     // Essayer de charger les données depuis le cache
     const cacheLoaded = loadDataFromSessionStorage();
 
-    // Si le cache n'est pas disponible ou expiré, charger les données
-    if (!cacheLoaded) {
+    // Si le cache n'est pas disponible ou expiré et qu'on n'est pas dans une navigation récente, charger les données
+    if (!cacheLoaded && !isRecentNavigation) {
       console.log(`Pas de cache valide pour ${variant}, chargement des données`);
       handleRefresh();
     } else {
       // Marquer les données comme chargées même si depuis le cache
       dataHasBeenLoadedRef.current = true;
+
+      // Si navigation récente, retirer le marqueur
+      if (isRecentNavigation) {
+        sessionStorage.removeItem('lastNavigation');
+      }
     }
   }, [variant]); // Dépendance seulement au variant
 
@@ -212,8 +313,23 @@ const UnifiedProblemsView: React.FC<UnifiedProblemsViewProps> = ({ title, varian
 
   // Retour au tableau de bord
   const handleBackClick = () => {
-    // Signaler la navigation depuis un cache valide pour éviter le rechargement automatique
-    if (dataHasBeenLoadedRef.current) {
+    // Forcer la sauvegarde des données avant la navigation
+    if (cachedActiveProblems && cachedActiveProblems.length > 0 &&
+        cachedProblemsLast72h && cachedProblemsLast72h.length > 0) {
+      // Sauvegarder d'abord les données dans notre cache
+      saveDataToSessionStorage(cachedActiveProblems, cachedProblemsLast72h);
+
+      // Signaler globalement la navigation entre les pages avec cache valide
+      sessionStorage.setItem('navigationFromCache', 'true');
+      sessionStorage.setItem('lastActiveTab', activeTab);
+      sessionStorage.setItem('lastTimeframe', selectedTimeframe);
+
+      // Stocker l'horodatage de navigation pour vérifier la fraîcheur des données
+      sessionStorage.setItem('lastNavigation', Date.now().toString());
+
+      console.log('Données sauvegardées avant navigation');
+    } else if (dataHasBeenLoadedRef.current) {
+      // Méthode de secours si les données ne sont pas complètes
       sessionStorage.setItem('navigationFromCache', 'true');
     }
 

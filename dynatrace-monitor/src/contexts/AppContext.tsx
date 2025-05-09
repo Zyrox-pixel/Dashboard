@@ -997,8 +997,16 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
       // Vérifier si on est sur la page de problèmes unifiés (qui a son propre cache)
       const isUnifiedProblemsPage = window.location.pathname.includes('/problems/unified');
 
-      // Si on est sur la page d'aperçu ou la page de problèmes unifiés, ne pas continuer avec le rafraîchissement auto
-      if (isOverviewPage || isUnifiedProblemsPage) {
+      // Vérifier si on vient de naviguer depuis une page avec cache
+      const hasNavigatedFromCache = !!sessionStorage.getItem('navigationFromCache');
+
+      // Si on est sur la page d'aperçu, la page de problèmes unifiés, ou qu'on a navigué depuis un cache, ne pas continuer
+      if (isOverviewPage || isUnifiedProblemsPage || hasNavigatedFromCache) {
+        // Si on a navigué depuis un cache, nettoyer le marqueur pour les futures navigations
+        if (hasNavigatedFromCache) {
+          console.log('Navigation depuis un cache détectée, rafraîchissement auto évité');
+          sessionStorage.removeItem('navigationFromCache');
+        }
         return;
       }
 
