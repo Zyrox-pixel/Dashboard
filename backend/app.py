@@ -229,14 +229,6 @@ def get_problems_72h():
         # Ne plus forcer le mode debug maintenant que le problème est résolu
         # debug_mode = True
         
-        # Logs détaillés pour debug
-        logger.info("="*50)
-        logger.info("DIAGNOSTIC: Appel endpoint /api/problems-72h")
-        logger.info(f"Paramètres: dashboard_type={dashboard_type}, zone_filter={zone_filter}")
-        logger.info(f"Variables d'environnement: DT_ENV_URL={DT_ENV_URL}")
-        logger.info(f"Token API: {'présent' if API_TOKEN else 'MANQUANT!'} (longueur: {len(API_TOKEN) if API_TOKEN else 0})")
-        logger.info(f"VFG_MZ_LIST: {os.environ.get('VFG_MZ_LIST', 'NON DÉFINI!')}")
-        logger.info("="*50)
         
         # Créer une clé de cache unique pour cette requête qui inclut la période
         specific_cache_key = f"problems-72h:{dashboard_type}:{zone_filter}:{timeframe}"

@@ -72,7 +72,6 @@ const UnifiedProblemsView: React.FC<UnifiedProblemsViewProps> = ({ title, varian
       await refreshData(dashboardType as 'vfg' | 'vfe' | undefined, activeTab === 'active', selectedTimeframe);
       setLastRefreshTime(new Date());
     } catch (error) {
-      console.error('Erreur lors du rafraîchissement des données:', error);
     } finally {
       setTimeout(() => {
         setIsRefreshing(false);

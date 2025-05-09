@@ -64,7 +64,6 @@ const AllProblemsView: React.FC = () => {
       
       // Si aucune propriété attendue n'est trouvée mais que c'est un objet non vide
       if (Object.keys(responseData).length > 0) {
-        console.log('Tentative de transformation de l\'objet en tableau');
         return [responseData];
       }
     }
@@ -92,7 +91,6 @@ const AllProblemsView: React.FC = () => {
   const loadProblems = async () => {
     // Éviter les requêtes simultanées
     if (requestInProgress.current) {
-      console.log('Une requête est déjà en cours, annulation...');
       return;
     }
 
@@ -115,10 +113,7 @@ const AllProblemsView: React.FC = () => {
     };
     
     try {
-      console.log('Chargement de tous les problèmes (VFG et VFE)...');
-      
       // Récupération des problèmes VFG avec gestion individuelle des erreurs
-      console.log("Récupération des problèmes VFG...");
       
       // Problèmes actifs VFG
       const vfgActiveResponse = await safeRequest(
@@ -143,10 +138,7 @@ const AllProblemsView: React.FC = () => {
         "Erreur lors de la récupération des problèmes récents VFG:"
       );
       
-      console.log("Traitement des problèmes VFG terminé.");
-      
       // Récupération des problèmes VFE
-      console.log("Récupération des problèmes VFE...");
       
       // Problèmes actifs VFE
       const vfeActiveResponse = await safeRequest(
@@ -171,7 +163,6 @@ const AllProblemsView: React.FC = () => {
         "Erreur lors de la récupération des problèmes récents VFE:"
       );
       
-      console.log("Traitement des problèmes VFE terminé.");
       
       // Fonction pour dédupliquer les problèmes par ID
       const dedupProblems = (problems: any[]): any[] => {
@@ -198,26 +189,14 @@ const AllProblemsView: React.FC = () => {
       const vfgRecentProblems = extractData(vfgRecentResponse.data);
       const vfeRecentProblems = extractData(vfeRecentResponse.data);
       
-      // Afficher des informations sur le nombre de problèmes récupérés
-      console.log(`Problèmes récupérés - VFG: ${vfgActiveProblems.length} actifs, ${vfgRecentProblems.length} récents`);
-      console.log(`Problèmes récupérés - VFE: ${vfeActiveProblems.length} actifs, ${vfeRecentProblems.length} récents`);
-      
       // Combiner et dédupliquer
       const combinedActiveProblems = dedupProblems([...vfgActiveProblems, ...vfeActiveProblems]);
       const combinedRecentProblems = dedupProblems([...vfgRecentProblems, ...vfeRecentProblems]);
-      
-      console.log(`Avant déduplication: ${vfgActiveProblems.length + vfeActiveProblems.length} problèmes actifs, ${vfgRecentProblems.length + vfeRecentProblems.length} problèmes récents`);
-      console.log(`Après déduplication: ${combinedActiveProblems.length} problèmes actifs, ${combinedRecentProblems.length} problèmes récents`);
-      
-      // Utiliser directement les problèmes combinés et dédupliqués
-      console.log(`Combinaison terminée: ${combinedActiveProblems.length} problèmes actifs, ${combinedRecentProblems.length} problèmes récents`);
       
       // Transformer les données
       const formattedActiveProblems = formatProblems(combinedActiveProblems, false);
       const formattedRecentProblems = formatProblems(combinedRecentProblems, true);
       
-      console.log('Problèmes actifs formatés:', formattedActiveProblems.length);
-      console.log('Problèmes récents formatés:', formattedRecentProblems.length);
       
       // Mettre à jour les états
       setActiveProblems(formattedActiveProblems);
@@ -243,17 +222,6 @@ const AllProblemsView: React.FC = () => {
       return [];
     }
     
-    console.log(`Formatage de ${problems.length} problèmes${is72h ? ' (72h)' : ''}`);
-    
-    // Afficher un exemple de problème pour le debug (seulement en mode développement)
-    if (problems.length > 0 && process.env.NODE_ENV === 'development') {
-      const sampleProblem = problems[0];
-      // Utiliser juste le logging sans formater pour éviter les erreurs TypeScript
-      console.log(`Exemple de problème (premières propriétés):`, 
-                 'id:', sampleProblem.id,
-                 'title:', sampleProblem.title,
-                 'status:', sampleProblem.status);
-    }
     
     return problems.map((problem) => {
       // Extraire le nom de l'hôte à partir des entités impactées (priorité)
@@ -393,12 +361,9 @@ const AllProblemsView: React.FC = () => {
     
     // Configurer un intervalle de rafraîchissement toutes les 5 minutes
     const intervalId = setInterval(() => {
-      console.log('Rafraîchissement automatique des problèmes...');
       // Vérifier si une requête est déjà en cours
       if (!requestInProgress.current) {
         loadProblems();
-      } else {
-        console.log('Rafraîchissement automatique ignoré, une requête est déjà en cours');
       }
     }, 300000); // 5 minutes
     
@@ -413,12 +378,10 @@ const AllProblemsView: React.FC = () => {
   // Écouter les événements réseau pour arrêter les timers si l'utilisateur est hors-ligne
   useEffect(() => {
     const handleOffline = () => {
-      console.log('Utilisateur hors-ligne, suspension des requêtes automatiques');
       setError('Connexion réseau perdue. Les données ne seront pas rafraîchies automatiquement.');
     };
-    
+
     const handleOnline = () => {
-      console.log('Utilisateur en ligne, reprise des requêtes');
       setError(null);
       // Rafraîchir immédiatement les données
       loadProblems();
