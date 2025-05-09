@@ -324,7 +324,7 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
             <br/>Cette opération peut prendre quelques instants...
           </p>
         </div>
-      </Layout>
+      </ModernLayout>
     );
   }
   
@@ -464,7 +464,7 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
           />
         </>
       )}
-    </Layout>
+    </ModernLayout>
   );
 };
 
