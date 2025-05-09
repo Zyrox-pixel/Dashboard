@@ -45,11 +45,11 @@ const Sidebar: React.FC = () => {
         </div>
         <ul>
           <li>
-            <Link to="/" className={`flex items-center gap-3 py-3 ${
+            <Link to="/overview" className={`flex items-center gap-3 py-3 ${
               sidebarCollapsed ? 'px-0 justify-center' : 'px-5'
             } ${
-              isDarkTheme 
-                ? 'text-slate-400 hover:bg-slate-700 hover:text-white' 
+              isDarkTheme
+                ? 'text-slate-400 hover:bg-slate-700 hover:text-white'
                 : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
             }`}>
               <Home size={20} className="flex-shrink-0" />

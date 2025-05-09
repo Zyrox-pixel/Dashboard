@@ -5,6 +5,7 @@ import UnifiedDashboard from './pages/UnifiedDashboard';
 import ActiveProblemsPage from './pages/ActiveProblemsPage';
 import RecentProblemsPage from './pages/RecentProblemsPage';
 import UnifiedProblemsPage from './pages/UnifiedProblemsPage';
+import OverviewPage from './pages/OverviewPage';
 import { AppProvider } from './contexts/AppContext';
 
 function App() {
@@ -13,30 +14,33 @@ function App() {
       <AppProvider>
         <Router>
           <Routes>
-            {/* Route par défaut - Redirige vers VFG */}
-            <Route path="/" element={<Navigate to="/dashboard/vfg" replace />} />
-            
+            {/* Route par défaut - Redirige vers la page d'aperçu */}
+            <Route path="/" element={<Navigate to="/overview" replace />} />
+
+            {/* Nouvelle route pour la page d'aperçu consolidée */}
+            <Route path="/overview" element={<OverviewPage />} />
+
             {/* Routes vers le tableau de bord unifié */}
             <Route path="/dashboard/:type" element={<UnifiedDashboard />} />
             <Route path="/dashboard/:type/:optimized" element={<UnifiedDashboard />} />
-            
+
             {/* Nouvelles routes pour les pages de problèmes */}
             <Route path="/problems/active" element={<ActiveProblemsPage />} />
             <Route path="/problems/recent" element={<RecentProblemsPage />} />
             <Route path="/problems/unified" element={<UnifiedProblemsPage />} />
-            
+
             {/* Routes de compatibilité avec l'ancienne structure */}
             <Route path="/vfg" element={<Navigate to="/dashboard/vfg" replace />} />
             <Route path="/vfe" element={<Navigate to="/dashboard/vfe" replace />} />
             <Route path="/optimized" element={<Navigate to="/dashboard/vfg/true" replace />} />
             <Route path="/vfg-optimized" element={<Navigate to="/dashboard/vfg/true" replace />} />
             <Route path="/vfe-optimized" element={<Navigate to="/dashboard/vfe/true" replace />} />
-            
+
             {/* Routes supplémentaires pour la compatibilité */}
             <Route path="/problems" element={<Navigate to="/problems/unified" replace />} />
             <Route path="/hosts" element={<Navigate to="/dashboard/vfg" replace />} />
             <Route path="/services" element={<Navigate to="/dashboard/vfg" replace />} />
-            
+
             {/* Redirection des routes non trouvées vers la page d'accueil */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
