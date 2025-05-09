@@ -29,7 +29,18 @@ const OverviewDashboard: React.FC = () => {
     const loadInitialData = async () => {
       // Charger les données pour VFG et VFE uniquement si pas déjà chargées
       if (!initialLoadDoneRef.current) {
-        await refreshData();
+        console.log("Chargement initial des données pour la Vue d'ensemble");
+
+        // Charger d'abord les données VFG
+        await refreshData('vfg', false);
+
+        // Puis charger les données VFE
+        // Utiliser setTimeout pour permettre à React de mettre à jour l'état entre les deux chargements
+        setTimeout(async () => {
+          await refreshData('vfe', false);
+          setLastRefreshTime(new Date());
+        }, 100);
+
         setLastRefreshTime(new Date());
         initialLoadDoneRef.current = true;
       }
@@ -38,9 +49,16 @@ const OverviewDashboard: React.FC = () => {
     loadInitialData();
   }, [refreshData]);
 
-  // Fonction de rafraîchissement manuel
+  // Fonction de rafraîchissement manuel qui charge à la fois VFG et VFE
   const handleRefresh = async () => {
-    await refreshData();
+    console.log("Rafraîchissement manuel des données pour la Vue d'ensemble");
+
+    // Charger d'abord les données VFG
+    await refreshData('vfg', false);
+
+    // Puis charger les données VFE
+    await refreshData('vfe', false);
+
     setLastRefreshTime(new Date());
   };
 
