@@ -423,23 +423,41 @@ const ModernHeader: React.FC<ModernHeaderProps> = ({
                   
                   {/* Menu options */}
                   <div className="space-y-1 pt-1">
-                    <a href="#" className="flex items-center gap-2 px-3 py-2 text-sm text-indigo-300 hover:bg-indigo-800/30 rounded-lg transition-colors duration-200">
+                    <button
+                      className="flex items-center gap-2 px-3 py-2 text-sm text-indigo-300 hover:bg-indigo-800/30 rounded-lg transition-colors duration-200 w-full text-left"
+                      onClick={() => {
+                        playButtonSound();
+                        // Handle settings click
+                      }}
+                    >
                       <Settings size={14} className="text-indigo-400" />
                       <span>Paramètres</span>
-                    </a>
-                    <a href="#" className="flex items-center gap-2 px-3 py-2 text-sm text-indigo-300 hover:bg-indigo-800/30 rounded-lg transition-colors duration-200">
+                    </button>
+                    <button
+                      className="flex items-center gap-2 px-3 py-2 text-sm text-indigo-300 hover:bg-indigo-800/30 rounded-lg transition-colors duration-200 w-full text-left"
+                      onClick={() => {
+                        playButtonSound();
+                        // Handle language selection
+                      }}
+                    >
                       <Globe size={14} className="text-indigo-400" />
                       <span>Langue</span>
                       <span className="ml-auto text-xs px-1.5 py-0.5 rounded bg-indigo-900/70 text-indigo-300">FR</span>
-                    </a>
-                    <a href="#" className="flex items-center gap-2 px-3 py-2 text-sm text-red-400 hover:bg-red-900/20 rounded-lg transition-colors duration-200 mt-2 border-t border-indigo-900/30 pt-2">
+                    </button>
+                    <button
+                      className="flex items-center gap-2 px-3 py-2 text-sm text-red-400 hover:bg-red-900/20 rounded-lg transition-colors duration-200 mt-2 border-t border-indigo-900/30 pt-2 w-full text-left"
+                      onClick={() => {
+                        playButtonSound();
+                        // Handle logout
+                      }}
+                    >
                       <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
                         <polyline points="16 17 21 12 16 7"></polyline>
                         <line x1="21" y1="12" x2="9" y2="12"></line>
                       </svg>
                       <span>Déconnexion</span>
-                    </a>
+                    </button>
                   </div>
                 </div>
               </div>
