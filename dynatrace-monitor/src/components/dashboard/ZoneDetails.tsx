@@ -7,7 +7,13 @@ import ProblemsList from './ProblemsList';
 import PaginatedTable, { Column } from '../common/PaginatedTable';
 import AdvancedFilter, { FilterCategory, FilterValue, FilterItem } from '../common/AdvancedFilter';
 import FilterBadges, { FilterBadge } from '../common/FilterBadges';
-import { exportProblemsToCSV, downloadCSV } from '../../utils/exportUtils';
+import {
+  exportProblemsToCSV,
+  exportHostsToCSV,
+  exportServicesToCSV,
+  exportProcessGroupsToCSV,
+  downloadCSV
+} from '../../utils/exportUtils';
 
 interface ZoneDetailsProps {
   zone: ManagementZone;
