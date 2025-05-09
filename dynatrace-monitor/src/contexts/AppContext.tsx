@@ -53,7 +53,7 @@ export interface AppActionsType {
   setSelectedZone: (zoneId: string | null) => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
   setActiveTab: (tab: string) => void;
-  refreshData: (dashboardType?: 'vfg' | 'vfe', refreshProblemsOnly?: boolean) => Promise<void>;
+  refreshData: (dashboardType?: 'vfg' | 'vfe', refreshProblemsOnly?: boolean, timeframe?: string) => Promise<void>;
   loadZoneData?: (zoneId: string) => Promise<void>;
 }
 
@@ -417,7 +417,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
   }, [state.vitalForGroupMZs, state.vitalForEntrepriseMZs, apiClient, optimized, getProcessIcon]);
 
   // Fonction pour charger toutes les données
-  const loadAllData = useCallback(async (dashboardType?: 'vfg' | 'vfe', refreshProblemsOnly?: boolean, silentMode: boolean = false) => {
+  const loadAllData = useCallback(async (dashboardType?: 'vfg' | 'vfe', refreshProblemsOnly?: boolean, silentMode: boolean = false, timeframe?: string) => {
     // Modification de la fonction pour utiliser async/await avec Promise.all
     console.log(`Loading all data for dashboard type: ${dashboardType || 'none'} ${refreshProblemsOnly ? '(problèmes uniquement)' : ''} ${silentMode ? '(mode silencieux)' : ''}`);
     const startTime = performance.now();
@@ -473,7 +473,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
       if (refreshProblemsOnly) {
         const responses = await Promise.all([
           apiClient.getProblems("OPEN", "-60d", dashboardType, true),  // Force le rafraîchissement pour les problèmes actifs sur 60 jours
-          apiClient.getProblems72h(dashboardType, undefined, true)   // Utilise le nouvel endpoint dédié pour les problèmes 72h
+          apiClient.getProblems72h(dashboardType, undefined, true, timeframe)   // Utilise le nouvel endpoint dédié pour les problèmes avec la période spécifiée
         ]);
         problemsResponse = responses[0] as ApiResponse<ProblemResponse[]>;
         problemsLast72hResponse = responses[1] as ApiResponse<ProblemResponse[]>;
@@ -485,7 +485,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
           apiClient.getVitalForGroupMZs(),
           apiClient.getVitalForEntrepriseMZs(),
           apiClient.getProblems("OPEN", "-60d", dashboardType, true),  // Force le rafraîchissement pour les problèmes actifs sur 60 jours
-          apiClient.getProblems72h(dashboardType, undefined, true)   // Utilise le nouvel endpoint dédié pour les problèmes 72h
+          apiClient.getProblems72h(dashboardType, undefined, true, timeframe)   // Utilise le nouvel endpoint dédié pour les problèmes avec la période spécifiée
         ]);
         summaryResponse = responses[0] as ApiResponse<SummaryData>;
         vfgResponse = responses[1] as ApiResponse<VitalForGroupMZsResponse>;
@@ -827,24 +827,27 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
   // Identifiant du dernier timeout pour éviter les collisions
   const refreshTimeoutIdRef = useRef<number | null>(null);
 
-  // Fonction pour rafraîchir les données - version non bloquante améliorée
-  const refreshData = useCallback(async (dashboardType?: 'vfg' | 'vfe', refreshProblemsOnly?: boolean): Promise<void> => {
+  // Fonction pour rafraîchir les données - version non bloquante améliorée avec prise en charge de la période
+  const refreshData = useCallback(async (dashboardType?: 'vfg' | 'vfe', refreshProblemsOnly?: boolean, timeframe?: string): Promise<void> => {
     // Éviter les appels multiples simultanés
     if (refreshInProgressRef.current) {
       console.log("Un rafraîchissement est déjà en cours, nouvelle demande ignorée");
       return;
     }
-    
+
     // Annuler tout timeout précédent pour éviter les collisions
     if (refreshTimeoutIdRef.current !== null) {
       clearTimeout(refreshTimeoutIdRef.current);
       refreshTimeoutIdRef.current = null;
     }
-    
+
     // Marquer le début du rafraîchissement
     refreshInProgressRef.current = true;
-    
-    console.log(`Refreshing data for dashboard type: ${dashboardType || 'none'} ${refreshProblemsOnly ? '(problèmes uniquement)' : ''}`);
+
+    // Utiliser 72h comme période par défaut si non spécifiée
+    const effectiveTimeframe = timeframe || "-72h";
+
+    console.log(`Refreshing data for dashboard type: ${dashboardType || 'none'} ${refreshProblemsOnly ? '(problèmes uniquement)' : ''} with timeframe: ${effectiveTimeframe}`);
     setState(prev => ({ ...prev, error: null }));
     
     // Définir un timeout maximum pour éviter que le drapeau reste bloqué
@@ -875,7 +878,7 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
         await new Promise<void>((resolve, reject) => {
           const asyncTimeoutId = window.setTimeout(async () => {
             try {
-              await loadAllData(dashboardType, true);
+              await loadAllData(dashboardType, true, false, effectiveTimeframe);
               resolve();
             } catch (error) {
               console.error("Erreur dans le rafraîchissement asynchrone:", error);
@@ -896,7 +899,7 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
         });
       } else {
         // Dans les autres cas, exécuter normalement
-        await loadAllData(dashboardType, refreshProblemsOnly || false);
+        await loadAllData(dashboardType, refreshProblemsOnly || false, false, effectiveTimeframe);
       }
     } catch (error) {
       console.error("Erreur dans refreshData:", error);

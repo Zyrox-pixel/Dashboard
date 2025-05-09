@@ -215,7 +215,7 @@ def set_management_zone():
 @time_execution
 def get_problems_72h():
     """
-    Endpoint dédié pour récupérer tous les problèmes des 72 dernières heures.
+    Endpoint dédié pour récupérer tous les problèmes pour une période spécifiée (72h par défaut).
     Basé sur l'approche du script Python qui fonctionne correctement,
     avec gestion de la pagination et filtrage précis.
     """
@@ -223,6 +223,7 @@ def get_problems_72h():
         # Récupérer les paramètres de requête
         dashboard_type = request.args.get('type', '')  # Pour identifier VFG ou VFE
         zone_filter = request.args.get('zone', '')  # Pour filtrer par une zone spécifique
+        timeframe = request.args.get('timeframe', 'now-72h')  # Période (72h par défaut)
         debug_mode = request.args.get('debug', 'false').lower() == 'true'
         
         # Ne plus forcer le mode debug maintenant que le problème est résolu
@@ -237,8 +238,8 @@ def get_problems_72h():
         logger.info(f"VFG_MZ_LIST: {os.environ.get('VFG_MZ_LIST', 'NON DÉFINI!')}")
         logger.info("="*50)
         
-        # Créer une clé de cache unique pour cette requête
-        specific_cache_key = f"problems-72h:{dashboard_type}:{zone_filter}"
+        # Créer une clé de cache unique pour cette requête qui inclut la période
+        specific_cache_key = f"problems-72h:{dashboard_type}:{zone_filter}:{timeframe}"
         
         # En mode debug, toujours vider le cache
         if debug_mode:
@@ -265,7 +266,7 @@ def get_problems_72h():
                 # Si un filtre de zone est fourni, l'utiliser au lieu de toutes les zones
                 if zone_filter:
                     logger.info(f"Filtrage par zone spécifique: {zone_filter}")
-                    problems = test_get_problems(management_zone_name=zone_filter, time_from="now-72h", status="OPEN,CLOSED")
+                    problems = test_get_problems(management_zone_name=zone_filter, time_from=timeframe, status="OPEN,CLOSED")
                     logger.info(f"Zone {zone_filter}: {len(problems)} problèmes trouvés sur 72h avec test_get_problems")
                     
                     # Formater chaque problème pour ajouter les informations d'entité impactée
@@ -299,7 +300,7 @@ def get_problems_72h():
                 for mz_name in mz_list:
                     try:
                         logger.info(f"Récupération des problèmes 72h pour MZ: {mz_name} avec test_get_problems")
-                        mz_problems = test_get_problems(management_zone_name=mz_name, time_from="now-72h", status="OPEN,CLOSED")
+                        mz_problems = test_get_problems(management_zone_name=mz_name, time_from=timeframe, status="OPEN,CLOSED")
                         logger.info(f"MZ {mz_name}: {len(mz_problems)} problèmes trouvés sur 72h avec test_get_problems")
                         all_problems.extend(mz_problems)
                     except Exception as mz_error:
@@ -401,7 +402,7 @@ def get_problems_72h():
                 try:
                     # Utiliser le moteur spécifique qui gère la pagination
                     logger.info(f"Appel get_all_problems_with_pagination pour zone: {zone_filter}")
-                    problems = get_all_problems_with_pagination(zone_filter, "now-72h", "OPEN,CLOSED")
+                    problems = get_all_problems_with_pagination(zone_filter, timeframe, "OPEN,CLOSED")
                     logger.info(f"Zone {zone_filter}: {len(problems)} problèmes trouvés sur 72h")
                     
                     # Afficher un exemple de problème s'il y en a
@@ -438,7 +439,7 @@ def get_problems_72h():
                 try:
                     logger.info(f"Récupération des problèmes 72h pour MZ: {mz_name}")
                     # Utiliser la nouvelle fonction qui gère la pagination
-                    mz_problems = get_all_problems_with_pagination(mz_name, "now-72h", "OPEN,CLOSED")
+                    mz_problems = get_all_problems_with_pagination(mz_name, timeframe, "OPEN,CLOSED")
                     logger.info(f"MZ {mz_name}: {len(mz_problems)} problèmes trouvés sur 72h")
                     
                     # Afficher un exemple de problème s'il y en a
@@ -552,7 +553,7 @@ def get_problems_72h():
                 effective_mz = current_mz
                 
             # Utiliser la nouvelle fonction qui gère la pagination
-            problems = get_all_problems_with_pagination(effective_mz, "now-72h", "OPEN,CLOSED")
+            problems = get_all_problems_with_pagination(effective_mz, timeframe, "OPEN,CLOSED")
             
             # En mode debug, afficher les problèmes pour investigation
             if debug_mode:
