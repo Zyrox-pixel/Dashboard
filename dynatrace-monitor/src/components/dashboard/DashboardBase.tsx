@@ -419,9 +419,6 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
               <div className="flex-1">
                 <h3 className="font-semibold text-lg text-white flex items-center gap-2">
                   SURVEILLANCE DES PROBLÈMES
-                  <span className="ml-2 bg-blue-900/40 text-blue-300 rounded-lg px-2 py-0.5 text-xs border border-blue-700/30">
-                    NOUVEAU
-                  </span>
                 </h3>
                 <p className="text-slate-400 mt-1">
                   Vue unifiée des incidents actifs et passés avec analyses détaillées
