@@ -1268,7 +1268,7 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
                   );
                   downloadCSV(csv, filename);
                 }}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium
+                className="flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium ml-2
                   bg-gradient-to-r from-green-600 to-emerald-700 hover:from-green-500 hover:to-emerald-600
                   text-white shadow-md border border-emerald-400/30
                   transition-all duration-200"

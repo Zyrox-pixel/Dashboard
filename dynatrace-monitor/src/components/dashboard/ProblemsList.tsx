@@ -692,11 +692,8 @@ const ProblemsList: React.FC<ProblemsListProps> = ({
             </button>
           </div>
           
-          {/* Contrôles de droite : Bouton d'export CSV personnalisé et bouton de rafraîchissement */}
-          <div className="flex items-center gap-3">
-            {/* Bouton d'export CSV personnalisé s'il est fourni */}
-            {customExportButton}
-
+          {/* Boutons à droite */}
+          <div className="flex items-center justify-end gap-3 flex-grow">
             {/* Bouton de rafraîchissement des problèmes en temps réel */}
             {showRefreshButton && (
               <button
@@ -712,6 +709,9 @@ const ProblemsList: React.FC<ProblemsListProps> = ({
                 <span className="hidden sm:inline">{isRefreshing ? 'Rafraîchissement...' : 'Rafraîchir les données'}</span>
               </button>
             )}
+
+            {/* Bouton d'export CSV personnalisé complètement à droite */}
+            {customExportButton}
           </div>
         </div>
       </div>
