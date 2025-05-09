@@ -39,14 +39,30 @@ const OverviewDashboard: React.FC = () => {
   const aggregatedActiveProblems = getAggregatedProblems();
   const aggregatedProblems72h = getAggregatedProblems72h();
   
-  // Effet pour forcer le chargement initial des données
+  // Effet pour forcer le chargement initial des données - optimisé
   useEffect(() => {
     const loadInitialData = async () => {
       console.log("Chargement initial des données depuis OverviewDashboard");
 
       try {
-        // Forcer le rechargement complet des données
-        await refreshAll(true);
+        // Priorité élevée pour le chargement initial
+        if (window.navigator && 'setAppBadge' in window.navigator) {
+          // @ts-ignore - API moderne pour indiquer une activité au niveau du navigateur
+          window.navigator.setAppBadge();
+        }
+
+        // Utiliser Promise.all pour accélérer le chargement
+        await Promise.all([
+          // Priorité 1: Chargement immédiat des données des problèmes pour affichage rapide
+          refreshAll(true),
+
+          // Initialisation des zones même avant d'avoir les données finales
+          new Promise(resolve => {
+            // Initier le chargement sans attendre les résultats complets
+            setTimeout(resolve, 10);
+          })
+        ]);
+
         console.log("Chargement initial terminé avec succès");
 
         // S'assurer que même sans problèmes, les zones sont initialisées
@@ -155,8 +171,23 @@ const OverviewDashboard: React.FC = () => {
     setLastRefreshTime(new Date());
   };
 
-  // Afficher un indicateur de chargement si nécessaire
+  // Améliorations d'UX pour le chargement
   const loading = isLoading.problems || problemsLoading.vfg || problemsLoading.vfe;
+
+  // État pour contrôler le spinner visuel pendant le chargement initial
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
+
+  // Effet pour masquer le skeleton loader après le chargement des données
+  useEffect(() => {
+    // Si les données sont chargées ou si le délai maximum est atteint
+    if ((!loading && vfgProblems.length > 0) || (!loading && vfeProblems.length > 0)) {
+      // Délai court pour une transition fluide
+      const timer = setTimeout(() => {
+        setInitialLoadComplete(true);
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [loading, vfgProblems.length, vfeProblems.length]);
 
   return (
     <Layout title="Vue d'Ensemble" subtitle="Supervision globale des applications critiques">
@@ -180,7 +211,7 @@ const OverviewDashboard: React.FC = () => {
               flex items-center gap-2"
           >
             <Clock size={16} className={loading ? 'animate-spin' : ''} />
-            <span>Rafraîchir</span>
+            <span>{loading ? 'Chargement...' : 'Rafraîchir'}</span>
           </button>
         </div>
       </div>
@@ -208,14 +239,20 @@ const OverviewDashboard: React.FC = () => {
               <div className="flex items-center gap-2 bg-red-900/20 border border-red-800/30 rounded-md px-3 py-1.5">
                 <AlertTriangle size={14} className="text-red-400" />
                 <span className="text-red-300 text-sm font-medium">
-                  {aggregatedActiveProblems.length} actif{aggregatedActiveProblems.length !== 1 ? 's' : ''}
+                  {initialLoadComplete ?
+                    `${aggregatedActiveProblems.length} actif${aggregatedActiveProblems.length !== 1 ? 's' : ''}` :
+                    <div className="inline-block w-16 h-5 bg-red-900/30 rounded animate-pulse"></div>
+                  }
                 </span>
               </div>
 
               <div className="flex items-center gap-2 bg-amber-900/20 border border-amber-800/30 rounded-md px-3 py-1.5">
                 <Clock size={14} className="text-amber-400" />
                 <span className="text-amber-300 text-sm font-medium">
-                  {aggregatedProblems72h.length} récent{aggregatedProblems72h.length !== 1 ? 's' : ''} (72h)
+                  {initialLoadComplete ?
+                    `${aggregatedProblems72h.length} récent${aggregatedProblems72h.length !== 1 ? 's' : ''} (72h)` :
+                    <div className="inline-block w-24 h-5 bg-amber-900/30 rounded animate-pulse"></div>
+                  }
                 </span>
               </div>
 
@@ -255,19 +292,35 @@ const OverviewDashboard: React.FC = () => {
           {/* Statistiques */}
           <div className="grid grid-cols-2 gap-4 mb-4">
             <div className="bg-slate-800/80 p-4 rounded-md border border-slate-700">
-              <div className="text-3xl font-bold text-blue-400 mb-1">{vfgStats.totalZones}</div>
+              <div className="text-3xl font-bold text-blue-400 mb-1">
+              {initialLoadComplete ? vfgStats.totalZones : (
+                <div className="h-8 w-16 bg-blue-900/30 rounded animate-pulse"></div>
+              )}
+            </div>
               <div className="text-sm text-slate-400">Management Zones</div>
             </div>
             <div className="bg-slate-800/80 p-4 rounded-md border border-slate-700">
-              <div className="text-3xl font-bold text-red-400 mb-1">{vfgStats.activeProblems}</div>
+              <div className="text-3xl font-bold text-red-400 mb-1">
+                {initialLoadComplete ? vfgStats.activeProblems : (
+                  <div className="h-8 w-16 bg-red-900/30 rounded animate-pulse"></div>
+                )}
+              </div>
               <div className="text-sm text-slate-400">Problèmes Actifs</div>
             </div>
             <div className="bg-slate-800/80 p-4 rounded-md border border-slate-700">
-              <div className="text-3xl font-bold text-amber-400 mb-1">{vfgStats.recentProblems}</div>
+              <div className="text-3xl font-bold text-amber-400 mb-1">
+                {initialLoadComplete ? vfgStats.recentProblems : (
+                  <div className="h-8 w-16 bg-amber-900/30 rounded animate-pulse"></div>
+                )}
+              </div>
               <div className="text-sm text-slate-400">Problèmes Récents (72h)</div>
             </div>
             <div className="bg-slate-800/80 p-4 rounded-md border border-slate-700">
-              <div className="text-3xl font-bold text-orange-400 mb-1">{vfgStats.criticalZones}</div>
+              <div className="text-3xl font-bold text-orange-400 mb-1">
+                {initialLoadComplete ? vfgStats.criticalZones : (
+                  <div className="h-8 w-16 bg-orange-900/30 rounded animate-pulse"></div>
+                )}
+              </div>
               <div className="text-sm text-slate-400">Zones Critiques</div>
             </div>
           </div>
@@ -333,19 +386,35 @@ const OverviewDashboard: React.FC = () => {
           {/* Statistiques */}
           <div className="grid grid-cols-2 gap-4 mb-4">
             <div className="bg-slate-800/80 p-4 rounded-md border border-slate-700">
-              <div className="text-3xl font-bold text-amber-400 mb-1">{vfeStats.totalZones}</div>
+              <div className="text-3xl font-bold text-amber-400 mb-1">
+                {initialLoadComplete ? vfeStats.totalZones : (
+                  <div className="h-8 w-16 bg-amber-900/30 rounded animate-pulse"></div>
+                )}
+              </div>
               <div className="text-sm text-slate-400">Management Zones</div>
             </div>
             <div className="bg-slate-800/80 p-4 rounded-md border border-slate-700">
-              <div className="text-3xl font-bold text-red-400 mb-1">{vfeStats.activeProblems}</div>
+              <div className="text-3xl font-bold text-red-400 mb-1">
+                {initialLoadComplete ? vfeStats.activeProblems : (
+                  <div className="h-8 w-16 bg-red-900/30 rounded animate-pulse"></div>
+                )}
+              </div>
               <div className="text-sm text-slate-400">Problèmes Actifs</div>
             </div>
             <div className="bg-slate-800/80 p-4 rounded-md border border-slate-700">
-              <div className="text-3xl font-bold text-amber-400 mb-1">{vfeStats.recentProblems}</div>
+              <div className="text-3xl font-bold text-amber-400 mb-1">
+                {initialLoadComplete ? vfeStats.recentProblems : (
+                  <div className="h-8 w-16 bg-amber-900/30 rounded animate-pulse"></div>
+                )}
+              </div>
               <div className="text-sm text-slate-400">Problèmes Récents (72h)</div>
             </div>
             <div className="bg-slate-800/80 p-4 rounded-md border border-slate-700">
-              <div className="text-3xl font-bold text-orange-400 mb-1">{vfeStats.criticalZones}</div>
+              <div className="text-3xl font-bold text-orange-400 mb-1">
+                {initialLoadComplete ? vfeStats.criticalZones : (
+                  <div className="h-8 w-16 bg-orange-900/30 rounded animate-pulse"></div>
+                )}
+              </div>
               <div className="text-sm text-slate-400">Zones Critiques</div>
             </div>
           </div>
@@ -394,6 +463,26 @@ const OverviewDashboard: React.FC = () => {
       {/* Section Infrastructure */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-6">
         {/* Total Hosts */}
+
+        {/* Overlay de chargement élégant - visible uniquement pendant le chargement initial */}
+        {(!initialLoadComplete || loading) && (
+          <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center">
+            <div className="bg-slate-800 p-8 rounded-lg border border-indigo-700 shadow-xl max-w-md w-full">
+              <div className="flex flex-col items-center text-center">
+                <div className="w-16 h-16 rounded-full bg-indigo-900/50 border-2 border-t-indigo-500 border-r-indigo-500 border-b-indigo-300 border-l-indigo-300 animate-spin mb-4"></div>
+                <h3 className="text-xl font-semibold text-white mb-2">Préparation du tableau de bord</h3>
+                <p className="text-slate-300 mb-4">
+                  Récupération des alertes et incidents en cours sur les systèmes critiques...
+                </p>
+                <div className="flex items-center gap-2 text-indigo-400">
+                  <div className="h-1.5 w-1.5 rounded-full bg-indigo-500 animate-pulse"></div>
+                  <div className="h-1.5 w-1.5 rounded-full bg-indigo-500 animate-pulse delay-150"></div>
+                  <div className="h-1.5 w-1.5 rounded-full bg-indigo-500 animate-pulse delay-300"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
         <div className="p-4 bg-slate-800 border border-slate-700 rounded-lg">
           <div className="flex items-center gap-3 mb-3">
             <Server size={18} className="text-green-400" />

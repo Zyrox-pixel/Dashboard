@@ -85,11 +85,17 @@ export const ProblemsProvider: React.FC<{children: React.ReactNode}> = ({ childr
   
   // Rafraîchir les problèmes VFG
   const refreshVFG = async (force = false) => {
-    // Vérifier si un chargement récent a eu lieu (moins de 15 secondes)
+    // Vérifier si un chargement récent a eu lieu (moins de 10 secondes - optimisé)
     const now = Date.now();
-    if (!force && now - lastFetchTimeRef.current.vfg < 15000) {
+    if (!force && now - lastFetchTimeRef.current.vfg < 10000) {
       console.log("🔵 Utilisation du cache pour VFG (récent)");
       return;
+    }
+
+    // Priorité élevée pour cette requête
+    if ('requestIdleCallback' in window) {
+      // @ts-ignore - optimisation moderne
+      window.cancelIdleCallback = window.cancelIdleCallback || function() {};
     }
     
     setIsLoading(prev => ({ ...prev, vfg: true }));
@@ -131,11 +137,17 @@ export const ProblemsProvider: React.FC<{children: React.ReactNode}> = ({ childr
   
   // Rafraîchir les problèmes VFE
   const refreshVFE = async (force = false) => {
-    // Vérifier si un chargement récent a eu lieu (moins de 15 secondes)
+    // Vérifier si un chargement récent a eu lieu (moins de 10 secondes - optimisé)
     const now = Date.now();
-    if (!force && now - lastFetchTimeRef.current.vfe < 15000) {
+    if (!force && now - lastFetchTimeRef.current.vfe < 10000) {
       console.log("🟠 Utilisation du cache pour VFE (récent)");
       return;
+    }
+
+    // Priorité élevée pour cette requête
+    if ('requestIdleCallback' in window) {
+      // @ts-ignore - optimisation moderne
+      window.cancelIdleCallback = window.cancelIdleCallback || function() {};
     }
     
     setIsLoading(prev => ({ ...prev, vfe: true }));
