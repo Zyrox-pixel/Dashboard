@@ -53,14 +53,23 @@ const ModernHeader: React.FC<ModernHeaderProps> = ({
     setNotifications(activeProblems.length);
   }, [activeProblems]);
   
-  // Effet sonore pour les boutons
+  // Effet sonore pour les boutons - avec gestion silencieuse des erreurs de permission
   const playButtonSound = () => {
     try {
       const audio = new Audio('data:audio/mp3;base64,SUQzAwAAAAAAJlRQRTEAAAAcAAAAU291bmRKYXkuY29tIFNvdW5kIEVmZmVjdHMA//uQxAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAADAAAGhgBVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVWqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqr///////////////////////////////////////////8AAAA8TEFNRTMuMTAwAZYAAAAAAAAAABSAJAJAQgAAgAAAA+alYZQPAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA//uAxAAABGQDe7QQAAI0gCV2lYABwwAVgcABAAAAB4HgZASAYBT8PAIAgfD9D8EAUF+nwNyfoAwPAxJBAkCQNwMBAEAOA9PAsDwOA30+XAgCQJAYDgSBIFAPSQQJAkDcDwdyOxdJGIAQPAcBwSBAD4D8Bfgh/gHAIB+h//6fZwQCvH8B/LhfgQEYuH////qBIRDDLiQZIBQbY8XGPnxsRJgIAFICIGHzhIE5CSkCBX8jAABgdZgO8JpnQALnARrHC5RiwMABgDGCpj/0eZeMfLsOFOsMBfA5YT43RVwsDdKL+MBx+RJxnEoxKCmr5X6qKjkvcPDJuN5gNY3IqBgINMjLAQBJOyVRZZH8fxIy2CwKJCUSDIwlMpJibZWu///7mmSaSlJlT/+6kkaUT///+pgCBISEhIUsBRUFf/+RJRUu7u7vJCZZVlXd3f3kib//u7vklTOv8ZlT/WVZTEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVQ==');
       audio.volume = 0.15;
-      audio.play();
+
+      // Tentative de lecture avec gestion silencieuse des erreurs de permission
+      const playPromise = audio.play();
+
+      if (playPromise !== undefined) {
+        playPromise.catch(error => {
+          // Auto-play was prevented - silently ignore this error
+          // This commonly happens when user hasn't interacted with the document yet
+        });
+      }
     } catch (e) {
-      console.log('Sound effect not supported');
+      // Gestion silencieuse des erreurs - ne pas logger pour éviter de polluer la console
     }
   };
   
