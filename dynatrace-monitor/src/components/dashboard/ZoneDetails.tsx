@@ -1251,35 +1251,34 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
       
       {/* Problèmes actifs pour cette zone */}
       {filteredProblems.length > 0 && (
-        <div>
+        <div className="relative">
+          {/* On modifie ProblemsList pour lui passer une propriété additionnelle pour l'export CSV */}
           <ProblemsList
             problems={filteredProblems}
             title={`Problèmes actifs dans ${zone.name}`}
             zoneFilter={zone.name}
             onRefresh={handleRefreshedProblems}
+            customExportButton={
+              <button
+                onClick={() => {
+                  const { csv, filename } = exportProblemsToCSV(
+                    filteredProblems,
+                    window.location.pathname.includes('vfe') ? 'vfe' : 'vfg',
+                    zone.name
+                  );
+                  downloadCSV(csv, filename);
+                }}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium
+                  bg-gradient-to-r from-green-600 to-emerald-700 hover:from-green-500 hover:to-emerald-600
+                  text-white shadow-md border border-emerald-400/30
+                  transition-all duration-200"
+                title="Télécharger les problèmes au format CSV"
+              >
+                <FileDown size={14} />
+                <span>Télécharger CSV</span>
+              </button>
+            }
           />
-
-          {/* Ajouter un bouton d'export CSV pour la vue détaillée de la zone */}
-          <div className="mt-2 flex justify-end">
-            <button
-              onClick={() => {
-                const { csv, filename } = exportProblemsToCSV(
-                  filteredProblems,
-                  window.location.pathname.includes('vfe') ? 'vfe' : 'vfg',
-                  zone.name
-                );
-                downloadCSV(csv, filename);
-              }}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium
-                bg-gradient-to-r from-green-600 to-emerald-700 hover:from-green-500 hover:to-emerald-600
-                text-white shadow-md border border-emerald-400/30
-                transition-all duration-200"
-              title="Télécharger les problèmes au format CSV"
-            >
-              <FileDown size={14} />
-              <span>Télécharger CSV</span>
-            </button>
-          </div>
         </div>
       )}
       

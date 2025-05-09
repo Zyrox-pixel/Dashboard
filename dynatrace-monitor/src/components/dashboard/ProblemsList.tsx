@@ -15,6 +15,7 @@ interface ProblemsListProps {
   title?: string;
   showRefreshButton?: boolean;
   onRefresh?: (refreshedProblems: Problem[]) => void;
+  customExportButton?: React.ReactNode; // Pour afficher un bouton d'export CSV personnalisé
 }
 
 
@@ -31,12 +32,13 @@ const extractDateFromProblem = (problem: Problem): string => {
 // Définir les options de filtrage par durée
 type DurationFilter = 'all' | 'lessThan15' | 'between15And60' | 'moreThan60';
 
-const ProblemsList: React.FC<ProblemsListProps> = ({ 
-  problems, 
+const ProblemsList: React.FC<ProblemsListProps> = ({
+  problems,
   zoneFilter,
   title = "Problèmes assignés aux Management Zones",
   showRefreshButton = true,
-  onRefresh
+  onRefresh,
+  customExportButton
 }) => {
   const { isLoading } = useApp();
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc'); // plus récent d'abord par défaut
@@ -690,21 +692,27 @@ const ProblemsList: React.FC<ProblemsListProps> = ({
             </button>
           </div>
           
-          {/* Bouton de rafraîchissement des problèmes en temps réel */}
-          {showRefreshButton && (
-            <button 
-              onClick={handleRefreshProblems}
-              disabled={isRefreshing}
-              className="flex items-center gap-2 px-4 py-1.5 rounded-md text-xs font-medium 
-                bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-500 hover:to-indigo-600 
-                text-white shadow-md border border-indigo-400/30
-                disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
-              title="Rafraîchir les problèmes en temps réel"
-            >
-              <RefreshCw size={14} className={`${isRefreshing ? 'animate-spin' : ''}`} />
-              <span className="hidden sm:inline">{isRefreshing ? 'Rafraîchissement...' : 'Rafraîchir les données'}</span>
-            </button>
-          )}
+          {/* Contrôles de droite : Bouton d'export CSV personnalisé et bouton de rafraîchissement */}
+          <div className="flex items-center gap-3">
+            {/* Bouton d'export CSV personnalisé s'il est fourni */}
+            {customExportButton}
+
+            {/* Bouton de rafraîchissement des problèmes en temps réel */}
+            {showRefreshButton && (
+              <button
+                onClick={handleRefreshProblems}
+                disabled={isRefreshing}
+                className="flex items-center gap-2 px-4 py-1.5 rounded-md text-xs font-medium
+                  bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-500 hover:to-indigo-600
+                  text-white shadow-md border border-indigo-400/30
+                  disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                title="Rafraîchir les problèmes en temps réel"
+              >
+                <RefreshCw size={14} className={`${isRefreshing ? 'animate-spin' : ''}`} />
+                <span className="hidden sm:inline">{isRefreshing ? 'Rafraîchissement...' : 'Rafraîchir les données'}</span>
+              </button>
+            )}
+          </div>
         </div>
       </div>
       
