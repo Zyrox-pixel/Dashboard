@@ -829,6 +829,14 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
       refreshTimeoutIdRef.current = null;
     }
 
+    // Vérifier si l'utilisateur navigue depuis un cache existant
+    const isNavigatingFromCache = sessionStorage.getItem('navigationFromCache') === 'true';
+    if (isNavigatingFromCache && !refreshProblemsOnly) {
+      console.log("Navigation depuis un cache existant, pas de rechargement automatique");
+      sessionStorage.removeItem('navigationFromCache');
+      return;
+    }
+
     // Marquer le début du rafraîchissement
     refreshInProgressRef.current = true;
 
@@ -836,29 +844,54 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
     const effectiveTimeframe = timeframe || "-72h";
 
     setState(prev => ({ ...prev, error: null }));
-    
+
     // Définir un timeout maximum pour éviter que le drapeau reste bloqué
     const timeoutId = window.setTimeout(() => {
       refreshInProgressRef.current = false;
       refreshTimeoutIdRef.current = null;
     }, 60000); // 60 secondes maximum
-    
+
     refreshTimeoutIdRef.current = timeoutId;
-    
+
     // Gérer les erreurs dans la fonction
     try {
+      // Vérifier s'il existe des données en cache pour la page de problèmes unifié
+      if (window.location.pathname.includes('/problems/unified') && !refreshProblemsOnly) {
+        // Essayer de lire le cache des problèmes
+        const cachedData = sessionStorage.getItem('problemsViewData');
+        if (cachedData) {
+          try {
+            const parsedData = JSON.parse(cachedData);
+            // Vérifier si les données sont encore valides (moins de 10 minutes)
+            if (parsedData && parsedData.timestamp && (Date.now() - parsedData.timestamp < 10 * 60 * 1000)) {
+              console.log("Utilisation des données en cache pour problems/unified");
+
+              // Si on a déjà des données en cache valides, ne pas recharger
+              refreshInProgressRef.current = false;
+              if (refreshTimeoutIdRef.current === timeoutId) {
+                clearTimeout(timeoutId);
+                refreshTimeoutIdRef.current = null;
+              }
+              return;
+            }
+          } catch (e) {
+            console.error("Erreur lors du parsing des données en cache:", e);
+          }
+        }
+      }
+
       // Exécuter loadAllData de manière non bloquante si on est dans un contexte de zone détaillée
       if (refreshProblemsOnly && state.selectedZone) {
-        
+
         // Mettre à jour l'état pour indiquer le chargement des problèmes
-        setState(prev => ({ 
-          ...prev, 
-          isLoading: { 
-            ...prev.isLoading, 
+        setState(prev => ({
+          ...prev,
+          isLoading: {
+            ...prev.isLoading,
             problems: true
           }
         }));
-        
+
         // Exécuter loadAllData avec un timeout court pour s'assurer que l'UI reste réactive
         await new Promise<void>((resolve, reject) => {
           const asyncTimeoutId = window.setTimeout(async () => {
@@ -869,16 +902,16 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
               // Async refresh error handled in reject
               reject(error);
             } finally {
-              setState(prev => ({ 
-                ...prev, 
-                isLoading: { 
-                  ...prev.isLoading, 
+              setState(prev => ({
+                ...prev,
+                isLoading: {
+                  ...prev.isLoading,
                   problems: false
                 }
               }));
             }
           }, 100); // Légèrement plus long pour éviter les problèmes de délai
-          
+
           // Nettoyer le timeout en cas d'annulation
           return () => clearTimeout(asyncTimeoutId);
         });
@@ -888,10 +921,10 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
       }
     } catch (error) {
       // Error in refreshData handled by updating state
-      setState(prev => ({ 
-        ...prev, 
-        isLoading: { 
-          ...prev.isLoading, 
+      setState(prev => ({
+        ...prev,
+        isLoading: {
+          ...prev.isLoading,
           problems: false
         },
         error: "Erreur lors du rafraîchissement des données"
@@ -961,8 +994,11 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
       // Vérifier si on est sur la page d'aperçu pour éviter les rafraîchissements automatiques
       const isOverviewPage = window.location.pathname === '/' || window.location.pathname === '/overview';
 
-      // Si on est sur la page d'aperçu, ne pas continuer avec le rafraîchissement auto
-      if (isOverviewPage) {
+      // Vérifier si on est sur la page de problèmes unifiés (qui a son propre cache)
+      const isUnifiedProblemsPage = window.location.pathname.includes('/problems/unified');
+
+      // Si on est sur la page d'aperçu ou la page de problèmes unifiés, ne pas continuer avec le rafraîchissement auto
+      if (isOverviewPage || isUnifiedProblemsPage) {
         return;
       }
 

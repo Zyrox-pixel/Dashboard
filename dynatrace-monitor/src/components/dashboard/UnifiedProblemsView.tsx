@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, Clock, RefreshCw, Filter, CalendarRange, Shield, BarChart, Calendar } from 'lucide-react';
 import ProblemsList from './ProblemsList';
@@ -12,6 +12,10 @@ interface UnifiedProblemsViewProps {
   variant: 'vfg' | 'vfe' | 'all';
 }
 
+// Clé de session storage pour mémoriser les données
+const PROBLEMS_CACHE_KEY = 'problemsViewData';
+const CACHE_LIFETIME = 10 * 60 * 1000; // 10 minutes en millisecondes
+
 /**
  * Composant de vue unifiée des problèmes combinant problèmes actifs et récents (72h)
  * dans une interface à onglets moderne et interactive
@@ -19,7 +23,11 @@ interface UnifiedProblemsViewProps {
 const UnifiedProblemsView: React.FC<UnifiedProblemsViewProps> = ({ title, variant }) => {
   const navigate = useNavigate();
   const { activeProblems, problemsLast72h, isLoading, refreshData } = useApp();
-  
+
+  // Référence pour éviter de déclencher un rechargement non nécessaire
+  const initialLoadCompletedRef = useRef<boolean>(false);
+  const dataHasBeenLoadedRef = useRef<boolean>(false);
+
   // État local pour l'onglet actif (actifs ou récents)
   const [activeTab, setActiveTab] = useState<'active' | 'recent'>('active');
 
@@ -39,16 +47,73 @@ const UnifiedProblemsView: React.FC<UnifiedProblemsViewProps> = ({ title, varian
   // Marqueur pour le rafraîchissement manuel
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [lastRefreshTime, setLastRefreshTime] = useState<Date>(new Date());
-  
+
+  // États pour stocker les problèmes pour chaque onglet - copie locale pour réduire les rechargements
+  const [cachedActiveProblems, setCachedActiveProblems] = useState<Problem[]>([]);
+  const [cachedProblemsLast72h, setCachedProblemsLast72h] = useState<Problem[]>([]);
+
   // Problèmes à afficher selon l'onglet actif
-  // Cas spécial: quand variant est 'all', nous n'appliquons aucun filtre supplémentaire
-  const problemsToDisplay = activeTab === 'active' ? activeProblems : problemsLast72h;
-  
+  const problemsToDisplay = activeTab === 'active' ? cachedActiveProblems : cachedProblemsLast72h;
+
+  // Méthode pour sauvegarder les données dans le SessionStorage
+  const saveDataToSessionStorage = (activeData: Problem[], recentData: Problem[]) => {
+    if (!activeData || !recentData) return;
+
+    try {
+      const dataToCache = {
+        active: activeData,
+        recent: recentData,
+        variant: variant,
+        timeframe: selectedTimeframe,
+        timestamp: Date.now()
+      };
+
+      sessionStorage.setItem(PROBLEMS_CACHE_KEY, JSON.stringify(dataToCache));
+      console.log(`Données des problèmes (${variant}) mises en cache dans sessionStorage`);
+    } catch (error) {
+      console.error('Erreur lors de la sauvegarde du cache:', error);
+    }
+  };
+
+  // Méthode pour charger les données depuis le SessionStorage
+  const loadDataFromSessionStorage = (): boolean => {
+    try {
+      const cachedData = sessionStorage.getItem(PROBLEMS_CACHE_KEY);
+      if (!cachedData) return false;
+
+      const parsedData = JSON.parse(cachedData);
+
+      // Vérifier si les données sont valides, concernent la même variante et ne sont pas trop anciennes
+      if (
+        parsedData &&
+        parsedData.variant === variant &&
+        Date.now() - parsedData.timestamp < CACHE_LIFETIME
+      ) {
+        console.log(`Utilisation des données en cache pour ${variant} (${new Date(parsedData.timestamp).toLocaleTimeString()})`);
+
+        // Restaurer les données et la période
+        setCachedActiveProblems(parsedData.active || []);
+        setCachedProblemsLast72h(parsedData.recent || []);
+        if (parsedData.timeframe) {
+          setSelectedTimeframe(parsedData.timeframe);
+        }
+
+        setLastRefreshTime(new Date(parsedData.timestamp));
+        return true;
+      }
+
+      return false;
+    } catch (error) {
+      console.error('Erreur lors du chargement du cache:', error);
+      return false;
+    }
+  };
+
   // Gérer le changement d'onglet
   const handleTabChange = (tab: 'active' | 'recent') => {
     setActiveTab(tab);
   };
-  
+
   // Fonction pour obtenir le libellé de la période sélectionnée
   const getTimeframeLabel = (value: string) => {
     const option = timeframeOptions.find(opt => opt.value === value);
@@ -57,11 +122,17 @@ const UnifiedProblemsView: React.FC<UnifiedProblemsViewProps> = ({ title, varian
 
   // Gestion du changement de période
   const handleTimeframeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setSelectedTimeframe(e.target.value);
+    const newTimeframe = e.target.value;
+    setSelectedTimeframe(newTimeframe);
+
+    // Déclencher un rafraîchissement uniquement si l'onglet actif est "recent"
+    if (activeTab === 'recent') {
+      refreshDataWithTimeframe(newTimeframe);
+    }
   };
 
-  // Gérer le rafraîchissement manuel des données
-  const handleRefresh = async () => {
+  // Fonction de rafraîchissement avec période spécifiée
+  const refreshDataWithTimeframe = async (timeframe: string) => {
     if (isRefreshing) return;
 
     setIsRefreshing(true);
@@ -69,18 +140,83 @@ const UnifiedProblemsView: React.FC<UnifiedProblemsViewProps> = ({ title, varian
       // Utilise le variant spécifié (vfg ou vfe), ou null pour 'all' (comportement par défaut)
       const dashboardType = variant === 'all' ? null : variant;
       // Passer la période sélectionnée comme troisième paramètre
-      await refreshData(dashboardType as 'vfg' | 'vfe' | undefined, activeTab === 'active', selectedTimeframe);
+      await refreshData(dashboardType as 'vfg' | 'vfe' | undefined, activeTab === 'active', timeframe);
       setLastRefreshTime(new Date());
     } catch (error) {
+      console.error('Erreur lors du rafraîchissement:', error);
     } finally {
       setTimeout(() => {
         setIsRefreshing(false);
       }, 500); // Délai minimum pour éviter des rafraîchissements trop rapides
     }
   };
-  
+
+  // Gérer le rafraîchissement manuel des données
+  const handleRefresh = () => {
+    refreshDataWithTimeframe(selectedTimeframe);
+  };
+
+  // Effet pour charger les données depuis le cache ou les récupérer au premier chargement
+  useEffect(() => {
+    // Si les données ont déjà été chargées, ne pas recharger
+    if (dataHasBeenLoadedRef.current) {
+      return;
+    }
+
+    // Essayer de charger les données depuis le cache
+    const cacheLoaded = loadDataFromSessionStorage();
+
+    // Si le cache n'est pas disponible ou expiré, charger les données
+    if (!cacheLoaded) {
+      console.log(`Pas de cache valide pour ${variant}, chargement des données`);
+      handleRefresh();
+    } else {
+      // Marquer les données comme chargées même si depuis le cache
+      dataHasBeenLoadedRef.current = true;
+    }
+  }, [variant]); // Dépendance seulement au variant
+
+  // Mise à jour des données de problèmes actifs lorsqu'elles changent dans le contexte
+  useEffect(() => {
+    if (activeProblems && activeProblems.length > 0) {
+      setCachedActiveProblems(activeProblems);
+
+      // Mise à jour du cache seulement si on a des données complètes
+      if (problemsLast72h && problemsLast72h.length > 0) {
+        saveDataToSessionStorage(activeProblems, problemsLast72h);
+      }
+
+      // Marquer que les données ont été chargées
+      if (!dataHasBeenLoadedRef.current) {
+        dataHasBeenLoadedRef.current = true;
+      }
+    }
+  }, [activeProblems]);
+
+  // Mise à jour des données de problèmes récents lorsqu'elles changent dans le contexte
+  useEffect(() => {
+    if (problemsLast72h && problemsLast72h.length > 0) {
+      setCachedProblemsLast72h(problemsLast72h);
+
+      // Mise à jour du cache seulement si on a des données complètes
+      if (activeProblems && activeProblems.length > 0) {
+        saveDataToSessionStorage(activeProblems, problemsLast72h);
+      }
+
+      // Marquer que les données ont été chargées
+      if (!dataHasBeenLoadedRef.current) {
+        dataHasBeenLoadedRef.current = true;
+      }
+    }
+  }, [problemsLast72h]);
+
   // Retour au tableau de bord
   const handleBackClick = () => {
+    // Signaler la navigation depuis un cache valide pour éviter le rechargement automatique
+    if (dataHasBeenLoadedRef.current) {
+      sessionStorage.setItem('navigationFromCache', 'true');
+    }
+
     if (variant === 'all') {
       // Pour la vue "tous les problèmes", retourner à la page d'accueil
       navigate('/');
@@ -89,21 +225,21 @@ const UnifiedProblemsView: React.FC<UnifiedProblemsViewProps> = ({ title, varian
       navigate(`/${variant}`);
     }
   };
-  
+
   // Classes CSS pour les onglets
   const getTabClasses = (tab: 'active' | 'recent') => {
     const isActive = activeTab === tab;
-    
+
     return `px-4 py-3 text-sm font-medium rounded-t-lg transition-all duration-200 ${
-      isActive 
-        ? 'bg-slate-800 text-white border-t border-l border-r border-slate-700' 
+      isActive
+        ? 'bg-slate-800 text-white border-t border-l border-r border-slate-700'
         : 'bg-slate-900 text-slate-400 hover:bg-slate-800/50 hover:text-slate-300 border-b border-slate-700'
     } flex items-center gap-2`;
   };
-  
+
   // Déterminer les couleurs d'accentuation en fonction de la variante
   const accentColor = variant === 'vfg' ? 'blue' : 'amber';
-  
+
   // Constantes CSS pour l'accentuation des couleurs
   const cssVariant = {
     text: `text-${accentColor}-500`,
@@ -114,30 +250,33 @@ const UnifiedProblemsView: React.FC<UnifiedProblemsViewProps> = ({ title, varian
     hoverBg: `hover:bg-${accentColor}-700`,
     icon: activeTab === 'active' ? <AlertTriangle className="text-red-500" size={24} /> : <Clock className="text-amber-500" size={24} />
   };
-  
+
+  // Déterminer si on doit afficher le loading
+  const showLoading = isLoading.problems && !dataHasBeenLoadedRef.current;
+
   return (
     <div className="space-y-6">
       {/* En-tête avec titre et bouton retour */}
       <div className="flex items-center justify-between">
-        <button 
+        <button
           onClick={handleBackClick}
           className="mb-2 flex items-center gap-2 px-4 py-1.5 rounded-lg border border-slate-600 text-slate-300 hover:bg-slate-700"
         >
           <Shield size={18} />
           <span>Retour au tableau de bord</span>
         </button>
-        
-        <button 
+
+        <button
           onClick={handleRefresh}
           disabled={isRefreshing || isLoading.problems}
-          className={`flex items-center gap-2 px-4 py-2 rounded-md ${cssVariant.bg} text-white ${cssVariant.hoverBg} 
+          className={`flex items-center gap-2 px-4 py-2 rounded-md ${cssVariant.bg} text-white ${cssVariant.hoverBg}
             disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200`}
         >
           <RefreshCw size={16} className={isRefreshing ? 'animate-spin' : ''} />
           <span>Rafraîchir</span>
         </button>
       </div>
-      
+
       {/* Bannière principale avec statistiques */}
       <div className={`p-5 ${cssVariant.bgDark} border ${cssVariant.border} rounded-lg mb-6`}>
         <div className="flex flex-wrap md:flex-nowrap items-start gap-4">
@@ -181,41 +320,41 @@ const UnifiedProblemsView: React.FC<UnifiedProblemsViewProps> = ({ title, varian
           </div>
         </div>
       </div>
-      
+
       {/* Navigation par onglets */}
       <div className="border-b border-slate-700 mb-4">
         <div className="flex space-x-1">
-          <button 
-            onClick={() => handleTabChange('active')} 
+          <button
+            onClick={() => handleTabChange('active')}
             className={getTabClasses('active')}
           >
             <AlertTriangle size={16} className="text-red-500" />
             <span>Problèmes actifs</span>
-            {activeProblems?.length > 0 && (
+            {cachedActiveProblems?.length > 0 && (
               <span className="ml-2 bg-red-900/60 text-red-200 rounded-full px-2 py-0.5 text-xs">
-                {activeProblems.length}
+                {cachedActiveProblems.length}
               </span>
             )}
           </button>
-          
-          <button 
-            onClick={() => handleTabChange('recent')} 
+
+          <button
+            onClick={() => handleTabChange('recent')}
             className={getTabClasses('recent')}
           >
             <Clock size={16} className="text-amber-500" />
             <span>Récents ({getTimeframeLabel(selectedTimeframe)})</span>
-            {problemsLast72h?.length > 0 && (
+            {cachedProblemsLast72h?.length > 0 && (
               <span className="ml-2 bg-amber-900/60 text-amber-200 rounded-full px-2 py-0.5 text-xs">
-                {problemsLast72h.length}
+                {cachedProblemsLast72h.length}
               </span>
             )}
           </button>
         </div>
       </div>
-      
+
       {/* Contenu de l'onglet actif */}
       <div className="mt-6">
-        {isLoading.problems ? (
+        {showLoading ? (
           <div className="flex items-center justify-center h-64">
             <div className="w-12 h-12 border-t-4 border-b-4 border-blue-500 rounded-full animate-spin"></div>
             <span className="ml-3 text-slate-400">Chargement des problèmes...</span>
