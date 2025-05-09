@@ -44,6 +44,7 @@ function App() {
             <Route path="/problems" element={<Navigate to="/problems/unified" replace />} />
             <Route path="/hosts" element={<Navigate to="/dashboard/vfg" replace />} />
             <Route path="/services" element={<Navigate to="/dashboard/vfg" replace />} />
+            <Route path="/other" element={<Navigate to="/overview" replace />} />
             
             {/* Redirection des routes non trouvées vers la page d'accueil */}
             <Route path="*" element={<Navigate to="/" replace />} />

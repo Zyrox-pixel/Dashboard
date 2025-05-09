@@ -8,7 +8,7 @@ import { useApp } from '../../contexts/AppContext';
 import { useTheme } from '../../contexts/ThemeContext';
 
 // Définir les types pour les fonctions
-type MenuItemKey = 'home' | 'problems' | 'vfg' | 'vfe' | 'other' | 'activity' | 'settings';
+type MenuItemKey = 'home' | 'problems' | 'vfg' | 'vfe' | 'activity' | 'settings';
 type ColorType = 'indigo' | 'amber' | 'red' | 'blue' | 'green' | 'purple';
 
 const Sidebar: React.FC = () => {
@@ -23,7 +23,6 @@ const Sidebar: React.FC = () => {
     else if (path.startsWith('/problems')) setActiveItem('problems');
     else if (path.startsWith('/vfg')) setActiveItem('vfg');
     else if (path.startsWith('/vfe')) setActiveItem('vfe');
-    else if (path.startsWith('/other')) setActiveItem('other');
   }, []);
 
   const toggleSidebar = () => {
@@ -126,7 +125,7 @@ const Sidebar: React.FC = () => {
                 <span className={`font-bold text-base whitespace-nowrap ${
                   isDarkTheme ? 'text-white' : 'text-slate-800'
                 }`}>
-                  Dynatrace Monitor
+                  PRODSEC Monitor
                 </span>
                 <span className="text-xs text-slate-500">
                   Enterprise Edition
@@ -271,19 +270,6 @@ const Sidebar: React.FC = () => {
               )}
             </Link>
             
-            {/* Other */}
-            <Link 
-              to="/other"
-              onClick={() => setActiveItem('other')}
-              className={getMenuItemClass('other')}
-            >
-              {getIconGlow('other')}
-              <Grid size={18} className={getIconClass('other')} />
-              
-              {!sidebarCollapsed && (
-                <span className="text-sm font-medium whitespace-nowrap">Other</span>
-              )}
-            </Link>
           </nav>
         </div>
         

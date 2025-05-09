@@ -11,7 +11,7 @@ import {
 } from './types';
 
 /**
- * API Client optimisé pour Dynatrace Monitor
+ * API Client optimisé pour PRODSEC Monitor
  * Supporte les modes standard et optimisé
  */
 class ApiClient {
