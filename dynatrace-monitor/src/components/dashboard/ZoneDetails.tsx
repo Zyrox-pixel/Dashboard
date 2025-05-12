@@ -375,28 +375,54 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
       }))
     };
     
-    // Temps de réponse (en millisecondes)
+    // Temps de réponse moyen (en millisecondes)
     const responseTimeBuckets = [
       { id: 'fast', label: 'Rapide (<0.5ms)', range: [0, 0.5] },
       { id: 'medium', label: 'Moyen (0.5-2ms)', range: [0.5, 2] },
       { id: 'slow', label: 'Lent (>2ms)', range: [2, Infinity] }
     ];
-    
+
     const responseTimeCategory: FilterCategory = {
       id: 'response_time',
-      label: 'Temps de réponse',
+      label: 'Temps de réponse (moy.)',
       icon: <Clock size={18} />,
       items: responseTimeBuckets.map(bucket => ({
         id: bucket.id,
         label: bucket.label,
         value: bucket.id,
-        count: services.filter(s => 
-          s.response_time !== null && 
-          s.response_time >= bucket.range[0] && 
+        count: services.filter(s =>
+          s.response_time !== null &&
+          s.response_time >= bucket.range[0] &&
           s.response_time < bucket.range[1]
         ).length,
         icon: bucket.id === 'fast' ? <span className="text-green-500">⚡</span> :
               bucket.id === 'medium' ? <span className="text-yellow-500">⏱</span> :
+              <span className="text-red-500">🐢</span>
+      }))
+    };
+
+    // Temps de réponse médian (en millisecondes)
+    const medianResponseTimeBuckets = [
+      { id: 'fast_median', label: 'Rapide (<0.5ms)', range: [0, 0.5] },
+      { id: 'medium_median', label: 'Moyen (0.5-2ms)', range: [0.5, 2] },
+      { id: 'slow_median', label: 'Lent (>2ms)', range: [2, Infinity] }
+    ];
+
+    const medianResponseTimeCategory: FilterCategory = {
+      id: 'median_response_time',
+      label: 'Temps de réponse (méd.)',
+      icon: <Clock size={18} />,
+      items: medianResponseTimeBuckets.map(bucket => ({
+        id: bucket.id,
+        label: bucket.label,
+        value: bucket.id,
+        count: services.filter(s =>
+          s.median_response_time !== null &&
+          s.median_response_time >= bucket.range[0] &&
+          s.median_response_time < bucket.range[1]
+        ).length,
+        icon: bucket.id === 'fast_median' ? <span className="text-green-500">⚡</span> :
+              bucket.id === 'medium_median' ? <span className="text-yellow-500">⏱</span> :
               <span className="text-red-500">🐢</span>
       }))
     };
@@ -427,7 +453,7 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
       }))
     };
     
-    return [technologyCategory, responseTimeCategory, errorRateCategory];
+    return [technologyCategory, responseTimeCategory, medianResponseTimeCategory, errorRateCategory];
   }, [services]);
   
   // Préparer les catégories de filtres pour les process groups
@@ -642,12 +668,22 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
             
           case 'response_time':
             if (service.response_time === null) return false;
-            
+
             const responseTime = service.response_time;
             return (
-              (filter.values.includes('fast') && responseTime < 100) ||
-              (filter.values.includes('medium') && responseTime >= 100 && responseTime < 500) ||
-              (filter.values.includes('slow') && responseTime >= 500)
+              (filter.values.includes('fast') && responseTime < 0.5) ||
+              (filter.values.includes('medium') && responseTime >= 0.5 && responseTime < 2) ||
+              (filter.values.includes('slow') && responseTime >= 2)
+            );
+
+          case 'median_response_time':
+            if (service.median_response_time === null) return false;
+
+            const medianResponseTime = service.median_response_time;
+            return (
+              (filter.values.includes('fast_median') && medianResponseTime < 0.5) ||
+              (filter.values.includes('medium_median') && medianResponseTime >= 0.5 && medianResponseTime < 2) ||
+              (filter.values.includes('slow_median') && medianResponseTime >= 2)
             );
             
           case 'error_rate':
@@ -779,7 +815,7 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
       key: 'response_time',
       label: (
         <div className="flex items-center cursor-pointer" onClick={() => requestSort('response_time')}>
-          Temps de réponse
+          Temps de réponse (moy.)
           {sortConfig.key === 'response_time' && (
             <span className="ml-1">
               {sortConfig.direction === 'ascending' ? (
@@ -801,6 +837,35 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
             'text-slate-400'
         }`}>
           {service.response_time !== null ? `${service.response_time} ms` : 'N/A'}
+        </span>
+      ),
+    },
+    {
+      key: 'median_response_time',
+      label: (
+        <div className="flex items-center cursor-pointer" onClick={() => requestSort('median_response_time')}>
+          Temps de réponse (méd.)
+          {sortConfig.key === 'median_response_time' && (
+            <span className="ml-1">
+              {sortConfig.direction === 'ascending' ? (
+                <ArrowUp size={14} />
+              ) : sortConfig.direction === 'descending' ? (
+                <ArrowDown size={14} />
+              ) : null}
+            </span>
+          )}
+        </div>
+      ),
+      cellClassName: 'text-sm',
+      render: (service: Service) => (
+        <span className={`${
+          service.median_response_time !== null ?
+            (service.median_response_time > 2 ? 'text-red-500' :
+            service.median_response_time > 1 ? 'text-yellow-500' :
+            'text-green-500') :
+            'text-slate-400'
+        }`}>
+          {service.median_response_time !== null ? `${service.median_response_time} ms` : 'N/A'}
         </span>
       ),
     },
@@ -1513,7 +1578,7 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
           <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 dark:bg-blue-900/30 text-sm border-b border-blue-100 dark:border-blue-800">
             <Clock size={14} className="text-blue-500 dark:text-blue-400" />
             <span className="text-blue-700 dark:text-blue-300">
-              Les métriques sont rafraîchies toutes les 30 minutes et les temps de réponse sont en millisecondes
+              Les métriques sont rafraîchies toutes les 30 minutes. Les temps de réponse moyens et médians sont affichés en millisecondes.
             </span>
           </div>
 

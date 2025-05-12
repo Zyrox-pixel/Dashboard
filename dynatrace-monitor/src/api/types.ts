@@ -108,12 +108,14 @@ export interface Service {
   id: string;
   name: string;
   response_time: number | null;
+  median_response_time: number | null; // Temps de réponse médian ajouté
   error_rate: number | null;
   requests: number | null;
   technology: string;
   tech_icon: string;
   status: string;
   response_time_history: MetricHistory[];
+  median_response_time_history: MetricHistory[]; // Historique du temps médian ajouté
   error_rate_history: MetricHistory[];
   request_count_history: MetricHistory[];
   dt_url: string;
