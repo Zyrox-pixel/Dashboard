@@ -1509,6 +1509,9 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
               <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full ml-2 dark:bg-blue-900 dark:text-blue-200">
                 Dernières 30 minutes
               </span>
+              <span className="text-xs text-slate-400 ml-2">
+                Rafraîchi le {new Date().toLocaleString()}
+              </span>
             </h2>
 
             {/* Barre de recherche et boutons d'actions pour les services */}
