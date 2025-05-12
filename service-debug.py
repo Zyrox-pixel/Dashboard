@@ -80,7 +80,7 @@ def fetch_dynatrace_data(api_token, mz_name):
     # L'API Entités peut avoir une limite sur la longueur de l'URL ou le nombre d'IDs.
     # Pour un très grand nombre d'IDs, il faudrait paginer ou faire plusieurs appels.
     # Ici, on suppose un nombre raisonnable.
-    entity_selector_names = f'entityId({",".join(f\'"{sid}"\' for sid in service_ids_from_metrics)})'
+    entity_selector_names = f'entityId({",".join(f'"{sid}"' for sid in service_ids_from_metrics)})'
     params_entities = {
         "entitySelector": entity_selector_names,
         "fields": "displayName,entityId", # entityId est inclus par défaut mais le demander explicitement est bien
