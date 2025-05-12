@@ -375,11 +375,11 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
       }))
     };
     
-    // Temps de réponse (en secondes)
+    // Temps de réponse (en millisecondes)
     const responseTimeBuckets = [
-      { id: 'fast', label: 'Rapide (<0.5s)', range: [0, 0.5] },
-      { id: 'medium', label: 'Moyen (0.5-2s)', range: [0.5, 2] },
-      { id: 'slow', label: 'Lent (>2s)', range: [2, Infinity] }
+      { id: 'fast', label: 'Rapide (<0.5ms)', range: [0, 0.5] },
+      { id: 'medium', label: 'Moyen (0.5-2ms)', range: [0.5, 2] },
+      { id: 'slow', label: 'Lent (>2ms)', range: [2, Infinity] }
     ];
     
     const responseTimeCategory: FilterCategory = {
@@ -794,13 +794,13 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
       cellClassName: 'text-sm',
       render: (service: Service) => (
         <span className={`${
-          service.response_time !== null ? 
-            (service.response_time > 2 ? 'text-red-500' : 
-            service.response_time > 1 ? 'text-yellow-500' : 
-            'text-green-500') : 
+          service.response_time !== null ?
+            (service.response_time > 2 ? 'text-red-500' :
+            service.response_time > 1 ? 'text-yellow-500' :
+            'text-green-500') :
             'text-slate-400'
         }`}>
-          {service.response_time !== null ? `${service.response_time} s` : 'N/A'}
+          {service.response_time !== null ? `${service.response_time} ms` : 'N/A'}
         </span>
       ),
     },
@@ -1513,7 +1513,7 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
           <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 dark:bg-blue-900/30 text-sm border-b border-blue-100 dark:border-blue-800">
             <Clock size={14} className="text-blue-500 dark:text-blue-400" />
             <span className="text-blue-700 dark:text-blue-300">
-              Les métriques sont rafraîchies toutes les 30 minutes et les temps de réponse sont en secondes
+              Les métriques sont rafraîchies toutes les 30 minutes et les temps de réponse sont en millisecondes
             </span>
           </div>
 
