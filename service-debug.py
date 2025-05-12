@@ -182,4 +182,14 @@ def generate_html_table_report(metrics_data_raw, mz_name):
         with open(HTML_OUTPUT_FILENAME, "w", encoding="utf-8") as f:
             f.write(html_content)
         print(f"\nLe rapport HTML tabulaire a été généré : '{os.path.abspath(HTML_OUTPUT_FILENAME)}'")
-        print("Ouvrez ce fichier dans votre
+        print("Ouvrez ce fichier dans votre navigateur web pour voir les résultats.")
+    except IOError as e:
+        print(f"Erreur lors de l'écriture du fichier HTML : {e}")
+
+if __name__ == "__main__":
+    print(f"--- Script de reporting Dynatrace vers Tableau HTML ---")
+    metrics_response = fetch_dynatrace_metrics(DYNATRACE_API_TOKEN, MANAGEMENT_ZONE_NAME)
+
+    # Toujours appeler generate_html_table_report, même si metrics_response est None ou une erreur,
+    # car la fonction gère l'affichage des messages d'erreur.
+    generate_html_table_report(metrics_response, MANAGEMENT_ZONE_NAME)
