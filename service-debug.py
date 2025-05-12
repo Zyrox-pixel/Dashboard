@@ -1,109 +1,163 @@
 import requests
 import json
 import os
-from datetime import datetime, timedelta
+from datetime import datetime
+import warnings
 
 # --- Configuration ---
-# Récupérez ces valeurs depuis vos variables d'environnement ou entrez-les directement
-# Pour la sécurité, il est préférable d'utiliser des variables d'environnement pour le token.
-DYNATRACE_BASE_URL = os.environ.get("DYNATRACE_BASE_URL", "https_://VOTRE_URL_DYNATRACE") # Ex: "https_://abcd12345.live.dynatrace.com"
-DYNATRACE_API_TOKEN = os.environ.get("DYNATRACE_API_TOKEN", "VOTRE_TOKEN_API_DYNATRACE")
-MANAGEMENT_ZONE_NAME = "NOM DE VOTRE MANAGEMENT ZONE" # Remplacez par le nom exact
+# URL et Management Zone pré-remplies d'après vos logs d'erreur.
+# VEUILLEZ VÉRIFIER ET SURTOUT REMPLACER VOTRE_TOKEN_API_DYNATRACE
+DYNATRACE_BASE_URL = os.environ.get("DYNATRACE_BASE_URL", "https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038")
+DYNATRACE_API_TOKEN = os.environ.get("DYNATRACE_API_TOKEN", "VOTRE_TOKEN_API_DYNATRACE") # REMPLACEZ CECI !
+MANAGEMENT_ZONE_NAME = "PRODSEC - AP11038 - WebSSO ITG"
 
-# Vérifiez que les placeholders ont été remplacés (sauf si vous utilisez des variables d'env)
-if "VOTRE_URL_DYNATRACE" in DYNATRACE_BASE_URL or "VOTRE_TOKEN_API_DYNATRACE" in DYNATRACE_API_TOKEN:
-    print("ERREUR: Veuillez remplacer les placeholders DYNATRACE_BASE_URL et DYNATRACE_API_TOKEN.")
+if "VOTRE_TOKEN_API_DYNATRACE" in DYNATRACE_API_TOKEN:
+    print("ERREUR: Veuillez remplacer DYNATRACE_API_TOKEN par votre véritable token dans le script.")
     exit()
 
-if MANAGEMENT_ZONE_NAME == "NOM DE VOTRE MANAGEMENT ZONE":
-    print("ERREUR: Veuillez remplacer le placeholder MANAGEMENT_ZONE_NAME.")
-    exit()
-
-# --- API Dynatrace ---
 METRICS_API_ENDPOINT = f"{DYNATRACE_BASE_URL.rstrip('/')}/api/v2/metrics/query"
+HTML_OUTPUT_FILENAME = "rapport_dynatrace.html"
 
-def fetch_service_metrics_by_mz_name(base_url, api_token, mz_name):
-    """
-    Récupère des métriques de service pour une Management Zone donnée sur les 2 dernières heures.
-    """
+def fetch_dynatrace_metrics(api_token, mz_name):
     headers = {
         "Authorization": f"Api-Token {api_token}",
         "Content-Type": "application/json"
     }
-
-    # Sélecteur de métriques : Temps de réponse moyen, nombre de requêtes, nombre d'erreurs
-    # :splitBy("dt.entity.service") permet d'avoir les résultats par service
     metric_selector = (
         "builtin:service.response.time:avg:splitBy(\"dt.entity.service\"),"
-        "builtin:service.requestCount.server:value:splitBy(\"dt.entity.service\")," # Doit être :value
-        "builtin:service.errors.total.count:value:splitBy(\"dt.entity.service\")"  # Doit être :value
+        "builtin:service.requestCount.server:value:splitBy(\"dt.entity.service\")," # Utilisation de :value
+        "builtin:service.errors.total.count:value:splitBy(\"dt.entity.service\")"  # Utilisation de :value
     )
-
-    # Sélecteur d'entités : Cible les entités de type SERVICE
-    # et appartenant à la Management Zone spécifiée par son nom.
     entity_selector = f'type(SERVICE),mzName("{mz_name}")'
-
-    # Période : les 2 dernières heures
-    # resolution="Inf" donne une seule valeur agrégée pour la période par métrique/service.
-    # Vous pourriez utiliser "10m", "1h" etc. pour une série temporelle plus détaillée.
     params = {
         "metricSelector": metric_selector,
         "entitySelector": entity_selector,
-        "from": "now-2h", # Les 2 dernières heures
+        "from": "now-2h",
         "to": "now",
         "resolution": "Inf"
     }
-
-    print(f"Requête API vers : {METRICS_API_ENDPOINT}")
-    print(f"Paramètres : {params}\n")
+    print(f"Tentative de récupération des métriques depuis Dynatrace pour la MZ: {mz_name}...")
+    print(f"URL de l'API: {METRICS_API_ENDPOINT}")
+    print(f"Paramètres: {json.dumps(params)}")
 
     try:
-        response = requests.get(METRICS_API_ENDPOINT, headers=headers, params=params, verify=False)
-        response.raise_for_status()  # Lève une exception pour les codes d'erreur HTTP (4xx ou 5xx)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", requests.packages.urllib3.exceptions.InsecureRequestWarning)
+            response = requests.get(METRICS_API_ENDPOINT, headers=headers, params=params, verify=False)
+        response.raise_for_status()
+        print("Données récupérées avec succès de Dynatrace.")
         return response.json()
     except requests.exceptions.HTTPError as http_err:
-        print(f"Erreur HTTP: {http_err}")
+        print(f"Erreur HTTP lors de la récupération des données: {http_err}")
         print(f"Réponse de l'API: {response.text}")
     except requests.exceptions.RequestException as req_err:
         print(f"Erreur de Requête: {req_err}")
     except json.JSONDecodeError:
-        print("Erreur: Impossible de décoder la réponse JSON.")
-        print(f"Réponse de l'API: {response.text}")
+        print(f"Erreur de décodage JSON. Réponse brute: {response.text if 'response' in locals() else 'N/A'}")
     except Exception as e:
-        print(f"Une erreur inattendue est survenue: {e}")
+        print(f"Une erreur inattendue est survenue lors de la récupération des données: {e}")
     return None
 
-if __name__ == "__main__":
-    print(f"--- Récupération des métriques pour la Management Zone : '{MANAGEMENT_ZONE_NAME}' ---")
-    metrics_data = fetch_service_metrics_by_mz_name(DYNATRACE_BASE_URL, DYNATRACE_API_TOKEN, MANAGEMENT_ZONE_NAME)
+def generate_html_report(metrics_data, mz_name):
+    html_content = f"""
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Rapport Métriques Dynatrace</title>
+    <style>
+        body {{ font-family: Arial, sans-serif; margin: 20px; background-color: #f4f7f6; color: #333; }}
+        .container {{ max-width: 900px; margin: auto; background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }}
+        h1 {{ color: #2c3e50; text-align: center; border-bottom: 2px solid #3498db; padding-bottom:10px; }}
+        h2 {{ color: #3498db; margin-top: 0; }}
+        p.period {{ text-align: center; font-style: italic; color: #7f8c8d; margin-bottom: 20px;}}
+        .metric-section {{ margin-bottom: 30px; padding: 20px; border: 1px solid #ddd; border-radius: 5px; background-color: #fdfdfd; }}
+        .metric-title {{ font-size: 1.4em; color: #2980b9; margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 5px;}}
+        .service-block {{ border-left: 3px solid #3498db; padding-left: 15px; margin-bottom: 15px; }}
+        .service-id {{ font-weight: bold; color: #555; }}
+        .timestamp {{ color: #777; font-size: 0.9em; }}
+        .value {{ font-size: 1.1em; color: #27ae60; }}
+        .no-data {{ color: #e74c3c; font-weight: bold; text-align: center; padding: 20px;}}
+        .error-message {{ background-color: #fdd; border: 1px solid #e74c3c; color: #c0392b; padding: 15px; margin-bottom: 20px; border-radius: 5px; }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Rapport des Métriques de Service Dynatrace</h1>
+        <h2>Management Zone: {mz_name}</h2>
+        <p class="period">Période: Dernières 2 heures (données agrégées à la fin de la période)</p>
+"""
 
-    if metrics_data:
-        print("\n--- Données Récupérées (JSON Brut) ---")
-        print(json.dumps(metrics_data, indent=2))
-
-        # Optionnel : Un petit traitement pour un affichage plus lisible
-        print("\n--- Données Formatées (Exemple) ---")
-        total_results = metrics_data.get("totalCount", 0)
-        print(f"Nombre total de séries de métriques trouvées : {total_results}")
-
-        for result_item in metrics_data.get("result", []):
-            metric_id = result_item.get("metricId")
-            print(f"\n  Métrique : {metric_id}")
-            for series_data in result_item.get("data", []):
-                # Les dimensions incluent l'ID de l'entité (service dans ce cas)
-                service_id = series_data.get("dimensions")[0] if series_data.get("dimensions") else "N/A"
-                # Avec resolution="Inf", il ne devrait y avoir qu'un seul point de données
-                timestamps = series_data.get("timestamps", [])
-                values = series_data.get("values", [])
-
-                if timestamps and values:
-                    # Le timestamp est en millisecondes, conversion en datetime lisible
-                    timestamp_dt = datetime.fromtimestamp(timestamps[0] / 1000)
-                    value = values[0]
-                    print(f"    Service ID : {service_id}")
-                    print(f"      Timestamp (fin de période) : {timestamp_dt.strftime('%Y-%m-%d %H:%M:%S')}")
-                    print(f"      Valeur : {value}")
-                else:
-                    print(f"    Service ID : {service_id} - Pas de données pour cette période.")
+    if not metrics_data or not metrics_data.get("result"):
+        html_content += "<p class='no-data'>Aucune donnée de métrique n'a été récupérée ou la structure des données est incorrecte.</p>"
+        if metrics_data and metrics_data.get("error"): # Si Dynatrace a renvoyé une erreur JSON structurée
+            error_info = metrics_data.get("error")
+            html_content += f"""
+        <div class="error-message">
+            <h4>Erreur de l'API Dynatrace :</h4>
+            <p><strong>Code :</strong> {error_info.get('code', 'N/A')}</p>
+            <p><strong>Message :</strong> {error_info.get('message', 'N/A')}</p>
+        </div>"""
     else:
-        print("Aucune donnée n'a été récupérée ou une erreur est survenue.")
+        for metric_item in metrics_data.get("result", []):
+            metric_id = metric_item.get("metricId", "Métrique inconnue")
+            html_content += f"""
+        <div class="metric-section">
+            <h3 class="metric-title">{metric_id}</h3>"""
+
+            if not metric_item.get("data"):
+                html_content += "<p>Aucune donnée pour cette métrique.</p>"
+            else:
+                for series_data in metric_item.get("data", []):
+                    service_id = series_data.get("dimensions")[0] if series_data.get("dimensions") else "Service ID non disponible"
+                    timestamps = series_data.get("timestamps", [])
+                    values = series_data.get("values", [])
+
+                    if timestamps and values and values[0] is not None:
+                        # Timestamp est en millisecondes
+                        timestamp_dt = datetime.fromtimestamp(timestamps[0] / 1000)
+                        value = values[0]
+                        html_content += f"""
+            <div class="service-block">
+                <p><span class="service-id">Service ID :</span> {service_id}</p>
+                <p><span class="timestamp">Fin de période :</span> {timestamp_dt.strftime('%Y-%m-%d %H:%M:%S')}</p>
+                <p><span class="value">Valeur :</span> {value:.2f} """ # Formatage à 2 décimales
+                        # Ajout d'unité simple pour le temps de réponse
+                        if "response.time" in metric_id:
+                            html_content += "ms"
+                        html_content += "</p>"
+                    else:
+                        html_content += f"""
+            <div class="service-block">
+                <p><span class="service-id">Service ID :</span> {service_id}</p>
+                <p>Pas de valeur de données pour cette période.</p>"""
+                    html_content += "</div>" # Fin service-block
+            html_content += "</div>" # Fin metric-section
+
+    html_content += """
+    </div> </body>
+</html>
+"""
+    try:
+        with open(HTML_OUTPUT_FILENAME, "w", encoding="utf-8") as f:
+            f.write(html_content)
+        print(f"\nLe rapport HTML a été généré : '{os.path.abspath(HTML_OUTPUT_FILENAME)}'")
+        print("Ouvrez ce fichier dans votre navigateur web pour voir les résultats.")
+    except IOError as e:
+        print(f"Erreur lors de l'écriture du fichier HTML : {e}")
+
+if __name__ == "__main__":
+    print(f"--- Script de reporting Dynatrace vers HTML ---")
+    metrics_response = fetch_dynatrace_metrics(DYNATRACE_API_TOKEN, MANAGEMENT_ZONE_NAME)
+
+    if metrics_response:
+        generate_html_report(metrics_response, MANAGEMENT_ZONE_NAME)
+    else:
+        print("Échec de la récupération des données de Dynatrace. Le rapport HTML ne sera pas généré avec des données.")
+        # On peut quand même générer un HTML avec le message d'erreur si metrics_response est une erreur structurée
+        if isinstance(metrics_response, dict) and "error" in metrics_response:
+             generate_html_report(metrics_response, MANAGEMENT_ZONE_NAME)
+        else:
+             # Générer un HTML indiquant un échec plus générique
+             empty_error_data = {"error": {"code": "SCRIPT_ERROR", "message": "Impossible de récupérer les données de Dynatrace. Vérifiez les logs console."}}
+             generate_html_report(empty_error_data, MANAGEMENT_ZONE_NAME)
