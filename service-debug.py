@@ -35,8 +35,8 @@ def fetch_service_metrics_by_mz_name(base_url, api_token, mz_name):
     # :splitBy("dt.entity.service") permet d'avoir les résultats par service
     metric_selector = (
         "builtin:service.response.time:avg:splitBy(\"dt.entity.service\"),"
-        "builtin:service.requestCount.server:sum:splitBy(\"dt.entity.service\"),"
-        "builtin:service.errors.total.count:sum:splitBy(\"dt.entity.service\")"
+        "builtin:service.requestCount.server:value:splitBy(\"dt.entity.service\")," # Doit être :value
+        "builtin:service.errors.total.count:value:splitBy(\"dt.entity.service\")"  # Doit être :value
     )
 
     # Sélecteur d'entités : Cible les entités de type SERVICE
@@ -58,7 +58,7 @@ def fetch_service_metrics_by_mz_name(base_url, api_token, mz_name):
     print(f"Paramètres : {params}\n")
 
     try:
-        response = requests.get(METRICS_API_ENDPOINT, headers=headers, params=params)
+        response = requests.get(METRICS_API_ENDPOINT, headers=headers, params=params, verify=False)
         response.raise_for_status()  # Lève une exception pour les codes d'erreur HTTP (4xx ou 5xx)
         return response.json()
     except requests.exceptions.HTTPError as http_err:
