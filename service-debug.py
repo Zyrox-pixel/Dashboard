@@ -81,9 +81,17 @@ def fetch_dynatrace_data(api_token, mz_name):
     print(f"\n--- Début Récupération Noms Services ---")
     print(f"Vérification pour {len(service_ids_from_metrics)} ID(s) de service...")
     service_id_to_name_map = {}
-    entity_selector_names = f'entityId({",".join(f'"{sid}"' for sid in service_ids_from_metrics)})'
-    print(f"Sélecteur d'entités utilisé : {entity_selector_names}") 
-    params_entities = { "entitySelector": entity_selector_names, "fields": "displayName,entityId", "from": "now-15m", "to": "now" }
+
+    # Demander tous les services de la MZ au lieu de filtrer par ID
+    # Cela garantit que nous obtenons tous les services disponibles
+    entity_selector_names = f'type(SERVICE),mzName("{mz_name}")'
+    print(f"Sélecteur d'entités utilisé : {entity_selector_names}")
+    params_entities = {
+        "entitySelector": entity_selector_names,
+        "fields": "displayName,entityId,properties.serviceType",
+        "from": "now-60m",  # Augmenté la fenêtre pour récupérer plus de services
+        "to": "now"
+    }
     
     try:
         print(f"Appel à l'API Entités: {ENTITIES_API_ENDPOINT} avec les paramètres ci-dessus")
@@ -100,13 +108,23 @@ def fetch_dynatrace_data(api_token, mz_name):
         print(f"Nombre d'entités trouvées dans la réponse: {len(found_entities)}") # DEBUG Nombre
         for entity in found_entities:
             entity_id = entity.get("entityId")
-            display_name = entity.get("displayName")
+            display_name = entity.get("displayName", "")
+
+            # Récupérer le type de service si disponible
+            service_type = ""
+            properties = entity.get("properties", {})
+            if properties and "serviceType" in properties:
+                service_type = properties["serviceType"]
+
             if entity_id and display_name:
-                 service_id_to_name_map[entity_id] = display_name
-                 print(f"  Mapping trouvé: {entity_id} -> {display_name}") # DEBUG Mapping
+                # Stocker le display_name et le service_type ensemble
+                service_id_to_name_map[entity_id] = {"name": display_name, "type": service_type}
+                print(f"  Mapping trouvé: {entity_id} -> {display_name} (Type: {service_type})") # DEBUG Mapping
             elif entity_id:
-                 service_id_to_name_map[entity_id] = entity_id # Fallback si pas de nom
-                 print(f"  Mapping (fallback ID): {entity_id} -> {entity_id}") # DEBUG Fallback
+                # Même en fallback, utiliser un nom descriptif
+                fallback_name = f"Service {entity_id[-6:]}"  # Utiliser seulement les 6 derniers caractères de l'ID
+                service_id_to_name_map[entity_id] = {"name": fallback_name, "type": service_type}
+                print(f"  Mapping (fallback): {entity_id} -> {fallback_name} (Type: {service_type})") # DEBUG Fallback
 
         print(f"Noms récupérés/mappés pour {len(service_id_to_name_map)} service(s).")
         print(f"CONTENU FINAL de service_id_to_name_map: {service_id_to_name_map}") # <-- Vérifiez attentivement ceci !
@@ -157,7 +175,7 @@ def generate_html_table_report(metrics_data_raw, service_id_to_name_map, mz_name
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Rapport Services Dynatrace</title>
+    <title>Rapport Services Dynatrace - Noms des Services</title>
     <style>
         /* ... (Styles CSS identiques) ... */
         body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 20px; background-color: #f0f2f5; color: #333; }}
@@ -165,13 +183,13 @@ def generate_html_table_report(metrics_data_raw, service_id_to_name_map, mz_name
         h1 {{ color: #1a237e; text-align: center; border-bottom: 2px solid #3949ab; padding-bottom:10px; font-size: 1.8em; }}
         h2 {{ color: #3949ab; margin-top: 0; font-size: 1.3em; }}
         p.period {{ text-align: center; font-style: italic; color: #546e7a; margin-bottom: 25px;}}
+        p.info {{ text-align: center; color: #3949ab; background-color: #e8eaf6; padding: 10px; border-radius: 5px; margin-bottom: 15px; }}
         table {{ width: 100%; border-collapse: collapse; margin-top: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }}
         th, td {{ border: 1px solid #c5cae9; padding: 10px 12px; text-align: left; word-wrap: break-word; }}
         th {{ background-color: #3949ab; color: white; font-size: 0.95em; }}
         tr:nth-child(even) {{ background-color: #e8eaf6; }}
         tr:hover {{ background-color: #c5cae9; }}
         td.service-name {{ font-weight: bold; color: #283593; }}
-        td.service-id-marker {{ font-size: 0.85em; color: #777; }}
         td.metric-value {{ text-align: right; }}
         td.na-value {{ color: #78909c; font-style:italic; text-align: center; }}
         .no-data {{ color: #d32f2f; font-weight: bold; text-align: center; padding: 20px; background-color: #ffebee; border: 1px solid #d32f2f; border-radius: 4px; }}
@@ -182,6 +200,7 @@ def generate_html_table_report(metrics_data_raw, service_id_to_name_map, mz_name
     <div class="container">
         <h1>Rapport des Métriques de Service Dynatrace</h1>
         <h2>Management Zone: {mz_name}</h2>
+        <p class="info">Affichage par <strong>Nom de Service</strong> (et non par ID)</p>
         <p class="period">Période: Dernières 30 minutes (valeurs agrégées)</p>
 """
 
@@ -202,9 +221,21 @@ def generate_html_table_report(metrics_data_raw, service_id_to_name_map, mz_name
             </thead>
             <tbody>"""
 
-        for service_id, metrics in sorted(services_pivot.items()):
-            # Affichage uniquement du nom du service, jamais de l'ID
-            service_display = service_id_to_name_map.get(service_id, "Service inconnu")
+        # Trier les services par nom plutôt que par ID
+        sorted_services = []
+        for service_id, metrics in services_pivot.items():
+            service_info = service_id_to_name_map.get(service_id, {"name": "Service inconnu", "type": ""})
+            sorted_services.append((service_id, metrics, service_info))
+
+        # Tri par nom de service
+        sorted_services.sort(key=lambda x: x[2]["name"].lower())
+
+        for service_id, metrics, service_info in sorted_services:
+            # Construire l'affichage avec le nom et éventuellement le type
+            if service_info["type"]:
+                service_display = f"{service_info['name']} <span style='font-size:0.8em;color:#666;'>({service_info['type']})</span>"
+            else:
+                service_display = service_info["name"]
 
             html_content += f"""
                 <tr>
@@ -249,6 +280,11 @@ def generate_html_table_report(metrics_data_raw, service_id_to_name_map, mz_name
         print(f"Erreur lors de l'écriture du fichier HTML : {e}")
 
 if __name__ == "__main__":
-    print(f"--- Script de reporting Dynatrace (Debug Noms/Secondes) ---")
+    print(f"--- Script de reporting Dynatrace (Affichage des NOMS de services) ---")
+    print(f"Génération d'un rapport montrant les noms des services au lieu des IDs")
+    print(f"Management Zone cible: {MANAGEMENT_ZONE_NAME}")
+    print(f"Fichier de sortie: {HTML_OUTPUT_FILENAME}")
+    print(f"Récupération des données en cours...")
+
     metrics_response_data, service_names_map = fetch_dynatrace_data(DYNATRACE_API_TOKEN, MANAGEMENT_ZONE_NAME)
     generate_html_table_report(metrics_response_data, service_names_map, MANAGEMENT_ZONE_NAME)
