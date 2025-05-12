@@ -13,7 +13,7 @@ HTML_OUTPUT_FILENAME = "rapport_dynatrace_services_nom_secondes.html"
 
 # Ordre préféré des métriques et leurs noms d'affichage
 PREFERRED_METRIC_ORDER_AND_NAMES = {
-    "builtin:service.response.time:avg": "Temps Rép. Moyen (s)", # Unité changée en secondes
+    "builtin:service.response.time:avg": "Temps Rép. Moyen (s)",
     "builtin:service.requestCount.server:value": "Nb Requêtes",
     "builtin:service.errors.total.count:value": "Nb Erreurs"
 }
@@ -26,7 +26,7 @@ METRICS_API_ENDPOINT = f"{DYNATRACE_BASE_URL.rstrip('/')}/api/v2/metrics/query"
 ENTITIES_API_ENDPOINT = f"{DYNATRACE_BASE_URL.rstrip('/')}/api/v2/entities"
 
 def fetch_dynatrace_data(api_token, mz_name):
-    """Récupère les métriques de service."""
+    """Récupère les métriques de service et ensuite les noms des services."""
     headers = {
         "Authorization": f"Api-Token {api_token}",
         "Content-Type": "application/json"
@@ -55,15 +55,15 @@ def fetch_dynatrace_data(api_token, mz_name):
         print("Données de métriques récupérées avec succès.")
     except requests.exceptions.HTTPError as http_err:
         print(f"Erreur HTTP (métriques): {http_err}\nRéponse de l'API: {response.text if 'response' in locals() else 'N/A'}")
+        return None, None 
     except Exception as e:
         print(f"Une erreur inattendue (métriques): {e}")
-        return None, None # Retourner None pour les deux en cas d'échec majeur
+        return None, None
 
     if not metrics_data or not metrics_data.get("result"):
         print("Aucune donnée de métrique ou structure de résultat inattendue.")
-        return metrics_data, {} # Retourner les données de métriques (qui peuvent contenir une erreur structurée) et un map de noms vide
+        return metrics_data, {}
 
-    # Extraire les IDs de service uniques des données de métriques
     service_ids_from_metrics = set()
     for metric_item in metrics_data.get("result", []):
         for series_data in metric_item.get("data", []):
@@ -74,17 +74,16 @@ def fetch_dynatrace_data(api_token, mz_name):
         print("Aucun ID de service trouvé dans les données de métriques.")
         return metrics_data, {}
 
-    # Récupérer les noms des services
     print(f"\nTentative de récupération des noms pour {len(service_ids_from_metrics)} ID(s) de service...")
     service_id_to_name_map = {}
-    # L'API Entités peut avoir une limite sur la longueur de l'URL ou le nombre d'IDs.
-    # Pour un très grand nombre d'IDs, il faudrait paginer ou faire plusieurs appels.
-    # Ici, on suppose un nombre raisonnable.
+    
+    # Ligne Corrigée :
     entity_selector_names = f'entityId({",".join(f'"{sid}"' for sid in service_ids_from_metrics)})'
+    
     params_entities = {
         "entitySelector": entity_selector_names,
-        "fields": "displayName,entityId", # entityId est inclus par défaut mais le demander explicitement est bien
-        "from": "now-15m", # Période récente, les entités doivent exister
+        "fields": "displayName,entityId",
+        "from": "now-15m", 
         "to": "now"
     }
     try:
@@ -114,9 +113,8 @@ def generate_html_table_report(metrics_data_raw, service_id_to_name_map, mz_name
     actual_metric_ids_from_response = set()
     ordered_metric_ids_for_table = []
 
-    # --- Section de Débogage (gardée pour l'instant) ---
     if metrics_data_raw and metrics_data_raw.get("result"):
-        print("\n--- DÉBUT DÉBOGAGE generate_html_table_report ---")
+        print("\n--- DÉBUT DÉBOGAGE generate_html_table_report ---") # Gardé pour l'instant
         for metric_item in metrics_data_raw.get("result", []):
             metric_id_from_item = metric_item.get("metricId")
             if not metric_id_from_item:
@@ -141,10 +139,9 @@ def generate_html_table_report(metrics_data_raw, service_id_to_name_map, mz_name
 
         print(f"IDs de métriques ordonnés pour les colonnes du tableau: {ordered_metric_ids_for_table}")
         if services_pivot:
-            first_service_id = list(services_pivot.keys())[0]
-            print(f"Données pivotées (exemple pour {first_service_id}): {services_pivot[first_service_id]}")
+            first_service_id_example = list(services_pivot.keys())[0]
+            print(f"Données pivotées (exemple pour {first_service_id_example}): {services_pivot[first_service_id_example]}")
         print("--- FIN DÉBOGAGE ---\n")
-    # --- Fin Section de Débogage ---
 
     html_content = f"""
 <!DOCTYPE html>
@@ -179,7 +176,7 @@ def generate_html_table_report(metrics_data_raw, service_id_to_name_map, mz_name
 
     if not services_pivot or not ordered_metric_ids_for_table:
         html_content += "<p class='no-data'>Aucune donnée de service à afficher ou aucune colonne de métrique définie.</p>"
-        if metrics_data_raw and metrics_data_raw.get("error"): # Erreur structurée de l'API métriques
+        if metrics_data_raw and metrics_data_raw.get("error"):
             error_info = metrics_data_raw.get("error")
             html_content += f"""
         <div class="error-message">
@@ -192,7 +189,7 @@ def generate_html_table_report(metrics_data_raw, service_id_to_name_map, mz_name
         <table>
             <thead>
                 <tr>
-                    <th>Nom du Service (ID)</th>""" # Changé l'en-tête
+                    <th>Nom du Service (ID)</th>"""
         for metric_id in ordered_metric_ids_for_table:
             display_name = PREFERRED_METRIC_ORDER_AND_NAMES.get(metric_id, metric_id)
             html_content += f"                    <th>{display_name}</th>\n"
@@ -202,10 +199,9 @@ def generate_html_table_report(metrics_data_raw, service_id_to_name_map, mz_name
             <tbody>"""
 
         for service_id, metrics in sorted(services_pivot.items()):
-            # Utiliser le nom du service si disponible, sinon l'ID
             display_service_identifier = service_id_to_name_map.get(service_id, service_id)
-            if display_service_identifier != service_id: # Si le nom a été trouvé et est différent de l'ID
-                 display_service_identifier = f"{display_service_identifier} ({service_id})" # Affiche Nom (ID)
+            if display_service_identifier != service_id and service_id_to_name_map.get(service_id): # Affiche Nom (ID) si le nom a été trouvé
+                 display_service_identifier = f"{display_service_identifier} ({service_id})"
             
             html_content += f"""
                 <tr>
@@ -220,12 +216,12 @@ def generate_html_table_report(metrics_data_raw, service_id_to_name_map, mz_name
                     if isinstance(value, (float, int)):
                         if metric_id_col == "builtin:service.response.time:avg":
                             value_seconds = float(value) / 1000.0
-                            value_display = f"{value_seconds:.3f}" # Affichage en secondes avec 3 décimales
+                            value_display = f"{value_seconds:.3f}"
                         elif isinstance(value, float):
                             value_display = f"{value:.2f}"
                         else: # int
                             value_display = str(value)
-                    else: # string (au cas où une valeur non-numérique serait passée)
+                    else: 
                         value_display = str(value)
                 
                 html_content += f"                    <td class=\"{css_class}\">{value_display}</td>\n"
@@ -249,9 +245,6 @@ def generate_html_table_report(metrics_data_raw, service_id_to_name_map, mz_name
 
 if __name__ == "__main__":
     print(f"--- Script de reporting Dynatrace (Noms de service & Secondes) ---")
-    metrics_data, service_names_map = fetch_dynatrace_data(DYNATRACE_API_TOKEN, MANAGEMENT_ZONE_NAME)
-    
-    # Même si metrics_data est None (échec total du fetch) ou contient une erreur,
-    # ou si service_names_map est vide, on passe à la génération HTML
-    # car generate_html_table_report est conçu pour gérer ces cas et afficher des messages d'erreur.
-    generate_html_table_report(metrics_data, service_names_map, MANAGEMENT_ZONE_NAME)
+    # Renommé la variable pour plus de clarté, car metrics_data peut être une erreur structurée de l'API
+    metrics_response_data, service_names_map = fetch_dynatrace_data(DYNATRACE_API_TOKEN, MANAGEMENT_ZONE_NAME)
+    generate_html_table_report(metrics_response_data, service_names_map, MANAGEMENT_ZONE_NAME)
