@@ -9,7 +9,7 @@ DYNATRACE_BASE_URL = os.environ.get("DYNATRACE_BASE_URL", "https://gmon-itgs.gro
 DYNATRACE_API_TOKEN = os.environ.get("DYNATRACE_API_TOKEN", "VOTRE_TOKEN_API_DYNATRACE") # REMPLACEZ CECI !
 MANAGEMENT_ZONE_NAME = "PRODSEC - AP11038 - WebSSO ITG"
 
-HTML_OUTPUT_FILENAME = "rapport_dynatrace_nom_service_debug.html"
+HTML_OUTPUT_FILENAME = "rapport_dynatrace_services_names.html"
 
 # Utilisation des longs metricId (avec splitBy) comme clés, basé sur les logs précédents
 PREFERRED_METRIC_ORDER_AND_NAMES = {
@@ -203,8 +203,8 @@ def generate_html_table_report(metrics_data_raw, service_id_to_name_map, mz_name
             <tbody>"""
 
         for service_id, metrics in sorted(services_pivot.items()):
-            # Affichage simplifié : Nom si trouvé, sinon ID avec marqueur
-            service_display = service_id_to_name_map.get(service_id, f'<span class="service-id-marker">{service_id} [ID]</span>')
+            # Affichage uniquement du nom du service, jamais de l'ID
+            service_display = service_id_to_name_map.get(service_id, "Service inconnu")
 
             html_content += f"""
                 <tr>
