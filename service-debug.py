@@ -25,6 +25,8 @@ if "VOTRE_TOKEN_API_DYNATRACE" in DYNATRACE_API_TOKEN:
 
 METRICS_API_ENDPOINT = f"{DYNATRACE_BASE_URL.rstrip('/')}/api/v2/metrics/query"
 ENTITIES_API_ENDPOINT = f"{DYNATRACE_BASE_URL.rstrip('/')}/api/v2/entities"
+# Ajout de l'API v1 pour les services (alternative)
+SERVICES_API_V1_ENDPOINT = f"{DYNATRACE_BASE_URL.rstrip('/')}/api/v1/entity/services"
 
 def fetch_dynatrace_data(api_token, mz_name):
     # ... (Logique fetch métriques identique à la précédente) ...
@@ -82,30 +84,106 @@ def fetch_dynatrace_data(api_token, mz_name):
     print(f"Vérification pour {len(service_ids_from_metrics)} ID(s) de service...")
     service_id_to_name_map = {}
 
-    # Demander tous les services de la MZ au lieu de filtrer par ID
-    # Cela garantit que nous obtenons tous les services disponibles
+    # MÉTHODE 1: Obtenir d'abord tous les services de la MZ
     entity_selector_names = f'type(SERVICE),mzName("{mz_name}")'
-    print(f"Sélecteur d'entités utilisé : {entity_selector_names}")
+    print(f"Sélecteur d'entités MZ : {entity_selector_names}")
     params_entities = {
         "entitySelector": entity_selector_names,
         "fields": "displayName,entityId,properties.serviceType",
-        "from": "now-60m",  # Augmenté la fenêtre pour récupérer plus de services
+        "from": "now-120m",  # Augmenté la fenêtre de temps
         "to": "now"
     }
     
     try:
-        print(f"Appel à l'API Entités: {ENTITIES_API_ENDPOINT} avec les paramètres ci-dessus")
-        # !!! Rappel : Vérifiez que le token API a la permission 'entities.read' !!!
+        # PREMIÈRE MÉTHODE: Par management zone
+        print(f"[MÉTHODE 1] Appel à l'API Entités par Management Zone: {ENTITIES_API_ENDPOINT}")
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", requests.packages.urllib3.exceptions.InsecureRequestWarning)
             response_entities = requests.get(ENTITIES_API_ENDPOINT, headers=headers, params=params_entities, verify=False)
-        print(f"Statut de la réponse API Entités: {response_entities.status_code}") # DEBUG Statut HTTP
-        response_entities.raise_for_status() # Vérifie les erreurs HTTP
-        entities_data = response_entities.json()
-        print(f"Réponse brute de l'API Entités (JSON): {json.dumps(entities_data, indent=2)}") # DEBUG Brut
-        
-        found_entities = entities_data.get("entities", [])
-        print(f"Nombre d'entités trouvées dans la réponse: {len(found_entities)}") # DEBUG Nombre
+        print(f"Statut de la réponse API (méthode MZ): {response_entities.status_code}")
+
+        if response_entities.status_code == 200:
+            entities_data = response_entities.json()
+            found_entities = entities_data.get("entities", [])
+            print(f"Nombre d'entités trouvées (méthode MZ): {len(found_entities)}")
+        else:
+            print(f"Échec de la requête par MZ: {response_entities.text}")
+            found_entities = []
+
+        # Si nous n'avons pas trouvé assez d'entités par MZ, essayons par ID directs
+        if len(found_entities) < len(service_ids_from_metrics):
+            print(f"\n[MÉTHODE 2] Tentative de récupération directe par IDs")
+            # Construction du sélecteur par ID
+            id_chunks = []
+            # Limiter à 20 IDs par requête pour éviter des URLs trop longues
+            chunk_size = 20
+            service_ids_list = list(service_ids_from_metrics)
+
+            for i in range(0, len(service_ids_list), chunk_size):
+                chunk = service_ids_list[i:i + chunk_size]
+                entity_selector_chunk = f'entityId({",".join(f'"{sid}"' for sid in chunk)})'
+
+                params_chunk = {
+                    "entitySelector": entity_selector_chunk,
+                    "fields": "displayName,entityId,properties.serviceType",
+                    "from": "now-120m",
+                    "to": "now"
+                }
+
+                print(f"Récupération du groupe {i//chunk_size + 1} avec {len(chunk)} IDs")
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore", requests.packages.urllib3.exceptions.InsecureRequestWarning)
+                    response_chunk = requests.get(ENTITIES_API_ENDPOINT, headers=headers, params=params_chunk, verify=False)
+
+                if response_chunk.status_code == 200:
+                    chunk_data = response_chunk.json()
+                    chunk_entities = chunk_data.get("entities", [])
+                    print(f"Entités trouvées dans ce groupe: {len(chunk_entities)}")
+                    found_entities.extend(chunk_entities)
+                else:
+                    print(f"Échec de la requête pour ce groupe: {response_chunk.text}")
+
+        # MÉTHODE 3: Essayer l'API V1 spécifique aux services si nous avons toujours des services manquants
+        found_ids = {entity.get("entityId") for entity in found_entities if entity.get("entityId")}
+        missing_ids = service_ids_from_metrics - found_ids
+
+        if missing_ids:
+            print(f"\n[MÉTHODE 3] {len(missing_ids)} services toujours manquants - Tentative par API V1")
+            try:
+                # Récupérer tous les services via l'API v1
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore", requests.packages.urllib3.exceptions.InsecureRequestWarning)
+                    response_v1 = requests.get(
+                        f"{SERVICES_API_V1_ENDPOINT}?includeDetails=true",
+                        headers=headers,
+                        verify=False
+                    )
+
+                if response_v1.status_code == 200:
+                    services_v1 = response_v1.json()
+
+                    # Si la réponse contient des services
+                    if isinstance(services_v1, list):
+                        v1_entities_added = []
+
+                        # Créer des objets compatibles avec notre format v2
+                        for svc in services_v1:
+                            if svc.get("entityId") in missing_ids:
+                                v1_entity = {
+                                    "entityId": svc.get("entityId"),
+                                    "displayName": svc.get("displayName", "Service API V1"),
+                                    "properties": {
+                                        "serviceType": svc.get("serviceType", {}).get("type", "unknown")
+                                    }
+                                }
+                                found_entities.append(v1_entity)
+                                v1_entities_added.append(svc.get("entityId"))
+
+                        print(f"API V1: {len(v1_entities_added)} services supplémentaires ajoutés")
+            except Exception as e:
+                print(f"Erreur lors de l'accès à l'API V1: {e}")
+
+        print(f"Nombre total d'entités trouvées (après toutes méthodes): {len(found_entities)}")
         for entity in found_entities:
             entity_id = entity.get("entityId")
             display_name = entity.get("displayName", "")
@@ -121,18 +199,63 @@ def fetch_dynatrace_data(api_token, mz_name):
                 service_id_to_name_map[entity_id] = {"name": display_name, "type": service_type}
                 print(f"  Mapping trouvé: {entity_id} -> {display_name} (Type: {service_type})") # DEBUG Mapping
             elif entity_id:
-                # Même en fallback, utiliser un nom descriptif
-                fallback_name = f"Service {entity_id[-6:]}"  # Utiliser seulement les 6 derniers caractères de l'ID
+                # Tenter d'extraire un nom plus informatif à partir de l'ID
+                # Format typique: SERVICE-XXXXXXXX avec parfois un nom de service dans l'ID
+                fallback_name = "Service inconnu"
+
+                # Analyse de l'ID avec regex pour extraire des parties plus informatives
+                import re
+                # Pattern 1: SERVICE-XXXXX où XXXXX peut contenir des indications (ex: "vault")
+                parts = entity_id.split('-')
+                if len(parts) > 1:
+                    # Prendre la dernière partie pour analyse
+                    last_part = parts[-1].lower()
+                    # Chercher un nom potentiel de service dans l'ID
+                    common_service_names = ["vault", "keycloak", "api", "app", "web", "auth", "db",
+                                          "proxy", "gateway", "service", "server", "client", "cache"]
+                    for name in common_service_names:
+                        if name in last_part:
+                            fallback_name = f"Service {name}"
+                            break
+
+                    if fallback_name == "Service inconnu":
+                        # Si pas de nom connu, on prend une partie de l'ID
+                        if service_type:
+                            fallback_name = f"{service_type} {entity_id[-8:]}"
+                        else:
+                            fallback_name = f"Service {entity_id[-8:]}"
+
                 service_id_to_name_map[entity_id] = {"name": fallback_name, "type": service_type}
                 print(f"  Mapping (fallback): {entity_id} -> {fallback_name} (Type: {service_type})") # DEBUG Fallback
 
         print(f"Noms récupérés/mappés pour {len(service_id_to_name_map)} service(s).")
-        print(f"CONTENU FINAL de service_id_to_name_map: {service_id_to_name_map}") # <-- Vérifiez attentivement ceci !
 
-        if len(service_id_to_name_map) < len(service_ids_from_metrics):
-            print("Attention: Certains noms de services n'ont pas pu être récupérés via l'API Entités.")
-            missing_ids = service_ids_from_metrics - set(service_id_to_name_map.keys())
-            print(f"IDs pour lesquels le nom est manquant: {missing_ids}") 
+        # Vérifier s'il reste des IDs sans mapping de nom
+        remaining_missing_ids = service_ids_from_metrics - set(service_id_to_name_map.keys())
+        if remaining_missing_ids:
+            print(f"Attention: {len(remaining_missing_ids)} noms de services restent introuvables")
+            print(f"Attribution de noms génériques pour les IDs manquants: {remaining_missing_ids}")
+
+            # Attribuer des noms génériques pour les IDs manquants
+            for missing_id in remaining_missing_ids:
+                # Format typique: SERVICE-XXXXXXXX
+                parts = missing_id.split('-')
+                if len(parts) > 1:
+                    # Extraire des informations de l'ID pour créer un nom plus informatif
+                    last_part = parts[-1]
+                    service_id_to_name_map[missing_id] = {
+                        "name": f"Service {last_part[:8]}",
+                        "type": "INCONNU"
+                    }
+                else:
+                    # Fallback si l'ID n'a pas le format attendu
+                    service_id_to_name_map[missing_id] = {
+                        "name": f"Service {missing_id[-8:]}",
+                        "type": "INCONNU"
+                    }
+                print(f"  Mapping (généré): {missing_id} -> {service_id_to_name_map[missing_id]['name']}")
+
+        print(f"CONTENU FINAL de service_id_to_name_map après traitement complet: {len(service_id_to_name_map)} services") 
             
     except requests.exceptions.HTTPError as http_err:
         print(f"ERREUR HTTP (lors de la récupération des noms): {http_err}")
