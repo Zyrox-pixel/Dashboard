@@ -377,9 +377,9 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
     
     // Temps de réponse moyen (en millisecondes)
     const responseTimeBuckets = [
-      { id: 'fast', label: 'Rapide (<0.5ms)', range: [0, 0.5] },
-      { id: 'medium', label: 'Moyen (0.5-2ms)', range: [0.5, 2] },
-      { id: 'slow', label: 'Lent (>2ms)', range: [2, Infinity] }
+      { id: 'fast', label: 'Rapide (<20ms)', range: [0, 20] },
+      { id: 'medium', label: 'Moyen (20-100ms)', range: [20, 100] },
+      { id: 'slow', label: 'Lent (>100ms)', range: [100, Infinity] }
     ];
 
     const responseTimeCategory: FilterCategory = {
@@ -403,9 +403,9 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
 
     // Temps de réponse médian (en millisecondes)
     const medianResponseTimeBuckets = [
-      { id: 'fast_median', label: 'Rapide (<0.5ms)', range: [0, 0.5] },
-      { id: 'medium_median', label: 'Moyen (0.5-2ms)', range: [0.5, 2] },
-      { id: 'slow_median', label: 'Lent (>2ms)', range: [2, Infinity] }
+      { id: 'fast_median', label: 'Rapide (<20ms)', range: [0, 20] },
+      { id: 'medium_median', label: 'Moyen (20-100ms)', range: [20, 100] },
+      { id: 'slow_median', label: 'Lent (>100ms)', range: [100, Infinity] }
     ];
 
     const medianResponseTimeCategory: FilterCategory = {
@@ -671,9 +671,9 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
 
             const responseTime = service.response_time;
             return (
-              (filter.values.includes('fast') && responseTime < 0.5) ||
-              (filter.values.includes('medium') && responseTime >= 0.5 && responseTime < 2) ||
-              (filter.values.includes('slow') && responseTime >= 2)
+              (filter.values.includes('fast') && responseTime < 20) ||
+              (filter.values.includes('medium') && responseTime >= 20 && responseTime < 100) ||
+              (filter.values.includes('slow') && responseTime >= 100)
             );
 
           case 'median_response_time':
@@ -681,9 +681,9 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
 
             const medianResponseTime = service.median_response_time;
             return (
-              (filter.values.includes('fast_median') && medianResponseTime < 0.5) ||
-              (filter.values.includes('medium_median') && medianResponseTime >= 0.5 && medianResponseTime < 2) ||
-              (filter.values.includes('slow_median') && medianResponseTime >= 2)
+              (filter.values.includes('fast_median') && medianResponseTime < 20) ||
+              (filter.values.includes('medium_median') && medianResponseTime >= 20 && medianResponseTime < 100) ||
+              (filter.values.includes('slow_median') && medianResponseTime >= 100)
             );
             
           case 'error_rate':
@@ -831,8 +831,8 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
       render: (service: Service) => (
         <span className={`${
           service.response_time !== null ?
-            (service.response_time > 2 ? 'text-red-500' :
-            service.response_time > 1 ? 'text-yellow-500' :
+            (service.response_time > 100 ? 'text-red-500' :
+            service.response_time > 20 ? 'text-yellow-500' :
             'text-green-500') :
             'text-slate-400'
         }`}>
@@ -860,8 +860,8 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
       render: (service: Service) => (
         <span className={`${
           service.median_response_time !== null ?
-            (service.median_response_time > 2 ? 'text-red-500' :
-            service.median_response_time > 1 ? 'text-yellow-500' :
+            (service.median_response_time > 100 ? 'text-red-500' :
+            service.median_response_time > 20 ? 'text-yellow-500' :
             'text-green-500') :
             'text-slate-400'
         }`}>

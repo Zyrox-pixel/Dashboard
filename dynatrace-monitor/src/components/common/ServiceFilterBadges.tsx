@@ -30,17 +30,17 @@ const ServiceFilterBadges: React.FC<ServiceFilterBadgesProps> = ({
     switch (type) {
       case 'response_time':
         switch (value) {
-          case 'fast': return 'Rapide (<0.5ms)';
-          case 'medium': return 'Moyen (0.5-2ms)';
-          case 'slow': return 'Lent (>2ms)';
+          case 'fast': return 'Rapide (<20ms)';
+          case 'medium': return 'Moyen (20-100ms)';
+          case 'slow': return 'Lent (>100ms)';
           default: return value;
         }
 
       case 'median_response_time':
         switch (value) {
-          case 'fast_median': return 'Rapide (<0.5ms)';
-          case 'medium_median': return 'Moyen (0.5-2ms)';
-          case 'slow_median': return 'Lent (>2ms)';
+          case 'fast_median': return 'Rapide (<20ms)';
+          case 'medium_median': return 'Moyen (20-100ms)';
+          case 'slow_median': return 'Lent (>100ms)';
           default: return value;
         }
         
