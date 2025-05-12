@@ -5,28 +5,36 @@ from datetime import datetime
 import warnings
 
 # --- Configuration ---
-# URL et Management Zone pré-remplies d'après vos logs d'erreur.
-# VEUILLEZ VÉRIFIER ET SURTOUT REMPLACER VOTRE_TOKEN_API_DYNATRACE
 DYNATRACE_BASE_URL = os.environ.get("DYNATRACE_BASE_URL", "https://gmon-itgs.group.echonet/e/6d539108-2970-46ba-b505-d3cf7712f038")
 DYNATRACE_API_TOKEN = os.environ.get("DYNATRACE_API_TOKEN", "VOTRE_TOKEN_API_DYNATRACE") # REMPLACEZ CECI !
 MANAGEMENT_ZONE_NAME = "PRODSEC - AP11038 - WebSSO ITG"
+
+HTML_OUTPUT_FILENAME = "rapport_dynatrace_tableau.html"
+
+# Pour simplifier les noms de métriques dans les entêtes du tableau
+METRIC_DISPLAY_NAMES = {
+    "builtin:service.response.time:avg": "Temps Rép. Moyen (ms)",
+    "builtin:service.requestCount.server:value": "Nb Requêtes",
+    "builtin:service.errors.total.count:value": "Nb Erreurs"
+}
+
 
 if "VOTRE_TOKEN_API_DYNATRACE" in DYNATRACE_API_TOKEN:
     print("ERREUR: Veuillez remplacer DYNATRACE_API_TOKEN par votre véritable token dans le script.")
     exit()
 
 METRICS_API_ENDPOINT = f"{DYNATRACE_BASE_URL.rstrip('/')}/api/v2/metrics/query"
-HTML_OUTPUT_FILENAME = "rapport_dynatrace.html"
 
 def fetch_dynatrace_metrics(api_token, mz_name):
     headers = {
         "Authorization": f"Api-Token {api_token}",
         "Content-Type": "application/json"
     }
+    # Ces métriques seront les colonnes de notre tableau
     metric_selector = (
         "builtin:service.response.time:avg:splitBy(\"dt.entity.service\"),"
-        "builtin:service.requestCount.server:value:splitBy(\"dt.entity.service\")," # Utilisation de :value
-        "builtin:service.errors.total.count:value:splitBy(\"dt.entity.service\")"  # Utilisation de :value
+        "builtin:service.requestCount.server:value:splitBy(\"dt.entity.service\"),"
+        "builtin:service.errors.total.count:value:splitBy(\"dt.entity.service\")"
     )
     entity_selector = f'type(SERVICE),mzName("{mz_name}")'
     params = {
@@ -34,7 +42,7 @@ def fetch_dynatrace_metrics(api_token, mz_name):
         "entitySelector": entity_selector,
         "from": "now-2h",
         "to": "now",
-        "resolution": "Inf"
+        "resolution": "Inf" # Une seule valeur agrégée pour la période
     }
     print(f"Tentative de récupération des métriques depuis Dynatrace pour la MZ: {mz_name}...")
     print(f"URL de l'API: {METRICS_API_ENDPOINT}")
@@ -58,40 +66,70 @@ def fetch_dynatrace_metrics(api_token, mz_name):
         print(f"Une erreur inattendue est survenue lors de la récupération des données: {e}")
     return None
 
-def generate_html_report(metrics_data, mz_name):
+def generate_html_table_report(metrics_data_raw, mz_name):
+    # 1. Restructurer les données : { "SERVICE_ID": {"metric1_id": valeur1, "metric2_id": valeur2 ...} }
+    services_pivot = {}
+    ordered_metric_ids = [] # Pour garder l'ordre des colonnes tel que défini dans la requête
+
+    if metrics_data_raw and metrics_data_raw.get("result"):
+        # Déterminer l'ordre des métriques à partir de la première métrique ayant des données (ou de la requête)
+        # Ceci est basé sur l'ordre dans metric_selector
+        requested_metrics_order = [
+            "builtin:service.response.time:avg",
+            "builtin:service.requestCount.server:value",
+            "builtin:service.errors.total.count:value"
+        ]
+        # Filtrer pour ne garder que celles présentes dans la réponse et dans l'ordre souhaité
+        actual_metric_ids_in_response = {item['metricId'] for item in metrics_data_raw["result"]}
+        ordered_metric_ids = [m_id for m_id in requested_metrics_order if m_id in actual_metric_ids_in_response]
+
+
+        for metric_item in metrics_data_raw.get("result", []):
+            metric_id = metric_item.get("metricId")
+            for series_data in metric_item.get("data", []):
+                service_id = series_data.get("dimensions")[0] if series_data.get("dimensions") else "Service ID inconnu"
+                value = series_data.get("values")[0] if series_data.get("values") and series_data.get("values")[0] is not None else "N/A"
+
+                if service_id not in services_pivot:
+                    services_pivot[service_id] = {}
+                services_pivot[service_id][metric_id] = value
+    
+    # Générer le HTML
     html_content = f"""
 <!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Rapport Métriques Dynatrace</title>
+    <title>Rapport Métriques Dynatrace (Tableau)</title>
     <style>
-        body {{ font-family: Arial, sans-serif; margin: 20px; background-color: #f4f7f6; color: #333; }}
-        .container {{ max-width: 900px; margin: auto; background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }}
-        h1 {{ color: #2c3e50; text-align: center; border-bottom: 2px solid #3498db; padding-bottom:10px; }}
-        h2 {{ color: #3498db; margin-top: 0; }}
-        p.period {{ text-align: center; font-style: italic; color: #7f8c8d; margin-bottom: 20px;}}
-        .metric-section {{ margin-bottom: 30px; padding: 20px; border: 1px solid #ddd; border-radius: 5px; background-color: #fdfdfd; }}
-        .metric-title {{ font-size: 1.4em; color: #2980b9; margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 5px;}}
-        .service-block {{ border-left: 3px solid #3498db; padding-left: 15px; margin-bottom: 15px; }}
-        .service-id {{ font-weight: bold; color: #555; }}
-        .timestamp {{ color: #777; font-size: 0.9em; }}
-        .value {{ font-size: 1.1em; color: #27ae60; }}
-        .no-data {{ color: #e74c3c; font-weight: bold; text-align: center; padding: 20px;}}
-        .error-message {{ background-color: #fdd; border: 1px solid #e74c3c; color: #c0392b; padding: 15px; margin-bottom: 20px; border-radius: 5px; }}
+        body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 20px; background-color: #f0f2f5; color: #333; }}
+        .container {{ max-width: 1000px; margin: auto; background-color: #fff; padding: 25px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }}
+        h1 {{ color: #1a237e; text-align: center; border-bottom: 2px solid #3949ab; padding-bottom:10px; font-size: 1.8em; }}
+        h2 {{ color: #3949ab; margin-top: 0; font-size: 1.3em; }}
+        p.period {{ text-align: center; font-style: italic; color: #546e7a; margin-bottom: 25px;}}
+        table {{ width: 100%; border-collapse: collapse; margin-top: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }}
+        th, td {{ border: 1px solid # C5cae9; padding: 10px 12px; text-align: left; }}
+        th {{ background-color: #3949ab; color: white; font-size: 0.95em; }}
+        tr:nth-child(even) {{ background-color: #e8eaf6; }}
+        tr:hover {{ background-color: # C5cae9; }}
+        td.service-id {{ font-weight: bold; color: #283593; }}
+        td.metric-value {{ text-align: right; }}
+        td.na-value {{ color: #78909c; font-style:italic; text-align: center; }}
+        .no-data {{ color: #d32f2f; font-weight: bold; text-align: center; padding: 20px; background-color: #ffebee; border: 1px solid #d32f2f; border-radius: 4px; }}
+        .error-message {{ background-color: #ffcdd2; border: 1px solid #f44336; color: #c62828; padding: 15px; margin-bottom: 20px; border-radius: 5px; }}
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Rapport des Métriques de Service Dynatrace</h1>
+        <h1>Rapport Métriques de Service Dynatrace</h1>
         <h2>Management Zone: {mz_name}</h2>
-        <p class="period">Période: Dernières 2 heures (données agrégées à la fin de la période)</p>
+        <p class="period">Période: Dernières 2 heures (valeurs agrégées)</p>
 """
 
-    if not metrics_data or not metrics_data.get("result"):
-        html_content += "<p class='no-data'>Aucune donnée de métrique n'a été récupérée ou la structure des données est incorrecte.</p>"
-        if metrics_data and metrics_data.get("error"): # Si Dynatrace a renvoyé une erreur JSON structurée
-            error_info = metrics_data.get("error")
+    if not services_pivot:
+        html_content += "<p class='no-data'>Aucune donnée de service à afficher.</p>"
+        if metrics_data_raw and metrics_data_raw.get("error"):
+            error_info = metrics_data_raw.get("error")
             html_content += f"""
         <div class="error-message">
             <h4>Erreur de l'API Dynatrace :</h4>
@@ -99,40 +137,42 @@ def generate_html_report(metrics_data, mz_name):
             <p><strong>Message :</strong> {error_info.get('message', 'N/A')}</p>
         </div>"""
     else:
-        for metric_item in metrics_data.get("result", []):
-            metric_id = metric_item.get("metricId", "Métrique inconnue")
+        html_content += """
+        <table>
+            <thead>
+                <tr>
+                    <th>Service ID</th>"""
+        for metric_id in ordered_metric_ids:
+            display_name = METRIC_DISPLAY_NAMES.get(metric_id, metric_id) # Utilise un nom plus court si disponible
+            html_content += f"                    <th>{display_name}</th>\n"
+        html_content += """
+                </tr>
+            </thead>
+            <tbody>"""
+
+        for service_id, metrics in sorted(services_pivot.items()): # Tri par Service ID pour la consistence
             html_content += f"""
-        <div class="metric-section">
-            <h3 class="metric-title">{metric_id}</h3>"""
+                <tr>
+                    <td class="service-id">{service_id}</td>"""
+            for metric_id in ordered_metric_ids:
+                value = metrics.get(metric_id, "N/A")
+                if isinstance(value, float):
+                    value_display = f"{value:.2f}"
+                elif value == "N/A":
+                     value_display = value
+                else: # Entiers ou autres chaînes
+                    value_display = str(value)
+                
+                css_class = "metric-value"
+                if value_display == "N/A":
+                    css_class = "na-value"
 
-            if not metric_item.get("data"):
-                html_content += "<p>Aucune donnée pour cette métrique.</p>"
-            else:
-                for series_data in metric_item.get("data", []):
-                    service_id = series_data.get("dimensions")[0] if series_data.get("dimensions") else "Service ID non disponible"
-                    timestamps = series_data.get("timestamps", [])
-                    values = series_data.get("values", [])
-
-                    if timestamps and values and values[0] is not None:
-                        # Timestamp est en millisecondes
-                        timestamp_dt = datetime.fromtimestamp(timestamps[0] / 1000)
-                        value = values[0]
-                        html_content += f"""
-            <div class="service-block">
-                <p><span class="service-id">Service ID :</span> {service_id}</p>
-                <p><span class="timestamp">Fin de période :</span> {timestamp_dt.strftime('%Y-%m-%d %H:%M:%S')}</p>
-                <p><span class="value">Valeur :</span> {value:.2f} """ # Formatage à 2 décimales
-                        # Ajout d'unité simple pour le temps de réponse
-                        if "response.time" in metric_id:
-                            html_content += "ms"
-                        html_content += "</p>"
-                    else:
-                        html_content += f"""
-            <div class="service-block">
-                <p><span class="service-id">Service ID :</span> {service_id}</p>
-                <p>Pas de valeur de données pour cette période.</p>"""
-                    html_content += "</div>" # Fin service-block
-            html_content += "</div>" # Fin metric-section
+                html_content += f"                    <td class=\"{css_class}\">{value_display}</td>\n"
+            html_content += "                </tr>"
+        html_content += """
+            </tbody>
+        </table>
+"""
 
     html_content += """
     </div> </body>
@@ -141,23 +181,5 @@ def generate_html_report(metrics_data, mz_name):
     try:
         with open(HTML_OUTPUT_FILENAME, "w", encoding="utf-8") as f:
             f.write(html_content)
-        print(f"\nLe rapport HTML a été généré : '{os.path.abspath(HTML_OUTPUT_FILENAME)}'")
-        print("Ouvrez ce fichier dans votre navigateur web pour voir les résultats.")
-    except IOError as e:
-        print(f"Erreur lors de l'écriture du fichier HTML : {e}")
-
-if __name__ == "__main__":
-    print(f"--- Script de reporting Dynatrace vers HTML ---")
-    metrics_response = fetch_dynatrace_metrics(DYNATRACE_API_TOKEN, MANAGEMENT_ZONE_NAME)
-
-    if metrics_response:
-        generate_html_report(metrics_response, MANAGEMENT_ZONE_NAME)
-    else:
-        print("Échec de la récupération des données de Dynatrace. Le rapport HTML ne sera pas généré avec des données.")
-        # On peut quand même générer un HTML avec le message d'erreur si metrics_response est une erreur structurée
-        if isinstance(metrics_response, dict) and "error" in metrics_response:
-             generate_html_report(metrics_response, MANAGEMENT_ZONE_NAME)
-        else:
-             # Générer un HTML indiquant un échec plus générique
-             empty_error_data = {"error": {"code": "SCRIPT_ERROR", "message": "Impossible de récupérer les données de Dynatrace. Vérifiez les logs console."}}
-             generate_html_report(empty_error_data, MANAGEMENT_ZONE_NAME)
+        print(f"\nLe rapport HTML tabulaire a été généré : '{os.path.abspath(HTML_OUTPUT_FILENAME)}'")
+        print("Ouvrez ce fichier dans votre
