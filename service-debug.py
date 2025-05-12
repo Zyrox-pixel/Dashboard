@@ -9,17 +9,14 @@ DYNATRACE_BASE_URL = os.environ.get("DYNATRACE_BASE_URL", "https://gmon-itgs.gro
 DYNATRACE_API_TOKEN = os.environ.get("DYNATRACE_API_TOKEN", "VOTRE_TOKEN_API_DYNATRACE") # REMPLACEZ CECI !
 MANAGEMENT_ZONE_NAME = "PRODSEC - AP11038 - WebSSO ITG"
 
-HTML_OUTPUT_FILENAME = "rapport_dynatrace_final_corrige.html"
+HTML_OUTPUT_FILENAME = "rapport_dynatrace_nom_service_debug.html"
 
-# !! CORRECTION IMPORTANTE !!
-# Utilisation des longs metricId (avec splitBy) comme clés,
-# basé sur les en-têtes observés dans les captures d'écran de l'utilisateur.
+# Utilisation des longs metricId (avec splitBy) comme clés, basé sur les logs précédents
 PREFERRED_METRIC_ORDER_AND_NAMES = {
-    "builtin:service.response.time:avg:splitBy(\"dt.entity.service\")": "Temps Rép. Moyen (s)", # Clé MISE À JOUR, unité (s)
-    "builtin:service.requestCount.server:value:splitBy(\"dt.entity.service\")": "Nb Requêtes",      # Clé MISE À JOUR
-    "builtin:service.errors.total.count:value:splitBy(\"dt.entity.service\")": "Nb Erreurs"        # Clé MISE À JOUR
+    "builtin:service.response.time:avg:splitBy(\"dt.entity.service\")": "Temps Rép. Moyen (s)",
+    "builtin:service.requestCount.server:value:splitBy(\"dt.entity.service\")": "Nb Requêtes",
+    "builtin:service.errors.total.count:value:splitBy(\"dt.entity.service\")": "Nb Erreurs"
 }
-# Identifiant exact à vérifier pour la conversion en secondes
 RESPONSE_TIME_METRIC_ID_KEY = "builtin:service.response.time:avg:splitBy(\"dt.entity.service\")"
 
 if "VOTRE_TOKEN_API_DYNATRACE" in DYNATRACE_API_TOKEN:
@@ -29,9 +26,8 @@ if "VOTRE_TOKEN_API_DYNATRACE" in DYNATRACE_API_TOKEN:
 METRICS_API_ENDPOINT = f"{DYNATRACE_BASE_URL.rstrip('/')}/api/v2/metrics/query"
 ENTITIES_API_ENDPOINT = f"{DYNATRACE_BASE_URL.rstrip('/')}/api/v2/entities"
 
-# --- La fonction fetch_dynatrace_data reste la même que la précédente ---
-# --- (Avec ses impressions de débogage pour les noms) ---
 def fetch_dynatrace_data(api_token, mz_name):
+    # ... (Logique fetch métriques identique à la précédente) ...
     headers = {
         "Authorization": f"Api-Token {api_token}",
         "Content-Type": "application/json"
@@ -45,11 +41,11 @@ def fetch_dynatrace_data(api_token, mz_name):
     params_metrics = {
         "metricSelector": metric_selector,
         "entitySelector": entity_selector_metrics,
-        "from": "now-2h",
+        "from": "now-30m", # Période 30 min
         "to": "now",
         "resolution": "Inf"
     }
-    print(f"Tentative de récupération des métriques depuis Dynatrace pour la MZ: {mz_name}...")
+    print(f"Tentative de récupération des métriques (30 min) pour la MZ: {mz_name}...")
     metrics_data = None
     try:
         with warnings.catch_warnings():
@@ -78,56 +74,59 @@ def fetch_dynatrace_data(api_token, mz_name):
     print(f"ID de service extraits des métriques: {service_ids_from_metrics}") 
 
     if not service_ids_from_metrics:
-        print("Aucun ID de service trouvé dans les données de métriques.")
+        print("Aucun ID de service trouvé.")
         return metrics_data, {}
 
-    print(f"\nTentative de récupération des noms pour {len(service_ids_from_metrics)} ID(s) de service...")
+    # --- Récupération des noms ---
+    print(f"\n--- Début Récupération Noms Services ---")
+    print(f"Vérification pour {len(service_ids_from_metrics)} ID(s) de service...")
     service_id_to_name_map = {}
-    
     entity_selector_names = f'entityId({",".join(f'"{sid}"' for sid in service_ids_from_metrics)})'
-    print(f"Sélecteur d'entités pour les noms: {entity_selector_names}") 
-
-    params_entities = {
-        "entitySelector": entity_selector_names,
-        "fields": "displayName,entityId",
-        "from": "now-15m", 
-        "to": "now"
-    }
+    print(f"Sélecteur d'entités utilisé : {entity_selector_names}") 
+    params_entities = { "entitySelector": entity_selector_names, "fields": "displayName,entityId", "from": "now-15m", "to": "now" }
+    
     try:
+        print(f"Appel à l'API Entités: {ENTITIES_API_ENDPOINT} avec les paramètres ci-dessus")
         # !!! Rappel : Vérifiez que le token API a la permission 'entities.read' !!!
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", requests.packages.urllib3.exceptions.InsecureRequestWarning)
             response_entities = requests.get(ENTITIES_API_ENDPOINT, headers=headers, params=params_entities, verify=False)
-        response_entities.raise_for_status()
+        print(f"Statut de la réponse API Entités: {response_entities.status_code}") # DEBUG Statut HTTP
+        response_entities.raise_for_status() # Vérifie les erreurs HTTP
         entities_data = response_entities.json()
-        print(f"Réponse brute de l'API Entités (pour noms): {json.dumps(entities_data, indent=2)}") 
-        for entity in entities_data.get("entities", []):
+        print(f"Réponse brute de l'API Entités (JSON): {json.dumps(entities_data, indent=2)}") # DEBUG Brut
+        
+        found_entities = entities_data.get("entities", [])
+        print(f"Nombre d'entités trouvées dans la réponse: {len(found_entities)}") # DEBUG Nombre
+        for entity in found_entities:
             entity_id = entity.get("entityId")
             display_name = entity.get("displayName")
             if entity_id and display_name:
                  service_id_to_name_map[entity_id] = display_name
+                 print(f"  Mapping trouvé: {entity_id} -> {display_name}") # DEBUG Mapping
             elif entity_id:
-                 service_id_to_name_map[entity_id] = entity_id 
-        print(f"Noms récupérés pour {len(service_id_to_name_map)} service(s).")
-        print(f"Service ID to Name Map (Contenu): {service_id_to_name_map}") # <-- Vérifiez ceci !
+                 service_id_to_name_map[entity_id] = entity_id # Fallback si pas de nom
+                 print(f"  Mapping (fallback ID): {entity_id} -> {entity_id}") # DEBUG Fallback
+
+        print(f"Noms récupérés/mappés pour {len(service_id_to_name_map)} service(s).")
+        print(f"CONTENU FINAL de service_id_to_name_map: {service_id_to_name_map}") # <-- Vérifiez attentivement ceci !
 
         if len(service_id_to_name_map) < len(service_ids_from_metrics):
-            print("Attention: Certains noms de services n'ont pas pu être récupérés.")
+            print("Attention: Certains noms de services n'ont pas pu être récupérés via l'API Entités.")
             missing_ids = service_ids_from_metrics - set(service_id_to_name_map.keys())
             print(f"IDs pour lesquels le nom est manquant: {missing_ids}") 
             
     except requests.exceptions.HTTPError as http_err:
-        print(f"Erreur HTTP (noms des services): {http_err}\nRéponse de l'API: {response_entities.text if 'response_entities' in locals() else 'N/A'}")
-        print("Les IDs de service seront utilisés à la place des noms manquants.")
+        print(f"ERREUR HTTP (lors de la récupération des noms): {http_err}")
+        print(f"Réponse de l'API Entités: {response_entities.text if 'response_entities' in locals() else 'N/A'}")
     except Exception as e:
-        print(f"Une erreur inattendue (noms des services): {e}")
-        print("Les IDs de service seront utilisés à la place des noms manquants.")
-        
+        print(f"ERREUR Inattendue (lors de la récupération des noms): {e}")
+    print(f"--- Fin Récupération Noms Services ---")   
     return metrics_data, service_id_to_name_map
 
-# --- La fonction generate_html_table_report est modifiée pour utiliser ---
-# --- les nouvelles clés et la condition de conversion corrigée ---
+
 def generate_html_table_report(metrics_data_raw, service_id_to_name_map, mz_name):
+    # ... (Début identique, traitement des métriques et IDs) ...
     services_pivot = {}
     actual_metric_ids_from_response = set()
     ordered_metric_ids_for_table = []
@@ -135,38 +134,24 @@ def generate_html_table_report(metrics_data_raw, service_id_to_name_map, mz_name
     if metrics_data_raw and metrics_data_raw.get("result"):
         print("\n--- DÉBUT DÉBOGAGE generate_html_table_report ---")
         for metric_item in metrics_data_raw.get("result", []):
-            metric_id_from_item = metric_item.get("metricId")
-            if not metric_id_from_item:
-                continue
-            actual_metric_ids_from_response.add(metric_id_from_item) 
-
-            for series_data in metric_item.get("data", []):
-                service_id = series_data.get("dimensions")[0] if series_data.get("dimensions") else "Service ID inconnu"
-                value = series_data.get("values")[0] if series_data.get("values") and series_data.get("values")[0] is not None else "N/A"
-                if service_id not in services_pivot:
-                    services_pivot[service_id] = {}
-                services_pivot[service_id][metric_id_from_item] = value
-        
-        # Affichage des IDs réels (important pour vérifier les clés utilisées)
-        print(f"IDs de métriques réellement présents dans la réponse API (métriques): {actual_metric_ids_from_response}") 
-
-        # Utiliser les clés (longues) de PREFERRED_METRIC_ORDER_AND_NAMES pour définir l'ordre
+             metric_id_from_item = metric_item.get("metricId")
+             if not metric_id_from_item: continue
+             actual_metric_ids_from_response.add(metric_id_from_item)
+             for series_data in metric_item.get("data", []):
+                 service_id = series_data.get("dimensions")[0] if series_data.get("dimensions") else "Inconnu"
+                 value = series_data.get("values")[0] if series_data.get("values") and series_data.get("values")[0] is not None else "N/A"
+                 if service_id not in services_pivot: services_pivot[service_id] = {}
+                 services_pivot[service_id][metric_id_from_item] = value
+        print(f"IDs métriques réels: {actual_metric_ids_from_response}") 
         preferred_keys_ordered = list(PREFERRED_METRIC_ORDER_AND_NAMES.keys())
         for pref_key in preferred_keys_ordered:
-             if pref_key in actual_metric_ids_from_response:
-                 ordered_metric_ids_for_table.append(pref_key)
-        
+             if pref_key in actual_metric_ids_from_response: ordered_metric_ids_for_table.append(pref_key)
         other_received_ids = sorted([m_id for m_id in actual_metric_ids_from_response if m_id not in ordered_metric_ids_for_table])
         ordered_metric_ids_for_table.extend(other_received_ids)
+        print(f"IDs métriques ordonnés pour colonnes: {ordered_metric_ids_for_table}")
+        print("--- FIN DÉBOGAGE generate_html_table_report ---\n")
 
-        print(f"IDs de métriques ordonnés pour les colonnes du tableau (utilisés pour les en-têtes et la recherche de valeurs): {ordered_metric_ids_for_table}") # <-- Vérifiez ceci !!
-        if services_pivot:
-            first_service_id_example = list(services_pivot.keys())[0]
-            print(f"Données pivotées (exemple pour {first_service_id_example}): {services_pivot[first_service_id_example]}")
-        print("--- FIN DÉBOGAGE ---\n")
-
-    # --- Le reste de la génération HTML ---
-    # (Utilise maintenant les clés et conditions corrigées)
+    # --- Génération HTML ---
     html_content = f"""
 <!DOCTYPE html>
 <html lang="fr">
@@ -174,7 +159,7 @@ def generate_html_table_report(metrics_data_raw, service_id_to_name_map, mz_name
     <meta charset="UTF-8">
     <title>Rapport Services Dynatrace</title>
     <style>
-        /* ... (Styles CSS identiques à la version précédente) ... */
+        /* ... (Styles CSS identiques) ... */
         body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 20px; background-color: #f0f2f5; color: #333; }}
         .container {{ max-width: 1100px; margin: auto; background-color: #fff; padding: 25px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }}
         h1 {{ color: #1a237e; text-align: center; border-bottom: 2px solid #3949ab; padding-bottom:10px; font-size: 1.8em; }}
@@ -186,6 +171,7 @@ def generate_html_table_report(metrics_data_raw, service_id_to_name_map, mz_name
         tr:nth-child(even) {{ background-color: #e8eaf6; }}
         tr:hover {{ background-color: #c5cae9; }}
         td.service-name {{ font-weight: bold; color: #283593; }}
+        td.service-id-marker {{ font-size: 0.85em; color: #777; }}
         td.metric-value {{ text-align: right; }}
         td.na-value {{ color: #78909c; font-style:italic; text-align: center; }}
         .no-data {{ color: #d32f2f; font-weight: bold; text-align: center; padding: 20px; background-color: #ffebee; border: 1px solid #d32f2f; border-radius: 4px; }}
@@ -196,21 +182,19 @@ def generate_html_table_report(metrics_data_raw, service_id_to_name_map, mz_name
     <div class="container">
         <h1>Rapport des Métriques de Service Dynatrace</h1>
         <h2>Management Zone: {mz_name}</h2>
-        <p class="period">Période: Dernières 2 heures (valeurs agrégées)</p>
+        <p class="period">Période: Dernières 30 minutes (valeurs agrégées)</p>
 """
 
     if not services_pivot or not ordered_metric_ids_for_table:
-        html_content += "<p class='no-data'>Aucune donnée de service à afficher ou aucune colonne de métrique définie. Vérifiez les logs console pour les erreurs.</p>"
-        # ... (gestion message d'erreur API métriques)
+        html_content += "<p class='no-data'>Aucune donnée de service à afficher ou aucune colonne de métrique définie. Vérifiez les logs console.</p>"
+        # ... (gestion erreur API métriques) ...
     else:
         html_content += """
         <table>
             <thead>
                 <tr>
-                    <th>Nom du Service (ID)</th>"""
-        # Génération des en-têtes avec les noms courts/corrigés
+                    <th>Service</th>""" # En-tête simplifié
         for metric_id in ordered_metric_ids_for_table:
-            # Utilise le nom court du dict si la clé (longue) existe, sinon metric_id brut
             display_name = PREFERRED_METRIC_ORDER_AND_NAMES.get(metric_id, metric_id) 
             html_content += f"                    <th>{display_name}</th>\n"
         html_content += """
@@ -219,17 +203,12 @@ def generate_html_table_report(metrics_data_raw, service_id_to_name_map, mz_name
             <tbody>"""
 
         for service_id, metrics in sorted(services_pivot.items()):
-            service_name = service_id_to_name_map.get(service_id, service_id)
-            display_service_identifier = service_name
-            if service_name != service_id :
-                 display_service_identifier = f"{service_name} ({service_id})"
-            elif service_id_to_name_map and service_id not in service_id_to_name_map and service_ids_from_metrics:
-                 display_service_identifier = f"{service_id} (Nom non trouvé)"
+            # Affichage simplifié : Nom si trouvé, sinon ID avec marqueur
+            service_display = service_id_to_name_map.get(service_id, f'<span class="service-id-marker">{service_id} [ID]</span>')
 
             html_content += f"""
                 <tr>
-                    <td class="service-name">{display_service_identifier}</td>"""
-            # Boucle pour générer les cellules de données
+                    <td class="service-name">{service_display}</td>"""
             for metric_id_col in ordered_metric_ids_for_table:
                 value = metrics.get(metric_id_col, "N/A")
                 value_display = "N/A"
@@ -238,12 +217,11 @@ def generate_html_table_report(metrics_data_raw, service_id_to_name_map, mz_name
                 if value != "N/A":
                     css_class = "metric-value"
                     if isinstance(value, (float, int)):
-                        # !! CORRECTION IMPORTANTE : Condition pour conversion en secondes !!
                         if metric_id_col == RESPONSE_TIME_METRIC_ID_KEY:
-                            # DEBUG Ajouté
-                            print(f"DEBUG - Conversion secondes pour {service_id}, metric_id: {metric_id_col}, valeur brute: {value}, type: {type(value)}")
+                            # Conversion secondes (le debug print est optionnel maintenant si l'on est sûr de la clé)
+                            # print(f"DEBUG - Conversion secondes pour {service_id}, metric_id: {metric_id_col}, valeur brute: {value}, type: {type(value)}")
                             value_seconds = float(value) / 1000.0
-                            value_display = f"{value_seconds:.3f}" # Affichage en secondes avec 3 décimales
+                            value_display = f"{value_seconds:.3f}"
                         elif isinstance(value, float):
                             value_display = f"{value:.2f}"
                         else: # int
@@ -271,6 +249,6 @@ def generate_html_table_report(metrics_data_raw, service_id_to_name_map, mz_name
         print(f"Erreur lors de l'écriture du fichier HTML : {e}")
 
 if __name__ == "__main__":
-    print(f"--- Script de reporting Dynatrace (Correction metricId + Debug Noms) ---")
+    print(f"--- Script de reporting Dynatrace (Debug Noms/Secondes) ---")
     metrics_response_data, service_names_map = fetch_dynatrace_data(DYNATRACE_API_TOKEN, MANAGEMENT_ZONE_NAME)
     generate_html_table_report(metrics_response_data, service_names_map, MANAGEMENT_ZONE_NAME)
