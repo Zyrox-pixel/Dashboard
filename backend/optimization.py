@@ -14,6 +14,7 @@ from datetime import datetime, timedelta
 import logging
 import os
 import re
+import json
 
 # Configuration du logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -48,1891 +49,954 @@ class OptimizedAPIClient:
         
         # Configuration avancée des retries
         retry_strategy = requests.adapters.Retry(
-            total=5,  # Nombre max de retries
-            backoff_factor=0.5,  # Facteur pour le délai exponentiel
-            status_forcelist=[408, 429, 500, 502, 503, 504],  # Statuts HTTP qui déclenchent un retry
-            allowed_methods=["GET"]  # Méthodes HTTP qui déclenchent un retry
+            total=3,
+            backoff_factor=0.3,
+            status_forcelist=[429, 500, 502, 503, 504],
+            allowed_methods=["HEAD", "GET", "PUT", "DELETE", "OPTIONS", "TRACE"]
         )
         
-        # Configuration avancée des connexions
-        adapter = requests.adapters.HTTPAdapter(
-            pool_connections=max_connections,
-            pool_maxsize=max_connections,
-            max_retries=retry_strategy,
-            pool_block=False  # Ne pas bloquer lorsque le pool est plein
-        )
+        # Sessions HTTP réutilisables pour optimiser les connexions
+        self.sessions = []
+        for _ in range(self.max_connections):
+            session = requests.Session()
+            adapter = requests.adapters.HTTPAdapter(
+                pool_connections=1,
+                pool_maxsize=1,
+                max_retries=retry_strategy
+            )
+            session.mount("http://", adapter)
+            session.mount("https://", adapter)
+            session.headers.update(self._default_headers())
+            session.verify = self.verify_ssl
+            self.sessions.append(session)
         
-        # Créer une session pour réutiliser les connexions
-        self.session = requests.Session()
-        self.session.mount('http://', adapter)
-        self.session.mount('https://', adapter)
-        self.session.headers.update({
+        self.session_index = 0
+        self.session_lock = threading.Lock()
+        
+        # Regroupement des requêtes pour optimisation
+        self.request_groups = {}
+        self.request_groups_lock = threading.Lock()
+        
+        # Métriques de performance
+        self.metrics = {
+            'total_requests': 0,
+            'cache_hits': 0,
+            'api_calls': 0,
+            'error_count': 0,
+            'total_api_time': 0,
+            'retry_count': 0,
+            'batch_optimization': 0
+        }
+        self.metrics_lock = threading.Lock()
+
+    def _default_headers(self):
+        """Headers par défaut pour toutes les requêtes"""
+        return {
             'Authorization': f'Api-Token {self.api_token}',
-            'Accept': 'application/json'
-        })
-        self.session.verify = self.verify_ssl
-        
-        # Définir un timeout par défaut plus long
-        self.default_timeout = (30, 120)  # (connect timeout, read timeout)
-        
-        # Utiliser des sémaphores pour contrôler l'accès aux ressources
-        self.semaphore = threading.BoundedSemaphore(value=self.max_connections)
-        
-        # Ajouter un compteur de requêtes pour le monitoring
-        self.request_count = 0
-        self.request_count_lock = threading.Lock()
-        
-        logger.info(f"Client API initialisé avec {max_workers} workers et {max_connections} connexions maximales")
-    
-    def get_cached(self, cache_key):
+            'Accept': 'application/json; charset=utf-8',
+            'Content-Type': 'application/json'
+        }
+
+    def _get_session(self):
+        """Obtient une session HTTP disponible en rotation"""
+        with self.session_lock:
+            session = self.sessions[self.session_index]
+            self.session_index = (self.session_index + 1) % len(self.sessions)
+            return session
+
+    def _cache_key(self, endpoint, params=None, custom_key=None):
+        """Génère une clé de cache unique"""
+        if custom_key:
+            return custom_key
+        key_parts = [endpoint]
+        if params:
+            sorted_params = sorted(params.items())
+            key_parts.append(str(sorted_params))
+        return ":".join(key_parts)
+
+    def _get_from_cache(self, cache_key):
         """Récupère une valeur du cache si elle existe et n'est pas expirée"""
         with self.cache_lock:
             if cache_key in self.cache:
-                item = self.cache[cache_key]
-                
-                # Déterminer la durée de cache à utiliser (personnalisée ou standard)
-                cache_duration = item.get('duration', self.cache_duration)
-                
-                # Vérifier si le cache est encore valide
-                current_time = time.time()
-                cache_age = current_time - item['timestamp']
-                
-                if cache_age < cache_duration:
-                    # Si c'est un cache persistant, ajouter un log informatif
-                    if 'duration' in item and cache_key.startswith('persistent_'):
-                        logger.info(f"Hit du cache persistant pour {cache_key} (âge: {cache_age/60:.1f}min, expiration: {(cache_duration-cache_age)/60:.1f}min)")
-                    else:
-                        logger.debug(f"Cache hit for {cache_key}")
-                    return item['data']
+                data, timestamp = self.cache[cache_key]
+                if time.time() - timestamp < self.cache_duration:
+                    with self.metrics_lock:
+                        self.metrics['cache_hits'] += 1
+                    return data
                 else:
-                    logger.debug(f"Cache expiré pour {cache_key} (âge: {cache_age/60:.1f}min > durée: {cache_duration/60:.1f}min)")
-        
-        logger.debug(f"Cache miss for {cache_key}")
+                    del self.cache[cache_key]
         return None
 
-    def set_cache(self, cache_key, data):
-        """Met à jour le cache avec de nouvelles données avec la durée standard"""
+    def _set_cache(self, cache_key, data):
+        """Stocke une valeur dans le cache avec timestamp"""
         with self.cache_lock:
-            self.cache[cache_key] = {
-                'data': data,
-                'timestamp': time.time()
-            }
-    
-    def set_persistent_cache(self, cache_key, data, duration=14400):
-        """
-        Met à jour le cache avec une durée personnalisée plus longue
-        Utile pour les données qui changent rarement (services, process groups)
-        
-        Args:
-            cache_key (str): Clé de cache
-            data: Données à mettre en cache
-            duration (int): Durée de vie du cache en secondes (défaut: 4 heures)
-        """
-        with self.cache_lock:
-            self.cache[cache_key] = {
-                'data': data,
-                'timestamp': time.time(),
-                'duration': duration  # Durée personnalisée
-            }
-            logger.info(f"Données mises en cache persistant ({duration/3600}h) pour la clé {cache_key}")
-            
-            # Log de debug pour la taille des données
-            if isinstance(data, list):
-                logger.info(f"Taille des données en cache: {len(data)} éléments pour {cache_key}")
-            elif isinstance(data, dict):
-                logger.info(f"Données en cache: dictionnaire avec {len(data)} clés pour {cache_key}")
+            self.cache[cache_key] = (data, time.time())
 
-    def clear_cache(self, pattern=None):
-        """
-        Efface le cache
-        
-        Args:
-            pattern (str): Motif pour effacer sélectivement le cache (None pour tout effacer)
-        """
+    def _clear_cache(self, pattern=None):
+        """Efface le cache complet ou les entrées correspondant au pattern"""
         with self.cache_lock:
             if pattern:
-                keys_to_delete = [key for key in self.cache if pattern in key]
+                keys_to_delete = [key for key in self.cache.keys() if pattern in key]
                 for key in keys_to_delete:
                     del self.cache[key]
             else:
                 self.cache.clear()
-        logger.info(f"Cache cleared. Pattern: {pattern}")
-    
-    # Ajouter une méthode pour gérer les requêtes avec sémaphore
-    def _request_with_semaphore(self, method, url, **kwargs):
-        with self.semaphore:
-            with self.request_count_lock:
-                self.request_count += 1
-            
-            # Utiliser le timeout par défaut si aucun n'est spécifié
-            if 'timeout' not in kwargs:
-                kwargs['timeout'] = self.default_timeout
-            
-            # Ajouter un log pour le debugging
-            logger.info(f"Requête {method} vers {url} avec timeout={kwargs.get('timeout')}")
-            
-            try:
-                response = self.session.request(method, url, **kwargs)
-                response.raise_for_status()
-                return response
-            except requests.exceptions.Timeout as e:
-                logger.error(f"Timeout pour la requête {url}: {e}")
-                # Les timeouts sont gérés par la stratégie de retry configurée dans le session
-                raise
-            except requests.exceptions.ConnectionError as e:
-                logger.error(f"Erreur de connexion pour {url}: {e}")
-                raise
-            except requests.exceptions.RequestException as e:
-                logger.error(f"Erreur de requête HTTP pour {url}: {e}")
-                raise
-            finally:
-                # Libérer la connexion explicitement
-                if 'response' in locals():
-                    response.close()
 
-    def query_api(self, endpoint, params=None, use_cache=True, cache_key=None):
+    def get_cache_stats(self):
+        """Retourne les statistiques de performance"""
+        with self.metrics_lock:
+            stats = self.metrics.copy()
+            if stats['total_requests'] > 0:
+                stats['cache_hit_rate'] = stats['cache_hits'] / stats['total_requests'] * 100
+                stats['api_hit_rate'] = stats['api_calls'] / stats['total_requests'] * 100
+                stats['error_rate'] = stats['error_count'] / stats['total_requests'] * 100
+            if stats['api_calls'] > 0:
+                stats['avg_api_time'] = stats['total_api_time'] / stats['api_calls']
+            return stats
+
+    def single_query(self, endpoint, params=None, use_cache=True, custom_cache_key=None, timeout=None):
         """
-        Exécute une requête API avec gestion du cache et sémaphore
-        
-        Args:
-            endpoint (str): Point de terminaison de l'API
-            params (dict): Paramètres de requête
-            use_cache (bool): Utiliser le cache
-            cache_key (str): Clé de cache personnalisée (si None, générée automatiquement)
-            
-        Returns:
-            dict: Réponse JSON de l'API
+        Effectue une requête unique à l'API Dynatrace avec cache automatique
         """
-        # Générer une clé de cache si elle n'est pas fournie
-        if cache_key is None:
-            param_str = str(params) if params else ""
-            cache_key = f"{endpoint}:{param_str}"
+        with self.metrics_lock:
+            self.metrics['total_requests'] += 1
         
         # Vérifier le cache si activé
         if use_cache:
-            cached_data = self.get_cached(cache_key)
+            cache_key = self._cache_key(endpoint, params, custom_cache_key)
+            cached_data = self._get_from_cache(cache_key)
             if cached_data is not None:
                 return cached_data
         
-        # Exécuter la requête avec sémaphore
+        # Faire la requête API
         url = f"{self.env_url}/api/v2/{endpoint}"
-        try:
-            # Si c'est une requête pour des entities, vérifier si pageSize est spécifié
-            # pour les process groups, utiliser une taille de page plus grande par défaut si non spécifié
-            if endpoint == "entities" and params and "entitySelector" in params:
-                if "type(PROCESS_GROUP)" in params["entitySelector"] and "pageSize" not in params:
-                    # Copier les paramètres pour ne pas modifier l'original
-                    params = params.copy()
-                    params["pageSize"] = 1000  # Récupérer jusqu'à 1000 process groups par défaut
-                    logger.info(f"Auto-configured pageSize=1000 for process groups query")
-            
-            response = self._request_with_semaphore("GET", url, params=params, timeout=(10, 60))  # Timeout augmenté pour les grandes requêtes
-            result = response.json()
-            
-            # Mettre en cache le résultat
-            if use_cache:
-                self.set_cache(cache_key, result)
+        session = self._get_session()
+        
+        start_time = time.time()
+        retry_count = 0
+        
+        while retry_count <= 3:
+            try:
+                # Gestion intelligente du timeout
+                if timeout is None:
+                    # Timeout adaptatif basé sur le type de requête
+                    if 'metrics/query' in endpoint:
+                        timeout = 60  # Requêtes de métriques plus longues
+                    elif 'problems' in endpoint:
+                        timeout = 30  # Requêtes de problèmes moyennes
+                    else:
+                        timeout = 15  # Requêtes standard
                 
-            return result
-        except requests.RequestException as e:
-            logger.error(f"API request error for {endpoint}: {str(e)}")
-            # Réessayer une fois en cas d'erreur de connexion
-            if "Connection" in str(e):
-                logger.info(f"Tentative de reconnexion pour {endpoint}")
-                time.sleep(1)  # Attendre 1 seconde avant de réessayer
-                try:
-                    response = self._request_with_semaphore("GET", url, params=params, timeout=(5, 30))
-                    result = response.json()
+                response = session.get(url, params=params, timeout=timeout)
+                
+                if response.status_code == 200:
+                    with self.metrics_lock:
+                        self.metrics['api_calls'] += 1
+                        self.metrics['total_api_time'] += time.time() - start_time
+                    
+                    data = response.json()
+                    
+                    # Mettre en cache si activé
                     if use_cache:
-                        self.set_cache(cache_key, result)
-                    return result
-                except Exception as retry_e:
-                    logger.error(f"Échec de la seconde tentative: {retry_e}")
-            raise
-
-    async def query_api_async(self, endpoint, params=None, use_cache=True, cache_key=None):
-        """Version asynchrone de query_api utilisant asyncio avec ThreadPoolExecutor"""
-        loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(
-            None, 
-            lambda: self.query_api(endpoint, params, use_cache, cache_key)
-        )
+                        self._set_cache(cache_key, data)
+                    
+                    return data
+                
+                elif response.status_code == 429:  # Rate limit
+                    retry_count += 1
+                    wait_time = min(2 ** retry_count, 30)
+                    logger.warning(f"Rate limit atteint, attente de {wait_time}s...")
+                    time.sleep(wait_time)
+                    with self.metrics_lock:
+                        self.metrics['retry_count'] += 1
+                
+                else:
+                    response.raise_for_status()
+                    
+            except requests.exceptions.Timeout:
+                retry_count += 1
+                if retry_count > 3:
+                    with self.metrics_lock:
+                        self.metrics['error_count'] += 1
+                    raise Exception(f"Timeout après {retry_count} tentatives pour {endpoint}")
+                time.sleep(2 ** retry_count)
+                
+            except Exception as e:
+                with self.metrics_lock:
+                    self.metrics['error_count'] += 1
+                logger.error(f"Erreur lors de la requête {endpoint}: {str(e)}")
+                return None
+        
+        with self.metrics_lock:
+            self.metrics['error_count'] += 1
+        return None
 
     def batch_query(self, queries):
         """
-        Exécute plusieurs requêtes API en parallèle avec contrôle de charge
+        Effectue plusieurs requêtes en parallèle avec optimisation intelligente
         
         Args:
-            queries (list): Liste de tuples (endpoint, params, use_cache, cache_key)
-            
+            queries: Liste de tuples (endpoint, params, use_cache, custom_cache_key)
+        
         Returns:
-            list: Liste des résultats correspondants
+            Liste des résultats dans l'ordre des requêtes
         """
-        # Si trop de requêtes, diviser en lots plus petits
-        if len(queries) > self.max_connections:
-            logger.info(f"Divisant {len(queries)} requêtes en lots de {self.max_connections}")
-            results = []
-            # Diviser les requêtes en groupes de max_connections
-            for i in range(0, len(queries), self.max_connections):
-                chunk = queries[i:i + self.max_connections]
-                chunk_results = self._execute_batch(chunk)
-                results.extend(chunk_results)
-                # Pause courte entre les lots pour éviter la surcharge
-                if i + self.max_connections < len(queries):
-                    time.sleep(0.5)
-            return results
-        else:
-            return self._execute_batch(queries)
-
-    def _execute_batch(self, queries):
-        """
-        Exécute un lot de requêtes avec ThreadPoolExecutor
-        """
-        with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            futures = {}  # Utiliser un dictionnaire pour conserver le mapping entre futures et queries
+        results = [None] * len(queries)
+        
+        # Séparer les requêtes qui peuvent être groupées
+        grouped_queries = self._group_similar_queries(queries)
+        
+        # Créer un ThreadPoolExecutor avec un nombre optimal de workers
+        adaptive_workers = min(self.max_workers, len(queries))
+        
+        with concurrent.futures.ThreadPoolExecutor(max_workers=adaptive_workers) as executor:
+            future_to_index = {}
             
-            for i, query in enumerate(queries):
-                # Gérer les différents formats de requêtes
-                if isinstance(query, tuple):
-                    if len(query) == 2:
-                        endpoint, params = query
-                        use_cache, cache_key = True, None
-                    elif len(query) == 3:
-                        endpoint, params, use_cache = query
-                        cache_key = None
-                    elif len(query) >= 4:
-                        endpoint, params, use_cache, cache_key = query[:4]
+            # Pour chaque groupe de requêtes similaires
+            for group_key, group_data in grouped_queries.items():
+                indices = group_data['indices']
+                
+                # Si on peut optimiser ce groupe (même endpoint, différents paramètres)
+                if len(indices) > 1 and self._can_batch_optimize(group_key):
+                    # Créer une requête unique optimisée pour tout le groupe
+                    future = executor.submit(self._optimized_group_query, group_data)
+                    future_to_index[future] = indices
                 else:
-                    endpoint, params = query, None
-                    use_cache, cache_key = True, None
-                
-                # Utiliser l'index comme identifiant unique pour chaque future
-                future = executor.submit(self.query_api, endpoint, params, use_cache, cache_key)
-                futures[i] = future
-            
-            # Collecter les résultats dans l'ordre original des requêtes
-            results = [None] * len(queries)
-            for i, future in futures.items():
-                try:
-                    results[i] = future.result()
-                except Exception as e:
-                    logger.error(f"Error in batch query for index {i}: {str(e)}")
-                    results[i] = None
-            
-            return results
-
-    async def batch_query_async(self, queries):
-        """Version asynchrone de batch_query utilisant asyncio"""
-        tasks = []
-        for query in queries:
-            # Gérer les différents formats de requêtes
-            if isinstance(query, tuple):
-                if len(query) == 2:
-                    endpoint, params = query
-                    use_cache, cache_key = True, None
-                elif len(query) == 3:
-                    endpoint, params, use_cache = query
-                    cache_key = None
-                elif len(query) >= 4:
-                    endpoint, params, use_cache, cache_key = query[:4]
-            else:
-                endpoint, params = query, None
-                use_cache, cache_key = True, None
-            
-            tasks.append(self.query_api_async(endpoint, params, use_cache, cache_key))
-        
-        return await asyncio.gather(*tasks, return_exceptions=True)
-
-    def extract_technology(self, entity_id, use_cache=True):
-        """
-        Extrait les informations de technologie d'une entité
-        Optimisé à partir de la fonction dans code.py
-        
-        Args:
-            entity_id (str): ID de l'entité
-            use_cache (bool): Utiliser le cache
-            
-        Returns:
-            dict: Informations sur la technologie
-        """
-        cache_key = f"technology:{entity_id}"
-        if use_cache:
-            cached_data = self.get_cached(cache_key)
-            if cached_data is not None:
-                return cached_data
-
-        try:
-            entity_details = self.query_api(f"entities/{entity_id}")
-            
-            # Récupération des technologies selon le type d'entité
-            tech_info = []
-            tech_icon = "code"  # Icône par défaut
-            
-            # Pour les services
-            if 'softwareTechnologies' in entity_details.get('properties', {}):
-                techs = entity_details['properties']['softwareTechnologies']
-                for tech in techs:
-                    if 'type' in tech:
-                        tech_info.append(tech['type'])
-            
-            # Pour les process groups
-            elif 'softwareTechnologies' in entity_details.get('fromRelationships', {}):
-                techs = entity_details['fromRelationships']['softwareTechnologies']
-                for tech in techs:
-                    if 'type' in tech:
-                        tech_info.append(tech['type'])
-            
-            # Approche alternative, chercher des indices dans les tags
-            if not tech_info:
-                # Chercher dans les tags
-                if 'tags' in entity_details:
-                    for tag in entity_details['tags']:
-                        if tag.get('key') == 'Technology' or tag.get('key') == 'technology':
-                            tech_info.append(tag.get('value'))
-            
-            # Si rien n'est trouvé, chercher des mots-clés dans le nom
-            if not tech_info:
-                name = entity_details.get('displayName', '').lower()
-                tech_keywords = {
-                    'java': ('java', 'coffee'),
-                    'python': ('python', 'snake'),
-                    'node.js': ('nodejs', 'node'),
-                    'nodejs': ('nodejs', 'node'),
-                    'php': ('php', 'elephant'),
-                    '.net': ('dotnet', 'windows'),
-                    'ruby': ('ruby', 'gem'),
-                    'go': ('go', 'gopher'),
-                    'postgresql': ('database', 'database'),
-                    'mysql': ('database', 'database'),
-                    'mongodb': ('database', 'database'),
-                    'oracle': ('database', 'database')
-                }
-                
-                for tech, (keyword, icon) in tech_keywords.items():
-                    if tech in name:
-                        tech_info.append(tech.upper())
-                        tech_icon = icon
-                        break
-            
-            # Déterminer l'icône à utiliser
-            if tech_info:
-                tech_name = tech_info[0].lower()
-                if 'java' in tech_name:
-                    tech_icon = 'coffee'
-                elif 'python' in tech_name:
-                    tech_icon = 'snake'
-                elif 'node' in tech_name:
-                    tech_icon = 'node'
-                elif 'php' in tech_name:
-                    tech_icon = 'elephant'
-                elif 'dot' in tech_name or '.net' in tech_name:
-                    tech_icon = 'windows'
-                elif 'ruby' in tech_name:
-                    tech_icon = 'gem'
-                elif 'go' in tech_name:
-                    tech_icon = 'gopher'
-                elif any(db in tech_name for db in ['sql', 'postgres', 'oracle', 'mongo', 'db']):
-                    tech_icon = 'database'
-            
-            result = {
-                'name': ", ".join(tech_info) if tech_info else "Non spécifié",
-                'icon': tech_icon
-            }
-            
-            if use_cache:
-                self.set_cache(cache_key, result)
-                
-            return result
-        except Exception as e:
-            logger.error(f"Erreur lors de l'extraction de la technologie pour {entity_id}: {e}")
-            return {
-                'name': "Non spécifié",
-                'icon': 'question'
-            }
-
-    def get_metric_history(self, entity_id, metric_selector, from_time, to_time, resolution="1h", use_cache=True):
-        """
-        Récupère l'historique des métriques avec gestion du cache
-        
-        Args:
-            entity_id (str): ID de l'entité
-            metric_selector (str): Sélecteur de métrique
-            from_time (int): Timestamp de début
-            to_time (int): Timestamp de fin
-            resolution (str): Résolution temporelle
-            use_cache (bool): Utiliser le cache
-            
-        Returns:
-            list: Historique des métriques
-        """
-        cache_key = f"metric_history:{entity_id}:{metric_selector}:{from_time}:{to_time}:{resolution}"
-        if use_cache:
-            cached_data = self.get_cached(cache_key)
-            if cached_data is not None:
-                return cached_data
-                
-        try:
-            data = self.query_api(
-                endpoint="metrics/query",
-                params={
-                    "metricSelector": metric_selector,
-                    "from": from_time,
-                    "to": to_time,
-                    "resolution": resolution,
-                    "entitySelector": f"entityId({entity_id})"
-                },
-                use_cache=False  # On utilise notre propre cache
-            )
-            
-            if data.get('result', []) and data['result'][0].get('data', []):
-                values = data['result'][0]['data'][0].get('values', [])
-                timestamps = data['result'][0]['data'][0].get('timestamps', [])
-                
-                # Créer un tableau de points pour les graphiques
-                history = []
-                if values and timestamps:
-                    for i in range(len(values)):
-                        if values[i] is not None:
-                            history.append({
-                                'timestamp': timestamps[i],
-                                'value': values[i]
-                            })
-                
-                if use_cache:
-                    self.set_cache(cache_key, history)
-                    
-                return history
-            
-            if use_cache:
-                self.set_cache(cache_key, [])
-                
-            return []
-        except Exception as e:
-            logger.error(f"Erreur lors de la récupération de l'historique pour {metric_selector}: {e}")
-            return []
-
-    def get_service_metrics_parallel(self, service_ids, from_time, to_time):
-        """
-        Récupère les métriques pour plusieurs services en parallèle
-        Optimisé pour gérer de grands nombres de services
-        
-        Args:
-            service_ids (list): Liste des IDs de services
-            from_time (int): Timestamp de début
-            to_time (int): Timestamp de fin
-            
-        Returns:
-            list: Métriques pour tous les services
-        """
-        # Si trop de services, traiter par lots
-        chunk_size = int(os.environ.get('REQUEST_CHUNK_SIZE', 15))
-        if len(service_ids) > chunk_size:
-            logger.info(f"Traitement par lots de {len(service_ids)} services")
-            all_service_metrics = []
-            
-            # Diviser les IDs en lots plus petits
-            for i in range(0, len(service_ids), chunk_size):
-                chunk_ids = service_ids[i:i + chunk_size]
-                logger.info(f"Traitement du lot {i//chunk_size + 1}/{(len(service_ids) + chunk_size - 1)//chunk_size} ({len(chunk_ids)} services)")
-                
-                # Traiter ce lot
-                chunk_metrics = self._process_service_chunk(chunk_ids, from_time, to_time)
-                all_service_metrics.extend(chunk_metrics)
-                
-                # Petite pause entre les lots pour éviter de surcharger l'API
-                if i + chunk_size < len(service_ids):
-                    time.sleep(1)
-            
-            return all_service_metrics
-        else:
-            # Si peu de services, utiliser la méthode normale
-            return self._process_service_chunk(service_ids, from_time, to_time)
-
-    def _process_service_chunk(self, service_ids, from_time, to_time):
-        """
-        Traite un lot de services
-        """
-        # Préparer les requêtes pour la récupération des détails des services avec ID explicite
-        service_details_queries = []
-        for service_id in service_ids:
-            service_details_queries.append((
-                f"entities/{service_id}", 
-                None, 
-                True,
-                f"service_details:{service_id}"  # Clé de cache explicite avec ID
-            ))
-        
-        # Récupérer les détails des services en parallèle
-        service_details_results = self.batch_query(service_details_queries)
-        
-        # Créer un dictionnaire pour associer les résultats aux services
-        service_details_dict = {}
-        for i, service_id in enumerate(service_ids):
-            service_details_dict[service_id] = service_details_results[i]
-        
-        # Préparer les requêtes de métriques pour tous les services avec clés explicites
-        metric_queries = []
-        
-        for service_id in service_ids:
-            # Requête pour le temps de réponse moyen avec ID explicite
-            metric_queries.append((
-                "metrics/query",
-                {
-                    "metricSelector": "builtin:service.response.time",
-                    "from": from_time,
-                    "to": to_time,
-                    "entitySelector": f"entityId({service_id})"
-                },
-                True,
-                f"response_time:{service_id}:{from_time}:{to_time}"  # Clé explicite avec ID
-            ))
-
-            # Requête pour le temps de réponse médian (50e percentile) avec ID explicite
-            metric_queries.append((
-                "metrics/query",
-                {
-                    "metricSelector": "builtin:service.response.time:percentile(50)",
-                    "from": from_time,
-                    "to": to_time,
-                    "entitySelector": f"entityId({service_id})"
-                },
-                True,
-                f"median_response_time:{service_id}:{from_time}:{to_time}"  # Clé explicite avec ID
-            ))
-            
-            # Requête pour le taux d'erreur avec ID explicite
-            metric_queries.append((
-                "metrics/query",
-                {
-                    "metricSelector": "builtin:service.errors.total.rate",
-                    "from": from_time,
-                    "to": to_time,
-                    "entitySelector": f"entityId({service_id})"
-                },
-                True,
-                f"error_rate:{service_id}:{from_time}:{to_time}"  # Clé explicite avec ID
-            ))
-            
-            # Requête pour le nombre de requêtes avec ID explicite
-            metric_queries.append((
-                "metrics/query",
-                {
-                    "metricSelector": "builtin:service.requestCount.total",
-                    "from": from_time,
-                    "to": to_time,
-                    "entitySelector": f"entityId({service_id})"
-                },
-                True,
-                f"requests:{service_id}:{from_time}:{to_time}"  # Clé explicite avec ID
-            ))
-        
-        # Exécuter toutes les requêtes de métriques en parallèle
-        all_metric_results = self.batch_query(metric_queries)
-        
-        # Créer des dictionnaires pour associer les résultats de métriques aux services
-        response_time_metrics = {}
-        median_response_time_metrics = {}
-        error_rate_metrics = {}
-        request_metrics = {}
-        
-        # Distribuer les résultats dans des dictionnaires par ID de service
-        result_index = 0
-        for service_id in service_ids:
-            response_time_metrics[service_id] = all_metric_results[result_index]
-            result_index += 1
-            median_response_time_metrics[service_id] = all_metric_results[result_index]
-            result_index += 1
-            error_rate_metrics[service_id] = all_metric_results[result_index]
-            result_index += 1
-            request_metrics[service_id] = all_metric_results[result_index]
-            result_index += 1
-        
-        # Récupérer les technologies en parallèle avec caching
-        tech_dict = {}
-        for service_id in service_ids:
-            tech_info = self.extract_technology(service_id)
-            tech_dict[service_id] = tech_info
-        
-        # Pour l'historique, ne le faire que pour un sous-ensemble si trop nombreux
-        history_sample_size = min(len(service_ids), 5)  # Limiter l'historique aux 5 premiers services
-        history_service_ids = service_ids[:history_sample_size]
-        
-        # Préparer les requêtes d'historique avec clés explicites
-        history_queries = []
-        for service_id in history_service_ids:
-            # Historique du temps de réponse avec résolution très fine (1min pour 30min de données)
-            history_queries.append((
-                "metrics/query",
-                {
-                    "metricSelector": "builtin:service.response.time",
-                    "from": from_time,
-                    "to": to_time,
-                    "resolution": "1m",  # Résolution plus fine : 1 minute pour 30 minutes de données
-                    "entitySelector": f"entityId({service_id})"
-                },
-                True,
-                f"rt_history:{service_id}:{from_time}:{to_time}"  # Clé explicite avec ID
-            ))
-            
-            # Historique du taux d'erreur avec résolution très fine
-            history_queries.append((
-                "metrics/query",
-                {
-                    "metricSelector": "builtin:service.errors.total.rate",
-                    "from": from_time,
-                    "to": to_time,
-                    "resolution": "1m",  # Résolution plus fine : 1 minute pour 30 minutes de données
-                    "entitySelector": f"entityId({service_id})"
-                },
-                True,
-                f"er_history:{service_id}:{from_time}:{to_time}"  # Clé explicite avec ID
-            ))
-            
-            # Historique du nombre de requêtes avec résolution très fine
-            history_queries.append((
-                "metrics/query",
-                {
-                    "metricSelector": "builtin:service.requestCount.total",
-                    "from": from_time,
-                    "to": to_time,
-                    "resolution": "1m",  # Résolution plus fine : 1 minute pour 30 minutes de données
-                    "entitySelector": f"entityId({service_id})"
-                },
-                True,
-                f"req_history:{service_id}:{from_time}:{to_time}"  # Clé explicite avec ID
-            ))
-        
-        # Exécuter les requêtes d'historique en parallèle
-        history_results = self.batch_query(history_queries)
-        
-        # Créer des dictionnaires pour associer les résultats d'historique aux services
-        rt_history_dict = {}
-        er_history_dict = {}
-        req_history_dict = {}
-        
-        # Distribuer les résultats d'historique dans des dictionnaires par ID de service
-        result_index = 0
-        for service_id in history_service_ids:
-            rt_history_dict[service_id] = history_results[result_index]
-            result_index += 1
-            er_history_dict[service_id] = history_results[result_index]
-            result_index += 1
-            req_history_dict[service_id] = history_results[result_index]
-            result_index += 1
-        
-        # Maintenant, assembler les métriques pour chaque service
-        service_metrics = []
-        for service_id in service_ids:
-            service_details = service_details_dict[service_id]
-            
-            # Vérification du type de service et activité
-            service_status = "Actif"
-            if service_details and 'properties' in service_details and 'monitoring' in service_details['properties']:
-                if service_details['properties']['monitoring'].get('monitoringState') != "ACTIVE":
-                    service_status = "Inactif"
-            
-            # Extraire les métriques pour ce service
-            response_time_data = response_time_metrics[service_id]
-            median_response_time_data = median_response_time_metrics[service_id]
-            error_rate_data = error_rate_metrics[service_id]
-            requests_data = request_metrics[service_id]
-
-            # Traiter les résultats des métriques
-            response_time = None
-            median_response_time = None
-            error_rate = None
-            requests_count = None
-            
-            # Extraire le temps de réponse moyen (conversion en ms)
-            if response_time_data and 'result' in response_time_data and response_time_data['result']:
-                result = response_time_data['result'][0]
-                if 'data' in result and result['data']:
-                    values = result['data'][0].get('values', [])
-                    if values and values[0] is not None:
-                        # Conversion en secondes comme demandé
-                        raw_value = values[0]
-                        if raw_value < 10:  # Déjà en secondes
-                            response_time = round(raw_value, 2)
-                            logger.info(f"Service {service_id}: Temps de réponse moyen en secondes: {response_time}s")
-                        else:
-                            # Convertir de millisecondes à secondes
-                            response_time = round(raw_value / 1000, 2)
-                            logger.info(f"Service {service_id}: Temps de réponse moyen converti de {raw_value}ms à {response_time}s")
-
-            # Extraire le temps de réponse médian (conversion en ms)
-            if median_response_time_data and 'result' in median_response_time_data and median_response_time_data['result']:
-                result = median_response_time_data['result'][0]
-                if 'data' in result and result['data']:
-                    values = result['data'][0].get('values', [])
-                    if values and values[0] is not None:
-                        # Conversion en secondes comme demandé
-                        raw_value = values[0]
-                        if raw_value < 10:  # Déjà en secondes
-                            median_response_time = round(raw_value, 2)
-                            logger.info(f"Service {service_id}: Temps de réponse médian en secondes: {median_response_time}s")
-                        else:
-                            # Convertir de millisecondes à secondes
-                            median_response_time = round(raw_value / 1000, 2)
-                            logger.info(f"Service {service_id}: Temps de réponse médian converti de {raw_value}ms à {median_response_time}s")
-            
-            # Extraire le taux d'erreur
-            if error_rate_data and 'result' in error_rate_data and error_rate_data['result']:
-                result = error_rate_data['result'][0]
-                if 'data' in result and result['data']:
-                    values = result['data'][0].get('values', [])
-                    if values and values[0] is not None:
-                        error_rate = round(values[0], 1)
-            
-            # Extraire le nombre de requêtes
-            if requests_data and 'result' in requests_data and requests_data['result']:
-                result = requests_data['result'][0]
-                if 'data' in result and result['data']:
-                    values = result['data'][0].get('values', [])
-                    if values and values[0] is not None:
-                        requests_count = int(values[0])
-            
-            # Extraire la technologie du dictionnaire
-            tech_info = tech_dict[service_id]
-            
-            # Traiter les historiques (uniquement si disponible dans le dictionnaire)
-            response_time_history = []
-            error_rate_history = []
-            request_count_history = []
-            
-            # Historique du temps de réponse moyen (uniquement si disponible)
-            if service_id in rt_history_dict:
-                rt_history_data = rt_history_dict[service_id]
-                if rt_history_data and 'result' in rt_history_data and rt_history_data['result']:
-                    result = rt_history_data['result'][0]
-                    if 'data' in result and result['data']:
-                        values = result['data'][0].get('values', [])
-                        timestamps = result['data'][0].get('timestamps', [])
-                        if values and timestamps:
-                            for i in range(len(values)):
-                                if values[i] is not None:
-                                    # Conversion en secondes pour les valeurs historiques
-                                    raw_value = values[i]
-                                    if raw_value < 10:  # Déjà en secondes
-                                        adjusted_value = round(raw_value, 2)
-                                    else:
-                                        # Convertir de millisecondes à secondes
-                                        adjusted_value = round(raw_value / 1000, 2)
-
-                                    response_time_history.append({
-                                        'timestamp': timestamps[i],
-                                        'value': adjusted_value
-                                    })
-
-            # Pour l'historique du temps de réponse médian, nous utilisons les mêmes données
-            # car nous n'avons pas de requête spécifique pour l'historique médian
-            # Dans une itération future, nous pourrions ajouter une requête spécifique pour cela
-            median_response_time_history = response_time_history.copy()
-            
-            # Historique du taux d'erreur (uniquement si disponible)
-            if service_id in er_history_dict:
-                er_history_data = er_history_dict[service_id]
-                if er_history_data and 'result' in er_history_data and er_history_data['result']:
-                    result = er_history_data['result'][0]
-                    if 'data' in result and result['data']:
-                        values = result['data'][0].get('values', [])
-                        timestamps = result['data'][0].get('timestamps', [])
-                        if values and timestamps:
-                            for i in range(len(values)):
-                                if values[i] is not None:
-                                    error_rate_history.append({
-                                        'timestamp': timestamps[i],
-                                        'value': values[i]
-                                    })
-            
-            # Historique du nombre de requêtes (uniquement si disponible)
-            if service_id in req_history_dict:
-                req_history_data = req_history_dict[service_id]
-                if req_history_data and 'result' in req_history_data and req_history_data['result']:
-                    result = req_history_data['result'][0]
-                    if 'data' in result and result['data']:
-                        values = result['data'][0].get('values', [])
-                        timestamps = result['data'][0].get('timestamps', [])
-                        if values and timestamps:
-                            for i in range(len(values)):
-                                if values[i] is not None:
-                                    request_count_history.append({
-                                        'timestamp': timestamps[i],
-                                        'value': values[i]
-                                    })
-            
-            # Créer l'objet de métriques pour ce service
-            service_metrics.append({
-                'id': service_id,
-                'name': service_details.get('displayName', 'Unknown') if service_details else 'Unknown',
-                'response_time': response_time,
-                'median_response_time': median_response_time,
-                'error_rate': error_rate,
-                'requests': requests_count,
-                'status': service_status,
-                'technology': tech_info['name'],
-                'tech_icon': tech_info['icon'],
-                'dt_url': f"{self.env_url}/ui/entity/{service_id}",
-                'response_time_history': response_time_history,
-                'median_response_time_history': median_response_time_history,
-                'error_rate_history': error_rate_history,
-                'request_count_history': request_count_history
-            })
-        
-        return service_metrics
-
-    def get_hosts_metrics_parallel(self, host_ids, from_time, to_time):
-        """
-        Récupère les métriques pour plusieurs hôtes en parallèle
-        Optimisé pour gérer de grands nombres d'hôtes
-        
-        Args:
-            host_ids (list): Liste des IDs d'hôtes
-            from_time (int): Timestamp de début
-            to_time (int): Timestamp de fin
-            
-        Returns:
-            list: Métriques pour tous les hôtes
-        """
-        # Si trop d'hôtes, traiter par lots
-        chunk_size = int(os.environ.get('REQUEST_CHUNK_SIZE', 15))
-        if len(host_ids) > chunk_size:
-            logger.info(f"Traitement par lots de {len(host_ids)} hôtes")
-            all_host_metrics = []
-            
-            # Diviser les IDs en lots plus petits
-            for i in range(0, len(host_ids), chunk_size):
-                chunk_ids = host_ids[i:i + chunk_size]
-                logger.info(f"Traitement du lot {i//chunk_size + 1}/{(len(host_ids) + chunk_size - 1)//chunk_size} ({len(chunk_ids)} hôtes)")
-                
-                # Traiter ce lot
-                chunk_metrics = self._process_host_chunk(chunk_ids, from_time, to_time)
-                all_host_metrics.extend(chunk_metrics)
-                
-                # Petite pause entre les lots pour éviter de surcharger l'API
-                if i + chunk_size < len(host_ids):
-                    time.sleep(1)
-            
-            return all_host_metrics
-        else:
-            # Si peu d'hôtes, utiliser la méthode normale
-            return self._process_host_chunk(host_ids, from_time, to_time)
-
-    def _process_host_chunk(self, host_ids, from_time, to_time):
-        """
-        Traite un lot d'hôtes
-        """
-        # Préparer les requêtes pour la récupération des détails des hôtes avec ID explicite
-        host_details_queries = []
-        for host_id in host_ids:
-            host_details_queries.append((
-                f"entities/{host_id}", 
-                None, 
-                True,
-                f"host_details:{host_id}"  # Clé de cache explicite avec ID
-            ))
-        
-        # Récupérer les détails des hôtes en parallèle
-        host_details_results = self.batch_query(host_details_queries)
-        
-        # Créer un dictionnaire pour associer les résultats aux hôtes
-        host_details_dict = {}
-        for i, host_id in enumerate(host_ids):
-            host_details_dict[host_id] = host_details_results[i]
-        
-        # Préparer les requêtes de métriques avec clés explicites
-        metric_queries = []
-        for host_id in host_ids:
-            # Requête pour l'utilisation CPU avec ID explicite
-            metric_queries.append((
-                "metrics/query",
-                {
-                    "metricSelector": "builtin:host.cpu.usage",
-                    "from": from_time,
-                    "to": to_time,
-                    "entitySelector": f"entityId({host_id})"
-                },
-                True,
-                f"cpu_usage:{host_id}:{from_time}:{to_time}"  # Clé explicite avec ID
-            ))
-            
-            # Requête pour l'utilisation RAM avec ID explicite
-            metric_queries.append((
-                "metrics/query",
-                {
-                    "metricSelector": "builtin:host.mem.usage",
-                    "from": from_time,
-                    "to": to_time,
-                    "entitySelector": f"entityId({host_id})"
-                },
-                True,
-                f"ram_usage:{host_id}:{from_time}:{to_time}"  # Clé explicite avec ID
-            ))
-        
-        # Exécuter toutes les requêtes de métriques en parallèle
-        all_metric_results = self.batch_query(metric_queries)
-        
-        # Créer des dictionnaires pour associer les résultats de métriques aux hôtes
-        cpu_metrics = {}
-        ram_metrics = {}
-        
-        # Distribuer les résultats dans des dictionnaires par ID d'hôte
-        result_index = 0
-        for host_id in host_ids:
-            cpu_metrics[host_id] = all_metric_results[result_index]
-            result_index += 1
-            ram_metrics[host_id] = all_metric_results[result_index]
-            result_index += 1
-        
-        # Pour l'historique, ne le faire que pour un sous-ensemble si trop nombreux
-        history_sample_size = min(len(host_ids), 5)  # Limiter l'historique aux 5 premiers hôtes
-        history_host_ids = host_ids[:history_sample_size]
-        
-        # Préparer les requêtes d'historique avec clés explicites
-        history_queries = []
-        for host_id in history_host_ids:
-            # Historique CPU avec ID explicite
-            history_queries.append((
-                "metrics/query",
-                {
-                    "metricSelector": "builtin:host.cpu.usage",
-                    "from": from_time,
-                    "to": to_time,
-                    "resolution": "1h",
-                    "entitySelector": f"entityId({host_id})"
-                },
-                True,
-                f"cpu_history:{host_id}:{from_time}:{to_time}"  # Clé explicite avec ID
-            ))
-            
-            # Historique RAM avec ID explicite
-            history_queries.append((
-                "metrics/query",
-                {
-                    "metricSelector": "builtin:host.mem.usage",
-                    "from": from_time,
-                    "to": to_time,
-                    "resolution": "1h",
-                    "entitySelector": f"entityId({host_id})"
-                },
-                True,
-                f"ram_history:{host_id}:{from_time}:{to_time}"  # Clé explicite avec ID
-            ))
-        
-        # Exécuter les requêtes d'historique en parallèle
-        history_results = self.batch_query(history_queries)
-        
-        # Créer des dictionnaires pour associer les résultats d'historique aux hôtes
-        cpu_history_dict = {}
-        ram_history_dict = {}
-        
-        # Distribuer les résultats d'historique dans des dictionnaires par ID d'hôte
-        result_index = 0
-        for host_id in history_host_ids:
-            cpu_history_dict[host_id] = history_results[result_index]
-            result_index += 1
-            ram_history_dict[host_id] = history_results[result_index]
-            result_index += 1
-        
-        # Maintenant, assembler les métriques pour chaque hôte
-        host_metrics = []
-        for host_id in host_ids:
-            host_details = host_details_dict[host_id]
-            cpu_data = cpu_metrics[host_id]
-            ram_data = ram_metrics[host_id]
-            
-            # Extraire les valeurs de métriques
-            cpu_usage = None
-            ram_usage = None
-            
-            # Traitement des données CPU
-            if cpu_data and 'result' in cpu_data and cpu_data['result']:
-                result = cpu_data['result'][0]
-                if 'data' in result and result['data']:
-                    values = result['data'][0].get('values', [])
-                    if values and values[0] is not None:
-                        cpu_usage = round(values[0], 1)
-            
-            # Traitement des données RAM
-            if ram_data and 'result' in ram_data and ram_data['result']:
-                result = ram_data['result'][0]
-                if 'data' in result and result['data']:
-                    values = result['data'][0].get('values', [])
-                    if values and values[0] is not None:
-                        ram_usage = round(values[0], 1)
-            
-            # Traiter les historiques (uniquement si disponible dans le dictionnaire)
-            cpu_history = []
-            ram_history = []
-            
-            # Historique CPU (uniquement si disponible)
-            if host_id in cpu_history_dict:
-                cpu_history_data = cpu_history_dict[host_id]
-                if cpu_history_data and 'result' in cpu_history_data and cpu_history_data['result']:
-                    result = cpu_history_data['result'][0]
-                    if 'data' in result and result['data']:
-                        values = result['data'][0].get('values', [])
-                        timestamps = result['data'][0].get('timestamps', [])
-                        if values and timestamps:
-                            for i in range(len(values)):
-                                if values[i] is not None:
-                                    cpu_history.append({
-                                        'timestamp': timestamps[i],
-                                        'value': values[i]
-                                    })
-            
-            # Historique RAM (uniquement si disponible)
-            if host_id in ram_history_dict:
-                ram_history_data = ram_history_dict[host_id]
-                if ram_history_data and 'result' in ram_history_data and ram_history_data['result']:
-                    result = ram_history_data['result'][0]
-                    if 'data' in result and result['data']:
-                        values = result['data'][0].get('values', [])
-                        timestamps = result['data'][0].get('timestamps', [])
-                        if values and timestamps:
-                            for i in range(len(values)):
-                                if values[i] is not None:
-                                    ram_history.append({
-                                        'timestamp': timestamps[i],
-                                        'value': values[i]
-                                    })
-            
-            # Extraire la version de l'OS des propriétés de l'hôte
-            os_version = "Non spécifié"
-            if host_details and 'properties' in host_details:
-                properties = host_details.get('properties', {})
-                
-                # Vérifier différentes propriétés possibles pour l'OS
-                if 'osType' in properties:
-                    os_type = properties.get('osType', "")
-                    os_version = os_type
-                    
-                    # Ajouter la version si disponible
-                    if 'osVersion' in properties:
-                        os_version = f"{os_type} {properties.get('osVersion', '')}"
-                elif 'kernelVersion' in properties:
-                    os_version = f"Kernel {properties.get('kernelVersion', '')}"
-                    
-                    # Si osVersion est également disponible
-                    if 'osVersion' in properties:
-                        os_version = f"{properties.get('osVersion', '')} (Kernel {properties.get('kernelVersion', '')})"
-                
-                # Si aucune propriété spécifique n'est trouvée, chercher dans les tags
-                if os_version == "Non spécifié" and 'tags' in host_details:
-                    for tag in host_details.get('tags', []):
-                        # Chercher les tags liés à l'OS
-                        if tag.get('key') in ['OS', 'os', 'Operating System', 'system']:
-                            os_version = tag.get('value', "Non spécifié")
-                            break
-            
-            # Créer l'objet de métriques d'hôte
-            host_metrics.append({
-                'id': host_id,
-                'name': host_details.get('displayName', 'Unknown') if host_details else 'Unknown',
-                'cpu': cpu_usage,
-                'ram': ram_usage,
-                'os_version': os_version,  # Ajout de la version de l'OS
-                'dt_url': f"{self.env_url}/ui/entity/{host_id}",
-                'cpu_history': cpu_history,
-                'ram_history': ram_history
-            })
-        
-        return host_metrics
-
-
-    def get_problems_filtered(self, mz_name=None, time_from="-24h", status="OPEN"):
-        """
-        Récupère et filtre les problèmes pour une management zone spécifique
-        
-        Args:
-            mz_name (str): Nom de la Management Zone (None pour toutes)
-            time_from (str): Période de temps (ex: "-24h")
-            status (str): Statut des problèmes ("OPEN", "CLOSED", etc.)
-            
-        Returns:
-            list: Liste des problèmes filtrés
-        """
-        # Utiliser une clé de cache unique pour chaque combinaison de paramètres
-        cache_key = f"problems:{mz_name}:{time_from}:{status}"
-        
-        # Pour les problèmes OPEN (actifs) et ALL, ne pas utiliser le cache afin d'avoir des données en temps réel
-        # Cela garantit que les problèmes résolus sont immédiatement reflétés dans l'interface
-        # De même, pour status="ALL", on veut toujours des données à jour
-        if status == "OPEN" or status == "ALL":
-            logger.info(f"Récupération en temps réel des problèmes pour {mz_name} avec statut={status}, période={time_from}")
-            # On continue sans consulter le cache
-        else:
-            # Pour les autres types de requêtes, on peut utiliser le cache mais avec une durée plus courte
-            cached_data = self.get_cached(cache_key)
-            if cached_data is not None:
-                return cached_data
-        
-        try:
-            # Récupérer tous les problèmes sans filtrer par MZ via l'API
-            params = {"from": time_from}
-            
-            # Pour ALL, on veut tous les problèmes, y compris OPEN et CLOSED
-            # Pour ce faire, nous ne spécifierons pas de statut à l'API Dynatrace,
-            # ce qui retournera tous les problèmes, puis nous filtrerons selon les besoins
-            if status is not None and status != "ALL":
-                params["status"] = status
-                
-            # Déboguer les paramètres
-            logger.info(f"Requête problèmes avec paramètres: {params}, mz_name: {mz_name}")
-            
-            # Pour les problèmes avec ALL sur une longue période, augmenter la taille max de page
-            if status == "ALL" and (time_from.startswith("-7") or time_from.startswith("-3")):
-                params["pageSize"] = 500  # Augmenter la taille maximale des résultats
-            
-            problems_data = self.query_api(
-                endpoint="problems",
-                params=params,
-                use_cache=False  # Forcer la requête sans utiliser le cache interne de query_api
-            )
-            
-            # Déboguer les résultats
-            total_problems = len(problems_data.get('problems', [])) if 'problems' in problems_data else 0
-            logger.info(f"Nombre total de problèmes récupérés: {total_problems} (statut:{status}, période:{time_from})")
-            
-            active_problems = []
-            if 'problems' in problems_data:
-                # Filtrage temporel supplémentaire côté serveur 
-                # Calculer le timestamp limite pour filtrer les problèmes
-                current_time = int(time.time() * 1000)  # Convertir en millisecondes
-                time_limit = None
-                
-                # Traiter les différents formats de période
-                if time_from == "-24h":
-                    time_limit = current_time - (24 * 60 * 60 * 1000)
-                elif time_from == "-72h" or time_from == "-3d":
-                    time_limit = current_time - (72 * 60 * 60 * 1000)
-                    logger.info(f"Récupération des problèmes sur 72 heures")
-                elif time_from == "-30d":
-                    time_limit = current_time - (30 * 24 * 60 * 60 * 1000)
-                    logger.info(f"Récupération des problèmes sur 30 jours")
-                elif time_from.startswith("-") and time_from.endswith("d"):
-                    # Supporter des périodes personnalisées en jours (-Nd)
-                    try:
-                        days = int(time_from[1:-1])
-                        time_limit = current_time - (days * 24 * 60 * 60 * 1000)
-                        logger.info(f"Période personnalisée de {days} jours appliquée")
-                    except ValueError:
-                        logger.warning(f"Format de période non reconnu: {time_from}, utilisation des 72h par défaut")
-                        time_limit = current_time - (72 * 60 * 60 * 1000)
-                elif time_from.startswith("-") and time_from.endswith("h"):
-                    # Supporter des périodes personnalisées en heures (-Nh)
-                    try:
-                        hours = int(time_from[1:-1])
-                        time_limit = current_time - (hours * 60 * 60 * 1000)
-                        logger.info(f"Période personnalisée de {hours} heures appliquée")
-                    except ValueError:
-                        logger.warning(f"Format de période non reconnu: {time_from}, utilisation des 72h par défaut")
-                        time_limit = current_time - (72 * 60 * 60 * 1000)
-                else:
-                    logger.warning(f"Format de période non reconnu: {time_from}, utilisation des 72h par défaut")
-                    time_limit = current_time - (72 * 60 * 60 * 1000)
-                
-                # On va filtrer manuellement les problèmes liés à notre Management Zone
-                mz_problems = 0
-                for problem in problems_data['problems']:
-                    # Vérification explicite du statut pour les problèmes OPEN
-                    if status == "OPEN" and problem.get('status') != 'OPEN':
-                        logger.debug(f"Problème {problem.get('id')} ignoré car son statut est {problem.get('status')}")
-                        continue
-                    
-                    # Vérifier aussi l'heure de fermeture pour les problèmes ouverts
-                    if status == "OPEN" and problem.get('endTime', 0) > 0:
-                        logger.debug(f"Problème {problem.get('id')} ignoré car il a une heure de fermeture")
-                        continue
-                    
-                    # Filtrer par date si nécessaire
-                    problem_start_time = problem.get('startTime', 0)
-                    
-                    # Pour le statut ALL, nous voulons inclure tous les problèmes qui étaient actifs pendant la période,
-                    # même s'ils ont commencé avant la limite de temps
-                    if time_limit and problem_start_time < time_limit:
-                        # Pour le statut ALL, on vérifie si le problème était toujours actif pendant la période demandée
-                        if status == "ALL":
-                            end_time = problem.get('endTime', 0)
-                            
-                            # Si le problème n'a pas de temps de fin ou s'il s'est terminé après notre limite de temps,
-                            # cela signifie qu'il était actif pendant la période demandée
-                            if end_time == 0 or end_time >= time_limit:
-                                # Inclure ce problème car il était actif pendant la période
-                                logger.debug(f"Problème {problem.get('id')} inclus car actif pendant la période demandée (début: {problem_start_time}, fin: {end_time})")
-                            else:
-                                # Le problème s'est terminé avant notre période
-                                logger.debug(f"Problème {problem.get('id')} ignoré car terminé avant la période: fin {end_time} < {time_limit}")
-                                continue
-                        else:
-                            # Pour les autres statuts, suivre le comportement existant
-                            logger.debug(f"Problème {problem.get('id')} ignoré car trop ancien: {problem_start_time} < {time_limit}")
-                            continue
+                    # Sinon, faire les requêtes individuellement
+                    for idx in indices:
+                        query = queries[idx]
+                        endpoint = query[0]
+                        params = query[1] if len(query) > 1 else None
+                        use_cache = query[2] if len(query) > 2 else True
+                        custom_cache_key = query[3] if len(query) > 3 else None
                         
-                    # Si aucune MZ n'est spécifiée, inclure tous les problèmes
-                    if mz_name is None:
-                        # Pour les requêtes avec statut "ALL", ajouter l'info resolved
-                        formatted_problem = self._format_problem(problem)
-                        if status == "ALL":
-                            formatted_problem['resolved'] = problem.get('status') != 'OPEN' or problem.get('endTime', 0) > 0
-                        active_problems.append(formatted_problem)
-                        continue
+                        future = executor.submit(
+                            self.single_query,
+                            endpoint,
+                            params,
+                            use_cache,
+                            custom_cache_key
+                        )
+                        future_to_index[future] = [idx]
+            
+            # Récupérer les résultats
+            for future in concurrent.futures.as_completed(future_to_index):
+                indices = future_to_index[future]
+                try:
+                    result = future.result()
                     
-                    # Vérifier si le problème est lié à notre Management Zone
-                    is_in_mz = False
-                    
-                    # Rechercher dans les management zones directement attachées au problème (méthode standard)
-                    if 'managementZones' in problem:
-                        for mz in problem.get('managementZones', []):
-                            if mz.get('name') == mz_name:
-                                is_in_mz = True
-                                break
-                    
-                    # Rechercher aussi dans les entités affectées si pas trouvé
-                    if not is_in_mz:
-                        for entity in problem.get('affectedEntities', []):
-                            # Vérifier les management zones de chaque entité affectée
-                            if 'managementZones' in entity:
-                                for mz in entity.get('managementZones', []):
-                                    if mz.get('name') == mz_name:
-                                        is_in_mz = True
-                                        break
-                            if is_in_mz:
-                                break
-                    
-                    # Si le problème est dans notre MZ, l'ajouter à notre liste
-                    if is_in_mz:
-                        mz_problems += 1
-                        formatted_problem = self._format_problem(problem, mz_name)
-                        # Pour les requêtes avec statut "ALL", ajouter l'info resolved
-                        if status == "ALL":
-                            formatted_problem['resolved'] = problem.get('status') != 'OPEN' or problem.get('endTime', 0) > 0
-                        active_problems.append(formatted_problem)
-                
-                if mz_name:
-                    logger.info(f"Problèmes filtrés appartenant à {mz_name}: {mz_problems}/{total_problems}")
-                
-                # Enrichir chaque problème avec les données des entités impactées
-                enriched_problems = []
-                for formatted_problem in active_problems:
-                    problem_id = formatted_problem.get('id')
-                    if problem_id:
-                        try:
-                            # Récupérer les détails du problème pour obtenir les entités impactées
-                            problem_details = self.query_api(
-                                endpoint=f"problems/{problem_id}",
-                                params={"fields": "+impactedEntities"},
-                                use_cache=True
-                            )
+                    # Si c'est un résultat groupé
+                    if isinstance(result, dict) and '_batch_results' in result:
+                        for idx, res in zip(indices, result['_batch_results']):
+                            results[idx] = res
+                    else:
+                        # Résultat simple
+                        for idx in indices:
+                            results[idx] = result
                             
-                            # Si nous avons les impactedEntities, les ajouter au problème formaté
-                            if problem_details and 'impactedEntities' in problem_details:
-                                formatted_problem['impactedEntities'] = problem_details.get('impactedEntities', [])
-                                
-                                # Vérifier s'il y a une entité hôte pour enrichir le champ 'host'
-                                for entity in problem_details.get('impactedEntities', []):
-                                    if entity.get('entityId', {}).get('type') == 'HOST':
-                                        host_name = entity.get('name')
-                                        if host_name:
-                                            formatted_problem['host'] = host_name
-                                            formatted_problem['impacted'] = host_name
-                                            break
-                        except Exception as e:
-                            logger.error(f"Erreur lors de l'enrichissement du problème {problem_id}: {e}")
-                    
-                    enriched_problems.append(formatted_problem)
-                
-                # Remplacer la liste des problèmes formatés par la liste enrichie
-                active_problems = enriched_problems
-            
-            # Pour les problèmes actifs (OPEN), utiliser une durée de cache réduite
-            # pour les autres types, utiliser la durée standard
-            if status == "OPEN" or status is None:
-                # La durée de mise en cache pour les problèmes actifs est gérée par PROBLEMS_CACHE_DURATION dans app.py
-                # Elle est plus courte pour garantir des données plus à jour
-                # Utiliser la méthode standard mais noter qu'en app.py, le cache sera court-circuité pour les OPEN
-                self.set_cache(cache_key, active_problems)
-                logger.info(f"Mise en cache des problèmes actifs pour {cache_key} - durée limitée")
-            else:
-                self.set_cache(cache_key, active_problems)
-                logger.info(f"Mise en cache standard des problèmes pour {cache_key}")
-            
-            return active_problems
+                except Exception as e:
+                    logger.error(f"Erreur dans requête batch: {str(e)}")
+                    for idx in indices:
+                        results[idx] = None
         
+        return results
+
+    def _group_similar_queries(self, queries):
+        """Groupe les requêtes similaires pour optimisation"""
+        groups = {}
+        
+        for idx, query in enumerate(queries):
+            endpoint = query[0]
+            group_key = endpoint.split('?')[0]  # Endpoint sans paramètres
+            
+            if group_key not in groups:
+                groups[group_key] = {
+                    'queries': [],
+                    'indices': [],
+                    'endpoint': endpoint
+                }
+            
+            groups[group_key]['queries'].append(query)
+            groups[group_key]['indices'].append(idx)
+        
+        return groups
+
+    def _can_batch_optimize(self, endpoint):
+        """Détermine si un endpoint peut être optimisé en batch"""
+        batch_optimizable = [
+            'entities',
+            'problems',
+            'metrics/query',
+            'events'
+        ]
+        
+        return any(opt in endpoint for opt in batch_optimizable)
+
+    def _optimized_group_query(self, group_data):
+        """
+        Exécute une requête optimisée pour un groupe
+        """
+        endpoint = group_data['endpoint']
+        queries = group_data['queries']
+        
+        # Pour les entités, on peut combiner les IDs
+        if 'entities' in endpoint:
+            return self._batch_entities_query(queries)
+        
+        # Pour les métriques, on peut combiner les sélecteurs
+        elif 'metrics/query' in endpoint:
+            return self._batch_metrics_query(queries)
+        
+        # Sinon, pas d'optimisation
+        return None
+
+    def _batch_entities_query(self, queries):
+        """Combine plusieurs requêtes d'entités en une seule"""
+        try:
+            # Extraire tous les IDs d'entités
+            entity_ids = []
+            for query in queries:
+                endpoint = query[0]
+                if 'entities/' in endpoint:
+                    entity_id = endpoint.split('entities/')[-1]
+                    entity_ids.append(entity_id)
+            
+            if not entity_ids:
+                return None
+            
+            # Créer une requête unique pour toutes les entités
+            params = {
+                'entitySelector': f'entityId({",".join(entity_ids)})'
+            }
+            
+            result = self.single_query('entities', params)
+            
+            if result and 'entities' in result:
+                # Créer un dictionnaire pour mapper les résultats
+                entities_map = {e['entityId']: e for e in result['entities']}
+                
+                # Retourner les résultats dans l'ordre original
+                batch_results = []
+                for entity_id in entity_ids:
+                    batch_results.append(entities_map.get(entity_id))
+                
+                return {'_batch_results': batch_results}
+            
+            with self.metrics_lock:
+                self.metrics['batch_optimization'] += 1
+            
         except Exception as e:
-            logger.error(f"Erreur lors de la récupération des problèmes: {e}")
-            return []
+            logger.error(f"Erreur dans batch entities: {str(e)}")
+        
+        return None
+
+    def _batch_metrics_query(self, queries):
+        """Combine plusieurs requêtes de métriques"""
+        try:
+            # Regrouper par timeframe similaire
+            timeframe_groups = {}
+            
+            for query in queries:
+                params = query[1] if len(query) > 1 else {}
+                timeframe = params.get('from', 'now-1h')
+                
+                if timeframe not in timeframe_groups:
+                    timeframe_groups[timeframe] = []
+                
+                timeframe_groups[timeframe].append(params)
+            
+            # Pour chaque groupe de timeframe
+            results = []
+            for timeframe, params_list in timeframe_groups.items():
+                # Combiner les metric selectors
+                selectors = []
+                for params in params_list:
+                    if 'metricSelector' in params:
+                        selectors.append(params['metricSelector'])
+                
+                if selectors:
+                    combined_params = {
+                        'metricSelector': ','.join(selectors),
+                        'from': timeframe,
+                        'to': params_list[0].get('to', 'now')
+                    }
+                    
+                    result = self.single_query('metrics/query', combined_params)
+                    
+                    if result:
+                        results.append(result)
+            
+            with self.metrics_lock:
+                self.metrics['batch_optimization'] += 1
+            
+            return {'_batch_results': results}
+            
+        except Exception as e:
+            logger.error(f"Erreur dans batch metrics: {str(e)}")
+        
+        return None
+
+
+class OptimizedAPIDynatrace:
+    """Classe optimisée pour les interactions avec l'API Dynatrace"""
     
-    def _format_problem(self, problem, zone=None):
-        """Formate un problème pour la réponse API avec extraction améliorée des informations de machine"""
-        # Vérification améliorée pour détecter les problèmes résolus
-        # Un problème est résolu s'il a une heure de fermeture, statut non-OPEN, 
-        # ou si son statut de résolution est défini
-        is_resolved = (
-            problem.get('status') != 'OPEN' or 
-            problem.get('endTime', 0) > 0 or
-            problem.get('resolutionState') == 'RESOLVED' or
-            problem.get('resolved', False)
+    def __init__(self, api_token, environment_url, verify_ssl=False, max_workers=20):
+        self.client = OptimizedAPIClient(
+            env_url=environment_url,
+            api_token=api_token,
+            verify_ssl=verify_ssl,
+            max_workers=max_workers
         )
         
-        # Si l'état est 'OPEN' mais qu'il y a une heure de fermeture, forcer la résolution
-        if problem.get('status') == 'OPEN' and problem.get('endTime', 0) > 0:
-            logger.info(f"Problème {problem.get('problemId')} marqué comme résolu car il a une heure de fermeture")
-            is_resolved = True
-        
-        # Calculer la durée du problème en secondes
-        start_time_ms = problem.get('startTime', 0)
-        end_time_ms = problem.get('endTime', 0) if problem.get('endTime', 0) > 0 else int(time.time() * 1000)
-        duration_sec = (end_time_ms - start_time_ms) / 1000
-        
-        # Formatage des dates pour l'affichage avec indication explicite qu'il s'agit d'UTC
-        # Les timestamps Dynatrace sont en millisecondes depuis epoch en UTC
-        # Ajouter des logs pour débogage des problèmes de timezone
-        logger.info(f"Problème {problem.get('problemId')}: timestamp={start_time_ms}, timestamp_sec={start_time_ms/1000}")
-        
-        # Utiliser datetime.utcfromtimestamp pour garantir la cohérence, puis convertir en heure locale
-        start_time_utc = datetime.utcfromtimestamp(start_time_ms/1000)
-        # On ajoute 2 heures pour prendre en compte le décalage horaire CEST (UTC+2)
-        start_time_local = start_time_utc + timedelta(hours=2)
-        start_time_str = start_time_local.strftime('%Y-%m-%d %H:%M')
-        
-        # Ajouter l'heure de fermeture si elle existe
-        end_time_str = None
-        if problem.get('endTime', 0) > 0:
-            end_time_ms = problem.get('endTime', 0)
-            # Même ajustement pour l'heure de fin
-            end_time_utc = datetime.utcfromtimestamp(end_time_ms/1000)
-            # On ajoute 2 heures pour prendre en compte le décalage horaire CEST (UTC+2)
-            end_time_local = end_time_utc + timedelta(hours=2)
-            end_time_str = end_time_local.strftime('%Y-%m-%d %H:%M')
-            logger.info(f"Problème {problem.get('problemId')}: fin_timestamp={end_time_ms}, fin_formatée={end_time_str}")
-        
-        # Déterminer la durée au format lisible (en jours plutôt qu'en heures)
-        duration_display = ""
-        if duration_sec < 60:
-            duration_display = f"{int(duration_sec)}s"
-        elif duration_sec < 3600:
-            duration_display = f"{int(duration_sec / 60)}m"
-        elif duration_sec < 86400:  # Moins d'un jour
-            duration_display = f"{int(duration_sec / 3600)}h {int((duration_sec % 3600) / 60)}m"
-        else:  # Plus d'un jour
-            days = int(duration_sec / 86400)
-            hours = int((duration_sec % 86400) / 3600)
-            duration_display = f"{days}j {hours}h"
-                
-        # FONCTION AMÉLIORÉE: Extraction plus précise du nom de machine
-        host_name = "Non spécifié"
-        
-        # Vérifions d'abord si les impactedEntities sont déjà présentes dans le problème
-        if 'impactedEntities' in problem:
-            for entity in problem.get('impactedEntities', []):
-                if entity.get('entityId', {}).get('type') == 'HOST':
-                    host_name = entity.get('name', "Non spécifié")
-                    logger.info(f"Hôte trouvé directement dans impactedEntities: {host_name}")
-                    break
-        
-        # Si nous n'avons pas trouvé l'hôte, continuer avec la méthode existante
-        if host_name == "Non spécifié":
-            # Liste des mots à exclure qui ne sont jamais des noms d'hôtes
-            excluded_words = [
-                "status", "service", "such", "still", "some", "system", "server",
-                "segmentation", "script", "extension", "memory", "application", 
-                "error", "timeout", "warning", "critical", "problem", "issue", 
-                "failure", "module", "process", "container", "function", "instance", 
-                "request", "being", "response", "health", "payload", "execution", 
-                "processing", "action", "object", "storage", "config", "socket",
-                "network", "security", "traffic", "information", "resource"
-            ]
+        # Métriques de performance par type d'appel
+        self.call_metrics = {}
+        self.call_metrics_lock = threading.Lock()
+    
+    def _track_call(self, call_type, duration, success=True):
+        """Enregistre les métriques d'un appel API"""
+        with self.call_metrics_lock:
+            if call_type not in self.call_metrics:
+                self.call_metrics[call_type] = {
+                    'count': 0,
+                    'success': 0,
+                    'errors': 0,
+                    'total_time': 0,
+                    'min_time': float('inf'),
+                    'max_time': 0
+                }
             
-            # Fonction d'aide pour vérifier si un nom est un nom d'hôte valide
-            def is_valid_hostname(name):
-                if not name or len(name) < 3 or len(name) > 50:
-                    return False
-                    
-                # Convertir en minuscules pour la comparaison
-                name_lower = name.lower()
-                
-                # Vérifier si le nom est dans la liste d'exclusion
-                if name_lower in excluded_words:
-                    return False
-                    
-                # Pattern spécifique pour les serveurs de l'entreprise
-                if re.match(r'^s[a-z0-9]\d{2,}[a-z0-9]*\.fr\.net\.intra$', name, re.IGNORECASE):
-                    logger.info(f"Hostname validation: Strong match with enterprise pattern: {name}")
-                    return True
-                    
-                # Pattern pour les serveurs commençant par s suivi de chiffres
-                if re.match(r'^s[a-z0-9]\d{2,}[a-z0-9]*$', name, re.IGNORECASE):
-                    logger.info(f"Hostname validation: Good match with s-server pattern: {name}")
-                    return True
-                
-                # Pattern pour les serveurs sv##, s### ou sv####
-                if re.match(r'^s[a-z]?\d{2,}[a-z0-9]*$', name, re.IGNORECASE):
-                    logger.info(f"Hostname validation: Likely server with sv## pattern: {name}")
-                    return True
-                
-                # Si le nom commence par win/srv suivi de chiffres
-                if re.match(r'^(win|srv)[a-z0-9]*\d+', name, re.IGNORECASE):
-                    logger.info(f"Hostname validation: Likely Windows server: {name}")
-                    return True
-                
-                # Vérifier les noms courts sans chiffres
-                if len(name) < 6 and not re.search(r'\d', name):
-                    logger.info(f"Hostname validation: Too short without numbers: {name}")
-                    return False
-                
-                # Filtrer les cas contenant des mots exclus
-                for word in excluded_words:
-                    if word in name_lower and name_lower != word:
-                        logger.info(f"Hostname validation: Contains excluded word '{word}': {name}")
-                        return False
-                
-                # Vérifier si c'est un FQDN avec des chiffres
-                if re.match(r'^[a-z0-9][-a-z0-9]*\.[a-z0-9][-a-z0-9.]+$', name, re.IGNORECASE) and re.search(r'\d', name):
-                    logger.info(f"Hostname validation: Valid FQDN with numbers: {name}")
-                    return True
-                
-                # Critères généraux: commence par 's' ET contient au moins un chiffre
-                # OU contient des chiffres ET a une structure de nom d'hôte (points/tirets)
-                is_valid = (name_lower.startswith('s') and re.search(r'\d', name)) or \
-                        (re.search(r'\d', name) and ('.' in name or '-' in name))
-                
-                if is_valid:
-                    logger.info(f"Hostname validation: General pattern match: {name}")
-                else:
-                    logger.info(f"Hostname validation: Failed general patterns: {name}")
-                    
-                return is_valid
+            metrics = self.call_metrics[call_type]
+            metrics['count'] += 1
+            metrics['total_time'] += duration
             
-            # PRIORITÉ 1: Chercher d'abord dans rootCauseEntity s'il existe et est de type HOST
-            if problem.get('rootCauseEntity') and problem['rootCauseEntity'].get('type') == 'HOST':
-                candidate = problem['rootCauseEntity'].get('name', problem['rootCauseEntity'].get('displayName'))
-                if candidate and is_valid_hostname(candidate):
-                    host_name = candidate
-                    logger.info(f"Hôte trouvé dans rootCauseEntity (priorité 1): {host_name}")
-            
-            # PRIORITÉ 2: Chercher dans les entités affectées de type HOST
-            if host_name == "Non spécifié" and 'affectedEntities' in problem:
-                for entity in problem.get('affectedEntities', []):
-                    if entity.get('type') == 'HOST':
-                        candidate = entity.get('name', entity.get('displayName', "Non spécifié"))
-                        if candidate != "Non spécifié" and is_valid_hostname(candidate):
-                            host_name = candidate
-                            logger.info(f"Hôte trouvé dans affectedEntities (priorité 2): {host_name}")
-                            break
-            
-            # PRIORITÉ 3: Chercher dans le displayId ou entityId s'ils ressemblent à des noms d'hôtes
-            if host_name == "Non spécifié" and problem.get('displayId'):
-                display_id = problem.get('displayId')
-                # Vérifier si displayId contient un nom d'hôte
-                host_match = re.search(r'\b(s[a-z0-9]\d{2,}[a-z0-9]*(?:\.fr\.net\.intra)?)\b', display_id, re.IGNORECASE)
-                if host_match and is_valid_hostname(host_match.group(1)):
-                    host_name = host_match.group(1)
-                    logger.info(f"Hôte trouvé dans displayId (priorité 3): {host_name}")
-            
-            # PRIORITÉ 4: Rechercher dans le titre avec des patterns spécifiques
-            if host_name == "Non spécifié" and problem.get('title'):
-                title = problem.get('title', '')
-                
-                # Liste de patterns du plus spécifique au moins spécifique
-                patterns = [
-                    r'HOST:\s*(\S+)',                                # HOST: hostname
-                    r'host\s+(\S+)',                                 # host hostname
-                    r'server\s+(\S+)',                               # server hostname
-                    r'\bon\s+(\S+)',                                 # on hostname
-                    r'\bat\s+(\S+)',                                 # at hostname
-                    r'\b(s[a-z0-9]\d{2,}[a-z0-9]*\.fr\.net\.intra)\b',  # Format spécifique d'entreprise
-                    r'\b(s[a-z0-9]\d{2,}[a-z0-9]*)\b',                  # Serveurs commençant par S avec chiffres
-                    r'\b(srv\d+[a-z0-9]*)\b',                          # Format srv##
-                    r'\b(win[a-z0-9]*\d+[a-z0-9]*)\b'                  # Serveurs Windows
-                ]
-                
-                for pattern in patterns:
-                    host_match = re.search(pattern, title, re.IGNORECASE)
-                    if host_match:
-                        # Récupérer le premier groupe non-None
-                        match_value = next((g for g in host_match.groups() if g), "Non spécifié")
-                        
-                        if is_valid_hostname(match_value):
-                            host_name = match_value
-                            logger.info(f"Hôte trouvé dans le titre via pattern {pattern} (priorité 4): {host_name}")
-                            break
-            
-            # PRIORITÉ 5: Rechercher dans la description ou le sous-titre
-            if host_name == "Non spécifié":
-                # Combiner la description et le sous-titre pour la recherche
-                combined_text = f"{problem.get('description', '')} {problem.get('subtitle', '')}"
-                
-                if combined_text.strip():
-                    # Pattern du plus spécifique au moins spécifique
-                    patterns = [
-                        r'\b(s[a-z0-9]\d{2,}[a-z0-9]*\.fr\.net\.intra)\b',  # Format complet
-                        r'\b(s[a-z0-9]\d{2,}[a-z0-9]*)\b',                  # Format s##
-                        r'\b(srv\d+[a-z0-9]*)\b',                           # Format srv##
-                        r'\bhost\s+(\S+)',                                   # host name
-                        r'\bserver\s+(\S+)',                                 # server name
-                        r'\b(win[a-z0-9]*\d+[a-z0-9]*)\b'                    # Serveurs Windows
-                    ]
-                    
-                    for pattern in patterns:
-                        host_match = re.search(pattern, combined_text, re.IGNORECASE)
-                        if host_match:
-                            match_value = next((g for g in host_match.groups() if g), "Non spécifié")
-                            if is_valid_hostname(match_value):
-                                host_name = match_value
-                                logger.info(f"Hôte trouvé dans la description/sous-titre (priorité 5): {host_name}")
-                                break
-        
-        # Log du résultat final
-        if host_name != "Non spécifié":
-            logger.info(f"Nom d'hôte final retenu pour le problème {problem.get('problemId', 'unknown')}: {host_name}")
-        else:
-            logger.info(f"Aucun nom d'hôte valide trouvé pour le problème {problem.get('problemId', 'unknown')}")
-        
-        # Utiliser en priorité la MZ correspondante stockée lors du filtrage
-        display_zone = None
-        if 'matching_mz' in problem:
-            display_zone = problem['matching_mz']
-            logger.info(f"Problème {problem.get('problemId')}: utilisation de la MZ correspondante pour l'affichage: {display_zone}")
-        elif zone:
-            display_zone = zone
-            logger.info(f"Problème {problem.get('problemId')}: utilisation de la MZ fournie en paramètre: {display_zone}")
-        else:
-            display_zone = self._extract_problem_zone(problem)
-            logger.info(f"Problème {problem.get('problemId')}: utilisation de la première MZ du problème: {display_zone}")
-            
-        result = {
-            'id': problem.get('problemId', 'Unknown'),
-            'title': problem.get('title', 'Problème inconnu'),
-            'impact': problem.get('impactLevel', 'UNKNOWN'),
-            'status': 'RESOLVED' if is_resolved else problem.get('status', 'OPEN'),
-            'affected_entities': len(problem.get('affectedEntities', [])),
-            'start_time': start_time_str,
-            'end_time': end_time_str,  # Ajout de l'heure de fermeture
-            'duration': duration_display,  # Ajout de la durée du problème
-            'dt_url': f"{self.env_url}/#problems/problemdetails;pid={problem.get('problemId', 'Unknown')}",
-            'zone': display_zone,
-            'resolved': is_resolved,
-            'host': host_name,  # Ajout du champ host explicite
-            'impacted': host_name  # Ajout pour compatibilité avec le frontend actuel
+            if success:
+                metrics['success'] += 1
+                metrics['min_time'] = min(metrics['min_time'], duration)
+                metrics['max_time'] = max(metrics['max_time'], duration)
+            else:
+                metrics['errors'] += 1
+    
+    def get_performance_report(self):
+        """Génère un rapport de performance détaillé"""
+        report = {
+            'client_metrics': self.client.get_cache_stats(),
+            'call_metrics': {}
         }
         
-        # N'ajouter impactedEntities que si elles sont disponibles
-        if 'impactedEntities' in problem:
-            result['impactedEntities'] = problem.get('impactedEntities', [])
+        with self.call_metrics_lock:
+            for call_type, metrics in self.call_metrics.items():
+                report['call_metrics'][call_type] = metrics.copy()
+                if metrics['count'] > 0:
+                    report['call_metrics'][call_type]['avg_time'] = metrics['total_time'] / metrics['count']
+                    report['call_metrics'][call_type]['success_rate'] = metrics['success'] / metrics['count'] * 100
         
-        return result
-        
-    def _extract_problem_zone(self, problem):
-        """Extrait la zone principale d'un problème"""
-        if 'managementZones' in problem and problem['managementZones']:
-            return problem['managementZones'][0].get('name', 'Non spécifié')
-        return 'Non spécifié'
-
-    def get_summary_parallelized(self, mz_name, from_time, to_time):
+        return report
+    
+    def get_all_processes_status_optimized(self):
         """
-        Récupère un résumé des métriques en utilisant des requêtes parallèles optimisées
-        
-        Args:
-            mz_name (str): Nom de la Management Zone
-            from_time (int): Timestamp de début
-            to_time (int): Timestamp de fin
-            
-        Returns:
-            dict: Résumé des métriques
+        Récupère le statut de tous les processus avec optimisation avancée
         """
-        cache_key = f"summary:{mz_name}:{from_time}:{to_time}"
-        cached_data = self.get_cached(cache_key)
-        if cached_data is not None:
-            return cached_data
+        start_time = time.time()
         
         try:
-            # Préparer les requêtes de base avec clés explicites et timeout
-            entity_queries = [
-                (
-                    "entities",
-                    {
-                        "entitySelector": f"type(SERVICE),mzName(\"{mz_name}\")",
-                        "fields": "+properties,+fromRelationships"
-                    },
-                    True,
-                    f"services:{mz_name}"
-                ),
-                (
-                    "entities",
-                    {
-                        "entitySelector": f"type(HOST),mzName(\"{mz_name}\")",
-                        "fields": "+properties,+fromRelationships"
-                    },
-                    True,
-                    f"hosts:{mz_name}"
-                ),
-                (
-                    "problems",
-                    {
-                        "from": "-24h",
-                        "status": "OPEN",
-                        "managementZone": mz_name
-                    },
-                    True,
-                    f"problems:{mz_name}"
-                )
-            ]
-            
-            # Exécuter les requêtes en parallèle avec un retry en cas d'échec
-            results = None
-            retry_count = 0
-            max_retries = 3
-            
-            while results is None and retry_count < max_retries:
-                try:
-                    results = self.batch_query(entity_queries)
-                    if not all(results):
-                        # Si une des requêtes a échoué, réessayer
-                        logger.warning(f"Certaines requêtes ont échoué, retry {retry_count+1}/{max_retries}")
-                        results = None
-                        retry_count += 1
-                        time.sleep(1)  # Attendre avant de réessayer
-                        continue
-                except Exception as e:
-                    logger.error(f"Erreur lors des requêtes en lot: {e}, retry {retry_count+1}/{max_retries}")
-                    retry_count += 1
-                    time.sleep(1)  # Attendre avant de réessayer
-                    if retry_count >= max_retries:
-                        raise
-
-            # S'il n'y a toujours pas de résultats après les tentatives
-            if results is None:
-                logger.error("Impossible d'obtenir les résultats après plusieurs tentatives")
-                return {
-                    'error': "Impossible d'obtenir les données après plusieurs tentatives",
-                    'timestamp': int(time.time() * 1000)
-                }
-            
-            # Utiliser des index explicites
-            services_data = results[0]
-            hosts_data = results[1]
-            problems_data = results[2]
-            
-            # Vérifier que les résultats sont valides
-            if not services_data or not hosts_data:
-                logger.warning("Données incomplètes reçues de l'API")
-                services_count = 0 if not services_data else len(services_data.get('entities', []))
-                hosts_count = 0 if not hosts_data else len(hosts_data.get('entities', []))
-                problems_count = 0 if not problems_data else len(problems_data.get('problems', []))
-                
-                # Créer un résumé minimal avec les informations disponibles
-                summary = {
-                    'hosts': {
-                        'count': hosts_count,
-                        'avg_cpu': 0,
-                        'critical_count': 0
-                    },
-                    'services': {
-                        'count': services_count,
-                        'with_errors': 0,
-                        'avg_error_rate': 0
-                    },
-                    'requests': {
-                        'total': 0,
-                        'hourly_avg': 0
-                    },
-                    'problems': {
-                        'count': problems_count
-                    },
-                    'timestamp': int(time.time() * 1000),
-                    'data_quality': 'partial'  # Indiquer que les données sont partielles
-                }
-                
-                self.set_cache(cache_key, summary)
-                return summary
-            
-            # Calculer les métriques résumées
-            services_count = len(services_data.get('entities', []))
-            hosts_count = len(hosts_data.get('entities', []))
-            problems_count = len(problems_data.get('problems', []))
-            
-            # Limiter le nombre d'hôtes et de services pour éviter la surcharge
-            max_metrics_entities = int(os.environ.get('MAX_METRICS_ENTITIES', 20))
-            
-            # Pour les hôtes, ne prendre que les MAX_METRICS_ENTITIES premiers
-            host_entities = hosts_data.get('entities', [])[:max_metrics_entities]
-            
-            # Préparer les requêtes de métriques en lot pour les hôtes limités
-            host_metric_queries = []
-            
-            for host in host_entities:
-                host_id = host.get('entityId')
-                host_metric_queries.append((
-                    "metrics/query",
-                    {
-                        "metricSelector": "builtin:host.cpu.usage",
-                        "from": from_time,
-                        "to": to_time,
-                        "entitySelector": f"entityId({host_id})"
-                    },
-                    True,
-                    f"summary_host_cpu:{host_id}:{from_time}:{to_time}"  # Clé explicite avec ID
-                ))
-            
-            # Exécuter les requêtes CPU en parallèle
-            host_cpu_results = self.batch_query(host_metric_queries)
-            
-            # Créer un mapping hôte ID -> résultats CPU
-            host_cpu_dict = {}
-            for i, host in enumerate(host_entities):
-                host_id = host.get('entityId')
-                host_cpu_dict[host_id] = host_cpu_results[i]
-            
-            # Calculer l'utilisation moyenne du CPU et le nombre d'hôtes critiques
-            total_cpu = 0
-            critical_hosts = 0
-            valid_cpu_count = 0
-            
-            for host in host_entities:
-                host_id = host.get('entityId')
-                cpu_data = host_cpu_dict[host_id]
-                
-                if cpu_data and 'result' in cpu_data and cpu_data['result']:
-                    result = cpu_data['result'][0]
-                    if 'data' in result and result['data']:
-                        values = result['data'][0].get('values', [])
-                        if values and values[0] is not None:
-                            cpu_usage = int(values[0])
-                            if cpu_usage > 80:
-                                critical_hosts += 1
-                            total_cpu += cpu_usage
-                            valid_cpu_count += 1
-            
-            avg_cpu = round(total_cpu / valid_cpu_count, 1) if valid_cpu_count > 0 else 0
-            
-            # Pour les services, ne prendre que les MAX_METRICS_ENTITIES premiers
-            service_entities = services_data.get('entities', [])[:max_metrics_entities]
-            
-            # Préparer les requêtes de métriques pour les services limités
-            service_metric_queries = []
-            
-            for service in service_entities:
-                service_id = service.get('entityId')
-                # Requête pour le nombre de requêtes
-                service_metric_queries.append((
-                    "metrics/query",
-                    {
-                        "metricSelector": "builtin:service.requestCount.total",
-                        "from": from_time,
-                        "to": to_time,
-                        "entitySelector": f"entityId({service_id})"
-                    },
-                    True,
-                    f"summary_service_requests:{service_id}:{from_time}:{to_time}"  # Clé explicite avec ID
-                ))
-                
-                # Requête pour le taux d'erreur
-                service_metric_queries.append((
-                    "metrics/query",
-                    {
-                        "metricSelector": "builtin:service.errors.total.rate",
-                        "from": from_time,
-                        "to": to_time,
-                        "entitySelector": f"entityId({service_id})"
-                    },
-                    True,
-                    f"summary_service_errors:{service_id}:{from_time}:{to_time}"  # Clé explicite avec ID
-                ))
-            
-            # Exécuter les requêtes de services en parallèle
-            service_metric_results = self.batch_query(service_metric_queries)
-            
-            # Créer des dictionnaires pour associer les résultats aux services
-            service_requests_dict = {}
-            service_errors_dict = {}
-            
-            # Distribuer les résultats dans des dictionnaires
-            result_index = 0
-            for service in service_entities:
-                service_id = service.get('entityId')
-                service_requests_dict[service_id] = service_metric_results[result_index]
-                result_index += 1
-                service_errors_dict[service_id] = service_metric_results[result_index]
-                result_index += 1
-            
-            # Calculer le nombre total de requêtes et le taux d'erreur moyen
-            total_requests = 0
-            total_errors = 0
-            services_with_errors = 0
-            
-            for service in service_entities:
-                service_id = service.get('entityId')
-                
-                # Extraire les données de requêtes
-                requests_data = service_requests_dict[service_id]
-                
-                if requests_data and 'result' in requests_data and requests_data['result']:
-                    result = requests_data['result'][0]
-                    if 'data' in result and result['data']:
-                        values = result['data'][0].get('values', [])
-                        if values and values[0] is not None:
-                            requests_count = int(values[0])
-                            total_requests += requests_count
-                
-                # Extraire les données d'erreurs
-                error_rate_data = service_errors_dict[service_id]
-                
-                if error_rate_data and 'result' in error_rate_data and error_rate_data['result']:
-                    result = error_rate_data['result'][0]
-                    if 'data' in result and result['data']:
-                        values = result['data'][0].get('values', [])
-                        if values and values[0] is not None:
-                            error_rate = round(values[0], 1)
-                            if error_rate > 0:
-                                total_errors += error_rate
-                                services_with_errors += 1
-            
-            avg_error_rate = round(total_errors / services_with_errors, 1) if services_with_errors > 0 else 0
-            
-            # Créer le résumé
-            summary = {
-                'hosts': {
-                    'count': hosts_count,
-                    'avg_cpu': avg_cpu,
-                    'critical_count': critical_hosts
-                },
-                'services': {
-                    'count': services_count,
-                    'with_errors': services_with_errors,
-                    'avg_error_rate': avg_error_rate
-                },
-                'requests': {
-                    'total': total_requests,
-                    'hourly_avg': round(total_requests / 24) if total_requests > 0 else 0
-                },
-                'problems': {
-                    'count': problems_count
-                },
-                'timestamp': int(time.time() * 1000),
-                'data_quality': 'full'  # Indiquer que les données sont complètes
+            # Utiliser un sélecteur d'entités optimisé
+            params = {
+                'entitySelector': 'type(PROCESS_GROUP_INSTANCE)',
+                'fields': 'properties.state,properties.softwareTechnologies,properties.metadata,fromRelationships.runsOn',
+                'from': 'now-5m',
+                'pageSize': 500
             }
             
-            # Mettre en cache le résumé
-            self.set_cache(cache_key, summary)
+            all_processes = []
+            next_page_key = True
             
-            return summary
+            while next_page_key:
+                if next_page_key != True:
+                    params['nextPageKey'] = next_page_key
+                
+                result = self.client.single_query('entities', params, use_cache=True)
+                
+                if result and 'entities' in result:
+                    all_processes.extend(result['entities'])
+                    next_page_key = result.get('nextPageKey')
+                else:
+                    break
+            
+            # Optimiser le formatage des résultats
+            formatted_processes = []
+            for process in all_processes:
+                formatted_process = {
+                    'entityId': process.get('entityId'),
+                    'displayName': process.get('displayName'),
+                    'state': process.get('properties', {}).get('state'),
+                    'technologies': process.get('properties', {}).get('softwareTechnologies', []),
+                    'metadata': process.get('properties', {}).get('metadata', {}),
+                    'host': None
+                }
+                
+                # Extraire l'information de l'hôte
+                relations = process.get('fromRelationships', {})
+                if 'runsOn' in relations and relations['runsOn']:
+                    formatted_process['host'] = relations['runsOn'][0].get('id')
+                
+                formatted_processes.append(formatted_process)
+            
+            duration = time.time() - start_time
+            self._track_call('get_all_processes_status', duration, success=True)
+            
+            return formatted_processes
+            
         except Exception as e:
-            logger.error(f"Erreur lors de la récupération du résumé: {e}")
-            return {
-                'error': str(e),
-                'timestamp': int(time.time() * 1000),
-                'data_quality': 'error'
-            }
-
-# Décorateur pour mesurer le temps d'exécution des fonctions
-def time_execution(func):
-    """Décorateur pour mesurer le temps d'exécution des fonctions"""
-    @wraps(func)
-    def wrapper(*args, **kwargs):
+            duration = time.time() - start_time
+            self._track_call('get_all_processes_status', duration, success=False)
+            logger.error(f"Erreur dans get_all_processes_status_optimized: {str(e)}")
+            return []
+    
+    def get_all_hosts_metrics_optimized(self, from_time='now-1h', to_time='now'):
+        """
+        Récupère les métriques de tous les hôtes avec optimisation maximale
+        """
         start_time = time.time()
-        result = func(*args, **kwargs)
-        end_time = time.time()
-        elapsed_time = end_time - start_time
-        logger.info(f"Fonction {func.__name__} exécutée en {elapsed_time:.2f} secondes")
-        return result
-    return wrapper
+        
+        try:
+            # 1. Récupérer tous les hôtes
+            host_params = {
+                'entitySelector': 'type(HOST)',
+                'fields': 'properties.state,properties.osType,properties.osVersion,tags',
+                'pageSize': 500
+            }
+            
+            all_hosts = []
+            next_page_key = True
+            
+            while next_page_key:
+                if next_page_key != True:
+                    host_params['nextPageKey'] = next_page_key
+                
+                result = self.client.single_query('entities', host_params, use_cache=True)
+                
+                if result and 'entities' in result:
+                    all_hosts.extend(result['entities'])
+                    next_page_key = result.get('nextPageKey')
+                else:
+                    break
+            
+            if not all_hosts:
+                return []
+            
+            # 2. Préparer les requêtes de métriques en batch
+            host_ids = [host['entityId'] for host in all_hosts]
+            
+            # Si beaucoup d'hôtes, traiter par lots
+            if len(host_ids) > 50:
+                return self._process_large_host_batch(host_ids, from_time, to_time)
+            else:
+                return self._process_host_metrics_batch(host_ids, from_time, to_time)
+            
+        except Exception as e:
+            duration = time.time() - start_time
+            self._track_call('get_all_hosts_metrics', duration, success=False)
+            logger.error(f"Erreur dans get_all_hosts_metrics_optimized: {str(e)}")
+            return []
+    
+    def _process_host_metrics_batch(self, host_ids, from_time, to_time):
+        """
+        Traite les métriques pour un batch d'hôtes
+        """
+        # Créer des requêtes pour toutes les métriques nécessaires
+        metric_selectors = [
+            'builtin:host.cpu.usage',
+            'builtin:host.mem.usage',
+            'builtin:host.disk.avail.percent',
+            'builtin:host.net.nic.trafficIn',
+            'builtin:host.net.nic.trafficOut'
+        ]
+        
+        # Construire une requête batch pour toutes les métriques et tous les hôtes
+        batch_queries = []
+        
+        for metric_selector in metric_selectors:
+            # Créer un sélecteur pour tous les hôtes
+            entity_selector = f'type(HOST),entityId({",".join(host_ids)})'
+            
+            params = {
+                'metricSelector': metric_selector,
+                'entitySelector': entity_selector,
+                'from': from_time,
+                'to': to_time,
+                'resolution': 'Inf'  # Une seule valeur agrégée
+            }
+            
+            batch_queries.append(('metrics/query', params))
+        
+        # Exécuter toutes les requêtes en parallèle
+        results = self.client.batch_query(batch_queries)
+        
+        # Organiser les résultats par hôte
+        host_metrics = {}
+        
+        for metric_idx, result in enumerate(results):
+            if result and 'result' in result:
+                metric_name = metric_selectors[metric_idx].split(':')[-1]
+                
+                for metric_result in result['result']:
+                    if 'data' in metric_result and metric_result['data']:
+                        for data_point in metric_result['data']:
+                            host_id = data_point.get('dimensions', [None])[0]
+                            if host_id:
+                                if host_id not in host_metrics:
+                                    host_metrics[host_id] = {
+                                        'entityId': host_id,
+                                        'metrics': {}
+                                    }
+                                
+                                values = data_point.get('values', [])
+                                if values:
+                                    host_metrics[host_id]['metrics'][metric_name] = values[0]
+        
+        return list(host_metrics.values())
+    
+    def _process_large_host_batch(self, host_ids, from_time, to_time):
+        """
+        Traite un grand nombre d'hôtes en les divisant en lots plus petits
+        """
+        chunk_size = 50
+        all_results = []
+        
+        for i in range(0, len(host_ids), chunk_size):
+            chunk_ids = host_ids[i:i + chunk_size]
+            logger.info(f"Traitement du lot {i//chunk_size + 1}/{(len(host_ids) + chunk_size - 1)//chunk_size}")
+            
+            chunk_results = self._process_host_metrics_batch(chunk_ids, from_time, to_time)
+            all_results.extend(chunk_results)
+            
+            # Petite pause entre les lots
+            if i + chunk_size < len(host_ids):
+                time.sleep(0.5)
+        
+        return all_results
+    
+    def get_management_zones_optimized(self):
+        """
+        Récupère toutes les management zones avec leurs comptes d'entités
+        """
+        start_time = time.time()
+        
+        try:
+            # 1. Récupérer toutes les management zones
+            mz_result = self.client.single_query('settings/objects', {
+                'schemaIds': 'builtin:management-zones',
+                'pageSize': 500
+            })
+            
+            if not mz_result or 'objects' not in mz_result:
+                return []
+            
+            # 2. Préparer les requêtes pour compter les entités dans chaque zone
+            count_queries = []
+            zone_info = {}
+            
+            for mz in mz_result['objects']:
+                mz_id = mz.get('objectId')
+                mz_name = mz.get('value', {}).get('name', 'Unknown')
+                
+                zone_info[mz_id] = {
+                    'id': mz_id,
+                    'name': mz_name,
+                    'counts': {}
+                }
+                
+                # Requêtes pour différents types d'entités
+                entity_types = [
+                    'PROCESS_GROUP_INSTANCE',
+                    'SERVICE',
+                    'HOST',
+                    'APPLICATION'
+                ]
+                
+                for entity_type in entity_types:
+                    params = {
+                        'entitySelector': f'type({entity_type}),mzId({mz_id})',
+                        'from': 'now-5m',
+                        'fields': '+properties.state'
+                    }
+                    
+                    cache_key = f"mz_count:{mz_id}:{entity_type}"
+                    count_queries.append(('entities', params, True, cache_key))
+            
+            # 3. Exécuter toutes les requêtes en parallèle
+            results = self.client.batch_query(count_queries)
+            
+            # 4. Traiter les résultats
+            query_idx = 0
+            for mz_id, mz_data in zone_info.items():
+                for entity_type_idx, entity_type in enumerate(['PROCESS_GROUP_INSTANCE', 'SERVICE', 'HOST', 'APPLICATION']):
+                    result = results[query_idx]
+                    query_idx += 1
+                    
+                    if result and 'totalCount' in result:
+                        type_key = {
+                            'PROCESS_GROUP_INSTANCE': 'processes',
+                            'SERVICE': 'services',
+                            'HOST': 'hosts',
+                            'APPLICATION': 'applications'
+                        }.get(entity_type, 'other')
+                        
+                        mz_data['counts'][type_key] = result['totalCount']
+                    else:
+                        mz_data['counts'][entity_type.lower()] = 0
+            
+            duration = time.time() - start_time
+            self._track_call('get_management_zones', duration, success=True)
+            
+            return list(zone_info.values())
+            
+        except Exception as e:
+            duration = time.time() - start_time
+            self._track_call('get_management_zones', duration, success=False)
+            logger.error(f"Erreur dans get_management_zones_optimized: {str(e)}")
+            return []
+    
+    def get_problems_optimized(self, status='OPEN', from_time='now-7d'):
+        """
+        Récupère les problèmes avec optimisation pour grandes volumétries
+        """
+        start_time = time.time()
+        
+        try:
+            params = {
+                'problemSelector': f'status({status})',
+                'from': from_time,
+                'fields': '+impactedEntities,+managementZone,+rootCauseEntity',
+                'pageSize': 100  # Taille optimale pour les problèmes avec détails
+            }
+            
+            all_problems = []
+            next_page_key = True
+            page_count = 0
+            
+            # Limite de sécurité pour éviter les boucles infinies
+            max_pages = 50
+            
+            while next_page_key and page_count < max_pages:
+                if next_page_key != True:
+                    params['nextPageKey'] = next_page_key
+                
+                result = self.client.single_query('problems', params, use_cache=True)
+                
+                if result and 'problems' in result:
+                    all_problems.extend(result['problems'])
+                    next_page_key = result.get('nextPageKey')
+                    page_count += 1
+                    
+                    # Pause entre les pages pour éviter le rate limiting
+                    if next_page_key:
+                        time.sleep(0.1)
+                else:
+                    break
+            
+            # Enrichir les problèmes avec des informations supplémentaires si nécessaire
+            if all_problems:
+                self._enrich_problems_data(all_problems)
+            
+            duration = time.time() - start_time
+            self._track_call('get_problems', duration, success=True)
+            
+            return all_problems
+            
+        except Exception as e:
+            duration = time.time() - start_time
+            self._track_call('get_problems', duration, success=False)
+            logger.error(f"Erreur dans get_problems_optimized: {str(e)}")
+            return []
+    
+    def _enrich_problems_data(self, problems):
+        """
+        Enrichit les données des problèmes avec des informations supplémentaires
+        """
+        # Collecter tous les IDs d'entités impactées pour un enrichissement batch
+        entity_ids = set()
+        
+        for problem in problems:
+            # Collecter les IDs des entités impactées
+            if 'impactedEntities' in problem:
+                for entity in problem['impactedEntities']:
+                    entity_ids.add(entity.get('entityId'))
+            
+            # Collecter l'ID de l'entité root cause
+            if 'rootCauseEntity' in problem and problem['rootCauseEntity']:
+                entity_ids.add(problem['rootCauseEntity'].get('entityId'))
+        
+        if not entity_ids:
+            return
+        
+        # Récupérer les détails de toutes les entités en une seule requête
+        entity_details = self._batch_get_entity_details(list(entity_ids))
+        
+        # Enrichir chaque problème avec les détails des entités
+        for problem in problems:
+            if 'impactedEntities' in problem:
+                for entity in problem['impactedEntities']:
+                    entity_id = entity.get('entityId')
+                    if entity_id in entity_details:
+                        entity.update(entity_details[entity_id])
+            
+            if 'rootCauseEntity' in problem and problem['rootCauseEntity']:
+                entity_id = problem['rootCauseEntity'].get('entityId')
+                if entity_id in entity_details:
+                    problem['rootCauseEntity'].update(entity_details[entity_id])
+    
+    def _batch_get_entity_details(self, entity_ids):
+        """
+        Récupère les détails de plusieurs entités en batch
+        """
+        if not entity_ids:
+            return {}
+        
+        # Diviser en lots si nécessaire
+        chunk_size = 100
+        all_details = {}
+        
+        for i in range(0, len(entity_ids), chunk_size):
+            chunk_ids = entity_ids[i:i + chunk_size]
+            
+            params = {
+                'entitySelector': f'entityId({",".join(chunk_ids)})',
+                'fields': '+tags,+managementZones,+properties'
+            }
+            
+            result = self.client.single_query('entities', params, use_cache=True)
+            
+            if result and 'entities' in result:
+                for entity in result['entities']:
+                    all_details[entity['entityId']] = entity
+        
+        return all_details
+    
+    def get_process_group_instances(self, process_group_id):
+        """
+        Récupère toutes les instances d'un groupe de processus
+        """
+        params = {
+            'entitySelector': f'type(PROCESS_GROUP_INSTANCE),fromRelationships.isInstanceOf(type(PROCESS_GROUP),entityId({process_group_id}))',
+            'fields': '+properties,+fromRelationships,+toRelationships',
+            'pageSize': 500
+        }
+        
+        return self._get_all_entities(params)
+    
+    def _get_all_entities(self, initial_params):
+        """
+        Méthode générique pour récupérer toutes les entités avec pagination
+        """
+        all_entities = []
+        params = initial_params.copy()
+        next_page_key = True
+        
+        while next_page_key:
+            if next_page_key != True:
+                params['nextPageKey'] = next_page_key
+            
+            result = self.client.single_query('entities', params, use_cache=True)
+            
+            if result and 'entities' in result:
+                all_entities.extend(result['entities'])
+                next_page_key = result.get('nextPageKey')
+            else:
+                break
+        
+        return all_entities
+
+# Nouvelles fonctions pour l'optimisation du Volet 3
+
+def load_mz_config():
+    """Charge la configuration des management zones depuis le fichier JSON"""
+    try:
+        with open('mz_config.json', 'r') as f:
+            return json.load(f)
+    except Exception as e:
+        logger.error(f"Erreur lors du chargement de mz_config.json: {str(e)}")
+        return {"management_zones": []}
+
+def get_count_for_single_zone_from_dynatrace(zone_id, api_client):
+    """
+    Récupère les counts pour une seule zone depuis Dynatrace
+    """
+    try:
+        counts = {}
+        entity_types = {
+            'hosts': 'HOST',
+            'services': 'SERVICE',
+            'processes': 'PROCESS_GROUP'
+        }
+        
+        for key, entity_type in entity_types.items():
+            params = {
+                'entitySelector': f'type({entity_type}),mzId({zone_id})',
+                'from': 'now-5m',
+                'pageSize': 1  # On veut juste le count
+            }
+            
+            result = api_client.single_query('entities', params, use_cache=True)
+            
+            if result and 'totalCount' in result:
+                counts[key] = result['totalCount']
+            else:
+                counts[key] = 0
+        
+        return counts
+            
+    except Exception as e:
+        logger.error(f"Erreur lors de la récupération des counts pour la zone {zone_id}: {str(e)}")
+        return None
+
+def fetch_all_zone_counts_optimized(api_token=None, environment_url=None):
+    """
+    Récupère les counts de toutes les zones de manière optimisée
+    """
+    try:
+        # Charger la configuration des zones
+        mz_data = load_mz_config()
+        zone_ids = [zone['id'] for zone in mz_data.get('management_zones', []) if zone.get('id')]
+        
+        if not zone_ids:
+            logger.warning("Aucune zone trouvée dans la configuration")
+            return {}
+        
+        # Utiliser les valeurs par défaut si non fournies
+        if not api_token:
+            api_token = os.getenv('DYNATRACE_API_TOKEN')
+        if not environment_url:
+            environment_url = os.getenv('DYNATRACE_ENVIRONMENT_URL')
+        
+        # Créer un client API optimisé
+        api_client = OptimizedAPIClient(
+            env_url=environment_url,
+            api_token=api_token,
+            verify_ssl=False,
+            max_workers=10
+        )
+        
+        results = {}
+        
+        # Utiliser ThreadPoolExecutor pour des appels concurrents
+        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+            future_to_zone = {
+                executor.submit(get_count_for_single_zone_from_dynatrace, zone_id, api_client): zone_id 
+                for zone_id in zone_ids
+            }
+            
+            for future in concurrent.futures.as_completed(future_to_zone):
+                zone_id = future_to_zone[future]
+                try:
+                    count = future.result()
+                    results[zone_id] = count
+                except Exception as exc:
+                    logger.error(f'Erreur lors de la récupération du count pour la zone {zone_id}: {exc}')
+                    results[zone_id] = None
+        
+        return results
+        
+    except Exception as e:
+        logger.error(f"Erreur dans fetch_all_zone_counts_optimized: {str(e)}")
+        return {}

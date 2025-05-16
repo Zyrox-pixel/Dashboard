@@ -12,7 +12,7 @@ import {
   ProblemResponse,
   DashboardVariant
 } from '../api/types';
-import { API_BASE_URL } from '../api/endpoints';
+import { API_BASE_URL, ENDPOINTS, fetchAllZoneCounts } from '../api/endpoints';
 import { Database, Shield, Key, Globe, Server, Grid, Building, CreditCard } from 'lucide-react';
 
 // Types unifiés pour les contextes
@@ -713,236 +713,131 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
       let encryptionMZs: ManagementZone[] = [];
       
       if (!refreshProblemsOnly) {
+        // Récupérer tous les counts de zones en une seule requête batch
+        let batchCounts: { [key: string]: { hosts: number; services: number; processes: number } | null } = {};
+        let shouldFetchBatchCounts = false;
+        
+        // Vérifier si nous avons des zones à traiter dans n'importe quelle catégorie
+        if ((vfgResponse && !vfgResponse.error && vfgResponse.data?.mzs) ||
+            (vfeResponse && !vfeResponse.error && vfeResponse.data?.mzs) ||
+            (detectionResponse && !detectionResponse.error && detectionResponse.data?.mzs) ||
+            (encryptionResponse && !encryptionResponse.error && encryptionResponse.data?.mzs)) {
+          shouldFetchBatchCounts = true;
+        }
+        
+        // Si nous avons des zones, récupérer tous les counts en batch
+        if (shouldFetchBatchCounts) {
+          try {
+            // Appeler fetchAllZoneCounts qui retourne les counts par zone
+            batchCounts = await fetchAllZoneCounts();
+            console.log(`Récupéré les counts pour toutes les zones en un seul appel batch`);
+          } catch (error) {
+            console.error('Erreur lors de la récupération des counts en batch:', error);
+          }
+        }
+        
         if (vfgResponse && !vfgResponse.error && vfgResponse.data?.mzs) {
-          // Obtenir les comptages pour chaque zone en parallèle
-          const mzPromises = vfgResponse.data.mzs.map(async (mzName) => {
-            try {
-                      
-              // Récupérer les comptages depuis l'API
-              const response = await fetch(`${API_BASE_URL}/management-zones/counts?zone=${encodeURIComponent(mzName)}`);
-              
-              if (response.ok) {
-                const data = await response.json();
-                const counts = data.counts || { hosts: 0, services: 0, processes: 0 };
-                
-                return {
-                  id: `env-${mzName.replace(/\s+/g, '-')}`,
-                  name: mzName,
-                  code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
-                  icon: getZoneIcon(mzName),
-                  iconName: getZoneIconName(mzName), // Pour le cache
-                  problemCount: 0,
-                  apps: counts.processes,
-                  services: counts.services,
-                  hosts: counts.hosts,
-                  availability: "99.99%", // Pour l'instant, valeur par défaut
-                  status: "healthy" as "healthy" | "warning",
-                  color: getZoneColor(mzName),
-                  dt_url: "#"
-                };
-              } else {
-                // API error handled in catch block
-                throw new Error(`Erreur API ${response.status}`);
-              }
-            } catch (error) {
-              // Error for MZ handled with fallback object
-              // En cas d'erreur, retourner un objet avec des comptages à 0
-              return {
-                id: `env-${mzName.replace(/\s+/g, '-')}`,
-                name: mzName,
-                code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
-                icon: getZoneIcon(mzName),
-                iconName: getZoneIconName(mzName), // Pour le cache
-                problemCount: 0,
-                apps: 0,
-                services: 0,
-                hosts: 0,
-                availability: "99.99%",
-                status: "healthy" as "healthy" | "warning",
-                color: getZoneColor(mzName),
-                dt_url: "#"
-              };
-            }
+          // Utiliser les counts du batch au lieu de faire des appels individuels
+          vfgMZs = vfgResponse.data.mzs.map((mzName) => {
+            const zoneId = `env-${mzName.replace(/\s+/g, '-')}`;
+            const counts = batchCounts[zoneId] || { hosts: 0, services: 0, processes: 0 };
+            
+            return {
+              id: zoneId,
+              name: mzName,
+              code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
+              icon: getZoneIcon(mzName),
+              iconName: getZoneIconName(mzName), // Pour le cache
+              problemCount: 0,
+              apps: counts.processes,
+              services: counts.services,
+              hosts: counts.hosts,
+              availability: "99.99%", // Pour l'instant, valeur par défaut
+              status: "healthy" as "healthy" | "warning",
+              color: getZoneColor(mzName),
+              dt_url: "#"
+            };
           });
-          
-          // Attendre la résolution de toutes les promesses
-          vfgMZs = await Promise.all(mzPromises);
           
           setState(prev => ({ ...prev, vitalForGroupMZs: vfgMZs }));
         }
         
         if (vfeResponse && !vfeResponse.error && vfeResponse.data?.mzs) {
-          // Obtenir les comptages pour chaque zone en parallèle
-          const mzPromises = vfeResponse.data.mzs.map(async (mzName) => {
-            try {
-              
-              // Récupérer les comptages depuis l'API
-              const response = await fetch(`${API_BASE_URL}/management-zones/counts?zone=${encodeURIComponent(mzName)}`);
-              
-              if (response.ok) {
-                const data = await response.json();
-                const counts = data.counts || { hosts: 0, services: 0, processes: 0 };
-                
-                return {
-                  id: `env-${mzName.replace(/\s+/g, '-')}`,
-                  name: mzName,
-                  code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
-                  icon: getZoneIcon(mzName),
-                  iconName: getZoneIconName(mzName), // Pour le cache
-                  problemCount: 0,
-                  apps: counts.processes,
-                  services: counts.services,
-                  hosts: counts.hosts,
-                  availability: "99.99%", // Pour l'instant, valeur par défaut
-                  status: "healthy" as "healthy" | "warning",
-                  color: getZoneColor(mzName),
-                  dt_url: "#"
-                };
-              } else {
-                // API error handled in catch block
-                throw new Error(`Erreur API ${response.status}`);
-              }
-            } catch (error) {
-              // Error for MZ handled with fallback object
-              // En cas d'erreur, retourner un objet avec des comptages à 0
-              return {
-                id: `env-${mzName.replace(/\s+/g, '-')}`,
-                name: mzName,
-                code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
-                icon: getZoneIcon(mzName),
-                iconName: getZoneIconName(mzName), // Pour le cache
-                problemCount: 0,
-                apps: 0,
-                services: 0,
-                hosts: 0,
-                availability: "99.99%",
-                status: "healthy" as "healthy" | "warning",
-                color: getZoneColor(mzName),
-                dt_url: "#"
-              };
-            }
+          // Utiliser les counts du batch au lieu de faire des appels individuels
+          vfeMZs = vfeResponse.data.mzs.map((mzName) => {
+            const zoneId = `env-${mzName.replace(/\s+/g, '-')}`;
+            const counts = batchCounts[zoneId] || { hosts: 0, services: 0, processes: 0 };
+            
+            return {
+              id: zoneId,
+              name: mzName,
+              code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
+              icon: getZoneIcon(mzName),
+              iconName: getZoneIconName(mzName), // Pour le cache
+              problemCount: 0,
+              apps: counts.processes,
+              services: counts.services,
+              hosts: counts.hosts,
+              availability: "99.99%", // Pour l'instant, valeur par défaut
+              status: "healthy" as "healthy" | "warning",
+              color: getZoneColor(mzName),
+              dt_url: "#"
+            };
           });
-          
-          // Attendre la résolution de toutes les promesses
-          vfeMZs = await Promise.all(mzPromises);
           
           setState(prev => ({ ...prev, vitalForEntrepriseMZs: vfeMZs }));
         }
         
         // Traiter les données des MZs Detection
         if (detectionResponse && !detectionResponse.error && detectionResponse.data?.mzs) {
-          // Obtenir les comptages pour chaque zone en parallèle
-          const mzPromises = detectionResponse.data.mzs.map(async (mzName) => {
-            try {
-              
-              // Récupérer les comptages depuis l'API
-              const response = await fetch(`${API_BASE_URL}/management-zones/counts?zone=${encodeURIComponent(mzName)}`);
-              
-              if (response.ok) {
-                const data = await response.json();
-                const counts = data.counts || { hosts: 0, services: 0, processes: 0 };
-                
-                return {
-                  id: `env-${mzName.replace(/\s+/g, '-')}`,
-                  name: mzName,
-                  code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
-                  icon: getZoneIcon(mzName),
-                  iconName: getZoneIconName(mzName), // Pour le cache
-                  problemCount: 0,
-                  apps: counts.processes,
-                  services: counts.services,
-                  hosts: counts.hosts,
-                  availability: "99.99%", // Pour l'instant, valeur par défaut
-                  status: "healthy" as "healthy" | "warning",
-                  color: getZoneColor(mzName),
-                  dt_url: "#"
-                };
-              } else {
-                // API error handled in catch block
-                throw new Error(`Erreur API ${response.status}`);
-              }
-            } catch (error) {
-              // Error for MZ handled with fallback object
-              // En cas d'erreur, retourner un objet avec des comptages à 0
-              return {
-                id: `env-${mzName.replace(/\s+/g, '-')}`,
-                name: mzName,
-                code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
-                icon: getZoneIcon(mzName),
-                iconName: getZoneIconName(mzName), // Pour le cache
-                problemCount: 0,
-                apps: 0,
-                services: 0,
-                hosts: 0,
-                availability: "99.99%",
-                status: "healthy" as "healthy" | "warning",
-                color: getZoneColor(mzName),
-                dt_url: "#"
-              };
-            }
+          // Utiliser les counts du batch au lieu de faire des appels individuels
+          detectionMZs = detectionResponse.data.mzs.map((mzName) => {
+            const zoneId = `env-${mzName.replace(/\s+/g, '-')}`;
+            const counts = batchCounts[zoneId] || { hosts: 0, services: 0, processes: 0 };
+            
+            return {
+              id: zoneId,
+              name: mzName,
+              code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
+              icon: getZoneIcon(mzName),
+              iconName: getZoneIconName(mzName), // Pour le cache
+              problemCount: 0,
+              apps: counts.processes,
+              services: counts.services,
+              hosts: counts.hosts,
+              availability: "99.99%", // Pour l'instant, valeur par défaut
+              status: "healthy" as "healthy" | "warning",
+              color: getZoneColor(mzName),
+              dt_url: "#"
+            };
           });
-          
-          // Attendre la résolution de toutes les promesses
-          detectionMZs = await Promise.all(mzPromises);
           
           setState(prev => ({ ...prev, detectionMZs }));
         }
         
         // Traiter les données des MZs Encryption
         if (encryptionResponse && !encryptionResponse.error && encryptionResponse.data?.mzs) {
-          // Obtenir les comptages pour chaque zone en parallèle
-          const mzPromises = encryptionResponse.data.mzs.map(async (mzName) => {
-            try {
-              
-              // Récupérer les comptages depuis l'API
-              const response = await fetch(`${API_BASE_URL}/management-zones/counts?zone=${encodeURIComponent(mzName)}`);
-              
-              if (response.ok) {
-                const data = await response.json();
-                const counts = data.counts || { hosts: 0, services: 0, processes: 0 };
-                
-                return {
-                  id: `env-${mzName.replace(/\s+/g, '-')}`,
-                  name: mzName,
-                  code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
-                  icon: getZoneIcon(mzName),
-                  iconName: getZoneIconName(mzName), // Pour le cache
-                  problemCount: 0,
-                  apps: counts.processes,
-                  services: counts.services,
-                  hosts: counts.hosts,
-                  availability: "99.99%", // Pour l'instant, valeur par défaut
-                  status: "healthy" as "healthy" | "warning",
-                  color: getZoneColor(mzName),
-                  dt_url: "#"
-                };
-              } else {
-                // API error handled in catch block
-                throw new Error(`Erreur API ${response.status}`);
-              }
-            } catch (error) {
-              // Error for MZ handled with fallback object
-              // En cas d'erreur, retourner un objet avec des comptages à 0
-              return {
-                id: `env-${mzName.replace(/\s+/g, '-')}`,
-                name: mzName,
-                code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
-                icon: getZoneIcon(mzName),
-                iconName: getZoneIconName(mzName), // Pour le cache
-                problemCount: 0,
-                apps: 0,
-                services: 0,
-                hosts: 0,
-                availability: "99.99%",
-                status: "healthy" as "healthy" | "warning",
-                color: getZoneColor(mzName),
-                dt_url: "#"
-              };
-            }
+          // Utiliser les counts du batch au lieu de faire des appels individuels
+          encryptionMZs = encryptionResponse.data.mzs.map((mzName) => {
+            const zoneId = `env-${mzName.replace(/\s+/g, '-')}`;
+            const counts = batchCounts[zoneId] || { hosts: 0, services: 0, processes: 0 };
+            
+            return {
+              id: zoneId,
+              name: mzName,
+              code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
+              icon: getZoneIcon(mzName),
+              iconName: getZoneIconName(mzName), // Pour le cache
+              problemCount: 0,
+              apps: counts.processes,
+              services: counts.services,
+              hosts: counts.hosts,
+              availability: "99.99%", // Pour l'instant, valeur par défaut
+              status: "healthy" as "healthy" | "warning",
+              color: getZoneColor(mzName),
+              dt_url: "#"
+            };
           });
-          
-          // Attendre la résolution de toutes les promesses
-          encryptionMZs = await Promise.all(mzPromises);
           
           setState(prev => ({ ...prev, encryptionMZs }));
         }

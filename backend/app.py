@@ -1391,5 +1391,87 @@ def get_performance():
         'optimized': True
     })
 
+@app.route('/api/batch-zone-counts', methods=['GET'])
+def batch_zone_counts():
+    """
+    Point de terminaison pour récupérer les counts de toutes les zones en un seul appel
+    Supporte maintenant les noms de zones passés comme paramètres de requête
+    """
+    try:
+        # Récupérer les noms de zones depuis les paramètres de requête
+        zone_names = request.args.getlist('zones[]')
+        
+        if zone_names:
+            # Si des noms de zones sont fournis, récupérer leurs counts directement
+            results = {}
+            
+            # Fonction pour récupérer le nombre d'entités par type
+            def get_zone_counts(zone_name):
+                counts = {}
+                entity_types = {
+                    'hosts': 'HOST',
+                    'services': 'SERVICE',
+                    'processes': 'PROCESS_GROUP'
+                }
+                
+                for key, entity_type in entity_types.items():
+                    try:
+                        # Utiliser la même API que la fonction existante
+                        api_url = f"{DT_ENV_URL}/api/v2/entities"
+                        headers = {
+                            'Authorization': f'Api-Token {API_TOKEN}',
+                            'Accept': 'application/json'
+                        }
+                        
+                        params = {
+                            'entitySelector': f'type({entity_type}),mzName("{zone_name}")',
+                            'pageSize': 1,
+                            'totalCount': 'true'
+                        }
+                        
+                        response = requests.get(api_url, headers=headers, params=params, verify=False, timeout=30)
+                        response.raise_for_status()
+                        data = response.json()
+                        
+                        counts[key] = data.get('totalCount', 0)
+                    except Exception as e:
+                        logger.error(f"Erreur lors du comptage des {entity_type} pour {zone_name}: {e}")
+                        counts[key] = 0
+                
+                return counts
+            
+            # Utiliser ThreadPoolExecutor pour des appels concurrents
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+                future_to_zone = {
+                    executor.submit(get_zone_counts, zone_name): zone_name 
+                    for zone_name in zone_names
+                }
+                
+                for future in concurrent.futures.as_completed(future_to_zone):
+                    zone_name = future_to_zone[future]
+                    zone_id = f"env-{zone_name.replace(' ', '-')}"
+                    try:
+                        counts = future.result()
+                        results[zone_id] = counts
+                    except Exception as exc:
+                        logger.error(f'Erreur lors de la récupération des counts pour la zone {zone_name}: {exc}')
+                        results[zone_id] = None
+            
+            return jsonify(results)
+        else:
+            # Si aucun nom de zone n'est fourni, utiliser l'ancienne méthode (par IDs depuis le fichier config)
+            from optimization import fetch_all_zone_counts_optimized
+            
+            counts = fetch_all_zone_counts_optimized(
+                api_token=API_TOKEN,
+                environment_url=DT_ENV_URL
+            )
+            
+            return jsonify(counts)
+    except Exception as e:
+        logger.error(f"Erreur dans /api/batch-zone-counts: {e}")
+        return jsonify({"error": "Failed to fetch batch zone counts", "details": str(e)}), 500
+
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0')

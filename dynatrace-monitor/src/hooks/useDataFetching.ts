@@ -1,16 +1,95 @@
 import { useState, useEffect, useCallback } from 'react';
 import { ApiResponse } from '../api/types';
+import { cacheService } from '../utils/cache';
 
 interface FetchingState {
   isLoading: boolean;
   error: string | null;
 }
 
+interface UseDataFetchingOptions<T> {
+  fetcher: () => Promise<T>; // La fonction qui fait l'appel API réel
+  cacheKeyParts: Array<string | number | Record<string, any>>; // Pour générer la clé de cache
+  ttlMs?: number; // TTL spécifique pour cette donnée
+}
+
 /**
+ * Hook amélioré pour gérer le chargement des données avec cache
+ */
+export function useDataFetching<T>({ fetcher, cacheKeyParts, ttlMs }: UseDataFetchingOptions<T>) {
+  const [data, setData] = useState<T | null>(null);
+  const [error, setError] = useState<Error | null>(null);
+  const [loading, setLoading] = useState(true);
+  // flag pour le Volet 2 (refresh en arrière-plan)
+  const [isServedFromCache, setIsServedFromCache] = useState(false); 
+
+  const cacheKey = cacheService.generateKey(cacheKeyParts);
+
+  const fetchData = useCallback(async (forceRefresh: boolean = false) => {
+    setLoading(true);
+    setIsServedFromCache(false);
+
+    if (!forceRefresh) {
+      const cachedData = cacheService.get<T>(cacheKey);
+      if (cachedData !== null) {
+        setData(cachedData);
+        setLoading(false);
+        setError(null);
+        setIsServedFromCache(true); // Marquer que c'est servi du cache
+        
+        // Lancement du rafraîchissement en arrière-plan
+        (async () => {
+          if (document.hidden) return; // Ne pas rafraîchir si l'onglet n'est pas visible
+
+          try {
+            console.log(`Background refreshing: ${cacheKey}`);
+            const freshData = await fetcher(); // fetcher est la fonction d'appel API
+            // Optionnel: comparer freshData avec cachedData pour éviter des écritures inutiles
+            // if (!isEqual(freshData, cachedData)) { // isEqual est une fonction de comparaison profonde
+            cacheService.set(cacheKey, freshData, ttlMs);
+            // Optionnel: Mettre à jour l'état pour refléter les nouvelles données immédiatement
+            // setData(freshData); // Ceci actualisera l'UI. A évaluer selon l'impact UX.
+            // }
+          } catch (backgroundError) {
+            console.warn(`Background refresh failed for ${cacheKey}:`, backgroundError);
+            // Pas d'impact sur l'utilisateur, l'erreur est juste logguée.
+          }
+        })();
+        
+        return; // Données du cache utilisées, pas besoin d'appeler l'API pour l'instant
+      }
+    }
+
+    // Si pas dans le cache, ou si forceRefresh est vrai
+    try {
+      const result = await fetcher();
+      setData(result);
+      cacheService.set(cacheKey, result, ttlMs);
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e : new Error('Failed to fetch data'));
+      // Ne pas effacer les données précédentes en cas d'erreur de rafraîchissement ?
+      // setData(null); // Optionnel : vider les données en cas d'erreur
+    } finally {
+      setLoading(false);
+    }
+  }, [fetcher, cacheKey, ttlMs]); // Ajouter les dépendances
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]); // fetchData est maintenant stable grâce à useCallback
+
+  const refreshData = () => fetchData(true); // Fonction pour forcer le refresh
+
+  return { data, error, loading, refreshData, isServedFromCache };
+}
+
+/**
+ * Hook original maintenu pour rétrocompatibilité
  * Hook générique pour gérer le chargement des données
  * Permet de réutiliser la logique de chargement, d'erreurs et d'état
  */
-export function useDataFetching<T>(
+export function useDataFetchingLegacy<T>(
   fetchFunction: () => Promise<ApiResponse<T>>,
   initialData: T,
   autoFetch: boolean = true

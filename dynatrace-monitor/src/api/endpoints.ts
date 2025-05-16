@@ -26,6 +26,7 @@ export const ENDPOINTS = {
   VITAL_FOR_ENTREPRISE_MZS: '/vital-for-entreprise-mzs', // Nouvel endpoint pour VFE
   DETECTION_MZS: '/detection-ctl-mzs', // Nouvel endpoint pour Detection CTL
   ENCRYPTION_MZS: '/security-encryption-mzs', // Nouvel endpoint pour Security Encryption
+  BATCH_ZONE_COUNTS: '/batch-zone-counts', // Endpoint pour récupérer les counts de toutes les zones
   
   // Endpoint de rafraîchissement du cache
   REFRESH_CACHE: (cacheType: string) => `/refresh/${cacheType}`
@@ -39,4 +40,31 @@ export const CACHE_TYPES = {
   PROBLEMS: 'problems',
   SUMMARY: 'summary',
   MANAGEMENT_ZONES: 'management_zones'
+};
+
+// Interface pour la réponse du batch zone counts
+export interface BatchZoneCountsResponse {
+  [zoneId: string]: {
+    hosts: number;
+    services: number;
+    processes: number;
+  } | null;
+}
+
+// Fonction pour récupérer les counts de toutes les zones
+export const fetchAllZoneCounts = async (zoneNames?: string[]): Promise<BatchZoneCountsResponse> => {
+  let url = `${API_BASE_URL}${ENDPOINTS.BATCH_ZONE_COUNTS}`;
+  
+  // Ajouter les noms de zones comme paramètres de requête si fournis
+  if (zoneNames && zoneNames.length > 0) {
+    const params = new URLSearchParams();
+    zoneNames.forEach(zone => params.append('zones[]', zone));
+    url += `?${params.toString()}`;
+  }
+  
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error('Failed to fetch batch zone counts');
+  }
+  return response.json();
 };
