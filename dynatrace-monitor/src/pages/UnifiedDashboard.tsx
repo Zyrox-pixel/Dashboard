@@ -108,6 +108,21 @@ const UnifiedDashboard: React.FC = () => {
           }
         } else if (cacheLoaded) {
           console.log(`Cache chargé pour ${variant}, pas de rechargement nécessaire`);
+          // Forcer un rafraîchissement si les données sont vides malgré le cache
+          const needsRefresh = (variant === 'vfg' && appContext.vitalForGroupMZs.length === 0) ||
+                              (variant === 'vfe' && appContext.vitalForEntrepriseMZs.length === 0) ||
+                              (variant === 'detection' && appContext.detectionMZs.length === 0) ||
+                              (variant === 'encryption' && appContext.encryptionMZs.length === 0);
+          
+          if (needsRefresh) {
+            console.log(`Cache chargé mais zones vides pour ${variant}, forçage du rechargement`);
+            try {
+              await refreshData(variant, false);
+              initializedRef.current[variant] = true;
+            } catch (error) {
+              console.error(`Erreur lors du rechargement forcé pour ${variant}:`, error);
+            }
+          }
         }
       };
       

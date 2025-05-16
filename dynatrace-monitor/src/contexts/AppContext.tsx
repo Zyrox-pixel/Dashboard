@@ -1378,8 +1378,24 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
       // Si on navigue vers une page de dashboard
       if (currentPath.includes('/dashboard/') || currentPath.includes('/vfg') || currentPath.includes('/vfe')) {
         console.log("Navigation vers dashboard détectée");
-        // Essayer de charger depuis le cache sans forcer un rechargement
-        loadFromCache();
+        // Essayer de charger depuis le cache
+        const cacheLoaded = loadFromCache();
+        
+        if (!cacheLoaded) {
+          console.log("Pas de cache trouvé, chargement des données...");
+          // Si pas de cache, charger les données normalement
+          loadAllData(undefined, false)
+            .then(() => {
+              console.log("Données chargées après navigation");
+              // Sauvegarder dans le cache pour les prochaines fois
+              setTimeout(saveToCache, 500);
+            })
+            .catch(error => {
+              console.error("Erreur lors du chargement après navigation:", error);
+            });
+        } else {
+          console.log("Cache trouvé et chargé");
+        }
       }
     };
     
