@@ -24,8 +24,8 @@ export const ENDPOINTS = {
   SET_MANAGEMENT_ZONE: '/set-management-zone',
   VITAL_FOR_GROUP_MZS: '/vital-for-group-mzs',
   VITAL_FOR_ENTREPRISE_MZS: '/vital-for-entreprise-mzs', // Nouvel endpoint pour VFE
-  DETECTION_MZS: '/detection-mzs', // Nouvel endpoint pour Detection
-  ENCRYPTION_MZS: '/encryption-mzs', // Nouvel endpoint pour Encryption
+  DETECTION_MZS: '/detection-ctl-mzs', // Nouvel endpoint pour Detection CTL
+  ENCRYPTION_MZS: '/security-encryption-mzs', // Nouvel endpoint pour Security Encryption
   
   // Endpoint de rafraîchissement du cache
   REFRESH_CACHE: (cacheType: string) => `/refresh/${cacheType}`
