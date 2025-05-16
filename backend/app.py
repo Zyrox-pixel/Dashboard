@@ -131,6 +131,74 @@ def get_vital_for_group_mzs_endpoint():
             'error': str(e)
         }), 500
         
+@app.route('/api/debug-env', methods=['GET'])
+def debug_env():
+    """Endpoint de debug pour vérifier les variables d'environnement"""
+    return jsonify({
+        'VFG_MZ_LIST': os.environ.get('VFG_MZ_LIST', 'NOT_FOUND'),
+        'VFE_MZ_LIST': os.environ.get('VFE_MZ_LIST', 'NOT_FOUND'),
+        'DETECTION_CTL_MZ_LIST': os.environ.get('DETECTION_CTL_MZ_LIST', 'NOT_FOUND'),
+        'SECURITY_ENCRYPTION_MZ_LIST': os.environ.get('SECURITY_ENCRYPTION_MZ_LIST', 'NOT_FOUND'),
+    })
+
+@app.route('/api/debug-problems', methods=['GET'])
+def debug_problems():
+    """Endpoint de debug pour vérifier tous les problèmes par zone"""
+    try:
+        # Récupérer TOUTES les zones
+        all_zones = []
+        
+        # VFG zones
+        vfg_string = os.environ.get('VFG_MZ_LIST', '')
+        if vfg_string:
+            all_zones.extend([{'zone': mz.strip(), 'type': 'VFG'} for mz in vfg_string.split(',')])
+        
+        # VFE zones
+        vfe_string = os.environ.get('VFE_MZ_LIST', '')
+        if vfe_string:
+            all_zones.extend([{'zone': mz.strip(), 'type': 'VFE'} for mz in vfe_string.split(',')])
+            
+        # Detection zones
+        detection_string = os.environ.get('DETECTION_CTL_MZ_LIST', '')
+        if detection_string:
+            all_zones.extend([{'zone': mz.strip(), 'type': 'DETECTION'} for mz in detection_string.split(',')])
+        
+        # Encryption zones
+        encryption_string = os.environ.get('SECURITY_ENCRYPTION_MZ_LIST', '')
+        if encryption_string:
+            all_zones.extend([{'zone': mz.strip(), 'type': 'ENCRYPTION'} for mz in encryption_string.split(',')])
+        
+        # Pour chaque zone, récupérer les problèmes
+        result = {}
+        for zone_info in all_zones:
+            zone_name = zone_info['zone']
+            zone_type = zone_info['type']
+            
+            try:
+                # Récupérer les problèmes actifs
+                problems = api_client.get_problems_filtered(zone_name, "-60d", "OPEN")
+                
+                result[zone_name] = {
+                    'type': zone_type,
+                    'problems_count': len(problems),
+                    'problems': problems[:3]  # Limiter à 3 exemples
+                }
+                
+                logger.info(f"Zone {zone_name} ({zone_type}): {len(problems)} problèmes trouvés")
+                
+            except Exception as e:
+                result[zone_name] = {
+                    'type': zone_type,
+                    'error': str(e)
+                }
+                logger.error(f"Erreur pour zone {zone_name}: {e}")
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        logger.error(f"Erreur dans debug_problems: {e}")
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/detection-ctl-mzs', methods=['GET'])
 def get_detection_ctl_mzs_endpoint():
     try:
@@ -722,8 +790,14 @@ def get_problems():
                 logger.error(f"Type de dashboard non reconnu: {dashboard_type}")
                 return []
             
+            logger.info(f"=== DEBUG PROBLEMS ===")
             logger.info(f"Dashboard type (problèmes): {dashboard_type}")
             logger.info(f"Variable MZ utilisée (problèmes): {mz_list_var}")
+            logger.info(f"Toutes les variables d'environnement MZ:")
+            logger.info(f"  VFG_MZ_LIST: {os.environ.get('VFG_MZ_LIST', 'NOT_FOUND')}")
+            logger.info(f"  VFE_MZ_LIST: {os.environ.get('VFE_MZ_LIST', 'NOT_FOUND')}")
+            logger.info(f"  DETECTION_CTL_MZ_LIST: {os.environ.get('DETECTION_CTL_MZ_LIST', 'NOT_FOUND')}")
+            logger.info(f"  SECURITY_ENCRYPTION_MZ_LIST: {os.environ.get('SECURITY_ENCRYPTION_MZ_LIST', 'NOT_FOUND')}")
             mz_string = os.environ.get(mz_list_var, '')
             logger.info(f"Valeur de {mz_list_var} (problèmes): '{mz_string}'")
             
