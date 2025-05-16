@@ -182,6 +182,82 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
   
   // Sélectionner l'API appropriée
   const apiClient = useMemo(() => optimized ? optimizedApi : api, [optimized]);
+  
+  // Système de cache persistant pour stocker les données des MZs
+  const CACHE_KEY = 'dashboardMZsData';
+  const CACHE_LIFETIME = 30 * 60 * 1000; // 30 minutes
+  
+  // Fonction utilitaire pour charger les données du cache
+  const loadFromCache = (): boolean => {
+    try {
+      const cachedData = localStorage.getItem(CACHE_KEY);
+      if (cachedData) {
+        const parsedData = JSON.parse(cachedData);
+        
+        // Vérifier que les données ne sont pas trop anciennes
+        if (parsedData.timestamp && Date.now() - parsedData.timestamp < CACHE_LIFETIME) {
+          console.log('Chargement des MZs depuis le cache localStorage');
+          
+          // Charger les MZs depuis le cache
+          if (parsedData.vitalForGroupMZs) {
+            setState(prev => ({ ...prev, vitalForGroupMZs: parsedData.vitalForGroupMZs }));
+          }
+          
+          if (parsedData.vitalForEntrepriseMZs) {
+            setState(prev => ({ ...prev, vitalForEntrepriseMZs: parsedData.vitalForEntrepriseMZs }));
+          }
+          
+          if (parsedData.detectionMZs) {
+            setState(prev => ({ ...prev, detectionMZs: parsedData.detectionMZs }));
+          }
+          
+          if (parsedData.encryptionMZs) {
+            setState(prev => ({ ...prev, encryptionMZs: parsedData.encryptionMZs }));
+          }
+          
+          // Charger aussi les données de la zone sélectionnée
+          if (parsedData.selectedZoneData) {
+            setState(prev => ({
+              ...prev,
+              selectedZone: parsedData.selectedZoneData.zoneId,
+              processGroups: parsedData.selectedZoneData.processGroups || [],
+              hosts: parsedData.selectedZoneData.hosts || [],
+              services: parsedData.selectedZoneData.services || []
+            }));
+          }
+          
+          return true;
+        }
+      }
+    } catch (error) {
+      console.error('Erreur lors du chargement du cache:', error);
+    }
+    return false;
+  };
+  
+  // Fonction utilitaire pour sauvegarder les données dans le cache
+  const saveToCache = (): void => {
+    try {
+      const dataToCache = {
+        vitalForGroupMZs: state.vitalForGroupMZs,
+        vitalForEntrepriseMZs: state.vitalForEntrepriseMZs,
+        detectionMZs: state.detectionMZs,
+        encryptionMZs: state.encryptionMZs,
+        selectedZoneData: state.selectedZone ? {
+          zoneId: state.selectedZone,
+          processGroups: state.processGroups,
+          hosts: state.hosts,
+          services: state.services
+        } : null,
+        timestamp: Date.now()
+      };
+      
+      localStorage.setItem(CACHE_KEY, JSON.stringify(dataToCache));
+      console.log('Données des MZs sauvegardées dans le cache');
+    } catch (error) {
+      console.error('Erreur lors de la sauvegarde du cache:', error);
+    }
+  };
 
   // Fonction pour obtenir les icônes des process
   const getProcessIcon = useCallback((techIcon: string) => {
@@ -506,6 +582,11 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
         },
         error: null 
       }));
+    }
+    
+    // Si nous ne rechargeons que les problèmes et que nous avons des données en cache, ne pas recharger les MZs
+    if (refreshProblemsOnly && state.vitalForGroupMZs.length > 0) {
+      console.log('Rafraîchissement des problèmes uniquement, conservation des données MZs du cache');
     }
     
     try {
@@ -1005,6 +1086,14 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
         }));
       }
       
+      // Sauvegarder les données dans le cache après un chargement réussi (sauf en mode silencieux)
+      if (!silentMode && !refreshProblemsOnly) {
+        // Attendre un court délai pour s'assurer que les états ont été mis à jour
+        setTimeout(() => {
+          saveToCache();
+        }, 300);
+      }
+      
     } catch (error: any) {
       console.error('Erreur lors du chargement des données:', error);
       setState(prev => ({ 
@@ -1174,11 +1263,47 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
       if (!initialLoadRef.current) {
         console.log("Initial data load");
         initialLoadRef.current = true;
-        try {
-          await loadAllData(undefined, false);
-          lastSuccessfulRefreshRef.current = Date.now();
-        } catch (error) {
-          console.error("Erreur lors du chargement initial des données:", error);
+        
+        // D'abord essayer de charger les données depuis le cache
+        const cacheLoaded = loadFromCache();
+        
+        if (cacheLoaded) {
+          console.log("Données chargées depuis le cache localStorage");
+          // Marquer que nous avons navigué depuis un cache
+          sessionStorage.setItem('navigationFromCache', 'true');
+          
+          // Mettre à jour l'état pour indiquer que le chargement initial est terminé
+          setState(prev => ({ 
+            ...prev, 
+            isLoading: { 
+              ...prev.isLoading, 
+              initialLoadComplete: true,
+              vitalForGroupMZs: false,
+              vitalForEntrepriseMZs: false,
+              detectionMZs: false,
+              encryptionMZs: false
+            } 
+          }));
+          
+          // Lancer un rafraîchissement silencieux en arrière-plan après un court délai
+          setTimeout(async () => {
+            try {
+              await loadAllData(undefined, false, true); // Mode silencieux
+              saveToCache(); // Sauvegarder les données fraîches
+            } catch (error) {
+              console.error("Erreur lors du rafraîchissement silencieux:", error);
+            }
+          }, 3000);
+        } else {
+          // Si pas de cache, charger normalement
+          try {
+            await loadAllData(undefined, false);
+            lastSuccessfulRefreshRef.current = Date.now();
+            // Sauvegarder dans le cache après le chargement initial
+            setTimeout(saveToCache, 500);
+          } catch (error) {
+            console.error("Erreur lors du chargement initial des données:", error);
+          }
         }
       }
     };
@@ -1297,6 +1422,9 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
     
     // Nettoyer l'intervalle et les timeouts lors du démontage du composant
     return () => {
+      // Sauvegarder le cache avant de démonter le composant
+      saveToCache();
+      
       if (autoRefreshIntervalRef.current !== null) {
         clearInterval(autoRefreshIntervalRef.current);
         autoRefreshIntervalRef.current = null;
@@ -1380,21 +1508,33 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
               }
               
               // Continuer avec le chargement normal
-              loadZoneData(zoneId);
+              loadZoneData(zoneId).then(() => {
+                // Sauvegarder le cache après le chargement de la zone
+                setTimeout(saveToCache, 500);
+              });
             })
             .catch(error => {
               // Error during services preloading, handled by continuing with normal loading
               // Continuer avec le chargement normal même en cas d'erreur
-              loadZoneData(zoneId);
+              loadZoneData(zoneId).then(() => {
+                // Sauvegarder le cache après le chargement de la zone
+                setTimeout(saveToCache, 500);
+              });
             });
         } else {
           // Zone non trouvée, procéder au chargement normal
-          loadZoneData(zoneId);
+          loadZoneData(zoneId).then(() => {
+            // Sauvegarder le cache après le chargement de la zone
+            setTimeout(saveToCache, 500);
+          });
         }
       } catch (error) {
         // General preloading error, handled by continuing with normal loading
         // En cas d'erreur, continuer avec le chargement normal
-        loadZoneData(zoneId);
+        loadZoneData(zoneId).then(() => {
+          // Sauvegarder le cache après le chargement de la zone
+          setTimeout(saveToCache, 500);
+        });
       }
     }
   }, [loadZoneData, state.vitalForGroupMZs, state.vitalForEntrepriseMZs, state.detectionMZs, state.encryptionMZs, apiClient]);

@@ -22,6 +22,15 @@ const UnifiedDashboard: React.FC = () => {
   const type = params.type || 'vfg';
   const isOptimized = params.optimized === 'true';
   
+  // Marquer que nous allons naviguer vers un dashboard avec cache potentiel
+  useEffect(() => {
+    // Marquer la navigation depuis le cache pour éviter les rechargements automatiques
+    const navigationFromCache = sessionStorage.getItem('navigationFromCache');
+    if (navigationFromCache === 'true') {
+      console.log('Navigation depuis cache détectée pour', type);
+    }
+  }, [type]);
+  
   // Identifier les paramètres du tableau de bord
   const dashboardProps = useMemo(() => {
     switch (type) {
