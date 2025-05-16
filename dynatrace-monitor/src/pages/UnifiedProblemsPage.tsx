@@ -18,11 +18,22 @@ const UnifiedProblemsPage: React.FC = () => {
   const dashboardType = new URLSearchParams(location.search).get('dashboard') || 'all';
   
   // Déterminer le titre en fonction du type de dashboard
-  const title = dashboardType === 'all'
-    ? "Surveillance des Problèmes - Tous les Environnements"
-    : dashboardType === 'vfg' 
-      ? "Surveillance des Problèmes - Vital for Group" 
-      : "Surveillance des Problèmes - Vital for Entreprise";
+  const title = (() => {
+    switch(dashboardType) {
+      case 'all':
+        return "Surveillance des Problèmes - Tous les Environnements";
+      case 'vfg':
+        return "Surveillance des Problèmes - Vital for Group";
+      case 'vfe':
+        return "Surveillance des Problèmes - Vital for Entreprise";
+      case 'detection':
+        return "Surveillance des Problèmes - Detection CTL";
+      case 'encryption':
+        return "Surveillance des Problèmes - Security Encryption";
+      default:
+        return "Surveillance des Problèmes";
+    }
+  })();
   
   // Utiliser le AllProblemsView lorsque dashboard=all pour éviter les problèmes de requêtes en boucle
   return (
@@ -32,7 +43,7 @@ const UnifiedProblemsPage: React.FC = () => {
       ) : (
         <UnifiedProblemsView 
           title={title}
-          variant={dashboardType as 'vfg' | 'vfe'}
+          variant={dashboardType as 'vfg' | 'vfe' | 'detection' | 'encryption'}
         />
       )}
     </Layout>
