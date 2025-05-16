@@ -2,7 +2,6 @@ import React, { useMemo, useEffect, useRef } from 'react';
 import { useParams, Navigate } from 'react-router-dom';
 import DashboardBase from '../components/dashboard/DashboardBase';
 import { useApp } from '../contexts/AppContext';
-import { AppProvider, OptimizedAppProvider } from '../contexts/AppContext';
 import { DashboardVariant } from '../api/types';
 
 // Correction de l'interface pour être compatible avec useParams
@@ -22,13 +21,23 @@ const UnifiedDashboard: React.FC = () => {
   const type = params.type || 'vfg';
   const isOptimized = params.optimized === 'true';
   
-  // Marquer que nous allons naviguer vers un dashboard avec cache potentiel
+  // Référence pour le contexte
+  const appContextRef = useRef<any>(null);
+  
+  // Effet pour charger le cache au montage du composant
   useEffect(() => {
-    // Marquer la navigation depuis le cache pour éviter les rechargements automatiques
-    const navigationFromCache = sessionStorage.getItem('navigationFromCache');
-    if (navigationFromCache === 'true') {
-      console.log('Navigation depuis cache détectée pour', type);
-    }
+    // Petit délai pour s'assurer que le contexte est monté
+    const timer = setTimeout(() => {
+      if (appContextRef.current && appContextRef.current.loadFromCacheIfAvailable) {
+        console.log('Tentative de chargement du cache pour', type);
+        const cacheLoaded = appContextRef.current.loadFromCacheIfAvailable();
+        if (cacheLoaded) {
+          console.log('Cache chargé avec succès pour', type);
+        }
+      }
+    }, 100);
+    
+    return () => clearTimeout(timer);
   }, [type]);
   
   // Identifier les paramètres du tableau de bord
@@ -58,13 +67,16 @@ const UnifiedDashboard: React.FC = () => {
     }
   }, [type, isOptimized]);
   
-  // Sélectionner le bon contexte selon le mode d'optimisation
-  const ContextProvider = isOptimized ? OptimizedAppProvider : AppProvider;
   
   // Composant interne qui accède au contexte
   const DashboardWithContext: React.FC = () => {
     const appContext = useApp();
-    const { refreshData } = appContext;
+    const { refreshData, loadFromCacheIfAvailable } = appContext;
+    
+    // Stocker la référence du contexte pour l'effet externe
+    useEffect(() => {
+      appContextRef.current = appContext;
+    }, [appContext]);
     
     // Utiliser un ref pour suivre si l'initialisation a déjà été effectuée
     const initializedRef = useRef<{ [key: string]: boolean }>({});
@@ -72,13 +84,20 @@ const UnifiedDashboard: React.FC = () => {
     // Charger les données une seule fois par type de dashboard
     useEffect(() => {
       const variant = dashboardProps.variant;
-      // Vérifier si ce type de dashboard a déjà été initialisé
-      if (!initializedRef.current[variant]) {
+      
+      // Essayer d'abord de charger depuis le cache
+      const cacheLoaded = loadFromCacheIfAvailable();
+      console.log(`Tentative de chargement du cache pour ${variant}: ${cacheLoaded}`);
+      
+      // Si pas de cache ou s'il n'a jamais été initialisé, charger normalement
+      if (!cacheLoaded && !initializedRef.current[variant]) {
         console.log(`Initializing dashboard data for ${variant}`);
         refreshData(variant, false);
         initializedRef.current[variant] = true;
+      } else if (cacheLoaded) {
+        console.log(`Cache chargé pour ${variant}, pas de rechargement nécessaire`);
       }
-    }, [dashboardProps.variant]); // refreshData est intentionnellement omis des dépendances
+    }, [dashboardProps.variant, loadFromCacheIfAvailable]); // refreshData est intentionnellement omis des dépendances
     
     return (
       <DashboardBase 

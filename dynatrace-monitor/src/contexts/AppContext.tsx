@@ -60,6 +60,7 @@ export interface AppActionsType {
   setActiveTab: (tab: string) => void;
   refreshData: (dashboardType?: DashboardVariant, refreshProblemsOnly?: boolean, timeframe?: string) => Promise<void>;
   loadZoneData?: (zoneId: string) => Promise<void>;
+  loadFromCacheIfAvailable: () => boolean;
 }
 
 export type AppContextType = AppStateType & AppActionsType;
@@ -1260,57 +1261,77 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
   useEffect(() => {
     // Fonction pour effectuer le chargement initial
     const performInitialLoad = async () => {
-      if (!initialLoadRef.current) {
-        console.log("Initial data load");
-        initialLoadRef.current = true;
+      console.log("performInitialLoad called");
+      
+      // D'abord essayer de charger les données depuis le cache
+      const cacheLoaded = loadFromCache();
+      
+      if (cacheLoaded) {
+        console.log("Données chargées depuis le cache localStorage");
+        // Marquer que nous avons navigué depuis un cache
+        sessionStorage.setItem('navigationFromCache', 'true');
         
-        // D'abord essayer de charger les données depuis le cache
-        const cacheLoaded = loadFromCache();
+        // Mettre à jour l'état pour indiquer que le chargement initial est terminé
+        setState(prev => ({ 
+          ...prev, 
+          isLoading: { 
+            ...prev.isLoading, 
+            initialLoadComplete: true,
+            vitalForGroupMZs: false,
+            vitalForEntrepriseMZs: false,
+            detectionMZs: false,
+            encryptionMZs: false
+          } 
+        }));
+          
         
-        if (cacheLoaded) {
-          console.log("Données chargées depuis le cache localStorage");
-          // Marquer que nous avons navigué depuis un cache
-          sessionStorage.setItem('navigationFromCache', 'true');
-          
-          // Mettre à jour l'état pour indiquer que le chargement initial est terminé
-          setState(prev => ({ 
-            ...prev, 
-            isLoading: { 
-              ...prev.isLoading, 
-              initialLoadComplete: true,
-              vitalForGroupMZs: false,
-              vitalForEntrepriseMZs: false,
-              detectionMZs: false,
-              encryptionMZs: false
-            } 
-          }));
-          
-          // Lancer un rafraîchissement silencieux en arrière-plan après un court délai
-          setTimeout(async () => {
-            try {
-              await loadAllData(undefined, false, true); // Mode silencieux
-              saveToCache(); // Sauvegarder les données fraîches
-            } catch (error) {
-              console.error("Erreur lors du rafraîchissement silencieux:", error);
-            }
-          }, 3000);
-        } else {
-          // Si pas de cache, charger normalement
+        // Lancer un rafraîchissement silencieux en arrière-plan après un court délai
+        setTimeout(async () => {
           try {
-            await loadAllData(undefined, false);
-            lastSuccessfulRefreshRef.current = Date.now();
-            // Sauvegarder dans le cache après le chargement initial
-            setTimeout(saveToCache, 500);
+            await loadAllData(undefined, false, true); // Mode silencieux
+            saveToCache(); // Sauvegarder les données fraîches
           } catch (error) {
-            console.error("Erreur lors du chargement initial des données:", error);
+            console.error("Erreur lors du rafraîchissement silencieux:", error);
           }
+        }, 3000);
+      } else {
+        // Si pas de cache, charger normalement
+        try {
+          await loadAllData(undefined, false);
+          lastSuccessfulRefreshRef.current = Date.now();
+          // Sauvegarder dans le cache après le chargement initial
+          setTimeout(saveToCache, 500);
+        } catch (error) {
+          console.error("Erreur lors du chargement initial des données:", error);
         }
       }
     };
     
-    // Lancer le chargement initial
+    // Lancer le chargement initial immédiatement
     performInitialLoad();
     
+    // Ecouter les changements de route pour recharger le cache si nécessaire
+    const handleRouteChange = () => {
+      const currentPath = window.location.pathname;
+      // Si on navigue vers une page de dashboard et que les données sont vides
+      if ((currentPath.includes('/dashboard/') || currentPath.includes('/vfg') || currentPath.includes('/vfe')) &&
+          state.vitalForGroupMZs.length === 0 && state.vitalForEntrepriseMZs.length === 0) {
+        console.log("Navigation vers dashboard détectée, rechargement du cache");
+        performInitialLoad();
+      }
+    };
+    
+    // Ajouter un listener pour les changements de route
+    window.addEventListener('popstate', handleRouteChange);
+    
+    // Nettoyer le listener
+    return () => {
+      window.removeEventListener('popstate', handleRouteChange);
+    };
+  }, [loadFromCache, saveToCache, state.vitalForGroupMZs.length, state.vitalForEntrepriseMZs.length]);
+  
+  // Effet séparé pour le rafraîchissement automatique
+  useEffect(() => {
     // Fonction pour effectuer le rafraîchissement automatique
     const performAutoRefresh = async () => {
       // Vérifier si un rafraîchissement est déjà en cours avec refreshInProgressRef
@@ -1555,6 +1576,7 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
     setSidebarCollapsed,
     setActiveTab,
     refreshData,
+    loadFromCacheIfAvailable: loadFromCache,
     performanceMetrics: state.performanceMetrics || performanceMetrics,
     ...(optimized ? {
       loadZoneData
@@ -1565,6 +1587,7 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
     setSidebarCollapsed,
     setActiveTab,
     refreshData,
+    loadFromCache,
     optimized,
     loadZoneData,
     performanceMetrics
