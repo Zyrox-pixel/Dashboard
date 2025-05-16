@@ -1302,7 +1302,7 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
         refreshTimeoutIdRef.current = null;
       }
     }
-  }, [loadAllData, state.selectedZone]); // Ajout de state.selectedZone comme dépendance
+  }, []); // Supprimer les dépendances qui peuvent causer des boucles
 
   // Référence à l'intervalle pour le rafraîchissement automatique
   const autoRefreshIntervalRef = useRef<number | null>(null);
@@ -1367,11 +1367,11 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
     // Ecouter les changements de route pour recharger le cache si nécessaire
     const handleRouteChange = () => {
       const currentPath = window.location.pathname;
-      // Si on navigue vers une page de dashboard et que les données sont vides
-      if ((currentPath.includes('/dashboard/') || currentPath.includes('/vfg') || currentPath.includes('/vfe')) &&
-          state.vitalForGroupMZs.length === 0 && state.vitalForEntrepriseMZs.length === 0) {
-        console.log("Navigation vers dashboard détectée, rechargement du cache");
-        performInitialLoad();
+      // Si on navigue vers une page de dashboard
+      if (currentPath.includes('/dashboard/') || currentPath.includes('/vfg') || currentPath.includes('/vfe')) {
+        console.log("Navigation vers dashboard détectée");
+        // Essayer de charger depuis le cache sans forcer un rechargement
+        loadFromCache();
       }
     };
     
@@ -1382,7 +1382,7 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
     return () => {
       window.removeEventListener('popstate', handleRouteChange);
     };
-  }, [loadFromCache, saveToCache, state.vitalForGroupMZs.length, state.vitalForEntrepriseMZs.length]);
+  }, []); // Exécuté seulement au montage du composant
   
   // Effet séparé pour le rafraîchissement automatique
   useEffect(() => {
@@ -1510,7 +1510,7 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
         autoRefreshTimeoutRef.current = null;
       }
     };
-  }, [loadAllData, refreshData, state.isLoading.problems]);
+  }, []); // Exécuté seulement au montage du composant
 
   // Fonction pour définir la zone sélectionnée et charger ses données
   const setSelectedZoneAndLoadData = useCallback((zoneId: string | null) => {
@@ -1637,13 +1637,7 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
     } : {})
   }), [
     state,
-    setSelectedZoneAndLoadData,
-    setSidebarCollapsed,
-    setActiveTab,
-    refreshData,
-    loadFromCache,
     optimized,
-    loadZoneData,
     performanceMetrics
   ]);
 

@@ -97,7 +97,7 @@ const UnifiedDashboard: React.FC = () => {
       } else if (cacheLoaded) {
         console.log(`Cache chargé pour ${variant}, pas de rechargement nécessaire`);
       }
-    }, [dashboardProps.variant, loadFromCacheIfAvailable]); // refreshData est intentionnellement omis des dépendances
+    }, [dashboardProps.variant]); // refreshData et loadFromCacheIfAvailable sont intentionnellement omis des dépendances
     
     return (
       <DashboardBase 
