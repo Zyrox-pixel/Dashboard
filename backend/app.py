@@ -464,7 +464,18 @@ def get_problems_72h():
                     return jsonify([])
             
             # Récupérer la liste des MZs pour ce dashboard type
-            mz_list_var = 'VFG_MZ_LIST' if dashboard_type == 'vfg' else 'VFE_MZ_LIST'
+            mz_list_var = None
+            if dashboard_type == 'vfg':
+                mz_list_var = 'VFG_MZ_LIST'
+            elif dashboard_type == 'vfe':
+                mz_list_var = 'VFE_MZ_LIST'
+            elif dashboard_type == 'detection':
+                mz_list_var = 'DETECTION_CTL_MZ_LIST'
+            elif dashboard_type == 'encryption':
+                mz_list_var = 'SECURITY_ENCRYPTION_MZ_LIST'
+            else:
+                logger.error(f"Type de dashboard non reconnu: {dashboard_type}")
+                return jsonify([])
             mz_string = os.environ.get(mz_list_var, '')
             
             logger.info(f"Valeur de {mz_list_var}: '{mz_string}'")
@@ -696,7 +707,18 @@ def get_problems():
                     return []
             
             # Comportement normal pour tous les problèmes du dashboard
-            mz_list_var = 'VFG_MZ_LIST' if dashboard_type == 'vfg' else 'VFE_MZ_LIST'
+            mz_list_var = None
+            if dashboard_type == 'vfg':
+                mz_list_var = 'VFG_MZ_LIST'
+            elif dashboard_type == 'vfe':
+                mz_list_var = 'VFE_MZ_LIST'
+            elif dashboard_type == 'detection':
+                mz_list_var = 'DETECTION_CTL_MZ_LIST'
+            elif dashboard_type == 'encryption':
+                mz_list_var = 'SECURITY_ENCRYPTION_MZ_LIST'
+            else:
+                logger.error(f"Type de dashboard non reconnu: {dashboard_type}")
+                return []
             mz_string = os.environ.get(mz_list_var, '')
             
             if not mz_string:
