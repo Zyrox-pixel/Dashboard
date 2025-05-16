@@ -69,28 +69,53 @@ export type AppContextType = AppStateType & AppActionsType;
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 // Fonctions utilitaires
-export const getZoneIcon = (zoneName: string) => {
+export const getZoneIconName = (zoneName: string) => {
   const lowerName = zoneName.toLowerCase();
   
   if (lowerName.includes('acesid')) {
-    return <Key size={18} />;
+    return 'key';
   } else if (lowerName.includes('ocsp')) {
-    return <Shield size={18} />;
+    return 'shield';
   } else if (lowerName.includes('websso') || lowerName.includes('itg')) {
-    return <Globe size={18} />;
+    return 'globe';
   } else if (lowerName.includes('refsg')) {
-    return <Database size={18} />;
+    return 'database';
   } else if (lowerName.includes('micro-segmentation')) {
-    return <Grid size={18} />;
+    return 'grid';
   } else if (lowerName.includes('epv')) {
-    return <Server size={18} />;
+    return 'server';
   } else if (lowerName.includes('finance') || lowerName.includes('financial')) {
-    return <CreditCard size={18} />;
+    return 'credit-card';
   } else if (lowerName.includes('business') || lowerName.includes('corp')) {
-    return <Building size={18} />;
+    return 'building';
   }
   
-  return <Shield size={18} />;
+  return 'shield';
+};
+
+export const getZoneIcon = (zoneName: string) => {
+  const iconName = getZoneIconName(zoneName);
+  
+  switch (iconName) {
+    case 'key':
+      return <Key size={18} />;
+    case 'shield':
+      return <Shield size={18} />;
+    case 'globe':
+      return <Globe size={18} />;
+    case 'database':
+      return <Database size={18} />;
+    case 'grid':
+      return <Grid size={18} />;
+    case 'server':
+      return <Server size={18} />;
+    case 'credit-card':
+      return <CreditCard size={18} />;
+    case 'building':
+      return <Building size={18} />;
+    default:
+      return <Shield size={18} />;
+  }
 };
 
 export const getZoneColor = (zoneName: string): 'red' | 'amber' | 'orange' | 'blue' | 'emerald' | 'purple' | 'green' => {
@@ -199,21 +224,36 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
         if (parsedData.timestamp && Date.now() - parsedData.timestamp < CACHE_LIFETIME) {
           console.log('Chargement des MZs depuis le cache localStorage');
           
-          // Charger les MZs depuis le cache
+          // Fonction pour reconstituer l'icône depuis le nom stocké
+          const reconstructIcon = (zone: any) => {
+            if (zone.iconName) {
+              return {
+                ...zone,
+                icon: getZoneIcon(zone.name) // Recréer l'icône depuis le nom de la zone
+              };
+            }
+            return zone;
+          };
+          
+          // Charger les MZs depuis le cache et reconstituer les icônes
           if (parsedData.vitalForGroupMZs) {
-            setState(prev => ({ ...prev, vitalForGroupMZs: parsedData.vitalForGroupMZs }));
+            const mzsWithIcons = parsedData.vitalForGroupMZs.map(reconstructIcon);
+            setState(prev => ({ ...prev, vitalForGroupMZs: mzsWithIcons }));
           }
           
           if (parsedData.vitalForEntrepriseMZs) {
-            setState(prev => ({ ...prev, vitalForEntrepriseMZs: parsedData.vitalForEntrepriseMZs }));
+            const mzsWithIcons = parsedData.vitalForEntrepriseMZs.map(reconstructIcon);
+            setState(prev => ({ ...prev, vitalForEntrepriseMZs: mzsWithIcons }));
           }
           
           if (parsedData.detectionMZs) {
-            setState(prev => ({ ...prev, detectionMZs: parsedData.detectionMZs }));
+            const mzsWithIcons = parsedData.detectionMZs.map(reconstructIcon);
+            setState(prev => ({ ...prev, detectionMZs: mzsWithIcons }));
           }
           
           if (parsedData.encryptionMZs) {
-            setState(prev => ({ ...prev, encryptionMZs: parsedData.encryptionMZs }));
+            const mzsWithIcons = parsedData.encryptionMZs.map(reconstructIcon);
+            setState(prev => ({ ...prev, encryptionMZs: mzsWithIcons }));
           }
           
           // Charger aussi les données de la zone sélectionnée
@@ -239,11 +279,17 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
   // Fonction utilitaire pour sauvegarder les données dans le cache
   const saveToCache = (): void => {
     try {
+      // Fonction pour nettoyer les zones avant la sauvegarde (retirer les composants React)
+      const cleanZoneForCache = (zone: any) => {
+        const { icon, ...cleanZone } = zone;
+        return cleanZone;
+      };
+      
       const dataToCache = {
-        vitalForGroupMZs: state.vitalForGroupMZs,
-        vitalForEntrepriseMZs: state.vitalForEntrepriseMZs,
-        detectionMZs: state.detectionMZs,
-        encryptionMZs: state.encryptionMZs,
+        vitalForGroupMZs: state.vitalForGroupMZs.map(cleanZoneForCache),
+        vitalForEntrepriseMZs: state.vitalForEntrepriseMZs.map(cleanZoneForCache),
+        detectionMZs: state.detectionMZs.map(cleanZoneForCache),
+        encryptionMZs: state.encryptionMZs.map(cleanZoneForCache),
         selectedZoneData: state.selectedZone ? {
           zoneId: state.selectedZone,
           processGroups: state.processGroups,
@@ -684,6 +730,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
                   name: mzName,
                   code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
                   icon: getZoneIcon(mzName),
+                  iconName: getZoneIconName(mzName), // Pour le cache
                   problemCount: 0,
                   apps: counts.processes,
                   services: counts.services,
@@ -705,6 +752,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
                 name: mzName,
                 code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
                 icon: getZoneIcon(mzName),
+                iconName: getZoneIconName(mzName), // Pour le cache
                 problemCount: 0,
                 apps: 0,
                 services: 0,
@@ -740,6 +788,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
                   name: mzName,
                   code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
                   icon: getZoneIcon(mzName),
+                  iconName: getZoneIconName(mzName), // Pour le cache
                   problemCount: 0,
                   apps: counts.processes,
                   services: counts.services,
@@ -761,6 +810,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
                 name: mzName,
                 code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
                 icon: getZoneIcon(mzName),
+                iconName: getZoneIconName(mzName), // Pour le cache
                 problemCount: 0,
                 apps: 0,
                 services: 0,
@@ -797,6 +847,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
                   name: mzName,
                   code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
                   icon: getZoneIcon(mzName),
+                  iconName: getZoneIconName(mzName), // Pour le cache
                   problemCount: 0,
                   apps: counts.processes,
                   services: counts.services,
@@ -818,6 +869,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
                 name: mzName,
                 code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
                 icon: getZoneIcon(mzName),
+                iconName: getZoneIconName(mzName), // Pour le cache
                 problemCount: 0,
                 apps: 0,
                 services: 0,
@@ -854,6 +906,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
                   name: mzName,
                   code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
                   icon: getZoneIcon(mzName),
+                  iconName: getZoneIconName(mzName), // Pour le cache
                   problemCount: 0,
                   apps: counts.processes,
                   services: counts.services,
@@ -875,6 +928,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
                 name: mzName,
                 code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
                 icon: getZoneIcon(mzName),
+                iconName: getZoneIconName(mzName), // Pour le cache
                 problemCount: 0,
                 apps: 0,
                 services: 0,
