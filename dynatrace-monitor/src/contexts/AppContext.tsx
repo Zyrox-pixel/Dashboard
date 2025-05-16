@@ -1311,8 +1311,16 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
   // Horodatage du dernier rafraîchissement réussi
   const lastSuccessfulRefreshRef = useRef<number>(0);
   
+  // Flag pour éviter les appels multiples
+  const hasInitialLoadedRef = useRef(false);
+
   // Charger les données initiales et configurer le rafraîchissement automatique
   useEffect(() => {
+    if (hasInitialLoadedRef.current) {
+      return; // Éviter de recharger si déjà chargé
+    }
+    hasInitialLoadedRef.current = true;
+
     // Fonction pour effectuer le chargement initial
     const performInitialLoad = async () => {
       console.log("performInitialLoad called");
@@ -1386,6 +1394,9 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
   
   // Effet séparé pour le rafraîchissement automatique
   useEffect(() => {
+    // Désactiver temporairement le rafraîchissement automatique pour éviter les boucles
+    return;
+    
     // Fonction pour effectuer le rafraîchissement automatique
     const performAutoRefresh = async () => {
       // Vérifier si un rafraîchissement est déjà en cours avec refreshInProgressRef
@@ -1636,7 +1647,22 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
       loadZoneData
     } : {})
   }), [
-    state,
+    state.activeProblems,
+    state.problemsLast72h,
+    state.vitalForGroupMZs,
+    state.vitalForEntrepriseMZs,
+    state.detectionMZs,
+    state.encryptionMZs,
+    state.selectedZone,
+    state.sidebarCollapsed,
+    state.activeTab,
+    state.processGroups,
+    state.hosts,
+    state.services,
+    state.summaryData,
+    state.isLoading,
+    state.error,
+    state.backendConnected,
     optimized,
     performanceMetrics
   ]);

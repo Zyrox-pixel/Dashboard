@@ -80,23 +80,38 @@ const UnifiedDashboard: React.FC = () => {
     
     // Utiliser un ref pour suivre si l'initialisation a déjà été effectuée
     const initializedRef = useRef<{ [key: string]: boolean }>({});
+    const isFirstRender = useRef(true);
     
     // Charger les données une seule fois par type de dashboard
     useEffect(() => {
+      if (!isFirstRender.current) {
+        return;
+      }
+      isFirstRender.current = false;
+      
       const variant = dashboardProps.variant;
       
-      // Essayer d'abord de charger depuis le cache
-      const cacheLoaded = loadFromCacheIfAvailable();
-      console.log(`Tentative de chargement du cache pour ${variant}: ${cacheLoaded}`);
+      // Essayer de charger depuis le cache sans provoquer de boucle
+      const loadData = async () => {
+        // Essayer d'abord de charger depuis le cache
+        const cacheLoaded = loadFromCacheIfAvailable();
+        console.log(`Tentative de chargement du cache pour ${variant}: ${cacheLoaded}`);
+        
+        // Si pas de cache ou s'il n'a jamais été initialisé, charger normalement
+        if (!cacheLoaded && !initializedRef.current[variant]) {
+          console.log(`Initializing dashboard data for ${variant}`);
+          try {
+            await refreshData(variant, false);
+            initializedRef.current[variant] = true;
+          } catch (error) {
+            console.error(`Erreur lors du chargement pour ${variant}:`, error);
+          }
+        } else if (cacheLoaded) {
+          console.log(`Cache chargé pour ${variant}, pas de rechargement nécessaire`);
+        }
+      };
       
-      // Si pas de cache ou s'il n'a jamais été initialisé, charger normalement
-      if (!cacheLoaded && !initializedRef.current[variant]) {
-        console.log(`Initializing dashboard data for ${variant}`);
-        refreshData(variant, false);
-        initializedRef.current[variant] = true;
-      } else if (cacheLoaded) {
-        console.log(`Cache chargé pour ${variant}, pas de rechargement nécessaire`);
-      }
+      loadData();
     }, [dashboardProps.variant]); // refreshData et loadFromCacheIfAvailable sont intentionnellement omis des dépendances
     
     return (
