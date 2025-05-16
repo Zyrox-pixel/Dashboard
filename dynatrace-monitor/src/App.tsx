@@ -36,9 +36,13 @@ function App() {
             {/* Routes de compatibilité avec l'ancienne structure */}
             <Route path="/vfg" element={<Navigate to="/dashboard/vfg" replace />} />
             <Route path="/vfe" element={<Navigate to="/dashboard/vfe" replace />} />
+            <Route path="/detection" element={<Navigate to="/dashboard/detection" replace />} />
+            <Route path="/encryption" element={<Navigate to="/dashboard/encryption" replace />} />
             <Route path="/optimized" element={<Navigate to="/dashboard/vfg/true" replace />} />
             <Route path="/vfg-optimized" element={<Navigate to="/dashboard/vfg/true" replace />} />
             <Route path="/vfe-optimized" element={<Navigate to="/dashboard/vfe/true" replace />} />
+            <Route path="/detection-optimized" element={<Navigate to="/dashboard/detection/true" replace />} />
+            <Route path="/encryption-optimized" element={<Navigate to="/dashboard/encryption/true" replace />} />
             
             {/* Routes supplémentaires pour la compatibilité */}
             <Route path="/problems" element={<Navigate to="/problems/unified" replace />} />

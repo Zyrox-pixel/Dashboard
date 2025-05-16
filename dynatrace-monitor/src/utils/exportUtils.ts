@@ -1,15 +1,15 @@
-import { Problem, Host, Service, ProcessGroup } from '../api/types';
+import { Problem, Host, Service, ProcessGroup, DashboardVariant } from '../api/types';
 
 /**
  * Convertit un tableau de problèmes en format CSV
  * @param problems Tableau de problèmes à exporter
- * @param filterType Type de vue (vfg, vfe, all)
+ * @param filterType Type de vue (vfg, vfe, detection, encryption, all)
  * @param datePrefix Préfixe de date pour le nom de fichier (format: YYYYMMDD)
  * @returns Un objet contenant le contenu CSV et le nom du fichier
  */
 export const exportProblemsToCSV = (
   problems: Problem[],
-  filterType: 'vfg' | 'vfe' | 'all',
+  filterType: DashboardVariant,
   mgmtZone?: string
 ): { csv: string; filename: string } => {
   // Créer l'en-tête du CSV selon les nouvelles exigences

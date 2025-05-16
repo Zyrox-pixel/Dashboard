@@ -1,5 +1,8 @@
 // Types pour les entités Dynatrace
 
+// Type pour les variantes de dashboard
+export type DashboardVariant = 'vfg' | 'vfe' | 'detection' | 'encryption' | 'all';
+
 // Types pour les entités dans Dynatrace
 export interface EntityStub {
   id: string;

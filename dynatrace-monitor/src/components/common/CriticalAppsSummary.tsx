@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Star, Award, Eye, ArrowRight, AlertTriangle, Server, Code, Activity } from 'lucide-react';
-import { ManagementZone, Problem } from '../../api/types';
+import { ManagementZone, Problem, DashboardVariant } from '../../api/types';
 
 interface CriticalAppsSummaryProps {
   vfgZones: ManagementZone[];
   vfeZones: ManagementZone[];
   activeProblems: Problem[];
-  onZoneClick: (zoneId: string, type: 'vfg' | 'vfe') => void;
+  onZoneClick: (zoneId: string, type: DashboardVariant) => void;
   className?: string;
 }
 
@@ -24,7 +24,7 @@ const CriticalAppsSummary: React.FC<CriticalAppsSummaryProps> = ({
   className = ''
 }) => {
   const navigate = useNavigate();
-  const [expandedSection, setExpandedSection] = useState<'vfg' | 'vfe' | null>(null);
+  const [expandedSection, setExpandedSection] = useState<DashboardVariant | null>(null);
   const [hoverZone, setHoverZone] = useState<string | null>(null);
   
   // Calcul des statistiques pour VFG

@@ -2,15 +2,15 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, Clock, RefreshCw, Filter, CalendarRange, Shield, BarChart, Calendar, FileDown } from 'lucide-react';
 import ProblemsList from './ProblemsList';
-import { Problem } from '../../api/types';
+import { Problem, DashboardVariant } from '../../api/types';
 import { useApp } from '../../contexts/AppContext';
 import { exportProblemsToCSV, downloadCSV } from '../../utils/exportUtils';
 
 interface UnifiedProblemsViewProps {
   /** Titre principal de la vue */
   title: string;
-  /** Variante du dashboard (vfg, vfe ou all) */
-  variant: 'vfg' | 'vfe' | 'all';
+  /** Variante du dashboard (vfg, vfe, detection, encryption ou all) */
+  variant: DashboardVariant;
   /** Filtre de zone optionnel (pour les sous-zones de management) */
   zoneFilter?: string;
 }
@@ -216,10 +216,10 @@ const UnifiedProblemsView: React.FC<UnifiedProblemsViewProps> = ({ title, varian
 
     setIsRefreshing(true);
     try {
-      // Utilise le variant spécifié (vfg ou vfe), ou null pour 'all' (comportement par défaut)
-      const dashboardType = variant === 'all' ? null : variant;
+      // Utilise le variant spécifié (vfg ou vfe), ou undefined pour 'all' (comportement par défaut)
+      const dashboardType = variant === 'all' ? undefined : variant;
       // Passer la période sélectionnée comme troisième paramètre
-      await refreshData(dashboardType as 'vfg' | 'vfe' | undefined, activeTab === 'active', timeframe);
+      await refreshData(dashboardType, activeTab === 'active', timeframe);
       setLastRefreshTime(new Date());
     } catch (error) {
       console.error('Erreur lors du rafraîchissement:', error);

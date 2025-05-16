@@ -4,7 +4,7 @@ import { useApp } from '../contexts/AppContext';
 import Layout from '../components/layout/Layout';
 import ProblemsList from '../components/dashboard/ProblemsList';
 import { ChevronLeft, AlertTriangle } from 'lucide-react';
-import { Problem } from '../api/types';
+import { Problem, DashboardVariant } from '../api/types';
 
 /**
  * Page dédiée à l'affichage des problèmes actifs
@@ -35,7 +35,7 @@ const ActiveProblemsPage: React.FC = () => {
     const loadOnce = async () => {
       console.log("Chargement initial des problèmes actifs");
       try {
-        await refreshData(dashboardType as 'vfg' | 'vfe', false);
+        await refreshData(dashboardType as DashboardVariant, false);
         setLastRefreshTime(Date.now());
       } catch (error) {
         console.error("Erreur lors du chargement initial des problèmes:", error);

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Layers, Search, CheckCircle2, AlertTriangle, LayoutGrid, List, ArrowDownUp, RefreshCw, Filter } from 'lucide-react';
 import ZoneCard from '../common/ZoneCard';
-import { ManagementZone } from '../../api/types';
+import { ManagementZone, DashboardVariant } from '../../api/types';
 
 // Type pour les filtres
 interface ZoneFilters {
@@ -15,7 +15,7 @@ interface ModernManagementZoneListProps {
   onZoneClick: (zoneId: string) => void;
   title?: string;
   subtitle?: string;
-  variant?: 'vfg' | 'vfe';
+  variant?: DashboardVariant;
   loading?: boolean;
   onRefresh?: () => void;
 }

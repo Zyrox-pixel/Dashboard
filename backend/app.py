@@ -130,6 +130,70 @@ def get_vital_for_group_mzs_endpoint():
             'source': 'env_file',
             'error': str(e)
         }), 500
+        
+@app.route('/api/detection-ctl-mzs', methods=['GET'])
+def get_detection_ctl_mzs_endpoint():
+    try:
+        # Récupérer directement la liste depuis la variable d'environnement
+        detection_ctl_mz_string = os.environ.get('DETECTION_CTL_MZ_LIST', '')
+        
+        # Logging pour debug
+        logger.info(f"DETECTION_CTL_MZ_LIST from .env: {detection_ctl_mz_string}")
+        
+        # Si la variable n'est pas définie, retourner une liste vide
+        if not detection_ctl_mz_string:
+            logger.warning("DETECTION_CTL_MZ_LIST is empty or not defined in .env file")
+            return jsonify({'mzs': [], 'source': 'env_file'})
+        
+        # Diviser la chaîne en liste de MZs
+        detection_ctl_mzs = [mz.strip() for mz in detection_ctl_mz_string.split(',')]
+        logger.info(f"Parsed Detection CTL MZs: {detection_ctl_mzs}")
+        
+        # Format de réponse simple
+        return jsonify({
+            'mzs': detection_ctl_mzs,
+            'source': 'env_file'  # Indique que les données viennent du fichier .env
+        })
+    except Exception as e:
+        logger.error(f"Erreur lors de la récupération des MZs Detection CTL: {e}")
+        # Retourner une réponse même en cas d'erreur
+        return jsonify({
+            'mzs': [],
+            'source': 'env_file',
+            'error': str(e)
+        }), 500
+        
+@app.route('/api/security-encryption-mzs', methods=['GET'])
+def get_security_encryption_mzs_endpoint():
+    try:
+        # Récupérer directement la liste depuis la variable d'environnement
+        security_encryption_mz_string = os.environ.get('SECURITY_ENCRYPTION_MZ_LIST', '')
+        
+        # Logging pour debug
+        logger.info(f"SECURITY_ENCRYPTION_MZ_LIST from .env: {security_encryption_mz_string}")
+        
+        # Si la variable n'est pas définie, retourner une liste vide
+        if not security_encryption_mz_string:
+            logger.warning("SECURITY_ENCRYPTION_MZ_LIST is empty or not defined in .env file")
+            return jsonify({'mzs': [], 'source': 'env_file'})
+        
+        # Diviser la chaîne en liste de MZs
+        security_encryption_mzs = [mz.strip() for mz in security_encryption_mz_string.split(',')]
+        logger.info(f"Parsed Security Encryption MZs: {security_encryption_mzs}")
+        
+        # Format de réponse simple
+        return jsonify({
+            'mzs': security_encryption_mzs,
+            'source': 'env_file'  # Indique que les données viennent du fichier .env
+        })
+    except Exception as e:
+        logger.error(f"Erreur lors de la récupération des MZs Security Encryption: {e}")
+        # Retourner une réponse même en cas d'erreur
+        return jsonify({
+            'mzs': [],
+            'source': 'env_file',
+            'error': str(e)
+        }), 500
 
 # Fonction pour récupérer la Management Zone actuelle
 def get_current_mz():

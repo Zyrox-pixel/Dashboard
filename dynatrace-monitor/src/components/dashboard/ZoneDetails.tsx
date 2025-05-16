@@ -2,7 +2,7 @@ import React, { useMemo, useCallback, useState, useEffect } from 'react';
 import { ChevronLeft, Clock, AlertTriangle, ExternalLink, RefreshCw, Cpu, Activity, Server, Filter, Loader, Database, Search, ArrowUp, ArrowDown, X, Check, Monitor, Sliders, FileDown } from 'lucide-react';
 import { useApp } from '../../contexts/AppContext';
 import { useTheme } from '../../contexts/ThemeContext';
-import { ManagementZone, Problem, ProcessGroup, Host, Service } from '../../api/types';
+import { ManagementZone, Problem, ProcessGroup, Host, Service, DashboardVariant } from '../../api/types';
 import ProblemsList from './ProblemsList';
 import PaginatedTable, { Column } from '../common/PaginatedTable';
 import AdvancedFilter, { FilterCategory, FilterValue, FilterItem } from '../common/AdvancedFilter';
@@ -1268,7 +1268,7 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
                 // Utiliser async/await pour gérer le rafraîchissement de manière non bloquante
                 // Rafraîchir les données avec le paramètre refreshProblemsOnly à false pour tout rafraîchir
                 // et forcer le timeframe à 60 jours (défini dans le backend)
-                await appContext.refreshData(dashboardType as 'vfg' | 'vfe', false);
+                await appContext.refreshData(dashboardType as DashboardVariant, false);
               } catch (error) {
                 // Erreur silencieusement gérée
               }

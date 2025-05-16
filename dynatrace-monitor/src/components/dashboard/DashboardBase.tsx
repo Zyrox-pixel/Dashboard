@@ -6,12 +6,13 @@ import ManagementZoneList from './ManagementZoneList';
 import ModernManagementZoneList from './ModernManagementZoneList';
 import ZoneDetails from './ZoneDetails';
 import { AppContextType } from '../../contexts/AppContext';
+import { DashboardVariant } from '../../api/types';
 import { Shield, Loader, AlertTriangle, RefreshCw, Clock, BarChart, ChevronLeft, Check, Server } from 'lucide-react';
 
 
 interface DashboardBaseProps {
   title: string;
-  variant: 'vfg' | 'vfe';
+  variant: DashboardVariant;
   optimized?: boolean;
   context: AppContextType;
 }
@@ -32,6 +33,8 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
     problemsLast72h, // Nouvel état pour les problèmes des 72 dernières heures
     vitalForGroupMZs, 
     vitalForEntrepriseMZs,
+    detectionMZs,
+    encryptionMZs,
     selectedZone, 
     setSelectedZone,
     activeTab,
@@ -53,7 +56,20 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
   const [loadingProgress, setLoadingProgress] = useState(0);
   
   // Déterminer les zones à afficher selon la variante
-  const zones = variant === 'vfg' ? vitalForGroupMZs : vitalForEntrepriseMZs;
+  const zones = (() => {
+    switch(variant) {
+      case 'vfg':
+        return vitalForGroupMZs;
+      case 'vfe':
+        return vitalForEntrepriseMZs;
+      case 'detection':
+        return detectionMZs || [];
+      case 'encryption':
+        return encryptionMZs || [];
+      default:
+        return [];
+    }
+  })();
 
   // Vérifier si une zone est spécifiée dans l'URL
   useEffect(() => {
@@ -180,7 +196,14 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
             Impossible de se connecter au serveur. Vérifiez que le backend est démarré et que votre connexion est active.
           </p>
           <button 
-            onClick={() => refreshData()}
+            onClick={() => {
+              // Si variant est 'all', on ne passe rien, sinon on passe la variante
+              if (variant !== 'all') {
+                refreshData(variant);
+              } else {
+                refreshData();
+              }
+            }}
             className={`px-6 py-3 ${cssClasses.accentBg} text-white rounded-md ${cssClasses.hoverBg} flex items-center gap-2`}
           >
             <RefreshCw size={18} />
@@ -202,7 +225,12 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
           <button 
             onClick={() => {
               setSelectedZone(null); // Réinitialiser la zone sélectionnée
-              refreshData();
+              // Si variant est 'all', on ne passe rien, sinon on passe la variante
+              if (variant !== 'all') {
+                refreshData(variant);
+              } else {
+                refreshData();
+              }
             }}
             className={`px-6 py-3 ${cssClasses.accentBg} text-white rounded-md ${cssClasses.hoverBg} flex items-center gap-2`}
           >
@@ -226,7 +254,14 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
             Aucune Management Zone n'a été trouvée. Vérifiez votre configuration.
           </p>
           <button 
-            onClick={() => refreshData()}
+            onClick={() => {
+              // Si variant est 'all', on ne passe rien, sinon on passe la variante
+              if (variant !== 'all') {
+                refreshData(variant);
+              } else {
+                refreshData();
+              }
+            }}
             className={`px-6 py-3 ${cssClasses.accentBg} text-white rounded-md ${cssClasses.hoverBg} flex items-center gap-2`}
           >
             <RefreshCw size={18} />
@@ -359,7 +394,14 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
               </div>
             </div>
             <button 
-              onClick={() => refreshData()}
+              onClick={() => {
+                // Si variant est 'all', on ne passe rien, sinon on passe la variante
+                if (variant !== 'all') {
+                  refreshData(variant);
+                } else {
+                  refreshData();
+                }
+              }}
               className={`px-4 py-2 ${cssClasses.accentBg} text-white rounded ${cssClasses.hoverBg} flex items-center gap-2 ml-auto`}
             >
               <RefreshCw size={16} />
@@ -459,7 +501,14 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
             title={variant === 'vfg' ? "Management Zones Vital for Group" : "Management Zones Vital for Enterprise"}
             variant={variant}
             loading={isLoading.dashboardData}
-            onRefresh={() => refreshData(variant, false)}
+            onRefresh={() => {
+              // Si variant est 'all', on ne passe rien, sinon on passe la variante
+              if (variant !== 'all') {
+                refreshData(variant, false);
+              } else {
+                refreshData();
+              }
+            }}
           />
         </>
       )}

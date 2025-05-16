@@ -8,8 +8,8 @@ import { useApp } from '../../contexts/AppContext';
 import { useTheme } from '../../contexts/ThemeContext';
 
 // Définir les types pour les fonctions
-type MenuItemKey = 'home' | 'problems' | 'vfg' | 'vfe' | 'activity' | 'settings';
-type ColorType = 'indigo' | 'amber' | 'red' | 'blue' | 'green' | 'purple';
+type MenuItemKey = 'home' | 'problems' | 'vfg' | 'vfe' | 'detection' | 'encryption' | 'activity' | 'settings';
+type ColorType = 'indigo' | 'amber' | 'red' | 'blue' | 'green' | 'purple' | 'teal' | 'orange';
 
 const Sidebar: React.FC = () => {
   const { sidebarCollapsed, setSidebarCollapsed } = useApp();
@@ -23,6 +23,8 @@ const Sidebar: React.FC = () => {
     else if (path.startsWith('/problems')) setActiveItem('problems');
     else if (path.startsWith('/vfg')) setActiveItem('vfg');
     else if (path.startsWith('/vfe')) setActiveItem('vfe');
+    else if (path.startsWith('/detection')) setActiveItem('detection');
+    else if (path.startsWith('/encryption')) setActiveItem('encryption');
   }, []);
 
   const toggleSidebar = () => {
@@ -264,6 +266,66 @@ const Sidebar: React.FC = () => {
               
               {/* Animation subtile d'arrière-plan pour les éléments actifs */}
               {activeItem === 'vfe' && (
+                <div className="absolute inset-0 -z-10 rounded-xl overflow-hidden">
+                  <div className="absolute inset-0 opacity-20 bg-grid-pattern"></div>
+                </div>
+              )}
+            </Link>
+            
+            {/* Detection CTL */}
+            <Link 
+              to="/detection"
+              onClick={() => setActiveItem('detection')}
+              className={getVitalItemClass('detection', 'teal')}
+            >
+              {getIconGlow('detection', 'teal')}
+              <div className={`relative flex-shrink-0 ${getIconClass('detection')}`}>
+                <Activity 
+                  size={18} 
+                  className={`${isDarkTheme ? 'text-teal-400' : 'text-teal-600'} 
+                            ${activeItem === 'detection' ? 'animate-pulse-slow' : ''}`} 
+                />
+              </div>
+              
+              {!sidebarCollapsed && (
+                <span className={`text-sm font-medium whitespace-nowrap transition-all duration-300
+                                ${activeItem === 'detection' ? 'tracking-wide' : ''}`}>
+                  Detection CTL
+                </span>
+              )}
+              
+              {/* Animation subtile d'arrière-plan pour les éléments actifs */}
+              {activeItem === 'detection' && (
+                <div className="absolute inset-0 -z-10 rounded-xl overflow-hidden">
+                  <div className="absolute inset-0 opacity-20 bg-grid-pattern"></div>
+                </div>
+              )}
+            </Link>
+            
+            {/* Security Encryption */}
+            <Link 
+              to="/encryption"
+              onClick={() => setActiveItem('encryption')}
+              className={getVitalItemClass('encryption', 'orange')}
+            >
+              {getIconGlow('encryption', 'orange')}
+              <div className={`relative flex-shrink-0 ${getIconClass('encryption')}`}>
+                <Shield 
+                  size={18} 
+                  className={`${isDarkTheme ? 'text-orange-400' : 'text-orange-600'} 
+                            ${activeItem === 'encryption' ? 'animate-pulse-slow' : ''}`} 
+                />
+              </div>
+              
+              {!sidebarCollapsed && (
+                <span className={`text-sm font-medium whitespace-nowrap transition-all duration-300
+                                ${activeItem === 'encryption' ? 'tracking-wide' : ''}`}>
+                  Security Encryption
+                </span>
+              )}
+              
+              {/* Animation subtile d'arrière-plan pour les éléments actifs */}
+              {activeItem === 'encryption' && (
                 <div className="absolute inset-0 -z-10 rounded-xl overflow-hidden">
                   <div className="absolute inset-0 opacity-20 bg-grid-pattern"></div>
                 </div>

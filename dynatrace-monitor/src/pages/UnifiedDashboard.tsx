@@ -3,6 +3,7 @@ import { useParams, Navigate } from 'react-router-dom';
 import DashboardBase from '../components/dashboard/DashboardBase';
 import { useApp } from '../contexts/AppContext';
 import { AppProvider, OptimizedAppProvider } from '../contexts/AppContext';
+import { DashboardVariant } from '../api/types';
 
 // Correction de l'interface pour être compatible avec useParams
 interface DashboardParams {
@@ -27,13 +28,23 @@ const UnifiedDashboard: React.FC = () => {
       case 'vfe':
         return {
           title: isOptimized ? "Vital for Entreprise (Optimisé)" : "Vital for Entreprise",
-          variant: 'vfe' as 'vfg' | 'vfe',
+          variant: 'vfe' as DashboardVariant,
+        };
+      case 'detection':
+        return {
+          title: isOptimized ? "Detection CTL (Optimisé)" : "Detection CTL",
+          variant: 'detection' as DashboardVariant,
+        };
+      case 'encryption':
+        return {
+          title: isOptimized ? "Security Encryption (Optimisé)" : "Security Encryption",
+          variant: 'encryption' as DashboardVariant,
         };
       case 'vfg':
       default:
         return {
           title: isOptimized ? "Vital for Group (Optimisé)" : "Vital for Group",
-          variant: 'vfg' as 'vfg' | 'vfe',
+          variant: 'vfg' as DashboardVariant,
         };
     }
   }, [type, isOptimized]);
