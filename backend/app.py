@@ -131,123 +131,6 @@ def get_vital_for_group_mzs_endpoint():
             'error': str(e)
         }), 500
         
-@app.route('/api/debug-env', methods=['GET'])
-def debug_env():
-    """Endpoint de debug pour vérifier les variables d'environnement"""
-    return jsonify({
-        'VFG_MZ_LIST': os.environ.get('VFG_MZ_LIST', 'NOT_FOUND'),
-        'VFE_MZ_LIST': os.environ.get('VFE_MZ_LIST', 'NOT_FOUND'),
-        'DETECTION_CTL_MZ_LIST': os.environ.get('DETECTION_CTL_MZ_LIST', 'NOT_FOUND'),
-        'SECURITY_ENCRYPTION_MZ_LIST': os.environ.get('SECURITY_ENCRYPTION_MZ_LIST', 'NOT_FOUND'),
-    })
-
-@app.route('/api/test-zone-problems', methods=['GET'])
-def test_zone_problems():
-    """Test direct de récupération des problèmes pour une zone spécifique"""
-    zone_name = request.args.get('zone', '')
-    if not zone_name:
-        return jsonify({'error': 'Paramètre zone requis'}), 400
-        
-    try:
-        logger.info(f"=== TEST DIRECT POUR ZONE: {zone_name} ===")
-        
-        # Test 1: Sans filtrage par MZ
-        problems_no_filter = api_client.get_problems_filtered(None, "-60d", "OPEN")
-        logger.info(f"Sans filtrage: {len(problems_no_filter)} problèmes trouvés")
-        
-        # Chercher les problèmes qui mentionnent cette zone
-        zone_problems = []
-        for problem in problems_no_filter:
-            # Vérifier dans les entités impactées
-            if 'impactedEntities' in problem:
-                for entity in problem['impactedEntities']:
-                    if zone_name in str(entity):
-                        zone_problems.append(problem)
-                        break
-            
-            # Vérifier dans d'autres champs
-            problem_str = str(problem).lower()
-            zone_str = zone_name.lower()
-            if zone_str in problem_str:
-                zone_problems.append(problem)
-        
-        logger.info(f"Problèmes liés à la zone {zone_name}: {len(zone_problems)}")
-        
-        # Test 2: Avec filtrage par MZ
-        problems_with_filter = api_client.get_problems_filtered(zone_name, "-60d", "OPEN")
-        logger.info(f"Avec filtrage par MZ: {len(problems_with_filter)} problèmes trouvés")
-        
-        return jsonify({
-            'zone': zone_name,
-            'total_problems_no_filter': len(problems_no_filter),
-            'problems_related_to_zone': len(zone_problems),
-            'problems_with_mz_filter': len(problems_with_filter),
-            'sample_problems': zone_problems[:3] if zone_problems else [],
-            'sample_problems_with_filter': problems_with_filter[:3]
-        })
-        
-    except Exception as e:
-        logger.error(f"Erreur dans test_zone_problems: {e}")
-        logger.error(traceback.format_exc())
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/debug-problems', methods=['GET'])
-def debug_problems():
-    """Endpoint de debug pour vérifier tous les problèmes par zone"""
-    try:
-        # Récupérer TOUTES les zones
-        all_zones = []
-        
-        # VFG zones
-        vfg_string = os.environ.get('VFG_MZ_LIST', '')
-        if vfg_string:
-            all_zones.extend([{'zone': mz.strip(), 'type': 'VFG'} for mz in vfg_string.split(',')])
-        
-        # VFE zones
-        vfe_string = os.environ.get('VFE_MZ_LIST', '')
-        if vfe_string:
-            all_zones.extend([{'zone': mz.strip(), 'type': 'VFE'} for mz in vfe_string.split(',')])
-            
-        # Detection zones
-        detection_string = os.environ.get('DETECTION_CTL_MZ_LIST', '')
-        if detection_string:
-            all_zones.extend([{'zone': mz.strip(), 'type': 'DETECTION'} for mz in detection_string.split(',')])
-        
-        # Encryption zones
-        encryption_string = os.environ.get('SECURITY_ENCRYPTION_MZ_LIST', '')
-        if encryption_string:
-            all_zones.extend([{'zone': mz.strip(), 'type': 'ENCRYPTION'} for mz in encryption_string.split(',')])
-        
-        # Pour chaque zone, récupérer les problèmes
-        result = {}
-        for zone_info in all_zones:
-            zone_name = zone_info['zone']
-            zone_type = zone_info['type']
-            
-            try:
-                # Récupérer les problèmes actifs
-                problems = api_client.get_problems_filtered(zone_name, "-60d", "OPEN")
-                
-                result[zone_name] = {
-                    'type': zone_type,
-                    'problems_count': len(problems),
-                    'problems': problems[:3]  # Limiter à 3 exemples
-                }
-                
-                logger.info(f"Zone {zone_name} ({zone_type}): {len(problems)} problèmes trouvés")
-                
-            except Exception as e:
-                result[zone_name] = {
-                    'type': zone_type,
-                    'error': str(e)
-                }
-                logger.error(f"Erreur pour zone {zone_name}: {e}")
-        
-        return jsonify(result)
-        
-    except Exception as e:
-        logger.error(f"Erreur dans debug_problems: {e}")
-        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/detection-ctl-mzs', methods=['GET'])
 def get_detection_ctl_mzs_endpoint():
@@ -596,8 +479,6 @@ def get_problems_72h():
                 return jsonify([])
             mz_string = os.environ.get(mz_list_var, '')
             
-            logger.info(f"Dashboard type: {dashboard_type}")
-            logger.info(f"Variable MZ utilisée: {mz_list_var}")
             logger.info(f"Valeur de {mz_list_var}: '{mz_string}'")
             
             if not mz_string:
@@ -840,16 +721,7 @@ def get_problems():
                 logger.error(f"Type de dashboard non reconnu: {dashboard_type}")
                 return []
             
-            logger.info(f"=== DEBUG PROBLEMS ===")
-            logger.info(f"Dashboard type (problèmes): {dashboard_type}")
-            logger.info(f"Variable MZ utilisée (problèmes): {mz_list_var}")
-            logger.info(f"Toutes les variables d'environnement MZ:")
-            logger.info(f"  VFG_MZ_LIST: {os.environ.get('VFG_MZ_LIST', 'NOT_FOUND')}")
-            logger.info(f"  VFE_MZ_LIST: {os.environ.get('VFE_MZ_LIST', 'NOT_FOUND')}")
-            logger.info(f"  DETECTION_CTL_MZ_LIST: {os.environ.get('DETECTION_CTL_MZ_LIST', 'NOT_FOUND')}")
-            logger.info(f"  SECURITY_ENCRYPTION_MZ_LIST: {os.environ.get('SECURITY_ENCRYPTION_MZ_LIST', 'NOT_FOUND')}")
             mz_string = os.environ.get(mz_list_var, '')
-            logger.info(f"Valeur de {mz_list_var} (problèmes): '{mz_string}'")
             
             if not mz_string:
                 logger.warning(f"{mz_list_var} est vide ou non définie dans .env")
@@ -861,22 +733,13 @@ def get_problems():
             # Récupérer les problèmes pour chaque MZ et les combiner
             all_problems = []
             
-            logger.info(f"=== DEBUT RECUPERATION PROBLEMES POUR {dashboard_type} ===")
-            logger.info(f"Nombre de zones à traiter: {len(mz_list)}")
-            
-            for i, mz_name in enumerate(mz_list):
+            for mz_name in mz_list:
                 try:
-                    logger.info(f"[{i+1}/{len(mz_list)}] Traitement de la zone: {mz_name}")
-                    logger.info(f"  - Time from: {time_from}")
-                    logger.info(f"  - Status: {use_status}")
-                    
+                    logger.info(f"Récupération des problèmes pour MZ: {mz_name} avec timeframe={time_from}, status={use_status}")
                     # Utiliser la méthode éprouvée qui fonctionnait avant
                     # Toujours utiliser le filtrage par MZ, en passant strictement le nom de la zone
                     mz_problems = api_client.get_problems_filtered(mz_name, time_from, use_status)
-                    
-                    logger.info(f"  - Résultat: {len(mz_problems)} problèmes trouvés")
-                    if mz_problems:
-                        logger.info(f"  - Premier problème: {mz_problems[0].get('id', 'NO_ID')} - {mz_problems[0].get('title', 'NO_TITLE')}")
+                    logger.info(f"MZ {mz_name}: {len(mz_problems)} problèmes trouvés")
                     
                     # Ajouter le champ 'resolved' pour les requêtes ALL
                     for problem in mz_problems:
@@ -884,11 +747,8 @@ def get_problems():
                             problem['resolved'] = problem.get('status') != 'OPEN'
                     
                     all_problems.extend(mz_problems)
-                    logger.info(f"  - Total cumulé: {len(all_problems)} problèmes")
-                    
                 except Exception as mz_error:
-                    logger.error(f"ERREUR lors de la récupération des problèmes pour MZ {mz_name}: {mz_error}")
-                    logger.error(traceback.format_exc())
+                    logger.error(f"Erreur lors de la récupération des problèmes pour MZ {mz_name}: {mz_error}")
             
             # Dédupliquer les problèmes (un même problème peut affecter plusieurs MZs)
             unique_problems = []
