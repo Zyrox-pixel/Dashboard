@@ -1178,7 +1178,7 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
   // Drapeau pour éviter les appels multiples à refreshData
   const refreshInProgressRef = useRef(false);
   // Identifiant du dernier timeout pour éviter les collisions
-  const refreshTimeoutIdRef = useRef<number | null>(null);
+  const refreshTimeoutIdRef = useRef<number | undefined>(undefined);
 
   // Fonction pour rafraîchir les données - version non bloquante améliorée avec prise en charge de la période
   const refreshData = useCallback(async (dashboardType?: DashboardVariant, refreshProblemsOnly?: boolean, timeframe?: string): Promise<void> => {
@@ -1189,9 +1189,9 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
     }
 
     // Annuler tout timeout précédent pour éviter les collisions
-    if (refreshTimeoutIdRef.current !== null) {
-      clearTimeout(refreshTimeoutIdRef.current);
-      refreshTimeoutIdRef.current = null;
+    if (refreshTimeoutIdRef.current !== undefined) {
+      window.clearTimeout(refreshTimeoutIdRef.current);
+      refreshTimeoutIdRef.current = undefined;
     }
 
     // Vérifier si l'utilisateur navigue depuis un cache existant
@@ -1213,7 +1213,7 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
     // Définir un timeout maximum pour éviter que le drapeau reste bloqué
     const timeoutId = window.setTimeout(() => {
       refreshInProgressRef.current = false;
-      refreshTimeoutIdRef.current = null;
+      refreshTimeoutIdRef.current = undefined;
     }, 60000); // 60 secondes maximum
 
     refreshTimeoutIdRef.current = timeoutId;
@@ -1234,8 +1234,8 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
               // Si on a déjà des données en cache valides, ne pas recharger
               refreshInProgressRef.current = false;
               if (refreshTimeoutIdRef.current === timeoutId) {
-                clearTimeout(timeoutId);
-                refreshTimeoutIdRef.current = null;
+                window.clearTimeout(timeoutId);
+                refreshTimeoutIdRef.current = undefined;
               }
               return;
             }
@@ -1278,7 +1278,7 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
           }, 100); // Légèrement plus long pour éviter les problèmes de délai
 
           // Nettoyer le timeout en cas d'annulation
-          return () => clearTimeout(asyncTimeoutId);
+          return () => window.clearTimeout(asyncTimeoutId);
         });
       } else {
         // Dans les autres cas, exécuter normalement
@@ -1298,16 +1298,16 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
       // Réinitialiser le drapeau et nettoyer le timeout
       refreshInProgressRef.current = false;
       if (refreshTimeoutIdRef.current === timeoutId) {
-        clearTimeout(timeoutId);
-        refreshTimeoutIdRef.current = null;
+        window.clearTimeout(timeoutId);
+        refreshTimeoutIdRef.current = undefined;
       }
     }
   }, []); // Supprimer les dépendances qui peuvent causer des boucles
 
   // Référence à l'intervalle pour le rafraîchissement automatique
-  const autoRefreshIntervalRef = useRef<number | null>(null);
+  const autoRefreshIntervalRef = useRef<number | undefined>(undefined);
   // Référence au dernier timeoutId pour le rafraîchissement automatique
-  const autoRefreshTimeoutRef = useRef<number | null>(null);
+  const autoRefreshTimeoutRef = useRef<number | undefined>(undefined);
   // Horodatage du dernier rafraîchissement réussi
   const lastSuccessfulRefreshRef = useRef<number>(0);
   
@@ -1443,15 +1443,15 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
       }
 
       // Annuler tout timeout précédent
-      if (autoRefreshTimeoutRef.current !== null) {
-        clearTimeout(autoRefreshTimeoutRef.current);
+      if (autoRefreshTimeoutRef.current !== undefined) {
+        window.clearTimeout(autoRefreshTimeoutRef.current);
       }
 
       // Définir un timeout juste pour nettoyer les références, mais sans modifier les indicateurs de chargement
       const timeoutId = window.setTimeout(() => {
         // Ne pas mettre à jour l'état d'isLoading pour un rafraîchissement en arrière-plan
         // setState(prev => ({ ...prev, isLoading: { ...prev.isLoading, problems: false }}));
-        autoRefreshTimeoutRef.current = null;
+        autoRefreshTimeoutRef.current = undefined;
       }, 30000); // 30 secondes maximum
       
       autoRefreshTimeoutRef.current = timeoutId;
@@ -1487,8 +1487,8 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
       } finally {
         // Nettoyer le timeout si c'est toujours le même, mais NE PAS modifier l'indicateur de chargement
         if (autoRefreshTimeoutRef.current === timeoutId) {
-          clearTimeout(timeoutId);
-          autoRefreshTimeoutRef.current = null;
+          window.clearTimeout(timeoutId);
+          autoRefreshTimeoutRef.current = undefined;
         }
       }
     };
@@ -1498,8 +1498,9 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
     
     
     // Nettoyer tout intervalle existant
-    if (autoRefreshIntervalRef.current !== null) {
-      clearInterval(autoRefreshIntervalRef.current);
+    if (autoRefreshIntervalRef.current !== undefined) {
+      window.clearInterval(autoRefreshIntervalRef.current);
+      autoRefreshIntervalRef.current = undefined;
     }
     
     // Configurer le nouvel intervalle
@@ -1511,14 +1512,14 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
       // Sauvegarder le cache avant de démonter le composant
       saveToCache();
       
-      if (autoRefreshIntervalRef.current !== null) {
-        clearInterval(autoRefreshIntervalRef.current);
-        autoRefreshIntervalRef.current = null;
+      if (autoRefreshIntervalRef.current !== undefined) {
+        window.clearInterval(autoRefreshIntervalRef.current);
+        autoRefreshIntervalRef.current = undefined;
       }
       
-      if (autoRefreshTimeoutRef.current !== null) {
-        clearTimeout(autoRefreshTimeoutRef.current);
-        autoRefreshTimeoutRef.current = null;
+      if (autoRefreshTimeoutRef.current !== undefined) {
+        window.clearTimeout(autoRefreshTimeoutRef.current);
+        autoRefreshTimeoutRef.current = undefined;
       }
     };
   }, []); // Exécuté seulement au montage du composant
