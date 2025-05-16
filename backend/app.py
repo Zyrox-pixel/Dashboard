@@ -478,6 +478,8 @@ def get_problems_72h():
                 return jsonify([])
             mz_string = os.environ.get(mz_list_var, '')
             
+            logger.info(f"Dashboard type: {dashboard_type}")
+            logger.info(f"Variable MZ utilisée: {mz_list_var}")
             logger.info(f"Valeur de {mz_list_var}: '{mz_string}'")
             
             if not mz_string:
@@ -719,7 +721,11 @@ def get_problems():
             else:
                 logger.error(f"Type de dashboard non reconnu: {dashboard_type}")
                 return []
+            
+            logger.info(f"Dashboard type (problèmes): {dashboard_type}")
+            logger.info(f"Variable MZ utilisée (problèmes): {mz_list_var}")
             mz_string = os.environ.get(mz_list_var, '')
+            logger.info(f"Valeur de {mz_list_var} (problèmes): '{mz_string}'")
             
             if not mz_string:
                 logger.warning(f"{mz_list_var} est vide ou non définie dans .env")

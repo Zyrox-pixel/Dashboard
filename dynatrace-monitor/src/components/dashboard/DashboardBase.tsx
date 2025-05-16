@@ -498,7 +498,20 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
           <ModernManagementZoneList 
             zones={zones} 
             onZoneClick={handleZoneClick}
-            title={variant === 'vfg' ? "Management Zones Vital for Group" : "Management Zones Vital for Enterprise"}
+            title={(() => {
+              switch(variant) {
+                case 'vfg':
+                  return "Management Zones Vital for Group";
+                case 'vfe':
+                  return "Management Zones Vital for Enterprise";
+                case 'detection':
+                  return "Management Zones Detection CTL";
+                case 'encryption':
+                  return "Management Zones Security Encryption";
+                default:
+                  return "Management Zones";
+              }
+            })()}
             variant={variant}
             loading={isLoading.dashboardData}
             onRefresh={() => {
