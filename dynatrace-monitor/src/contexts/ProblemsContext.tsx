@@ -19,6 +19,7 @@ interface ProblemsContextType extends ProblemsState {
   refreshAll: (force?: boolean) => Promise<boolean | void>;
   getAggregatedProblems: () => Problem[];
   getAggregatedProblems72h: () => Problem[];
+  setCurrentAppType: (appType: string) => void; // No longer optional
 }
 
 const ProblemsContext = createContext<ProblemsContextType | undefined>(undefined);
@@ -76,6 +77,9 @@ export const ProblemsProvider: React.FC<{children: React.ReactNode}> = ({ childr
   const [vfgProblems72h, setVfgProblems72h] = useState<Problem[]>([]);
   const [vfeProblems72h, setVfeProblems72h] = useState<Problem[]>([]);
   const [isLoading, setIsLoading] = useState({ vfg: false, vfe: false });
+  
+  // État pour suivre le type d'application courant
+  const [currentAppType, setCurrentAppType] = useState<string>('vfg'); // Par défaut à 'vfg'
   
   // Cache avancé pour éviter les requêtes répétées - avec localStorage
   const lastFetchTimeRef = useRef({
@@ -370,7 +374,8 @@ export const ProblemsProvider: React.FC<{children: React.ReactNode}> = ({ childr
     refreshVFE,
     refreshAll,
     getAggregatedProblems,
-    getAggregatedProblems72h
+    getAggregatedProblems72h,
+    setCurrentAppType: (appType: string) => setCurrentAppType(appType)
   };
   
   return (

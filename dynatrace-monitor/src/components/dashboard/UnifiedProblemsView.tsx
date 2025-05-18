@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, Clock, RefreshCw, Filter, CalendarRange, Shield, BarChart, Calendar, FileDown } from 'lucide-react';
 import ProblemsList from './ProblemsList';
 import { Problem, DashboardVariant } from '../../api/types';
 import { useApp } from '../../contexts/AppContext';
+import { useProblems } from '../../contexts/ProblemsContext';
 import { exportProblemsToCSV, downloadCSV } from '../../utils/exportUtils';
 
 interface UnifiedProblemsViewProps {
@@ -15,9 +16,11 @@ interface UnifiedProblemsViewProps {
   zoneFilter?: string;
 }
 
-// Clé de session storage pour mémoriser les données
-const PROBLEMS_CACHE_KEY = 'problemsViewData';
+// Clé de session storage pour mémoriser les données - variante distincte pour chaque application
+const PROBLEMS_CACHE_KEY_PREFIX = 'problemsViewData';
 const PROBLEMS_CONTEXT_CACHE_KEY = 'problemsData'; // Clé utilisée par ProblemsContext
+// Fonction utilitaire pour obtenir la clé spécifique au variant
+const getVariantSpecificCacheKey = (variant: string) => `${PROBLEMS_CACHE_KEY_PREFIX}_${variant}`;
 const CACHE_LIFETIME = 10 * 60 * 1000; // 10 minutes en millisecondes
 
 /**
@@ -26,7 +29,38 @@ const CACHE_LIFETIME = 10 * 60 * 1000; // 10 minutes en millisecondes
  */
 const UnifiedProblemsView: React.FC<UnifiedProblemsViewProps> = ({ title, variant, zoneFilter }) => {
   const navigate = useNavigate();
-  const { activeProblems, problemsLast72h, isLoading, refreshData } = useApp();
+  const { refreshData } = useApp();
+  const { vfgProblems, vfeProblems, vfgProblems72h, vfeProblems72h, isLoading, setCurrentAppType } = useProblems();
+  
+  // Détermine les problèmes actifs et les problèmes des 72 dernières heures en fonction du variant
+  const activeProblems = useMemo(() => {
+    // Mettre à jour le type d'application courant quand le variant change
+    setCurrentAppType(variant);
+    
+    if (variant === 'vfg') {
+      return vfgProblems;
+    } else if (variant === 'vfe') {
+      return vfeProblems;
+    } else {
+      // Pour 'all' ou autres variantes, combiner les problèmes
+      return [...vfgProblems, ...vfeProblems].filter((problem, index, self) => 
+        self.findIndex(p => p.id === problem.id) === index
+      );
+    }
+  }, [variant, vfgProblems, vfeProblems, setCurrentAppType]);
+  
+  const problemsLast72h = useMemo(() => {
+    if (variant === 'vfg') {
+      return vfgProblems72h;
+    } else if (variant === 'vfe') {
+      return vfeProblems72h;
+    } else {
+      // Pour 'all' ou autres variantes, combiner les problèmes
+      return [...vfgProblems72h, ...vfeProblems72h].filter((problem, index, self) => 
+        self.findIndex(p => p.id === problem.id) === index
+      );
+    }
+  }, [variant, vfgProblems72h, vfeProblems72h]);
 
   // Référence pour éviter de déclencher un rechargement non nécessaire
   const initialLoadCompletedRef = useRef<boolean>(false);
@@ -59,7 +93,7 @@ const UnifiedProblemsView: React.FC<UnifiedProblemsViewProps> = ({ title, varian
   // Problèmes à afficher selon l'onglet actif
   const problemsToDisplay = activeTab === 'active' ? cachedActiveProblems : cachedProblemsLast72h;
 
-  // Méthode pour sauvegarder les données dans le SessionStorage
+  // Méthode pour sauvegarder les données dans le SessionStorage avec une clé spécifique au variant
   const saveDataToSessionStorage = (activeData: Problem[], recentData: Problem[]) => {
     if (!activeData || !recentData) return;
 
@@ -72,30 +106,32 @@ const UnifiedProblemsView: React.FC<UnifiedProblemsViewProps> = ({ title, varian
         timestamp: Date.now()
       };
 
-      sessionStorage.setItem(PROBLEMS_CACHE_KEY, JSON.stringify(dataToCache));
-      console.log(`Données des problèmes (${variant}) mises en cache dans sessionStorage`);
+      // Utiliser une clé spécifique au variant pour éviter la contamination entre applications
+      const cacheKey = getVariantSpecificCacheKey(variant);
+      sessionStorage.setItem(cacheKey, JSON.stringify(dataToCache));
+      console.log(`Données des problèmes (${variant}) mises en cache dans sessionStorage avec clé: ${cacheKey}`);
     } catch (error) {
       console.error('Erreur lors de la sauvegarde du cache:', error);
     }
   };
 
-  // Méthode pour charger les données depuis le SessionStorage
+  // Méthode pour charger les données depuis le SessionStorage avec clé spécifique au variant
   const loadDataFromSessionStorage = (): boolean => {
     try {
-      // Essayer d'abord de charger depuis notre propre cache
-      const cachedData = sessionStorage.getItem(PROBLEMS_CACHE_KEY);
+      // Essayer d'abord de charger depuis notre propre cache avec la clé spécifique au variant
+      const cacheKey = getVariantSpecificCacheKey(variant);
+      const cachedData = sessionStorage.getItem(cacheKey);
 
       // Si les données sont trouvées, vérifier leur validité
       if (cachedData) {
         const parsedData = JSON.parse(cachedData);
 
-        // Vérifier si les données sont valides, concernent la même variante et ne sont pas trop anciennes
+        // Vérifier si les données sont valides et ne sont pas trop anciennes
         if (
           parsedData &&
-          parsedData.variant === variant &&
           Date.now() - parsedData.timestamp < CACHE_LIFETIME
         ) {
-          console.log(`Utilisation des données en cache sessionStorage pour ${variant} (${new Date(parsedData.timestamp).toLocaleTimeString()})`);
+          console.log(`Utilisation des données en cache sessionStorage pour ${variant} (${new Date(parsedData.timestamp).toLocaleTimeString()}) avec clé: ${cacheKey}`);
 
           // Restaurer les données et la période
           setCachedActiveProblems(parsedData.active || []);
@@ -109,8 +145,8 @@ const UnifiedProblemsView: React.FC<UnifiedProblemsViewProps> = ({ title, varian
         }
       }
 
-      // Si aucune donnée n'est trouvée dans notre cache ou si elles ne sont pas valides,
-      // essayer de charger depuis le cache du ProblemsContext
+      // Si aucune donnée n'est trouvée dans notre cache spécifique au variant ou si elles ne sont pas valides,
+      // essayer de charger depuis le cache du ProblemsContext mais en isolant strictement les données par variant
       const contextCache = localStorage.getItem(PROBLEMS_CONTEXT_CACHE_KEY);
       if (contextCache) {
         try {
@@ -122,10 +158,11 @@ const UnifiedProblemsView: React.FC<UnifiedProblemsViewProps> = ({ title, varian
 
             console.log(`Utilisation des données du cache ProblemsContext pour ${variant}`);
 
-            // Déterminer les données appropriées selon le variant
-            let activeData = [];
-            let recentData = [];
+            // Déterminer UNIQUEMENT les données appropriées à la variante actuelle
+            let activeData: Problem[] = [];
+            let recentData: Problem[] = [];
 
+            // Sélection stricte des données en fonction du variant actuel
             if (variant === 'all') {
               // Pour le variant 'all', prendre toutes les données
               activeData = [
@@ -137,9 +174,11 @@ const UnifiedProblemsView: React.FC<UnifiedProblemsViewProps> = ({ title, varian
                 ...(parsedContextData.vfeProblems72h || [])
               ];
             } else if (variant === 'vfg') {
+              // Seulement les données VFG pour le variant VFG
               activeData = parsedContextData.vfgProblems || [];
               recentData = parsedContextData.vfgProblems72h || [];
             } else if (variant === 'vfe') {
+              // Seulement les données VFE pour le variant VFE
               activeData = parsedContextData.vfeProblems || [];
               recentData = parsedContextData.vfeProblems72h || [];
             }
@@ -166,12 +205,12 @@ const UnifiedProblemsView: React.FC<UnifiedProblemsViewProps> = ({ title, varian
               });
             }
 
-            // Mettre à jour nos états avec les données du contexte
+            // Mettre à jour nos états avec les données du contexte correspondant strictement au variant actuel
             setCachedActiveProblems(activeData);
             setCachedProblemsLast72h(recentData);
             setLastRefreshTime(new Date(parsedContextData.timestamp));
 
-            // Sauvegarder ces données dans notre propre cache pour une utilisation future
+            // Sauvegarder ces données dans notre propre cache avec la clé spécifique au variant
             saveDataToSessionStorage(activeData, recentData);
 
             return true;
@@ -393,7 +432,7 @@ const UnifiedProblemsView: React.FC<UnifiedProblemsViewProps> = ({ title, varian
   };
 
   // Déterminer si on doit afficher le loading
-  const showLoading = isLoading.problems && !dataHasBeenLoadedRef.current;
+  const showLoading = (isLoading.vfg || isLoading.vfe) && !dataHasBeenLoadedRef.current;
 
   return (
     <div className="space-y-6">
@@ -409,7 +448,7 @@ const UnifiedProblemsView: React.FC<UnifiedProblemsViewProps> = ({ title, varian
 
         <button
           onClick={handleRefresh}
-          disabled={isRefreshing || isLoading.problems}
+          disabled={isRefreshing || isLoading.vfg || isLoading.vfe}
           className={`flex items-center gap-2 px-4 py-2 rounded-md ${cssVariant.bg} text-white ${cssVariant.hoverBg}
             disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200`}
         >
