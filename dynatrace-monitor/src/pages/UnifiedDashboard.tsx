@@ -116,6 +116,7 @@ const UnifiedDashboard: React.FC = () => {
     
     return (
       <DashboardBase 
+        key={`dashboard-${dashboardProps.variant}`}
         title={dashboardProps.title}
         variant={dashboardProps.variant}
         optimized={isOptimized}

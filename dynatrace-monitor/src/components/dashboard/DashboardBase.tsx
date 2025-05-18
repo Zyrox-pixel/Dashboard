@@ -10,6 +10,7 @@ import { DashboardVariant, Problem } from '../../api/types';
 import { ENDPOINTS } from '../../api/endpoints';
 import cacheService from '../../utils/cacheService';
 import { Shield, Loader, AlertTriangle, RefreshCw, Clock, BarChart, ChevronLeft, Check, Server } from 'lucide-react';
+import { useProblems } from '../../contexts/ProblemsContext';
 
 
 interface DashboardBaseProps {
@@ -31,8 +32,6 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
 }) => {
   const navigate = useNavigate();
   const { 
-    activeProblems: allActiveProblems,
-    problemsLast72h: allProblemsLast72h, 
     vitalForGroupMZs, 
     vitalForEntrepriseMZs,
     detectionMZs,
@@ -51,77 +50,78 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
     refreshData
   } = context;
   
-  // Filtrer les problèmes actifs en fonction de la variante du dashboard
-  const activeProblems = useMemo(() => {
-    if (variant === 'vfg') {
-      // Pour VFG, ne prendre que les problèmes des zones VFG
-      return allActiveProblems.filter((problem: Problem) => {
-        // Si le problème a une zone et que cette zone existe dans les zones VFG
-        return problem.zone && vitalForGroupMZs.some(zone => 
-          problem.zone.includes(zone.name)
-        );
-      });
-    } else if (variant === 'vfe') {
-      // Pour VFE, ne prendre que les problèmes des zones VFE
-      return allActiveProblems.filter((problem: Problem) => {
-        return problem.zone && vitalForEntrepriseMZs.some(zone => 
-          problem.zone.includes(zone.name)
-        );
-      });
-    } else if (variant === 'detection') {
-      // Pour Detection, ne prendre que les problèmes des zones Detection
-      return allActiveProblems.filter((problem: Problem) => {
-        return problem.zone && detectionMZs.some(zone => 
-          problem.zone.includes(zone.name)
-        );
-      });
-    } else if (variant === 'encryption') {
-      // Pour Encryption, ne prendre que les problèmes des zones Encryption
-      return allActiveProblems.filter((problem: Problem) => {
-        return problem.zone && encryptionMZs.some(zone => 
-          problem.zone.includes(zone.name)
-        );
-      });
-    }
-    // Par défaut, retourner tous les problèmes
-    return allActiveProblems;
-  }, [allActiveProblems, variant, vitalForGroupMZs, vitalForEntrepriseMZs, detectionMZs, encryptionMZs]);
+  // Utiliser le ProblemsContext pour récupérer les problèmes spécifiques au dashboard
+  const { vfgProblems, vfeProblems, vfgProblems72h, vfeProblems72h } = useProblems();
   
-  // Filtrer les problèmes récents (72h) en fonction de la variante du dashboard
-  const problemsLast72h = useMemo(() => {
-    if (variant === 'vfg') {
-      // Pour VFG, ne prendre que les problèmes des zones VFG
-      return allProblemsLast72h.filter((problem: Problem) => {
-        // Si le problème a une zone et que cette zone existe dans les zones VFG
-        return problem.zone && vitalForGroupMZs.some(zone => 
-          problem.zone.includes(zone.name)
-        );
-      });
-    } else if (variant === 'vfe') {
-      // Pour VFE, ne prendre que les problèmes des zones VFE
-      return allProblemsLast72h.filter((problem: Problem) => {
-        return problem.zone && vitalForEntrepriseMZs.some(zone => 
-          problem.zone.includes(zone.name)
-        );
-      });
-    } else if (variant === 'detection') {
-      // Pour Detection, ne prendre que les problèmes des zones Detection
-      return allProblemsLast72h.filter((problem: Problem) => {
-        return problem.zone && detectionMZs.some(zone => 
-          problem.zone.includes(zone.name)
-        );
-      });
-    } else if (variant === 'encryption') {
-      // Pour Encryption, ne prendre que les problèmes des zones Encryption
-      return allProblemsLast72h.filter((problem: Problem) => {
-        return problem.zone && encryptionMZs.some(zone => 
-          problem.zone.includes(zone.name)
-        );
-      });
+  // Utiliser directement les problèmes du ProblemsContext en fonction de la variante
+  const activeProblems = useMemo(() => {
+    switch (variant) {
+      case 'vfg':
+        // Utiliser les problèmes VFG directement depuis ProblemsContext
+        return vfgProblems;
+        
+      case 'vfe':
+        // Utiliser les problèmes VFE directement depuis ProblemsContext
+        return vfeProblems;
+        
+      case 'detection':
+        // Pour Detection, filtrer les problèmes depuis AppContext pour l'instant
+        const allActiveProblems = context.activeProblems || [];
+        return allActiveProblems.filter((problem: Problem) => {
+          return problem.zone && detectionMZs.some(zone => 
+            problem.zone.toLowerCase().includes(zone.name.toLowerCase())
+          );
+        });
+        
+      case 'encryption':
+        // Pour Encryption, filtrer les problèmes depuis AppContext pour l'instant
+        const allProblems = context.activeProblems || [];
+        return allProblems.filter((problem: Problem) => {
+          return problem.zone && encryptionMZs.some(zone => 
+            problem.zone.toLowerCase().includes(zone.name.toLowerCase())
+          );
+        });
+        
+      default:
+        // Par défaut, utiliser les problèmes VFG
+        return vfgProblems;
     }
-    // Par défaut, retourner tous les problèmes
-    return allProblemsLast72h;
-  }, [allProblemsLast72h, variant, vitalForGroupMZs, vitalForEntrepriseMZs, detectionMZs, encryptionMZs]);
+  }, [variant, vfgProblems, vfeProblems, context.activeProblems, detectionMZs, encryptionMZs]);
+  
+  // Utiliser directement les problèmes récents du ProblemsContext en fonction de la variante
+  const problemsLast72h = useMemo(() => {
+    switch (variant) {
+      case 'vfg':
+        // Utiliser les problèmes 72h VFG directement depuis ProblemsContext
+        return vfgProblems72h;
+        
+      case 'vfe':
+        // Utiliser les problèmes 72h VFE directement depuis ProblemsContext
+        return vfeProblems72h;
+        
+      case 'detection':
+        // Pour Detection, filtrer les problèmes depuis AppContext pour l'instant
+        const allProblems72h = context.problemsLast72h || [];
+        return allProblems72h.filter((problem: Problem) => {
+          return problem.zone && detectionMZs.some(zone => 
+            problem.zone.toLowerCase().includes(zone.name.toLowerCase())
+          );
+        });
+        
+      case 'encryption':
+        // Pour Encryption, filtrer les problèmes depuis AppContext pour l'instant
+        const allEncProblems72h = context.problemsLast72h || [];
+        return allEncProblems72h.filter((problem: Problem) => {
+          return problem.zone && encryptionMZs.some(zone => 
+            problem.zone.toLowerCase().includes(zone.name.toLowerCase())
+          );
+        });
+        
+      default:
+        // Par défaut, utiliser les problèmes VFG
+        return vfgProblems72h;
+    }
+  }, [variant, vfgProblems72h, vfeProblems72h, context.problemsLast72h, detectionMZs, encryptionMZs]);
   
   // État pour le nouvel onglet de problèmes (actifs ou 72h)
   const [problemTab, setProblemTab] = useState('active'); // 'active' ou 'recent'
@@ -524,9 +524,13 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
           {/* Carte unifiée des problèmes avec Vue 3D stylisée */}
           <div 
             onClick={() => {
-              // Nettoyer le cache des problèmes spécifique à ce dashboard
-              cacheService.invalidateCategory(`get:${ENDPOINTS.PROBLEMS}:${variant}`);
-              cacheService.invalidateCategory(`get:${ENDPOINTS.PROBLEMS_72H}:${variant}`);
+              // Nettoyer le cache complet du dashboard et des problèmes
+              cacheService.invalidateCategory(`get:${ENDPOINTS.PROBLEMS}`);
+              cacheService.invalidateCategory(`get:${ENDPOINTS.PROBLEMS_72H}`);
+              cacheService.invalidateCategory(`dashboard:${variant}`);
+              
+              // Forcer le rafraîchissement des problèmes pour ce dashboard
+              sessionStorage.setItem('navigationFromCache', 'true');
               
               // Naviguer vers la page des problèmes avec le type de dashboard comme paramètre
               navigate(`/problems/unified?dashboard=${variant}`);
