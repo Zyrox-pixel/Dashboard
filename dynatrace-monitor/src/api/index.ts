@@ -275,8 +275,13 @@ class ApiClient {
    */
   public async get<T>(endpoint: string, config?: AxiosRequestConfig, useCache: boolean = true): Promise<ApiResponse<T>> {
     try {
-      // Générer une clé de cache
-      const cacheKey = `get:${endpoint}:${JSON.stringify(config || {})}`;
+      // Générer une clé de cache incluant le type de dashboard pour les problèmes
+      let cacheKey = `get:${endpoint}:${JSON.stringify(config || {})}`;
+      
+      // Pour les endpoints de problèmes, inclure le type de dashboard dans la clé
+      if ((endpoint === ENDPOINTS.PROBLEMS || endpoint === ENDPOINTS.PROBLEMS_72H) && config?.params?.type) {
+        cacheKey = `get:${endpoint}:${config.params.type}:${JSON.stringify(config)}`;
+      }
       
       // Vérifier si les données sont en cache (toujours vérifier, même en mode non-optimisé)
       if (useCache) {
@@ -397,7 +402,12 @@ class ApiClient {
   public async post<T>(endpoint: string, data?: any, config?: AxiosRequestConfig, cacheResponse: boolean = false): Promise<ApiResponse<T>> {
     try {
       // Génère une clé de cache
-      const cacheKey = `post:${endpoint}:${JSON.stringify(data || {})}:${JSON.stringify(config || {})}`;
+      let cacheKey = `post:${endpoint}:${JSON.stringify(data || {})}:${JSON.stringify(config || {})}`;
+      
+      // Pour les endpoints de problèmes, inclure le type de dashboard dans la clé
+      if ((endpoint === ENDPOINTS.PROBLEMS || endpoint === ENDPOINTS.PROBLEMS_72H) && config?.params?.type) {
+        cacheKey = `post:${endpoint}:${config.params.type}:${JSON.stringify(data || {})}:${JSON.stringify(config)}`;
+      }
       
       // Vérifier si les données sont en cache (si cacheResponse est activé)
       if (cacheResponse) {
@@ -629,7 +639,7 @@ class ApiClient {
    * Récupérer les problèmes
    * @param status Le statut des problèmes à récupérer (OPEN, ALL, etc.)
    * @param timeframe La période de temps (ex: "-24h", "-72h", "all" pour aucune limite)
-   * @param dashboardType Le type de dashboard (vfg, vfe)
+   * @param dashboardType Le type de dashboard (vfg, vfe, detection, encryption)
    * @param forceRefresh Si true, force le rafraîchissement (ignore le cache)
    */
   public getProblems(
@@ -656,7 +666,7 @@ class ApiClient {
     // Le backend traitera ce paramètre spécial pour invalider le cache
     if (forceRefresh) {
       params.debug = 'true';
-      console.log(`Forçage du rafraîchissement des problèmes (statut: ${status}, timeframe: ${timeframe})`);
+      console.log(`Forçage du rafraîchissement des problèmes (statut: ${status}, timeframe: ${timeframe}, dashboard: ${dashboardType})`);
     }
     
     // Pour les problèmes actifs, toujours désactiver le cache côté client aussi
@@ -668,7 +678,7 @@ class ApiClient {
   /**
    * Récupérer spécifiquement les problèmes pour une période spécifiée (72h par défaut)
    * Utilise l'endpoint dédié basé sur l'implémentation du script Python
-   * @param dashboardType Le type de dashboard (vfg, vfe)
+   * @param dashboardType Le type de dashboard (vfg, vfe, detection, encryption)
    * @param zoneFilter Filtre optionnel pour une MZ spécifique
    * @param forceRefresh Si true, force le rafraîchissement (ignore le cache)
    * @param timeframe La période de temps (ex: "-24h", "-72h", "-7d", etc.)
@@ -697,7 +707,7 @@ class ApiClient {
     // Si on force le rafraîchissement, ajouter le paramètre debug
     if (forceRefresh) {
       params.debug = 'true';
-      console.log(`Forçage du rafraîchissement des problèmes avec période ${timeframe} (dashboard: ${dashboardType || 'none'}, zone: ${zoneFilter || 'none'})`);
+      console.log(`Forçage du rafraîchissement des problèmes avec période ${timeframe} (dashboard: ${dashboardType}, zone: ${zoneFilter})`);
     }
 
     // Ne pas utiliser le cache si on force le rafraîchissement

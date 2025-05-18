@@ -3,6 +3,7 @@ import { useParams, Navigate } from 'react-router-dom';
 import DashboardBase from '../components/dashboard/DashboardBase';
 import { useApp } from '../contexts/AppContext';
 import { AppProvider, OptimizedAppProvider } from '../contexts/AppContext';
+import { useProblems } from '../contexts/ProblemsContext';
 import { DashboardVariant } from '../api/types';
 import cacheService, { CACHE_DURATIONS } from '../utils/cacheService';
 
@@ -57,12 +58,20 @@ const UnifiedDashboard: React.FC = () => {
   const DashboardWithContext: React.FC = () => {
     const appContext = useApp();
     const { refreshData } = appContext;
+    const { setCurrentAppType } = useProblems();
     
     // État pour suivre le chargement des données
     const [isLoading, setIsLoading] = useState(false);
     
     // Utiliser un ref pour suivre si l'initialisation a déjà été effectuée
     const initializedRef = useRef<{ [key: string]: boolean }>({});
+    
+    // Mettre à jour le type d'application courant quand la variante change
+    useEffect(() => {
+      // Informer le contexte des problèmes du type d'application actuel
+      setCurrentAppType(dashboardProps.variant);
+      console.log(`[UnifiedDashboard] Setting current app type to ${dashboardProps.variant}`);
+    }, [dashboardProps.variant, setCurrentAppType]);
     
     // Charger les données une seule fois par type de dashboard avec gestion du cache
     useEffect(() => {

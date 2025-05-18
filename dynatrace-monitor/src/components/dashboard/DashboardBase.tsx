@@ -7,6 +7,8 @@ import ModernManagementZoneList from './ModernManagementZoneList';
 import ZoneDetails from './ZoneDetails';
 import { AppContextType } from '../../contexts/AppContext';
 import { DashboardVariant, Problem } from '../../api/types';
+import { ENDPOINTS } from '../../api/endpoints';
+import cacheService from '../../utils/cacheService';
 import { Shield, Loader, AlertTriangle, RefreshCw, Clock, BarChart, ChevronLeft, Check, Server } from 'lucide-react';
 
 
@@ -521,7 +523,14 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
           {/* Cartes des problèmes avec navigation */}
           {/* Carte unifiée des problèmes avec Vue 3D stylisée */}
           <div 
-            onClick={() => navigate(`/problems/unified?dashboard=${variant}`)}
+            onClick={() => {
+              // Nettoyer le cache des problèmes spécifique à ce dashboard
+              cacheService.invalidateCategory(`get:${ENDPOINTS.PROBLEMS}:${variant}`);
+              cacheService.invalidateCategory(`get:${ENDPOINTS.PROBLEMS_72H}:${variant}`);
+              
+              // Naviguer vers la page des problèmes avec le type de dashboard comme paramètre
+              navigate(`/problems/unified?dashboard=${variant}`);
+            }}
             className="p-5 rounded-lg border cursor-pointer transition-all mb-6 
                       hover:shadow-lg border-slate-700 bg-gradient-to-br from-slate-800 via-slate-900 to-slate-800 
                       hover:bg-gradient-to-br hover:from-slate-700 hover:via-slate-800 hover:to-slate-700"

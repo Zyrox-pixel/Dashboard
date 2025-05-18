@@ -10,6 +10,7 @@ import {
   ApiResponse,
   VitalForGroupMZsResponse,
   ProblemResponse,
+  ProcessResponse,
   DashboardVariant
 } from '../api/types';
 import { API_BASE_URL } from '../api/endpoints';
@@ -1457,13 +1458,13 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
               } else if (tab === 'processes') {
                 return apiClient.getProcesses();
               }
-              return Promise.resolve(null);
+              return null;
             })
-            .then((response: any) => {
+            .then((response: ApiResponse<Host[]> | ApiResponse<Service[]> | ApiResponse<ProcessResponse[]> | null) => {
               if (response && !response.error && response.data) {
                 // Mettre à jour l'état avec les nouvelles données
-                if (tab === 'hosts') {
-                  const hostsData = Array.isArray(response.data) ? response.data : [];
+                if (tab === 'hosts' && 'data' in response) {
+                  const hostsData = Array.isArray(response.data) ? response.data as Host[] : [];
                   setState(prev => ({ ...prev, hosts: hostsData }));
                   
                   // Mettre en cache les données
