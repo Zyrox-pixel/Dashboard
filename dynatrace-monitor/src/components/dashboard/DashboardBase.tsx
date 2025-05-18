@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../layout/Layout';
 import ProblemsList from './ProblemsList';
@@ -6,7 +6,7 @@ import ManagementZoneList from './ManagementZoneList';
 import ModernManagementZoneList from './ModernManagementZoneList';
 import ZoneDetails from './ZoneDetails';
 import { AppContextType } from '../../contexts/AppContext';
-import { DashboardVariant } from '../../api/types';
+import { DashboardVariant, Problem } from '../../api/types';
 import { Shield, Loader, AlertTriangle, RefreshCw, Clock, BarChart, ChevronLeft, Check, Server } from 'lucide-react';
 
 
@@ -29,8 +29,8 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
 }) => {
   const navigate = useNavigate();
   const { 
-    activeProblems,
-    problemsLast72h, // Nouvel état pour les problèmes des 72 dernières heures
+    activeProblems: allActiveProblems,
+    problemsLast72h: allProblemsLast72h, 
     vitalForGroupMZs, 
     vitalForEntrepriseMZs,
     detectionMZs,
@@ -48,6 +48,78 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
     performanceMetrics,
     refreshData
   } = context;
+  
+  // Filtrer les problèmes actifs en fonction de la variante du dashboard
+  const activeProblems = useMemo(() => {
+    if (variant === 'vfg') {
+      // Pour VFG, ne prendre que les problèmes des zones VFG
+      return allActiveProblems.filter((problem: Problem) => {
+        // Si le problème a une zone et que cette zone existe dans les zones VFG
+        return problem.zone && vitalForGroupMZs.some(zone => 
+          problem.zone.includes(zone.name)
+        );
+      });
+    } else if (variant === 'vfe') {
+      // Pour VFE, ne prendre que les problèmes des zones VFE
+      return allActiveProblems.filter((problem: Problem) => {
+        return problem.zone && vitalForEntrepriseMZs.some(zone => 
+          problem.zone.includes(zone.name)
+        );
+      });
+    } else if (variant === 'detection') {
+      // Pour Detection, ne prendre que les problèmes des zones Detection
+      return allActiveProblems.filter((problem: Problem) => {
+        return problem.zone && detectionMZs.some(zone => 
+          problem.zone.includes(zone.name)
+        );
+      });
+    } else if (variant === 'encryption') {
+      // Pour Encryption, ne prendre que les problèmes des zones Encryption
+      return allActiveProblems.filter((problem: Problem) => {
+        return problem.zone && encryptionMZs.some(zone => 
+          problem.zone.includes(zone.name)
+        );
+      });
+    }
+    // Par défaut, retourner tous les problèmes
+    return allActiveProblems;
+  }, [allActiveProblems, variant, vitalForGroupMZs, vitalForEntrepriseMZs, detectionMZs, encryptionMZs]);
+  
+  // Filtrer les problèmes récents (72h) en fonction de la variante du dashboard
+  const problemsLast72h = useMemo(() => {
+    if (variant === 'vfg') {
+      // Pour VFG, ne prendre que les problèmes des zones VFG
+      return allProblemsLast72h.filter((problem: Problem) => {
+        // Si le problème a une zone et que cette zone existe dans les zones VFG
+        return problem.zone && vitalForGroupMZs.some(zone => 
+          problem.zone.includes(zone.name)
+        );
+      });
+    } else if (variant === 'vfe') {
+      // Pour VFE, ne prendre que les problèmes des zones VFE
+      return allProblemsLast72h.filter((problem: Problem) => {
+        return problem.zone && vitalForEntrepriseMZs.some(zone => 
+          problem.zone.includes(zone.name)
+        );
+      });
+    } else if (variant === 'detection') {
+      // Pour Detection, ne prendre que les problèmes des zones Detection
+      return allProblemsLast72h.filter((problem: Problem) => {
+        return problem.zone && detectionMZs.some(zone => 
+          problem.zone.includes(zone.name)
+        );
+      });
+    } else if (variant === 'encryption') {
+      // Pour Encryption, ne prendre que les problèmes des zones Encryption
+      return allProblemsLast72h.filter((problem: Problem) => {
+        return problem.zone && encryptionMZs.some(zone => 
+          problem.zone.includes(zone.name)
+        );
+      });
+    }
+    // Par défaut, retourner tous les problèmes
+    return allProblemsLast72h;
+  }, [allProblemsLast72h, variant, vitalForGroupMZs, vitalForEntrepriseMZs, detectionMZs, encryptionMZs]);
   
   // État pour le nouvel onglet de problèmes (actifs ou 72h)
   const [problemTab, setProblemTab] = useState('active'); // 'active' ou 'recent'
@@ -419,7 +491,7 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
         // Vue détaillée d'une Management Zone
         <ZoneDetails
           zone={currentZone}
-          problems={activeProblems.filter(p => p.zone.includes(currentZone.name))}
+          problems={activeProblems.filter((p: Problem) => p.zone.includes(currentZone.name))}
           processGroups={processGroups || []}
           hosts={hosts || []}
           services={services || []}
