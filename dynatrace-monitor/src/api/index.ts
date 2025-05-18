@@ -7,8 +7,10 @@ import {
   ProcessResponse,
   Host,
   Service,
-  SummaryData
+  SummaryData,
+  DashboardVariant
 } from './types';
+import cacheService, { CACHE_DURATIONS } from '../utils/cacheService';
 
 /**
  * API Client optimisé pour PRODSEC Monitor
@@ -31,6 +33,9 @@ class ApiClient {
     this.cacheDuration = options.cacheDuration || 30000;
     this.cache = new Map();
     this.pendingRequests = new Map();
+    
+    // Log pour indiquer l'initialisation du client API
+    console.log(`[ApiClient] Initialized (optimized: ${this.optimizedMode})`);
 
     // Créer une instance axios avec des configurations de base
     this.axiosInstance = axios.create({
@@ -104,11 +109,25 @@ class ApiClient {
 
   /**
    * Récupère une valeur du cache si elle est encore valide
+   * Utilise le service de cache centralisé si disponible, sinon utilise le cache local
    */
   private getCached<T>(key: string): T | null {
+    // Utiliser le service de cache centralisé en priorité
+    const cachedData = cacheService.get<T>(key);
+    if (cachedData !== null) {
+      return cachedData;
+    }
+    
+    // Fallback sur le cache local
     const cachedItem = this.cache.get(key);
     if (cachedItem && (Date.now() - cachedItem.timestamp) < this.cacheDuration) {
-      console.log(`Cache hit: ${key}`);
+      console.log(`[ApiClient] Cache hit (local): ${key}`);
+      
+      // Migrer vers le service de cache centralisé
+      const category = key.split(':')[0];
+      const ttl = this.getCacheDurationForCategory(category);
+      cacheService.set(key, cachedItem.data, { ttl });
+      
       return cachedItem.data;
     }
     return null;
@@ -116,20 +135,64 @@ class ApiClient {
 
   /**
    * Met à jour le cache avec de nouvelles données
+   * Utilise le service de cache centralisé si disponible, sinon utilise le cache local
    */
   private setCache<T>(key: string, data: T): void {
+    // Déterminer la catégorie et la durée de cache appropriée
+    const category = key.split(':')[0];
+    const ttl = this.getCacheDurationForCategory(category);
+    
+    // Mettre à jour le service de cache centralisé
+    cacheService.set(key, data, { ttl, category });
+    
+    // Mettre à jour aussi le cache local pour la compatibilité
     this.cache.set(key, {
       data,
       timestamp: Date.now()
     });
   }
+  
+  /**
+   * Détermine la durée de cache appropriée pour une catégorie
+   */
+  private getCacheDurationForCategory(category: string): number {
+    // Convertir en secondes
+    const defaultDuration = Math.floor(this.cacheDuration / 1000);
+    
+    // Mapper les catégories aux durées de cache
+    if (category === 'get' || category === 'post') {
+      if (category.includes('problems')) {
+        return CACHE_DURATIONS.PROBLEMS;
+      } else if (category.includes('problems-72h')) {
+        return CACHE_DURATIONS.PROBLEMS_72H;
+      } else if (category.includes('summary')) {
+        return CACHE_DURATIONS.SUMMARY;
+      } else if (category.includes('hosts')) {
+        return CACHE_DURATIONS.HOSTS;
+      } else if (category.includes('services')) {
+        return CACHE_DURATIONS.SERVICES;
+      } else if (category.includes('processes')) {
+        return CACHE_DURATIONS.PROCESSES;
+      } else if (category.includes('management-zones')) {
+        return CACHE_DURATIONS.MANAGEMENT_ZONES;
+      } else if (category.includes('counts')) {
+        return CACHE_DURATIONS.COUNTS;
+      }
+    }
+    
+    return defaultDuration;
+  }
 
   /**
    * Efface une entrée spécifique ou tout le cache
+   * Utilise le service de cache centralisé si disponible, sinon utilise le cache local
    */
   public clearCache(pattern?: string): void {
     if (pattern) {
-      // Effacer uniquement les entrées correspondant au motif
+      // Effacer uniquement les entrées correspondant au motif dans le service de cache
+      cacheService.invalidateCategory(pattern);
+      
+      // Effacer aussi dans le cache local pour la compatibilité
       Array.from(this.cache.keys()).forEach(key => {
         if (key.includes(pattern)) {
           this.cache.delete(key);
@@ -137,8 +200,11 @@ class ApiClient {
       });
     } else {
       // Effacer tout le cache
+      cacheService.clear();
       this.cache.clear();
     }
+    
+    console.log(`[ApiClient] Cache cleared${pattern ? ` (pattern: ${pattern})` : ''}`);
   }
 
   /**
@@ -205,21 +271,24 @@ class ApiClient {
   }
 
   /**
-   * Effectue une requête GET avec gestion du cache
+   * Effectue une requête GET avec gestion du cache améliorée
    */
   public async get<T>(endpoint: string, config?: AxiosRequestConfig, useCache: boolean = true): Promise<ApiResponse<T>> {
     try {
-      // Vérifier si on utilise le cache (mode optimisé et useCache activé)
-      const shouldUseCache = this.optimizedMode && useCache;
-      
       // Générer une clé de cache
       const cacheKey = `get:${endpoint}:${JSON.stringify(config || {})}`;
       
-      // Vérifier si les données sont en cache
-      if (shouldUseCache) {
-        // En mode standard, vérifier aussi le cache sessionStorage
+      // Vérifier si les données sont en cache (toujours vérifier, même en mode non-optimisé)
+      if (useCache) {
+        // Vérifier d'abord le cache centralisé
+        const cachedData = cacheService.get<T>(cacheKey);
+        if (cachedData) {
+          console.log(`[API] Using centralized cached data for ${endpoint}`);
+          return { data: cachedData };
+        }
+        
+        // Vérifier ensuite le cache sessionStorage (pour la compatibilité)
         if (!this.optimizedMode) {
-          // Vérifier le cache sessionStorage pour les données non-critiques
           const cachedData = sessionStorage.getItem(cacheKey);
           
           if (cachedData && endpoint !== ENDPOINTS.PROBLEMS && endpoint !== ENDPOINTS.SUMMARY) {
@@ -229,12 +298,20 @@ class ApiClient {
             
             // Utiliser le cache si moins de 5 minutes se sont écoulées
             if (now - cacheTime < 5 * 60 * 1000) {
-              console.log(`[API] Using cached data for ${endpoint}`);
+              console.log(`[API] Using sessionStorage cached data for ${endpoint}`);
+              
+              // Migrer vers le service de cache centralisé
+              const category = endpoint.split('/')[0] || 'default';
+              const ttl = this.getCacheDurationForCategory(category);
+              cacheService.set(cacheKey, parsed.data, { ttl, category });
+              
               return { data: parsed.data };
             }
           }
-        } else {
-          // En mode optimisé, utiliser le cache interne
+        }
+        
+        // Vérifier le cache interne (pour la compatibilité)
+        if (this.optimizedMode) {
           const cachedData = this.getCached<T>(cacheKey);
           if (cachedData) {
             return { data: cachedData };
@@ -242,7 +319,7 @@ class ApiClient {
         }
         
         // Si nous avons déjà une requête en cours pour cette clé, retourner la promesse existante
-        if (this.optimizedMode && this.pendingRequests.has(cacheKey)) {
+        if (this.pendingRequests.has(cacheKey)) {
           return this.pendingRequests.get(cacheKey)!;
         }
       }
@@ -251,11 +328,17 @@ class ApiClient {
       const requestPromise = this.axiosInstance.get<T>(endpoint, config)
         .then(response => {
           // Mettre en cache les données si nécessaire
-          if (shouldUseCache) {
+          if (useCache) {
+            // Déterminer la catégorie et la durée de cache
+            const category = endpoint.split('/')[0] || 'default';
+            const ttl = this.getCacheDurationForCategory(category);
+            
+            // Mettre à jour le cache centralisé
+            cacheService.set(cacheKey, response.data, { ttl, category });
+            
+            // Mettre à jour aussi les caches existants pour la compatibilité
             if (this.optimizedMode) {
-              // En mode optimisé, utiliser le cache interne
               this.setCache(cacheKey, response.data);
-              this.pendingRequests.delete(cacheKey);
             } else {
               // En mode standard, utiliser sessionStorage pour les données non-critiques
               if (endpoint !== ENDPOINTS.PROBLEMS && endpoint !== ENDPOINTS.SUMMARY) {
@@ -265,15 +348,16 @@ class ApiClient {
                 }));
               }
             }
+            
+            // Nettoyer la requête en cours
+            this.pendingRequests.delete(cacheKey);
           }
           
           return { data: response.data };
         })
         .catch(error => {
           // Nettoyer la requête en cours en cas d'erreur
-          if (shouldUseCache && this.optimizedMode) {
-            this.pendingRequests.delete(cacheKey);
-          }
+          this.pendingRequests.delete(cacheKey);
           
           if (axios.isAxiosError(error)) {
             return { 
@@ -287,8 +371,8 @@ class ApiClient {
           };
         });
 
-      // Enregistrer la requête en cours si nécessaire
-      if (shouldUseCache && this.optimizedMode) {
+      // Enregistrer la requête en cours
+      if (useCache) {
         this.pendingRequests.set(cacheKey, requestPromise);
       }
 
@@ -308,20 +392,28 @@ class ApiClient {
   }
 
   /**
-   * Effectue une requête POST avec gestion du cache pour les réponses
+   * Effectue une requête POST avec gestion du cache améliorée pour les réponses
    */
   public async post<T>(endpoint: string, data?: any, config?: AxiosRequestConfig, cacheResponse: boolean = false): Promise<ApiResponse<T>> {
     try {
-      // Génère une clé de cache si nécessaire pour le mode optimisé
-      const cacheKey = (this.optimizedMode && cacheResponse) 
-        ? `post:${endpoint}:${JSON.stringify(data || {})}:${JSON.stringify(config || {})}` 
-        : '';
+      // Génère une clé de cache
+      const cacheKey = `post:${endpoint}:${JSON.stringify(data || {})}:${JSON.stringify(config || {})}`;
       
-      // Vérifier si les données sont en cache (uniquement en mode optimisé)
-      if (this.optimizedMode && cacheResponse) {
-        const cachedData = this.getCached<T>(cacheKey);
+      // Vérifier si les données sont en cache (si cacheResponse est activé)
+      if (cacheResponse) {
+        // Vérifier d'abord le cache centralisé
+        const cachedData = cacheService.get<T>(cacheKey);
         if (cachedData) {
+          console.log(`[API] Using centralized cached data for POST ${endpoint}`);
           return { data: cachedData };
+        }
+        
+        // Vérifier le cache interne (pour la compatibilité)
+        if (this.optimizedMode) {
+          const cachedData = this.getCached<T>(cacheKey);
+          if (cachedData) {
+            return { data: cachedData };
+          }
         }
         
         // Si nous avons déjà une requête en cours pour cette clé, retourner la promesse existante
@@ -333,9 +425,21 @@ class ApiClient {
       // Créer la requête
       const requestPromise = this.axiosInstance.post<T>(endpoint, data, config)
         .then(response => {
-          // Mettre en cache les données si nécessaire (mode optimisé)
-          if (this.optimizedMode && cacheResponse) {
-            this.setCache(cacheKey, response.data);
+          // Mettre en cache les données si nécessaire
+          if (cacheResponse) {
+            // Déterminer la catégorie et la durée de cache
+            const category = endpoint.split('/')[0] || 'default';
+            const ttl = this.getCacheDurationForCategory(category);
+            
+            // Mettre à jour le cache centralisé
+            cacheService.set(cacheKey, response.data, { ttl, category });
+            
+            // Mettre à jour aussi le cache local pour la compatibilité
+            if (this.optimizedMode) {
+              this.setCache(cacheKey, response.data);
+            }
+            
+            // Nettoyer la requête en cours
             this.pendingRequests.delete(cacheKey);
           }
           
@@ -346,6 +450,11 @@ class ApiClient {
               sessionStorage.removeItem(`dynatrace_monitor:${ENDPOINTS.HOSTS}`);
               sessionStorage.removeItem(`dynatrace_monitor:${ENDPOINTS.SERVICES}`);
               sessionStorage.removeItem(`dynatrace_monitor:${ENDPOINTS.PROCESSES}`);
+              
+              // Invalider aussi dans le cache centralisé
+              cacheService.invalidateCategory('get:hosts');
+              cacheService.invalidateCategory('get:services');
+              cacheService.invalidateCategory('get:processes');
             }
             
             if (endpoint.includes(ENDPOINTS.REFRESH_CACHE(''))) {
@@ -358,6 +467,9 @@ class ApiClient {
                     : ENDPOINTS[cacheType.toUpperCase() as keyof typeof ENDPOINTS];
                 
                 sessionStorage.removeItem(`dynatrace_monitor:${endpointPath}`);
+                
+                // Invalider aussi dans le cache centralisé
+                cacheService.invalidateCategory(`get:${cacheType}`);
               }
             }
           }
@@ -365,8 +477,8 @@ class ApiClient {
           return { data: response.data };
         })
         .catch(error => {
-          // Nettoyer la requête en cours en cas d'erreur (mode optimisé)
-          if (this.optimizedMode && cacheResponse) {
+          // Nettoyer la requête en cours en cas d'erreur
+          if (cacheResponse) {
             this.pendingRequests.delete(cacheKey);
           }
           
@@ -382,8 +494,8 @@ class ApiClient {
           };
         });
 
-      // Enregistrer la requête en cours si nécessaire (mode optimisé)
-      if (this.optimizedMode && cacheResponse) {
+      // Enregistrer la requête en cours si nécessaire
+      if (cacheResponse) {
         this.pendingRequests.set(cacheKey, requestPromise);
       }
 

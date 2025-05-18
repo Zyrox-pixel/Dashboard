@@ -14,6 +14,7 @@ import {
 } from '../api/types';
 import { API_BASE_URL } from '../api/endpoints';
 import { Database, Shield, Key, Globe, Server, Grid, Building, CreditCard } from 'lucide-react';
+import cacheService, { CACHE_DURATIONS } from '../utils/cacheService';
 
 // Types unifiés pour les contextes
 export interface AppStateType {
@@ -1404,9 +1405,112 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
     setState(prev => ({ ...prev, sidebarCollapsed: collapsed }));
   }, []);
 
+  // Fonction optimisée pour changer d'onglet avec chargement intelligent des données
   const setActiveTab = useCallback((tab: string) => {
+    // Stocker l'onglet précédent pour référence
+    const previousTab = state.activeTab;
+    
+    // Mettre à jour l'onglet actif immédiatement pour une UI réactive
     setState(prev => ({ ...prev, activeTab: tab }));
-  }, []);
+    
+    // Si nous sommes dans une zone sélectionnée, optimiser le chargement des données
+    if (state.selectedZone) {
+      // Vérifier si nous avons besoin de charger des données spécifiques pour cet onglet
+      const needsHostsData = tab === 'hosts' && state.hosts.length === 0;
+      const needsServicesData = tab === 'services' && state.services.length === 0;
+      const needsProcessesData = tab === 'processes' && state.processGroups.length === 0;
+      
+      // Vérifier si les données sont en cache
+      const cacheKey = `zone_data:${state.selectedZone}:${tab}`;
+      const cachedData = cacheService.get(cacheKey);
+      
+      if (cachedData) {
+        console.log(`[AppContext] Using cached data for tab ${tab}`);
+        
+        // Mettre à jour l'état avec les données en cache
+        if (tab === 'hosts' && Array.isArray(cachedData)) {
+          setState(prev => ({ ...prev, hosts: cachedData as Host[] }));
+        } else if (tab === 'services' && Array.isArray(cachedData)) {
+          setState(prev => ({ ...prev, services: cachedData as Service[] }));
+        } else if (tab === 'processes' && Array.isArray(cachedData)) {
+          setState(prev => ({ ...prev, processGroups: cachedData as ProcessGroup[] }));
+        }
+      } else if (needsHostsData || needsServicesData || needsProcessesData) {
+        // Si les données ne sont pas en cache et sont nécessaires, les charger
+        console.log(`[AppContext] Loading data for tab ${tab}`);
+        
+        // Trouver la zone sélectionnée
+        const selectedZoneObj = state.vitalForGroupMZs.find(zone => zone.id === state.selectedZone) ||
+                               state.vitalForEntrepriseMZs.find(zone => zone.id === state.selectedZone) ||
+                               state.detectionMZs.find(zone => zone.id === state.selectedZone) ||
+                               state.encryptionMZs.find(zone => zone.id === state.selectedZone);
+        
+        if (selectedZoneObj) {
+          // Définir la management zone si nécessaire
+          apiClient.setManagementZone(selectedZoneObj.name)
+            .then(() => {
+              // Charger uniquement les données nécessaires pour l'onglet actif
+              if (tab === 'hosts') {
+                return apiClient.getHosts();
+              } else if (tab === 'services') {
+                return apiClient.getServices();
+              } else if (tab === 'processes') {
+                return apiClient.getProcesses();
+              }
+              return Promise.resolve(null);
+            })
+            .then((response: any) => {
+              if (response && !response.error && response.data) {
+                // Mettre à jour l'état avec les nouvelles données
+                if (tab === 'hosts') {
+                  const hostsData = Array.isArray(response.data) ? response.data : [];
+                  setState(prev => ({ ...prev, hosts: hostsData }));
+                  
+                  // Mettre en cache les données
+                  cacheService.set(`zone_data:${state.selectedZone}:hosts`, hostsData, { 
+                    ttl: CACHE_DURATIONS.HOSTS,
+                    category: 'zone_data'
+                  });
+                } else if (tab === 'services') {
+                  const servicesData = Array.isArray(response.data) ? response.data as Service[] : [];
+                  setState(prev => ({ ...prev, services: servicesData }));
+                  
+                  // Mettre en cache les données
+                  cacheService.set(`zone_data:${state.selectedZone}:services`, servicesData, { 
+                    ttl: CACHE_DURATIONS.SERVICES,
+                    category: 'zone_data'
+                  });
+                } else if (tab === 'processes') {
+                  const processData = Array.isArray(response.data) ? response.data : [];
+                  
+                  // Transformer les données
+                  const processGroups: ProcessGroup[] = processData.map((process: any) => ({
+                    id: process.id || `proc-${Math.random().toString(36).substring(2, 9)}`,
+                    name: process.name || "Processus inconnu",
+                    technology: process.technology || "Non spécifié",
+                    icon: getProcessIcon(process.tech_icon || ''),
+                    dt_url: process.dt_url || "#",
+                    type: ((process.tech_icon && process.tech_icon.toLowerCase().includes('database')) 
+                      ? 'database' : 'technology') as 'database' | 'technology' | 'server'
+                  }));
+                  
+                  setState(prev => ({ ...prev, processGroups }));
+                  
+                  // Mettre en cache les données
+                  cacheService.set(`zone_data:${state.selectedZone}:processes`, processGroups, { 
+                    ttl: CACHE_DURATIONS.PROCESSES,
+                    category: 'zone_data'
+                  });
+                }
+              }
+            })
+            .catch(error => {
+              console.error(`[AppContext] Error loading data for tab ${tab}:`, error);
+            });
+        }
+      }
+    }
+  }, [state.activeTab, state.selectedZone, state.hosts.length, state.services.length, state.processGroups.length, state.vitalForGroupMZs, state.vitalForEntrepriseMZs, state.detectionMZs, state.encryptionMZs, apiClient, getProcessIcon]);
 
   // Valeur du contexte
   const contextValue = useMemo<AppContextType>(() => ({

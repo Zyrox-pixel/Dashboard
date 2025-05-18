@@ -1,9 +1,10 @@
-import React, { useMemo, useEffect, useRef } from 'react';
+import React, { useMemo, useEffect, useRef, useState } from 'react';
 import { useParams, Navigate } from 'react-router-dom';
 import DashboardBase from '../components/dashboard/DashboardBase';
 import { useApp } from '../contexts/AppContext';
 import { AppProvider, OptimizedAppProvider } from '../contexts/AppContext';
 import { DashboardVariant } from '../api/types';
+import cacheService, { CACHE_DURATIONS } from '../utils/cacheService';
 
 // Correction de l'interface pour être compatible avec useParams
 interface DashboardParams {
@@ -57,19 +58,52 @@ const UnifiedDashboard: React.FC = () => {
     const appContext = useApp();
     const { refreshData } = appContext;
     
+    // État pour suivre le chargement des données
+    const [isLoading, setIsLoading] = useState(false);
+    
     // Utiliser un ref pour suivre si l'initialisation a déjà été effectuée
     const initializedRef = useRef<{ [key: string]: boolean }>({});
     
-    // Charger les données une seule fois par type de dashboard
+    // Charger les données une seule fois par type de dashboard avec gestion du cache
     useEffect(() => {
       const variant = dashboardProps.variant;
+      
+      // Vérifier si les données sont en cache
+      const cacheKey = `dashboard:${variant}:initialized`;
+      const cachedData = cacheService.get(cacheKey);
+      
+      // Si les données sont en cache, marquer comme initialisé
+      if (cachedData) {
+        console.log(`[UnifiedDashboard] Using cached data for ${variant}`);
+        initializedRef.current[variant] = true;
+        return;
+      }
+      
       // Vérifier si ce type de dashboard a déjà été initialisé
       if (!initializedRef.current[variant]) {
-        console.log(`Initializing dashboard data for ${variant}`);
-        refreshData(variant, false);
-        initializedRef.current[variant] = true;
+        console.log(`[UnifiedDashboard] Initializing dashboard data for ${variant}`);
+        setIsLoading(true);
+        
+        // Charger les données
+        refreshData(variant, false)
+          .then(() => {
+            // Mettre en cache l'état d'initialisation
+            cacheService.set(cacheKey, true, { 
+              ttl: CACHE_DURATIONS.MANAGEMENT_ZONES,
+              category: 'dashboard'
+            });
+            
+            // Marquer comme initialisé
+            initializedRef.current[variant] = true;
+          })
+          .catch(error => {
+            console.error(`[UnifiedDashboard] Error initializing data for ${variant}:`, error);
+          })
+          .finally(() => {
+            setIsLoading(false);
+          });
       }
-    }, [dashboardProps.variant]); // refreshData est intentionnellement omis des dépendances
+    }, [dashboardProps.variant, refreshData]); // Inclure refreshData dans les dépendances
     
     return (
       <DashboardBase 
