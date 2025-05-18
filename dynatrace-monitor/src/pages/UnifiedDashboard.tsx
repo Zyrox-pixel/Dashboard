@@ -58,7 +58,13 @@ const UnifiedDashboard: React.FC = () => {
   const DashboardWithContext: React.FC = () => {
     const appContext = useApp();
     const { refreshData } = appContext;
-    const { setCurrentAppType } = useProblems();
+    const { 
+      setCurrentAppType,
+      refreshVFG, 
+      refreshVFE, 
+      refreshDetection, 
+      refreshEncryption 
+    } = useProblems();
     
     // État pour suivre le chargement des données
     const [isLoading, setIsLoading] = useState(false);
@@ -71,7 +77,23 @@ const UnifiedDashboard: React.FC = () => {
       // Informer le contexte des problèmes du type d'application actuel
       setCurrentAppType(dashboardProps.variant);
       console.log(`[UnifiedDashboard] Setting current app type to ${dashboardProps.variant}`);
-    }, [dashboardProps.variant, setCurrentAppType]);
+      
+      // Sélectionner la méthode de rafraîchissement selon le type
+      switch (dashboardProps.variant) {
+        case 'vfg':
+          refreshVFG(false); // Rafraîchir sans forcer
+          break;
+        case 'vfe':
+          refreshVFE(false);
+          break;
+        case 'detection':
+          refreshDetection(false);
+          break;
+        case 'encryption':
+          refreshEncryption(false);
+          break;
+      }
+    }, [dashboardProps.variant, setCurrentAppType, refreshVFG, refreshVFE, refreshDetection, refreshEncryption]);
     
     // Charger les données une seule fois par type de dashboard avec gestion du cache
     useEffect(() => {

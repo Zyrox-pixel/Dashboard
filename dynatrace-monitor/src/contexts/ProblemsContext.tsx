@@ -5,17 +5,25 @@ import { api } from '../api';
 interface ProblemsState {
   vfgProblems: Problem[];
   vfeProblems: Problem[];
+  detectionProblems: Problem[];
+  encryptionProblems: Problem[];
   vfgProblems72h: Problem[];
   vfeProblems72h: Problem[];
+  detectionProblems72h: Problem[];
+  encryptionProblems72h: Problem[];
   isLoading: {
     vfg: boolean;
     vfe: boolean;
+    detection: boolean;
+    encryption: boolean;
   };
 }
 
 interface ProblemsContextType extends ProblemsState {
   refreshVFG: (force?: boolean) => Promise<void>;
   refreshVFE: (force?: boolean) => Promise<void>;
+  refreshDetection: (force?: boolean) => Promise<void>;
+  refreshEncryption: (force?: boolean) => Promise<void>;
   refreshAll: (force?: boolean) => Promise<boolean | void>;
   getAggregatedProblems: () => Problem[];
   getAggregatedProblems72h: () => Problem[];
@@ -74,9 +82,18 @@ export const ProblemsProvider: React.FC<{children: React.ReactNode}> = ({ childr
   // États séparés pour chaque type de problème
   const [vfgProblems, setVfgProblems] = useState<Problem[]>([]);
   const [vfeProblems, setVfeProblems] = useState<Problem[]>([]);
+  const [detectionProblems, setDetectionProblems] = useState<Problem[]>([]);
+  const [encryptionProblems, setEncryptionProblems] = useState<Problem[]>([]);
   const [vfgProblems72h, setVfgProblems72h] = useState<Problem[]>([]);
   const [vfeProblems72h, setVfeProblems72h] = useState<Problem[]>([]);
-  const [isLoading, setIsLoading] = useState({ vfg: false, vfe: false });
+  const [detectionProblems72h, setDetectionProblems72h] = useState<Problem[]>([]);
+  const [encryptionProblems72h, setEncryptionProblems72h] = useState<Problem[]>([]);
+  const [isLoading, setIsLoading] = useState({ 
+    vfg: false, 
+    vfe: false, 
+    detection: false, 
+    encryption: false 
+  });
   
   // État pour suivre le type d'application courant
   const [currentAppType, setCurrentAppType] = useState<string>('vfg'); // Par défaut à 'vfg'
@@ -84,15 +101,21 @@ export const ProblemsProvider: React.FC<{children: React.ReactNode}> = ({ childr
   // Cache avancé pour éviter les requêtes répétées - avec localStorage
   const lastFetchTimeRef = useRef({
     vfg: 0,
-    vfe: 0
+    vfe: 0,
+    detection: 0,
+    encryption: 0
   });
 
   // Système de cache pour stocker les données entre les sessions
   const cacheRef = useRef({
     vfgProblems: null as Problem[] | null,
     vfeProblems: null as Problem[] | null,
+    detectionProblems: null as Problem[] | null,
+    encryptionProblems: null as Problem[] | null,
     vfgProblems72h: null as Problem[] | null,
-    vfeProblems72h: null as Problem[] | null
+    vfeProblems72h: null as Problem[] | null,
+    detectionProblems72h: null as Problem[] | null,
+    encryptionProblems72h: null as Problem[] | null
   });
 
   // Fonction utilitaire pour charger les données du cache
@@ -124,6 +147,26 @@ export const ProblemsProvider: React.FC<{children: React.ReactNode}> = ({ childr
             setVfeProblems72h(parsedData.vfeProblems72h);
             cacheRef.current.vfeProblems72h = parsedData.vfeProblems72h;
           }
+          
+          if (parsedData.detectionProblems && parsedData.detectionProblems.length > 0) {
+            setDetectionProblems(parsedData.detectionProblems);
+            cacheRef.current.detectionProblems = parsedData.detectionProblems;
+          }
+          
+          if (parsedData.detectionProblems72h && parsedData.detectionProblems72h.length > 0) {
+            setDetectionProblems72h(parsedData.detectionProblems72h);
+            cacheRef.current.detectionProblems72h = parsedData.detectionProblems72h;
+          }
+          
+          if (parsedData.encryptionProblems && parsedData.encryptionProblems.length > 0) {
+            setEncryptionProblems(parsedData.encryptionProblems);
+            cacheRef.current.encryptionProblems = parsedData.encryptionProblems;
+          }
+          
+          if (parsedData.encryptionProblems72h && parsedData.encryptionProblems72h.length > 0) {
+            setEncryptionProblems72h(parsedData.encryptionProblems72h);
+            cacheRef.current.encryptionProblems72h = parsedData.encryptionProblems72h;
+          }
 
           return true;
         }
@@ -140,8 +183,12 @@ export const ProblemsProvider: React.FC<{children: React.ReactNode}> = ({ childr
       const dataToCache = {
         vfgProblems: vfgProblems,
         vfeProblems: vfeProblems,
+        detectionProblems: detectionProblems,
+        encryptionProblems: encryptionProblems,
         vfgProblems72h: vfgProblems72h,
         vfeProblems72h: vfeProblems72h,
+        detectionProblems72h: detectionProblems72h,
+        encryptionProblems72h: encryptionProblems72h,
         timestamp: Date.now()
       };
 
@@ -247,6 +294,102 @@ export const ProblemsProvider: React.FC<{children: React.ReactNode}> = ({ childr
     }
   };
   
+  // Rafraîchir les problèmes Detection
+  const refreshDetection = async (force = false) => {
+    // Vérifier si un chargement récent a eu lieu (moins de 10 secondes - optimisé)
+    const now = Date.now();
+    if (!force && now - lastFetchTimeRef.current.detection < 10000) {
+      return;
+    }
+
+    // Priorité élevée pour cette requête
+    if ('requestIdleCallback' in window) {
+      // @ts-ignore - optimisation moderne
+      window.cancelIdleCallback = window.cancelIdleCallback || function() {};
+    }
+    
+    setIsLoading(prev => ({ ...prev, detection: true }));
+    
+    try {
+      
+      // Récupérer les problèmes actifs
+      const activeProblemsResponse = await api.getProblems("OPEN", "-60d", "detection", force);
+      if (!activeProblemsResponse.error && activeProblemsResponse.data) {
+        const transformedProblems = Array.isArray(activeProblemsResponse.data) 
+          ? activeProblemsResponse.data.map(transformProblemData)
+          : [];
+        
+        setDetectionProblems(transformedProblems);
+      }
+      
+      // Récupérer les problèmes des 72 dernières heures
+      const problems72hResponse = await api.getProblems72h("detection", undefined, force);
+      if (!problems72hResponse.error && problems72hResponse.data) {
+        const transformedProblems = Array.isArray(problems72hResponse.data) 
+          ? problems72hResponse.data.map(transformProblemData)
+          : [];
+        
+        setDetectionProblems72h(transformedProblems);
+      }
+      
+      // Mettre à jour l'horodatage
+      lastFetchTimeRef.current.detection = now;
+      
+    } catch (error) {
+      // Error handled in finally block
+    } finally {
+      setIsLoading(prev => ({ ...prev, detection: false }));
+    }
+  };
+  
+  // Rafraîchir les problèmes Encryption
+  const refreshEncryption = async (force = false) => {
+    // Vérifier si un chargement récent a eu lieu (moins de 10 secondes - optimisé)
+    const now = Date.now();
+    if (!force && now - lastFetchTimeRef.current.encryption < 10000) {
+      return;
+    }
+
+    // Priorité élevée pour cette requête
+    if ('requestIdleCallback' in window) {
+      // @ts-ignore - optimisation moderne
+      window.cancelIdleCallback = window.cancelIdleCallback || function() {};
+    }
+    
+    setIsLoading(prev => ({ ...prev, encryption: true }));
+    
+    try {
+      
+      // Récupérer les problèmes actifs
+      const activeProblemsResponse = await api.getProblems("OPEN", "-60d", "encryption", force);
+      if (!activeProblemsResponse.error && activeProblemsResponse.data) {
+        const transformedProblems = Array.isArray(activeProblemsResponse.data) 
+          ? activeProblemsResponse.data.map(transformProblemData)
+          : [];
+        
+        setEncryptionProblems(transformedProblems);
+      }
+      
+      // Récupérer les problèmes des 72 dernières heures
+      const problems72hResponse = await api.getProblems72h("encryption", undefined, force);
+      if (!problems72hResponse.error && problems72hResponse.data) {
+        const transformedProblems = Array.isArray(problems72hResponse.data) 
+          ? problems72hResponse.data.map(transformProblemData)
+          : [];
+        
+        setEncryptionProblems72h(transformedProblems);
+      }
+      
+      // Mettre à jour l'horodatage
+      lastFetchTimeRef.current.encryption = now;
+      
+    } catch (error) {
+      // Error handled in finally block
+    } finally {
+      setIsLoading(prev => ({ ...prev, encryption: false }));
+    }
+  };
+  
   // Rafraîchir tous les problèmes - version optimisée avec types corrigés
   const refreshAll = async (force = false): Promise<boolean | void> => {
 
@@ -258,11 +401,15 @@ export const ProblemsProvider: React.FC<{children: React.ReactNode}> = ({ childr
       // Utiliser les données du cache comme fallback en cas d'échec de chargement
       const initialVfgProblems = [...vfgProblems];
       const initialVfeProblems = [...vfeProblems];
+      const initialDetectionProblems = [...detectionProblems];
+      const initialEncryptionProblems = [...encryptionProblems];
 
-      // Exécuter les deux rafraîchissements en parallèle
+      // Exécuter tous les rafraîchissements en parallèle
       await Promise.all([
         refreshVFG(force),
-        refreshVFE(force)
+        refreshVFE(force),
+        refreshDetection(force),
+        refreshEncryption(force)
       ]);
 
       // Sauvegarder les données mise à jour dans le cache local
@@ -280,11 +427,21 @@ export const ProblemsProvider: React.FC<{children: React.ReactNode}> = ({ childr
       if (vfeProblems.length === 0 && cacheRef.current.vfeProblems) {
         setVfeProblems(cacheRef.current.vfeProblems);
       }
+      
+      if (detectionProblems.length === 0 && cacheRef.current.detectionProblems) {
+        setDetectionProblems(cacheRef.current.detectionProblems);
+      }
+      
+      if (encryptionProblems.length === 0 && cacheRef.current.encryptionProblems) {
+        setEncryptionProblems(cacheRef.current.encryptionProblems);
+      }
 
       // Essayer une approche séquentielle pour éviter la surcharge
       try {
         await refreshVFG(force);
         await refreshVFE(force);
+        await refreshDetection(force);
+        await refreshEncryption(force);
         return true;
       } catch (fallbackError) {
         // Failure is returned as false
@@ -309,6 +466,16 @@ export const ProblemsProvider: React.FC<{children: React.ReactNode}> = ({ childr
       problemMap.set(problem.id, problem);
     });
     
+    // Agréger les problèmes Detection
+    detectionProblems.forEach(problem => {
+      problemMap.set(problem.id, problem);
+    });
+    
+    // Agréger les problèmes Encryption
+    encryptionProblems.forEach(problem => {
+      problemMap.set(problem.id, problem);
+    });
+    
     return Array.from(problemMap.values());
   };
   
@@ -323,6 +490,16 @@ export const ProblemsProvider: React.FC<{children: React.ReactNode}> = ({ childr
     
     // Agréger les problèmes VFE
     vfeProblems72h.forEach(problem => {
+      problemMap.set(problem.id, problem);
+    });
+    
+    // Agréger les problèmes Detection
+    detectionProblems72h.forEach(problem => {
+      problemMap.set(problem.id, problem);
+    });
+    
+    // Agréger les problèmes Encryption
+    encryptionProblems72h.forEach(problem => {
       problemMap.set(problem.id, problem);
     });
     
@@ -367,11 +544,17 @@ export const ProblemsProvider: React.FC<{children: React.ReactNode}> = ({ childr
   const contextValue: ProblemsContextType = {
     vfgProblems,
     vfeProblems,
+    detectionProblems,
+    encryptionProblems,
     vfgProblems72h,
     vfeProblems72h,
+    detectionProblems72h,
+    encryptionProblems72h,
     isLoading,
     refreshVFG,
     refreshVFE,
+    refreshDetection,
+    refreshEncryption,
     refreshAll,
     getAggregatedProblems,
     getAggregatedProblems72h,

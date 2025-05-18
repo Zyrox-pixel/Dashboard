@@ -51,7 +51,16 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
   } = context;
   
   // Utiliser le ProblemsContext pour récupérer les problèmes spécifiques au dashboard
-  const { vfgProblems, vfeProblems, vfgProblems72h, vfeProblems72h } = useProblems();
+  const { 
+    vfgProblems, 
+    vfeProblems, 
+    detectionProblems, 
+    encryptionProblems, 
+    vfgProblems72h, 
+    vfeProblems72h, 
+    detectionProblems72h, 
+    encryptionProblems72h 
+  } = useProblems();
   
   // Utiliser directement les problèmes du ProblemsContext en fonction de la variante
   const activeProblems = useMemo(() => {
@@ -65,28 +74,18 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
         return vfeProblems;
         
       case 'detection':
-        // Pour Detection, filtrer les problèmes depuis AppContext pour l'instant
-        const allActiveProblems = context.activeProblems || [];
-        return allActiveProblems.filter((problem: Problem) => {
-          return problem.zone && detectionMZs.some(zone => 
-            problem.zone.toLowerCase().includes(zone.name.toLowerCase())
-          );
-        });
+        // Utiliser les problèmes Detection directement depuis ProblemsContext
+        return detectionProblems;
         
       case 'encryption':
-        // Pour Encryption, filtrer les problèmes depuis AppContext pour l'instant
-        const allProblems = context.activeProblems || [];
-        return allProblems.filter((problem: Problem) => {
-          return problem.zone && encryptionMZs.some(zone => 
-            problem.zone.toLowerCase().includes(zone.name.toLowerCase())
-          );
-        });
+        // Utiliser les problèmes Encryption directement depuis ProblemsContext
+        return encryptionProblems;
         
       default:
         // Par défaut, utiliser les problèmes VFG
         return vfgProblems;
     }
-  }, [variant, vfgProblems, vfeProblems, context.activeProblems, detectionMZs, encryptionMZs]);
+  }, [variant, vfgProblems, vfeProblems, detectionProblems, encryptionProblems]);
   
   // Utiliser directement les problèmes récents du ProblemsContext en fonction de la variante
   const problemsLast72h = useMemo(() => {
@@ -100,28 +99,18 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
         return vfeProblems72h;
         
       case 'detection':
-        // Pour Detection, filtrer les problèmes depuis AppContext pour l'instant
-        const allProblems72h = context.problemsLast72h || [];
-        return allProblems72h.filter((problem: Problem) => {
-          return problem.zone && detectionMZs.some(zone => 
-            problem.zone.toLowerCase().includes(zone.name.toLowerCase())
-          );
-        });
+        // Utiliser les problèmes 72h Detection directement depuis ProblemsContext
+        return detectionProblems72h;
         
       case 'encryption':
-        // Pour Encryption, filtrer les problèmes depuis AppContext pour l'instant
-        const allEncProblems72h = context.problemsLast72h || [];
-        return allEncProblems72h.filter((problem: Problem) => {
-          return problem.zone && encryptionMZs.some(zone => 
-            problem.zone.toLowerCase().includes(zone.name.toLowerCase())
-          );
-        });
+        // Utiliser les problèmes 72h Encryption directement depuis ProblemsContext
+        return encryptionProblems72h;
         
       default:
         // Par défaut, utiliser les problèmes VFG
         return vfgProblems72h;
     }
-  }, [variant, vfgProblems72h, vfeProblems72h, context.problemsLast72h, detectionMZs, encryptionMZs]);
+  }, [variant, vfgProblems72h, vfeProblems72h, detectionProblems72h, encryptionProblems72h]);
   
   // État pour le nouvel onglet de problèmes (actifs ou 72h)
   const [problemTab, setProblemTab] = useState('active'); // 'active' ou 'recent'
