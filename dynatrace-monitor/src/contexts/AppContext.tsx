@@ -1447,23 +1447,26 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
                                state.encryptionMZs.find(zone => zone.id === state.selectedZone);
         
         if (selectedZoneObj) {
-          // Définir la management zone si nécessaire
-          apiClient.setManagementZone(selectedZoneObj.name)
-            .then(() => {
+          // Fonction asynchrone pour gérer le chargement des données
+          const loadTabData = async () => {
+            try {
+              // Définir la management zone si nécessaire
+              await apiClient.setManagementZone(selectedZoneObj.name);
+              
               // Charger uniquement les données nécessaires pour l'onglet actif
+              let response: ApiResponse<Host[]> | ApiResponse<Service[]> | ApiResponse<ProcessResponse[]> | null = null;
+              
               if (tab === 'hosts') {
-                return apiClient.getHosts();
+                response = await apiClient.getHosts();
               } else if (tab === 'services') {
-                return apiClient.getServices();
+                response = await apiClient.getServices();
               } else if (tab === 'processes') {
-                return apiClient.getProcesses();
+                response = await apiClient.getProcesses();
               }
-              return null;
-            })
-            .then((response: ApiResponse<Host[]> | ApiResponse<Service[]> | ApiResponse<ProcessResponse[]> | null) => {
+              
               if (response && !response.error && response.data) {
                 // Mettre à jour l'état avec les nouvelles données
-                if (tab === 'hosts' && 'data' in response) {
+                if (tab === 'hosts' && tab === 'hosts') {
                   const hostsData = Array.isArray(response.data) ? response.data as Host[] : [];
                   setState(prev => ({ ...prev, hosts: hostsData }));
                   
@@ -1504,10 +1507,13 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
                   });
                 }
               }
-            })
-            .catch(error => {
+            } catch (error) {
               console.error(`[AppContext] Error loading data for tab ${tab}:`, error);
-            });
+            }
+          };
+          
+          // Appeler la fonction asynchrone
+          loadTabData();
         }
       }
     }
