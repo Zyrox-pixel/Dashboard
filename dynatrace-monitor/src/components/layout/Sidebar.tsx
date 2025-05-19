@@ -8,7 +8,7 @@ import { useApp } from '../../contexts/AppContext';
 import { useTheme } from '../../contexts/ThemeContext';
 
 // Définir les types pour les fonctions
-type MenuItemKey = 'home' | 'problems' | 'vfg' | 'vfe' | 'other' | 'activity' | 'settings';
+type MenuItemKey = 'home' | 'problems' | 'vfg' | 'vfe' | 'activity' | 'settings';
 type ColorType = 'indigo' | 'amber' | 'red' | 'blue' | 'green' | 'purple';
 
 const Sidebar: React.FC = () => {
@@ -23,7 +23,6 @@ const Sidebar: React.FC = () => {
     else if (path.startsWith('/problems')) setActiveItem('problems');
     else if (path.startsWith('/vfg')) setActiveItem('vfg');
     else if (path.startsWith('/vfe')) setActiveItem('vfe');
-    else if (path.startsWith('/other')) setActiveItem('other');
   }, []);
 
   const toggleSidebar = () => {
@@ -126,10 +125,10 @@ const Sidebar: React.FC = () => {
                 <span className={`font-bold text-base whitespace-nowrap ${
                   isDarkTheme ? 'text-white' : 'text-slate-800'
                 }`}>
-                  Dynatrace Monitor
+                  PRODSEC Monitor
                 </span>
                 <span className="text-xs text-slate-500">
-                  Enterprise Edition
+                  SEC06
                 </span>
               </div>
             </div>
@@ -137,11 +136,11 @@ const Sidebar: React.FC = () => {
         </div>
         
         {/* Bouton de collapse avec animation */}
-        <button 
-          onClick={toggleSidebar} 
+        <button
+          onClick={toggleSidebar}
           className={`ml-auto w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300 ${
-            isDarkTheme 
-              ? 'bg-slate-800 text-slate-300 hover:bg-indigo-900 hover:text-indigo-400 hover:shadow-md hover:shadow-indigo-900/30' 
+            isDarkTheme
+              ? 'bg-slate-800 text-slate-300 hover:bg-indigo-900 hover:text-indigo-400 hover:shadow-md hover:shadow-indigo-900/30'
               : 'bg-slate-100 text-slate-500 hover:bg-indigo-100 hover:text-indigo-600 hover:shadow-sm hover:shadow-indigo-300/30'
           }`}
         >
@@ -271,19 +270,6 @@ const Sidebar: React.FC = () => {
               )}
             </Link>
             
-            {/* Other */}
-            <Link 
-              to="/other"
-              onClick={() => setActiveItem('other')}
-              className={getMenuItemClass('other')}
-            >
-              {getIconGlow('other')}
-              <Grid size={18} className={getIconClass('other')} />
-              
-              {!sidebarCollapsed && (
-                <span className="text-sm font-medium whitespace-nowrap">Other</span>
-              )}
-            </Link>
           </nav>
         </div>
         
@@ -295,20 +281,49 @@ const Sidebar: React.FC = () => {
           isDarkTheme ? 'border-t border-slate-700/40' : 'border-t border-slate-200/70'
         }`}>
           <div className={`flex items-center gap-2 px-3 py-2 rounded-xl ${
-            isDarkTheme 
-              ? 'bg-gradient-to-r from-indigo-900/20 via-blue-900/20 to-indigo-900/10 shadow-inner shadow-black/20' 
+            isDarkTheme
+              ? 'bg-gradient-to-r from-indigo-900/20 via-blue-900/20 to-indigo-900/10 shadow-inner shadow-black/20'
               : 'bg-gradient-to-r from-indigo-50 to-blue-50 shadow-inner shadow-blue-100/30'
           }`}>
-            <Command size={16} className={isDarkTheme ? 'text-indigo-400' : 'text-indigo-600'} />
+            {/* BNP Paribas Logo */}
+            <div className="relative flex-shrink-0">
+              <div className={`absolute inset-0 w-5 h-5 bg-green-500 rounded-full blur-md opacity-60 ${isDarkTheme ? 'animate-pulse-slow' : ''}`}></div>
+              <div className="relative z-10 text-green-600 font-bold text-xs">BNP</div>
+            </div>
             {!sidebarCollapsed && (
               <div className="flex flex-col">
                 <span className={`text-xs font-medium ${isDarkTheme ? 'text-slate-300' : 'text-slate-700'}`}>
-                  Enterprise Edition
+                  BNP Paribas
                 </span>
-                <span className="text-[10px] text-slate-500">v2.3.8</span>
+                <span className="text-[10px] text-slate-500">v1.0.0</span>
               </div>
             )}
           </div>
+
+          {/* Developer credit and feedback link */}
+          {!sidebarCollapsed && (
+            <div className={`mt-3 px-2 py-2 rounded-lg text-center ${
+              isDarkTheme ? 'bg-slate-800/50' : 'bg-slate-200/50'
+            }`}>
+              <div className="flex flex-col items-center">
+                <span className={`text-xs ${isDarkTheme ? 'text-slate-400' : 'text-slate-600'}`}>
+                  Développé par
+                </span>
+                <a
+                  href="mailto:Rayane.Bennasr@externe.bnpparibas.com"
+                  className={`text-xs font-medium mt-1 ${
+                    isDarkTheme ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-800'
+                  }`}
+                >
+                  Rayane Ben Nasr
+                </a>
+                <div className="flex items-center mt-2 bg-blue-600/20 px-2 py-0.5 rounded">
+                  <span className="text-[10px] font-bold text-blue-500 mr-1">BETA</span>
+                  <span className="text-[9px] text-slate-500">Vos retours sont précieux</span>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
       

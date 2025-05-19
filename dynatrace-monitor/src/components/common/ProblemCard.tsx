@@ -16,13 +16,11 @@ const ProblemCard: React.FC<ProblemCardProps> = ({ problem }) => {
   // Vérifier si le problème est résolu
   const isResolved = problem.resolved || false;
 
-  // Extraire les informations sur l'entité impactée (hôte, service, etc.) 
+  // Extraire les informations sur l'entité impactée (hôte, service, etc.)
   const getHostInfo = (problem: Problem): string => {
-    console.log('Debugging problem data for host extraction:', problem.id);
-    
     // Liste des mots à exclure qui ne sont jamais des noms d'hôtes
     const excludedWords = [
-      'segmentation', 'script', 'extension', 'status', 'service', 'such', 'still', 
+      'segmentation', 'script', 'extension', 'status', 'service', 'such', 'still',
       'some', 'system', 'server', 'memory', 'application', 'error', 'timeout',
       'warning', 'critical', 'problem', 'issue', 'failure', 'module', 'process',
       'container', 'function', 'instance', 'request', 'being', 'response', 'health',
@@ -43,46 +41,39 @@ const ProblemCard: React.FC<ProblemCardProps> = ({ problem }) => {
       // Pattern spécifique pour les serveurs de l'entreprise (sv01XXXXX.fr.net.intra)
       const enterpriseServerPattern = /^s[a-z0-9]\d{2,}[a-z0-9]*\.fr\.net\.intra$/i;
       if (enterpriseServerPattern.test(name)) {
-        console.log("Strong match with enterprise server pattern:", name);
         return true;
       }
-      
+
       // Pattern pour les serveurs commençant par s suivi de chiffres
       const sServerPattern = /^s[a-z0-9]\d{2,}[a-z0-9]*$/i;
       if (sServerPattern.test(name)) {
-        console.log("Good match with s-server pattern:", name);
         return true;
       }
-      
+
       // Le pattern pour les serveurs avec format sv##, s### ou sv#### est fortement susceptible d'être un serveur
       if (/^s[a-z]?\d{2,}[a-z0-9]*$/i.test(lowerName)) {
-        console.log("Likely a server with sv## or s### pattern:", name);
         return true;
       }
-      
+
       // Si le nom commence par win/srv suivi de chiffres, c'est probablement un serveur windows
       if (/^(win|srv)[a-z0-9]*\d+/i.test(lowerName)) {
-        console.log("Likely a Windows server:", name);
         return true;
       }
-      
+
       // Si le nom contient des segments séparés par des points, ressemble à un FQDN et contient des chiffres
       if (/^[a-z0-9][-a-z0-9]*\.[a-z0-9][-a-z0-9.]+$/i.test(lowerName) && /\d/.test(lowerName)) {
-        console.log("Likely a FQDN with numbers:", name);
         return true;
       }
-      
+
       // Certains mots courts ou expressions génériques ne devraient jamais être considérés comme des hôtes
       if (name.length < 6 && !/\d/.test(name)) {
-        console.log("Too short without numbers, not a hostname:", name);
         return false;
       }
-      
-      // Filtrer les cas où le nom contient des mots comme "error", "warning", "critical" 
+
+      // Filtrer les cas où le nom contient des mots comme "error", "warning", "critical"
       // au milieu de la chaîne (par exemple "script error handling")
       for (const word of excludedWords) {
         if (lowerName.includes(word) && lowerName !== word) {
-          console.log(`Contains excluded word "${word}", not a hostname:`, name);
           return false;
         }
       }
@@ -98,43 +89,38 @@ const ProblemCard: React.FC<ProblemCardProps> = ({ problem }) => {
     // PRIORITÉ 1: Utiliser le champ impacted car il a été rempli par le backend en priorité
     // C'est le champ le plus fiable car il contient déjà le meilleur nom d'hôte trouvé par le backend
     if (problem.impacted && problem.impacted !== "Non spécifié") {
-      console.log('Using explicit impacted field from backend:', problem.impacted);
       return problem.impacted;
     }
-    
+
     // PRIORITÉ 2: Utiliser le champ host s'il existe
     if (problem.host && problem.host !== "Non spécifié") {
-      console.log('Using explicit host field from backend:', problem.host);
       return problem.host;
     }
-    
+
     // PRIORITÉ 3: Utiliser impactedEntities s'il existe et contient des entités
     if (problem.impactedEntities && Array.isArray(problem.impactedEntities)) {
       for (const entity of problem.impactedEntities) {
         // Vérifier d'abord si c'est un HOST (priorité la plus élevée)
         if (entity.entityId && entity.entityId.type === 'HOST' && entity.name) {
-          console.log('Found HOST in impactedEntities:', entity.name);
           return entity.name;
         }
       }
-      
+
       // Si aucun HOST n'est trouvé, chercher d'autres types d'entités (SERVICE, PROCESS_GROUP, etc.)
       for (const entity of problem.impactedEntities) {
         if (entity.entityId && entity.name) {
-          console.log(`Found ${entity.entityId.type} in impactedEntities:`, entity.name);
           return entity.name;
         }
       }
     }
-    
+
     // PRIORITÉ 4: Rechercher dans rootCauseEntity
     if (problem.rootCauseEntity && problem.rootCauseEntity.name) {
       if (isValidHostname(problem.rootCauseEntity.name)) {
-        console.log('Using valid rootCauseEntity:', problem.rootCauseEntity.name);
         return problem.rootCauseEntity.name;
       }
     }
-    
+
     // PRIORITÉ 5: Rechercher après "impacted:" ou "host:" ou "server:" dans le sous-titre ou titre
     const impactedTexts = `${problem.title || ''} ${problem.subtitle || ''}`;
     const hostIndicators = [
@@ -144,18 +130,17 @@ const ProblemCard: React.FC<ProblemCardProps> = ({ problem }) => {
       /\bon\s+([^\s,.;]+)/i,
       /\bat\s+([^\s,.;]+)/i
     ];
-    
+
     for (const pattern of hostIndicators) {
       const match = impactedTexts.match(pattern);
       if (match && match[1] && isValidHostname(match[1])) {
-        console.log(`Found valid host after "${pattern}":`, match[1]);
         return match[1];
       }
     }
-    
+
     // PRIORITÉ 6: Rechercher un nom d'hôte dans le titre ou sous-titre avec des patterns spécifiques
     const textToSearch = `${problem.title || ''} ${problem.subtitle || ''}`;
-    
+
     // Patterns spécifiques pour les serveurs - ordre du plus spécifique au moins spécifique
     const serverPatterns = [
       /\b(s[a-z0-9]\d{2,}[a-z0-9]*\.fr\.net\.intra)\b/i,  // Format sv01XXXXX.fr.net.intra
@@ -164,19 +149,17 @@ const ProblemCard: React.FC<ProblemCardProps> = ({ problem }) => {
       /\b(win[a-z0-9]*\d+[a-z0-9]*)\b/i,                  // Serveurs Windows avec des chiffres
       /\b([a-z][a-z0-9]{2,}-[a-z0-9]{2,})\b/i             // Serveurs avec format prefix-name (au moins 3 chars)
     ];
-    
+
     for (const pattern of serverPatterns) {
       const matches = textToSearch.match(new RegExp(pattern, 'gi')) || [];
       for (const match of matches) {
         if (isValidHostname(match)) {
-          console.log(`Found valid host with server pattern:`, match);
           return match;
         }
       }
     }
-    
+
     // Si aucun nom d'hôte valide n'a été trouvé, retourner "Non spécifié"
-    console.log('No valid hostname found for problem:', problem.id);
     return "Non spécifié";
   };
   

@@ -574,7 +574,7 @@ class OptimizedAPIClient:
         metric_queries = []
         
         for service_id in service_ids:
-            # Requête pour le temps de réponse avec ID explicite
+            # Requête pour le temps de réponse moyen avec ID explicite
             metric_queries.append((
                 "metrics/query",
                 {
@@ -585,6 +585,19 @@ class OptimizedAPIClient:
                 },
                 True,
                 f"response_time:{service_id}:{from_time}:{to_time}"  # Clé explicite avec ID
+            ))
+
+            # Requête pour le temps de réponse médian (50e percentile) avec ID explicite
+            metric_queries.append((
+                "metrics/query",
+                {
+                    "metricSelector": "builtin:service.response.time:percentile(50)",
+                    "from": from_time,
+                    "to": to_time,
+                    "entitySelector": f"entityId({service_id})"
+                },
+                True,
+                f"median_response_time:{service_id}:{from_time}:{to_time}"  # Clé explicite avec ID
             ))
             
             # Requête pour le taux d'erreur avec ID explicite
@@ -618,6 +631,7 @@ class OptimizedAPIClient:
         
         # Créer des dictionnaires pour associer les résultats de métriques aux services
         response_time_metrics = {}
+        median_response_time_metrics = {}
         error_rate_metrics = {}
         request_metrics = {}
         
@@ -625,6 +639,8 @@ class OptimizedAPIClient:
         result_index = 0
         for service_id in service_ids:
             response_time_metrics[service_id] = all_metric_results[result_index]
+            result_index += 1
+            median_response_time_metrics[service_id] = all_metric_results[result_index]
             result_index += 1
             error_rate_metrics[service_id] = all_metric_results[result_index]
             result_index += 1
@@ -717,15 +733,17 @@ class OptimizedAPIClient:
             
             # Extraire les métriques pour ce service
             response_time_data = response_time_metrics[service_id]
+            median_response_time_data = median_response_time_metrics[service_id]
             error_rate_data = error_rate_metrics[service_id]
             requests_data = request_metrics[service_id]
-            
+
             # Traiter les résultats des métriques
             response_time = None
+            median_response_time = None
             error_rate = None
             requests_count = None
             
-            # Extraire le temps de réponse (conversion en ms)
+            # Extraire le temps de réponse moyen (conversion en ms)
             if response_time_data and 'result' in response_time_data and response_time_data['result']:
                 result = response_time_data['result'][0]
                 if 'data' in result and result['data']:
@@ -735,11 +753,27 @@ class OptimizedAPIClient:
                         raw_value = values[0]
                         if raw_value < 10:  # Déjà en secondes
                             response_time = round(raw_value, 2)
-                            logger.info(f"Service {service_id}: Temps de réponse en secondes: {response_time}s")
+                            logger.info(f"Service {service_id}: Temps de réponse moyen en secondes: {response_time}s")
                         else:
                             # Convertir de millisecondes à secondes
                             response_time = round(raw_value / 1000, 2)
-                            logger.info(f"Service {service_id}: Temps de réponse converti de {raw_value}ms à {response_time}s")
+                            logger.info(f"Service {service_id}: Temps de réponse moyen converti de {raw_value}ms à {response_time}s")
+
+            # Extraire le temps de réponse médian (conversion en ms)
+            if median_response_time_data and 'result' in median_response_time_data and median_response_time_data['result']:
+                result = median_response_time_data['result'][0]
+                if 'data' in result and result['data']:
+                    values = result['data'][0].get('values', [])
+                    if values and values[0] is not None:
+                        # Conversion en secondes comme demandé
+                        raw_value = values[0]
+                        if raw_value < 10:  # Déjà en secondes
+                            median_response_time = round(raw_value, 2)
+                            logger.info(f"Service {service_id}: Temps de réponse médian en secondes: {median_response_time}s")
+                        else:
+                            # Convertir de millisecondes à secondes
+                            median_response_time = round(raw_value / 1000, 2)
+                            logger.info(f"Service {service_id}: Temps de réponse médian converti de {raw_value}ms à {median_response_time}s")
             
             # Extraire le taux d'erreur
             if error_rate_data and 'result' in error_rate_data and error_rate_data['result']:
@@ -765,7 +799,7 @@ class OptimizedAPIClient:
             error_rate_history = []
             request_count_history = []
             
-            # Historique du temps de réponse (uniquement si disponible)
+            # Historique du temps de réponse moyen (uniquement si disponible)
             if service_id in rt_history_dict:
                 rt_history_data = rt_history_dict[service_id]
                 if rt_history_data and 'result' in rt_history_data and rt_history_data['result']:
@@ -783,11 +817,16 @@ class OptimizedAPIClient:
                                     else:
                                         # Convertir de millisecondes à secondes
                                         adjusted_value = round(raw_value / 1000, 2)
-                                        
+
                                     response_time_history.append({
                                         'timestamp': timestamps[i],
                                         'value': adjusted_value
                                     })
+
+            # Pour l'historique du temps de réponse médian, nous utilisons les mêmes données
+            # car nous n'avons pas de requête spécifique pour l'historique médian
+            # Dans une itération future, nous pourrions ajouter une requête spécifique pour cela
+            median_response_time_history = response_time_history.copy()
             
             # Historique du taux d'erreur (uniquement si disponible)
             if service_id in er_history_dict:
@@ -826,6 +865,7 @@ class OptimizedAPIClient:
                 'id': service_id,
                 'name': service_details.get('displayName', 'Unknown') if service_details else 'Unknown',
                 'response_time': response_time,
+                'median_response_time': median_response_time,
                 'error_rate': error_rate,
                 'requests': requests_count,
                 'status': service_status,
@@ -833,6 +873,7 @@ class OptimizedAPIClient:
                 'tech_icon': tech_info['icon'],
                 'dt_url': f"{self.env_url}/ui/entity/{service_id}",
                 'response_time_history': response_time_history,
+                'median_response_time_history': median_response_time_history,
                 'error_rate_history': error_rate_history,
                 'request_count_history': request_count_history
             })
@@ -1110,6 +1151,8 @@ class OptimizedAPIClient:
         Returns:
             list: Liste des problèmes filtrés
         """
+        # AJOUT DE LOGS POUR DÉBOGAGE
+        logger.info(f"[DEBUG] get_problems_filtered appelé avec mz_name={mz_name}, time_from={time_from}, status={status}")
         # Utiliser une clé de cache unique pour chaque combinaison de paramètres
         cache_key = f"problems:{mz_name}:{time_from}:{status}"
         
@@ -1126,7 +1169,7 @@ class OptimizedAPIClient:
                 return cached_data
         
         try:
-            # Récupérer tous les problèmes sans filtrer par MZ via l'API
+            # Préparer les paramètres de requête
             params = {"from": time_from}
             
             # Pour ALL, on veut tous les problèmes, y compris OPEN et CLOSED
@@ -1134,6 +1177,14 @@ class OptimizedAPIClient:
             # ce qui retournera tous les problèmes, puis nous filtrerons selon les besoins
             if status is not None and status != "ALL":
                 params["status"] = status
+            
+            # AMÉLIORATION: Utiliser problemSelector pour filtrer directement par MZ
+            # Cette approche est plus efficace et cohérente avec test_get_problems
+            if mz_name:
+                # Échapper les guillemets doubles dans le nom de la MZ pour le sélecteur
+                escaped_mz_name = mz_name.replace('"', '\\"')
+                params["problemSelector"] = f'managementZones("{escaped_mz_name}")'
+                logger.info(f"Utilisation de problemSelector pour filtrer par MZ: {params['problemSelector']}")
                 
             # Déboguer les paramètres
             logger.info(f"Requête problèmes avec paramètres: {params}, mz_name: {mz_name}")
@@ -1244,6 +1295,7 @@ class OptimizedAPIClient:
                         for mz in problem.get('managementZones', []):
                             if mz.get('name') == mz_name:
                                 is_in_mz = True
+                                logger.info(f"Problème {problem.get('id')} trouvé dans MZ {mz_name} via managementZones")
                                 break
                     
                     # Rechercher aussi dans les entités affectées si pas trouvé
@@ -1254,6 +1306,20 @@ class OptimizedAPIClient:
                                 for mz in entity.get('managementZones', []):
                                     if mz.get('name') == mz_name:
                                         is_in_mz = True
+                                        logger.info(f"Problème {problem.get('id')} trouvé dans MZ {mz_name} via affectedEntities")
+                                        break
+                            if is_in_mz:
+                                break
+                    
+                    # Rechercher dans les entités impactées si pas trouvé
+                    if not is_in_mz and 'impactedEntities' in problem:
+                        for entity in problem.get('impactedEntities', []):
+                            # Vérifier les management zones de chaque entité impactée
+                            if 'managementZones' in entity:
+                                for mz in entity.get('managementZones', []):
+                                    if mz.get('name') == mz_name:
+                                        is_in_mz = True
+                                        logger.info(f"Problème {problem.get('id')} trouvé dans MZ {mz_name} via impactedEntities")
                                         break
                             if is_in_mz:
                                 break

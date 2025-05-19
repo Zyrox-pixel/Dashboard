@@ -11,7 +11,7 @@ import {
 } from './types';
 
 /**
- * API Client optimisé pour Dynatrace Monitor
+ * API Client optimisé pour PRODSEC Monitor
  * Supporte les modes standard et optimisé
  */
 class ApiClient {
@@ -434,9 +434,10 @@ class ApiClient {
         }, false), // Ne pas utiliser le cache
         this.get<ProblemResponse[]>(ENDPOINTS.PROBLEMS_72H, {
           params: {
-            debug: 'true' // Force le rafraîchissement
+            debug: 'true', // Force le rafraîchissement
+            timeframe: '-72h' // Utiliser 72h par défaut pour la méthode loadDashboardData
           }
-        }, false), // Ne pas utiliser le cache pour les problèmes 72h
+        }, false), // Ne pas utiliser le cache pour les problèmes
         this.get<Host[]>(ENDPOINTS.HOSTS),
         this.get<Service[]>(ENDPOINTS.SERVICES),
         this.get<ProcessResponse[]>(ENDPOINTS.PROCESSES)
@@ -553,38 +554,43 @@ class ApiClient {
   }
   
   /**
-   * Récupérer spécifiquement les problèmes des 72 dernières heures
+   * Récupérer spécifiquement les problèmes pour une période spécifiée (72h par défaut)
    * Utilise l'endpoint dédié basé sur l'implémentation du script Python
    * @param dashboardType Le type de dashboard (vfg, vfe)
    * @param zoneFilter Filtre optionnel pour une MZ spécifique
    * @param forceRefresh Si true, force le rafraîchissement (ignore le cache)
+   * @param timeframe La période de temps (ex: "-24h", "-72h", "-7d", etc.)
    */
   public getProblems72h(
     dashboardType?: string,
     zoneFilter?: string,
-    forceRefresh: boolean = false
+    forceRefresh: boolean = false,
+    timeframe: string = "-72h"
   ) {
     const params: any = {};
-    
+
     // Ajouter le type de dashboard s'il est spécifié
     if (dashboardType) {
       params.type = dashboardType;
     }
-    
+
     // Ajouter le filtre de zone s'il est spécifié
     if (zoneFilter) {
       params.zone = zoneFilter;
     }
-    
+
+    // Ajouter la période spécifiée
+    params.timeframe = timeframe;
+
     // Si on force le rafraîchissement, ajouter le paramètre debug
     if (forceRefresh) {
       params.debug = 'true';
-      console.log(`Forçage du rafraîchissement des problèmes 72h (dashboard: ${dashboardType || 'none'}, zone: ${zoneFilter || 'none'})`);
+      console.log(`Forçage du rafraîchissement des problèmes avec période ${timeframe} (dashboard: ${dashboardType || 'none'}, zone: ${zoneFilter || 'none'})`);
     }
-    
+
     // Ne pas utiliser le cache si on force le rafraîchissement
     const useCache = !forceRefresh;
-    
+
     return this.get<ProblemResponse[]>(ENDPOINTS.PROBLEMS_72H, { params }, useCache);
   }
 

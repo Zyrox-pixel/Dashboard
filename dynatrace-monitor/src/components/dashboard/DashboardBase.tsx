@@ -59,12 +59,11 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
   useEffect(() => {
     const queryParams = new URLSearchParams(window.location.search);
     const zoneId = queryParams.get('zoneId');
-    
+
     if (zoneId && !selectedZone) {
       // Vérifier si cette zone existe dans la liste actuelle
       const zoneExists = zones.some(zone => zone.id === zoneId);
       if (zoneExists) {
-        console.log(`Setting zone from URL: ${zoneId}`);
         setSelectedZone(zoneId);
         // Naviguer à #details pour s'assurer que l'utilisateur voit les détails
         window.location.hash = 'details';
@@ -123,7 +122,6 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
   
   // Gérer le clic sur une zone
   const handleZoneClick = (zoneId: string) => {
-    console.log(`Zone clicked: ${zoneId}`);
     setSelectedZone(zoneId);
     setActiveTab('hosts');
   };
@@ -132,7 +130,6 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
   const handleBackClick = () => {
     // Avant d'effacer la zone, s'assurer que les problèmes ne sont pas en cours de chargement
     if (isLoading.problems) {
-      console.log("Attendez que les problèmes finissent de se charger avant de retourner...");
       // Ajouter un délai pour éviter de revenir pendant un refresh
       setTimeout(() => {
         setSelectedZone(null);
@@ -158,14 +155,7 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
     return `${(timeMs / 1000).toFixed(2)} s`;
   };
   
-  console.log("Dashboard render state:", {
-    isLoading,
-    backendConnected,
-    error,
-    selectedZone,
-    currentZone,
-    zonesCount: zones.length
-  });
+  // Pas de logs nécessaires pour le render state
   
   // Afficher un écran de chargement si le chargement initial n'est pas terminé
   if (!isLoading.initialLoadComplete || (isLoading.dashboardData && optimized)) {
@@ -429,9 +419,6 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
               <div className="flex-1">
                 <h3 className="font-semibold text-lg text-white flex items-center gap-2">
                   SURVEILLANCE DES PROBLÈMES
-                  <span className="ml-2 bg-blue-900/40 text-blue-300 rounded-lg px-2 py-0.5 text-xs border border-blue-700/30">
-                    NOUVEAU
-                  </span>
                 </h3>
                 <p className="text-slate-400 mt-1">
                   Vue unifiée des incidents actifs et passés avec analyses détaillées

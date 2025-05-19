@@ -1,5 +1,5 @@
 import React, { useMemo, useCallback, useState, useEffect } from 'react';
-import { ChevronLeft, Clock, AlertTriangle, ExternalLink, RefreshCw, Cpu, Activity, Server, Filter, Loader, Database, Search, ArrowUp, ArrowDown, X, Check, Monitor, Sliders } from 'lucide-react';
+import { ChevronLeft, Clock, AlertTriangle, ExternalLink, RefreshCw, Cpu, Activity, Server, Filter, Loader, Database, Search, ArrowUp, ArrowDown, X, Check, Monitor, Sliders, FileDown } from 'lucide-react';
 import { useApp } from '../../contexts/AppContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { ManagementZone, Problem, ProcessGroup, Host, Service } from '../../api/types';
@@ -7,6 +7,13 @@ import ProblemsList from './ProblemsList';
 import PaginatedTable, { Column } from '../common/PaginatedTable';
 import AdvancedFilter, { FilterCategory, FilterValue, FilterItem } from '../common/AdvancedFilter';
 import FilterBadges, { FilterBadge } from '../common/FilterBadges';
+import {
+  exportProblemsToCSV,
+  exportHostsToCSV,
+  exportServicesToCSV,
+  exportProcessGroupsToCSV,
+  downloadCSV
+} from '../../utils/exportUtils';
 
 interface ZoneDetailsProps {
   zone: ManagementZone;
@@ -114,11 +121,9 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
   const handleRefreshedProblems = useCallback((refreshedProblems: Problem[]) => {
     // Filtrer les problèmes rafraîchis pour cette zone spécifique
     const zoneRefreshedProblems = refreshedProblems.filter(problem => problem.zone === zone.name);
-    
+
     // Mettre à jour l'état local des problèmes filtrés
     setFilteredProblems(zoneRefreshedProblems);
-    
-    console.log(`Mise à jour des problèmes pour la zone ${zone.name}: ${zoneRefreshedProblems.length} problèmes trouvés`);
   }, [zone.name]);
   
   // 4. Modifiez l'appel à ProblemsList pour utiliser filteredProblems au lieu de zoneProblems
@@ -370,28 +375,54 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
       }))
     };
     
-    // Temps de réponse (en secondes)
+    // Temps de réponse moyen (en millisecondes)
     const responseTimeBuckets = [
-      { id: 'fast', label: 'Rapide (<0.5s)', range: [0, 0.5] },
-      { id: 'medium', label: 'Moyen (0.5-2s)', range: [0.5, 2] },
-      { id: 'slow', label: 'Lent (>2s)', range: [2, Infinity] }
+      { id: 'fast', label: 'Rapide (<20ms)', range: [0, 20] },
+      { id: 'medium', label: 'Moyen (20-100ms)', range: [20, 100] },
+      { id: 'slow', label: 'Lent (>100ms)', range: [100, Infinity] }
     ];
-    
+
     const responseTimeCategory: FilterCategory = {
       id: 'response_time',
-      label: 'Temps de réponse',
+      label: 'Temps de réponse (moy.)',
       icon: <Clock size={18} />,
       items: responseTimeBuckets.map(bucket => ({
         id: bucket.id,
         label: bucket.label,
         value: bucket.id,
-        count: services.filter(s => 
-          s.response_time !== null && 
-          s.response_time >= bucket.range[0] && 
+        count: services.filter(s =>
+          s.response_time !== null &&
+          s.response_time >= bucket.range[0] &&
           s.response_time < bucket.range[1]
         ).length,
         icon: bucket.id === 'fast' ? <span className="text-green-500">⚡</span> :
               bucket.id === 'medium' ? <span className="text-yellow-500">⏱</span> :
+              <span className="text-red-500">🐢</span>
+      }))
+    };
+
+    // Temps de réponse médian (en millisecondes)
+    const medianResponseTimeBuckets = [
+      { id: 'fast_median', label: 'Rapide (<20ms)', range: [0, 20] },
+      { id: 'medium_median', label: 'Moyen (20-100ms)', range: [20, 100] },
+      { id: 'slow_median', label: 'Lent (>100ms)', range: [100, Infinity] }
+    ];
+
+    const medianResponseTimeCategory: FilterCategory = {
+      id: 'median_response_time',
+      label: 'Temps de réponse (méd.)',
+      icon: <Clock size={18} />,
+      items: medianResponseTimeBuckets.map(bucket => ({
+        id: bucket.id,
+        label: bucket.label,
+        value: bucket.id,
+        count: services.filter(s =>
+          s.median_response_time !== null &&
+          s.median_response_time >= bucket.range[0] &&
+          s.median_response_time < bucket.range[1]
+        ).length,
+        icon: bucket.id === 'fast_median' ? <span className="text-green-500">⚡</span> :
+              bucket.id === 'medium_median' ? <span className="text-yellow-500">⏱</span> :
               <span className="text-red-500">🐢</span>
       }))
     };
@@ -422,7 +453,7 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
       }))
     };
     
-    return [technologyCategory, responseTimeCategory, errorRateCategory];
+    return [technologyCategory, responseTimeCategory, medianResponseTimeCategory, errorRateCategory];
   }, [services]);
   
   // Préparer les catégories de filtres pour les process groups
@@ -637,12 +668,22 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
             
           case 'response_time':
             if (service.response_time === null) return false;
-            
+
             const responseTime = service.response_time;
             return (
-              (filter.values.includes('fast') && responseTime < 100) ||
-              (filter.values.includes('medium') && responseTime >= 100 && responseTime < 500) ||
-              (filter.values.includes('slow') && responseTime >= 500)
+              (filter.values.includes('fast') && responseTime < 20) ||
+              (filter.values.includes('medium') && responseTime >= 20 && responseTime < 100) ||
+              (filter.values.includes('slow') && responseTime >= 100)
+            );
+
+          case 'median_response_time':
+            if (service.median_response_time === null) return false;
+
+            const medianResponseTime = service.median_response_time;
+            return (
+              (filter.values.includes('fast_median') && medianResponseTime < 20) ||
+              (filter.values.includes('medium_median') && medianResponseTime >= 20 && medianResponseTime < 100) ||
+              (filter.values.includes('slow_median') && medianResponseTime >= 100)
             );
             
           case 'error_rate':
@@ -774,7 +815,7 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
       key: 'response_time',
       label: (
         <div className="flex items-center cursor-pointer" onClick={() => requestSort('response_time')}>
-          Temps de réponse
+          Temps de réponse (moy.)
           {sortConfig.key === 'response_time' && (
             <span className="ml-1">
               {sortConfig.direction === 'ascending' ? (
@@ -789,13 +830,42 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
       cellClassName: 'text-sm',
       render: (service: Service) => (
         <span className={`${
-          service.response_time !== null ? 
-            (service.response_time > 2 ? 'text-red-500' : 
-            service.response_time > 1 ? 'text-yellow-500' : 
-            'text-green-500') : 
+          service.response_time !== null ?
+            (service.response_time > 100 ? 'text-red-500' :
+            service.response_time > 20 ? 'text-yellow-500' :
+            'text-green-500') :
             'text-slate-400'
         }`}>
-          {service.response_time !== null ? `${service.response_time} s` : 'N/A'}
+          {service.response_time !== null ? `${service.response_time} ms` : 'N/A'}
+        </span>
+      ),
+    },
+    {
+      key: 'median_response_time',
+      label: (
+        <div className="flex items-center cursor-pointer" onClick={() => requestSort('median_response_time')}>
+          Temps de réponse (méd.)
+          {sortConfig.key === 'median_response_time' && (
+            <span className="ml-1">
+              {sortConfig.direction === 'ascending' ? (
+                <ArrowUp size={14} />
+              ) : sortConfig.direction === 'descending' ? (
+                <ArrowDown size={14} />
+              ) : null}
+            </span>
+          )}
+        </div>
+      ),
+      cellClassName: 'text-sm',
+      render: (service: Service) => (
+        <span className={`${
+          service.median_response_time !== null ?
+            (service.median_response_time > 100 ? 'text-red-500' :
+            service.median_response_time > 20 ? 'text-yellow-500' :
+            'text-green-500') :
+            'text-slate-400'
+        }`}>
+          {service.median_response_time !== null ? `${service.median_response_time} ms` : 'N/A'}
         </span>
       ),
     },
@@ -1085,11 +1155,9 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
   // Obtenir l'état de chargement des problèmes depuis le contexte
   const appContext = useApp();
   
-  // Log pour vérifier les valeurs
+  // Effet sans logs pour le suivi des comptages réels
   useEffect(() => {
-    if (!isLoading) {
-      console.log(`Comptages réels pour ${zone.name}:`, realCounts);
-    }
+    // Pas de logs nécessaires pour les comptages
   }, [isLoading, realCounts, zone.name]);
   
   // Mettre à jour l'état local quand l'état de chargement des problèmes change
@@ -1097,13 +1165,12 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
   useEffect(() => {
     if (appContext.isLoading.problems) {
       setIsRefreshingProblems(true);
-      
+
       // Définir un timeout pour masquer l'indicateur après 20 secondes maximum
       const timeoutId = setTimeout(() => {
-        console.log("Timeout de sécurité pour l'indicateur de chargement des problèmes");
         setIsRefreshingProblems(false);
       }, 20000);
-      
+
       // Nettoyer le timeout si l'état change avant
       return () => clearTimeout(timeoutId);
     } else {
@@ -1202,9 +1269,8 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
                 // Rafraîchir les données avec le paramètre refreshProblemsOnly à false pour tout rafraîchir
                 // et forcer le timeframe à 60 jours (défini dans le backend)
                 await appContext.refreshData(dashboardType as 'vfg' | 'vfe', false);
-                console.log("Rafraîchissement global terminé avec succès");
               } catch (error) {
-                console.error("Erreur lors du rafraîchissement global:", error);
+                // Erreur silencieusement gérée
               }
             }}
             disabled={appContext.isLoading.problems || appContext.isLoading.zoneDetails}
@@ -1250,12 +1316,35 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
       
       {/* Problèmes actifs pour cette zone */}
       {filteredProblems.length > 0 && (
-        <ProblemsList 
-          problems={filteredProblems} 
-          title={`Problèmes actifs dans ${zone.name}`}
-          zoneFilter={zone.name}
-          onRefresh={handleRefreshedProblems}
-        />
+        <div className="relative">
+          {/* On modifie ProblemsList pour lui passer une propriété additionnelle pour l'export CSV */}
+          <ProblemsList
+            problems={filteredProblems}
+            title={`Problèmes actifs dans ${zone.name}`}
+            zoneFilter={zone.name}
+            onRefresh={handleRefreshedProblems}
+            customExportButton={
+              <button
+                onClick={() => {
+                  const { csv, filename } = exportProblemsToCSV(
+                    filteredProblems,
+                    window.location.pathname.includes('vfe') ? 'vfe' : 'vfg',
+                    zone.name
+                  );
+                  downloadCSV(csv, filename);
+                }}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium ml-2
+                  bg-gradient-to-r from-green-600 to-emerald-700 hover:from-green-500 hover:to-emerald-600
+                  text-white shadow-md border border-emerald-400/30
+                  transition-all duration-200"
+                title="Télécharger les problèmes au format CSV"
+              >
+                <FileDown size={14} />
+                <span>Télécharger CSV</span>
+              </button>
+            }
+          />
+        </div>
       )}
       
       {/* Navigation par onglets */}
@@ -1319,18 +1408,18 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
                 <span>Hôtes</span>
                 <span className="text-xs text-slate-400 ml-2">({filteredHosts.length})</span>
               </h2>
-              
-              {/* Barre de recherche et bouton de filtre pour les hôtes */}
+
+              {/* Barre de recherche et boutons d'actions pour les hôtes */}
               <div className="flex items-center gap-3">
                 <div className="relative">
-                  <input 
-                    type="text" 
+                  <input
+                    type="text"
                     value={hostSearchTerm}
                     onChange={(e) => setHostSearchTerm(e.target.value)}
                     placeholder="Rechercher un hôte..."
                     className={`w-64 h-8 pl-8 pr-4 rounded-md ${
-                      isDarkTheme 
-                        ? 'bg-slate-700 border-slate-600 text-white placeholder-slate-400' 
+                      isDarkTheme
+                        ? 'bg-slate-700 border-slate-600 text-white placeholder-slate-400'
                         : 'bg-slate-100 border-slate-200 text-slate-900 placeholder-slate-500'
                     } border focus:outline-none focus:ring-1 focus:ring-indigo-500`}
                   />
@@ -1344,19 +1433,36 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
                     </button>
                   )}
                 </div>
-                
-                <button 
+
+                {/* Bouton d'export CSV */}
+                <button
+                  onClick={() => {
+                    const { csv, filename } = exportHostsToCSV(filteredHosts, zone.name);
+                    downloadCSV(csv, filename);
+                  }}
+                  className={`flex items-center gap-1 px-3 py-1 rounded-md border text-sm
+                    ${isDarkTheme
+                      ? 'border-green-600 bg-green-700/30 text-green-400 hover:bg-green-700/40'
+                      : 'border-green-600 bg-green-100 text-green-600 hover:bg-green-200'
+                    }`}
+                  title="Télécharger la liste des hôtes au format CSV"
+                >
+                  <FileDown size={14} />
+                  <span>Télécharger CSV</span>
+                </button>
+
+                <button
                   onClick={() => {
                     setFilterType('os');
                     setShowAdvancedFilter(true);
                   }}
                   className={`flex items-center gap-1 px-3 py-1 rounded-md border text-sm ${
-                    isDarkTheme 
-                      ? osFilters.length > 0 
-                        ? 'border-indigo-600 bg-indigo-700/30 text-indigo-400' 
-                        : 'border-slate-600 text-slate-300 hover:bg-slate-700' 
-                      : osFilters.length > 0 
-                        ? 'border-indigo-600 bg-indigo-100 text-indigo-600' 
+                    isDarkTheme
+                      ? osFilters.length > 0
+                        ? 'border-indigo-600 bg-indigo-700/30 text-indigo-400'
+                        : 'border-slate-600 text-slate-300 hover:bg-slate-700'
+                      : osFilters.length > 0
+                        ? 'border-indigo-600 bg-indigo-100 text-indigo-600'
                         : 'border-slate-300 text-slate-600 hover:bg-slate-100'
                   }`}
                 >
@@ -1403,19 +1509,22 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
               <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full ml-2 dark:bg-blue-900 dark:text-blue-200">
                 Dernières 30 minutes
               </span>
+              <span className="text-xs text-slate-400 ml-2">
+                Rafraîchi le {new Date().toLocaleString()}
+              </span>
             </h2>
-            
-            {/* Barre de recherche pour les services */}
+
+            {/* Barre de recherche et boutons d'actions pour les services */}
             <div className="flex items-center gap-3">
               <div className="relative">
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   value={serviceSearchTerm}
                   onChange={(e) => setServiceSearchTerm(e.target.value)}
                   placeholder="Rechercher un service..."
                   className={`w-64 h-8 pl-8 pr-4 rounded-md ${
-                    isDarkTheme 
-                      ? 'bg-slate-700 border-slate-600 text-white placeholder-slate-400' 
+                    isDarkTheme
+                      ? 'bg-slate-700 border-slate-600 text-white placeholder-slate-400'
                       : 'bg-slate-100 border-slate-200 text-slate-900 placeholder-slate-500'
                   } border focus:outline-none focus:ring-1 focus:ring-indigo-500`}
                 />
@@ -1429,19 +1538,36 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
                   </button>
                 )}
               </div>
-              
-              <button 
+
+              {/* Bouton d'export CSV pour les services */}
+              <button
+                onClick={() => {
+                  const { csv, filename } = exportServicesToCSV(filteredServices, zone.name);
+                  downloadCSV(csv, filename);
+                }}
+                className={`flex items-center gap-1 px-3 py-1 rounded-md border text-sm
+                  ${isDarkTheme
+                    ? 'border-green-600 bg-green-700/30 text-green-400 hover:bg-green-700/40'
+                    : 'border-green-600 bg-green-100 text-green-600 hover:bg-green-200'
+                  }`}
+                title="Télécharger la liste des services au format CSV"
+              >
+                <FileDown size={14} />
+                <span>Télécharger CSV</span>
+              </button>
+
+              <button
                 onClick={() => {
                   setFilterType('service');
                   setShowAdvancedFilter(true);
                 }}
                 className={`flex items-center gap-1 px-3 py-1 rounded-md border text-sm ${
-                  isDarkTheme 
-                    ? serviceFilters.length > 0 
-                      ? 'border-indigo-600 bg-indigo-700/30 text-indigo-400' 
-                      : 'border-slate-600 text-slate-300 hover:bg-slate-700' 
-                    : serviceFilters.length > 0 
-                      ? 'border-indigo-600 bg-indigo-100 text-indigo-600' 
+                  isDarkTheme
+                    ? serviceFilters.length > 0
+                      ? 'border-indigo-600 bg-indigo-700/30 text-indigo-400'
+                      : 'border-slate-600 text-slate-300 hover:bg-slate-700'
+                    : serviceFilters.length > 0
+                      ? 'border-indigo-600 bg-indigo-100 text-indigo-600'
                       : 'border-slate-300 text-slate-600 hover:bg-slate-100'
                 }`}
               >
@@ -1455,7 +1581,7 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
           <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 dark:bg-blue-900/30 text-sm border-b border-blue-100 dark:border-blue-800">
             <Clock size={14} className="text-blue-500 dark:text-blue-400" />
             <span className="text-blue-700 dark:text-blue-300">
-              Les métriques sont rafraîchies toutes les 30 minutes et les temps de réponse sont en secondes
+              Les métriques sont rafraîchies toutes les 30 minutes. Les temps de réponse moyens et médians sont affichés en millisecondes.
             </span>
           </div>
 
@@ -1492,24 +1618,43 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
               <span>Process Groups</span>
               <span className="text-xs text-slate-400 ml-2">({filteredProcessGroups.length})</span>
             </h2>
-            <button 
-              onClick={() => {
-                setFilterType('process');
-                setShowAdvancedFilter(true);
-              }}
-              className={`flex items-center gap-1 px-3 py-1 rounded-md border text-sm ${
-                isDarkTheme 
-                  ? processFilters.length > 0 
-                    ? 'border-indigo-600 bg-indigo-700/30 text-indigo-400' 
-                    : 'border-slate-600 text-slate-300 hover:bg-slate-700' 
-                  : processFilters.length > 0 
-                    ? 'border-indigo-600 bg-indigo-100 text-indigo-600' 
-                    : 'border-slate-300 text-slate-600 hover:bg-slate-100'
-              }`}
-            >
-              <Filter size={14} />
-              <span>Filtres avancés {processFilters.length > 0 && `(${processFilters.length})`}</span>
-            </button>
+            <div className="flex items-center gap-3">
+              {/* Bouton d'export CSV pour les process groups */}
+              <button
+                onClick={() => {
+                  const { csv, filename } = exportProcessGroupsToCSV(filteredProcessGroups, zone.name);
+                  downloadCSV(csv, filename);
+                }}
+                className={`flex items-center gap-1 px-3 py-1 rounded-md border text-sm
+                  ${isDarkTheme
+                    ? 'border-green-600 bg-green-700/30 text-green-400 hover:bg-green-700/40'
+                    : 'border-green-600 bg-green-100 text-green-600 hover:bg-green-200'
+                  }`}
+                title="Télécharger la liste des process groups au format CSV"
+              >
+                <FileDown size={14} />
+                <span>Télécharger CSV</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setFilterType('process');
+                  setShowAdvancedFilter(true);
+                }}
+                className={`flex items-center gap-1 px-3 py-1 rounded-md border text-sm ${
+                  isDarkTheme
+                    ? processFilters.length > 0
+                      ? 'border-indigo-600 bg-indigo-700/30 text-indigo-400'
+                      : 'border-slate-600 text-slate-300 hover:bg-slate-700'
+                    : processFilters.length > 0
+                      ? 'border-indigo-600 bg-indigo-100 text-indigo-600'
+                      : 'border-slate-300 text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                <Filter size={14} />
+                <span>Filtres avancés {processFilters.length > 0 && `(${processFilters.length})`}</span>
+              </button>
+            </div>
           </div>
 
           {/* Afficher les badges de filtres actifs */}

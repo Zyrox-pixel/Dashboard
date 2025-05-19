@@ -4,7 +4,7 @@ import { X, Clock, Activity, AlertOctagon, BarChart } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 
 interface ServiceFilter {
-  type: 'technology' | 'response_time' | 'error_rate' | 'status';
+  type: 'technology' | 'response_time' | 'median_response_time' | 'error_rate' | 'status';
   values: string[];
 }
 
@@ -30,9 +30,17 @@ const ServiceFilterBadges: React.FC<ServiceFilterBadgesProps> = ({
     switch (type) {
       case 'response_time':
         switch (value) {
-          case 'fast': return 'Rapide (<100ms)';
-          case 'medium': return 'Moyen (100-500ms)';
-          case 'slow': return 'Lent (>500ms)';
+          case 'fast': return 'Rapide (<20ms)';
+          case 'medium': return 'Moyen (20-100ms)';
+          case 'slow': return 'Lent (>100ms)';
+          default: return value;
+        }
+
+      case 'median_response_time':
+        switch (value) {
+          case 'fast_median': return 'Rapide (<20ms)';
+          case 'medium_median': return 'Moyen (20-100ms)';
+          case 'slow_median': return 'Lent (>100ms)';
           default: return value;
         }
         
@@ -64,6 +72,8 @@ const ServiceFilterBadges: React.FC<ServiceFilterBadgesProps> = ({
         return <Activity size={12} />;
       case 'response_time':
         return <Clock size={12} />;
+      case 'median_response_time':
+        return <Clock size={12} />;
       case 'error_rate':
         return <AlertOctagon size={12} />;
       case 'status':
@@ -83,6 +93,11 @@ const ServiceFilterBadges: React.FC<ServiceFilterBadgesProps> = ({
           if (value === 'fast') return 'bg-green-900/30 text-green-300 border-green-700/50';
           if (value === 'medium') return 'bg-yellow-900/30 text-yellow-300 border-yellow-700/50';
           if (value === 'slow') return 'bg-red-900/30 text-red-300 border-red-700/50';
+          return 'bg-indigo-900/30 text-indigo-300 border-indigo-700/50';
+        case 'median_response_time':
+          if (value === 'fast_median') return 'bg-green-900/30 text-green-300 border-green-700/50';
+          if (value === 'medium_median') return 'bg-yellow-900/30 text-yellow-300 border-yellow-700/50';
+          if (value === 'slow_median') return 'bg-red-900/30 text-red-300 border-red-700/50';
           return 'bg-indigo-900/30 text-indigo-300 border-indigo-700/50';
         case 'error_rate':
           if (value === 'normal') return 'bg-green-900/30 text-green-300 border-green-700/50';
@@ -106,6 +121,11 @@ const ServiceFilterBadges: React.FC<ServiceFilterBadgesProps> = ({
           if (value === 'medium') return 'bg-yellow-50 text-yellow-700 border-yellow-200';
           if (value === 'slow') return 'bg-red-50 text-red-700 border-red-200';
           return 'bg-indigo-50 text-indigo-700 border-indigo-200';
+        case 'median_response_time':
+          if (value === 'fast_median') return 'bg-green-50 text-green-700 border-green-200';
+          if (value === 'medium_median') return 'bg-yellow-50 text-yellow-700 border-yellow-200';
+          if (value === 'slow_median') return 'bg-red-50 text-red-700 border-red-200';
+          return 'bg-indigo-50 text-indigo-700 border-indigo-200';
         case 'error_rate':
           if (value === 'normal') return 'bg-green-50 text-green-700 border-green-200';
           if (value === 'elevated') return 'bg-yellow-50 text-yellow-700 border-yellow-200';
@@ -128,7 +148,9 @@ const ServiceFilterBadges: React.FC<ServiceFilterBadgesProps> = ({
       case 'technology':
         return 'Technologie';
       case 'response_time':
-        return 'Temps de réponse';
+        return 'Temps de réponse (moy.)';
+      case 'median_response_time':
+        return 'Temps de réponse (méd.)';
       case 'error_rate':
         return 'Taux d\'erreur';
       case 'status':
