@@ -68,43 +68,60 @@ const UnifiedDashboard: React.FC = () => {
       }
     }, [dashboardProps.variant, initialLoadComplete, refreshCachedData]);
     
-    // Mettre à jour les zones de management avec les problèmes
+    // Mettre à jour les zones de management avec les problèmes - exécution immédiate avec priorité accrue
     useEffect(() => {
-      if (activeProblems.length > 0) {
-        // Utiliser les problèmes actifs pour mettre à jour les Management Zones
-        updateManagementZonesWithProblems(activeProblems);
-        
-        // Synchroniser manuellement les MZs avec les problèmes pour corriger l'affichage
-        // Mettre à jour le compteur de problèmes pour chaque zone
-        if (appContext.vitalForGroupMZs.length > 0 || appContext.vitalForEntrepriseMZs.length > 0) {
-          const updatedVfgMZs = appContext.vitalForGroupMZs.map(zone => {
-            const zoneProblems = activeProblems.filter(p => p.zone && p.zone.includes(zone.name));
-            return {
-              ...zone,
-              problemCount: zoneProblems.length,
-              status: (zoneProblems.length > 0 ? "warning" : "healthy") as "warning" | "healthy"
-            };
-          });
+      // Fonction pour mettre à jour les zones avec les problèmes
+      const updateZonesWithProblems = () => {
+        if (activeProblems.length > 0) {
+          // Utiliser les problèmes actifs pour mettre à jour les Management Zones
+          updateManagementZonesWithProblems(activeProblems);
           
-          const updatedVfeMZs = appContext.vitalForEntrepriseMZs.map(zone => {
-            const zoneProblems = activeProblems.filter(p => p.zone && p.zone.includes(zone.name));
-            return {
-              ...zone,
-              problemCount: zoneProblems.length,
-              status: (zoneProblems.length > 0 ? "warning" : "healthy") as "warning" | "healthy"
-            };
-          });
-          
-          // Force update de l'état global des MZs
-          if (appContext.vitalForGroupMZs !== updatedVfgMZs) {
-            appContext.vitalForGroupMZs = updatedVfgMZs;
-          }
-          
-          if (appContext.vitalForEntrepriseMZs !== updatedVfeMZs) {
-            appContext.vitalForEntrepriseMZs = updatedVfeMZs;
+          // Synchroniser immédiatement les MZs avec les problèmes
+          if (appContext.vitalForGroupMZs.length > 0 || appContext.vitalForEntrepriseMZs.length > 0) {
+            console.log(`Mise à jour immédiate des statuts de zones pour ${activeProblems.length} problèmes`);
+            
+            const updatedVfgMZs = appContext.vitalForGroupMZs.map(zone => {
+              const zoneProblems = activeProblems.filter(p => p.zone && p.zone.includes(zone.name));
+              return {
+                ...zone,
+                problemCount: zoneProblems.length,
+                status: (zoneProblems.length > 0 ? "warning" : "healthy") as "warning" | "healthy"
+              };
+            });
+            
+            const updatedVfeMZs = appContext.vitalForEntrepriseMZs.map(zone => {
+              const zoneProblems = activeProblems.filter(p => p.zone && p.zone.includes(zone.name));
+              return {
+                ...zone,
+                problemCount: zoneProblems.length,
+                status: (zoneProblems.length > 0 ? "warning" : "healthy") as "warning" | "healthy"
+              };
+            });
+            
+            // Force update de l'état global des MZs
+            if (appContext.vitalForGroupMZs !== updatedVfgMZs) {
+              appContext.vitalForGroupMZs = updatedVfgMZs;
+            }
+            
+            if (appContext.vitalForEntrepriseMZs !== updatedVfeMZs) {
+              appContext.vitalForEntrepriseMZs = updatedVfeMZs;
+            }
           }
         }
-      }
+      };
+      
+      // Exécuter immédiatement la mise à jour
+      updateZonesWithProblems();
+      
+      // Aussi configurer un effet de nettoyage qui garantit que la mise à jour est appliquée
+      // même si d'autres opérations asynchrones sont en cours
+      const immediateUpdate = requestAnimationFrame(() => {
+        updateZonesWithProblems();
+      });
+      
+      return () => {
+        cancelAnimationFrame(immediateUpdate);
+      };
     }, [activeProblems, updateManagementZonesWithProblems, appContext]);
 
     // Combiner les données du contexte et du cache

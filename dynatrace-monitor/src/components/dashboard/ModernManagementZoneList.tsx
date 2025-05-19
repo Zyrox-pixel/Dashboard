@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Layers, Search, CheckCircle2, AlertTriangle, LayoutGrid, List, ArrowDownUp, RefreshCw, Filter } from 'lucide-react';
 import ZoneCard from '../common/ZoneCard';
 import { ManagementZone } from '../../api/types';
@@ -76,25 +76,43 @@ const ModernManagementZoneList: React.FC<ModernManagementZoneListProps> = ({
     }
   }, [scrolling]);
   
-  // Force la mise à jour de l'UI quand les données des zones changent (notamment les problèmes)
+  // State pour forcer la mise à jour de l'UI quand les données des zones changent
   const [lastRefresh, setLastRefresh] = useState(Date.now());
   
+  // Utilise useRef pour suivre la dernière structure de données des zones
+  const prevZonesRef = useRef<string>('');
+  
   useEffect(() => {
-    // Ce useEffect force une mise à jour du composant quand les zones changent
-    // en particulier leurs propriétés problemCount et status
+    // Ce useEffect force une mise à jour du composant dès que les zones changent
     if (zones && zones.length > 0) {
-      // Vérifier si des zones ont des problèmes
-      const hasProblems = zones.some(zone => zone.problemCount > 0);
+      // Créer une empreinte de la structure actuelle des zones avec leurs statuts
+      const zonesHash = JSON.stringify(zones.map(z => ({id: z.id, problemCount: z.problemCount, status: z.status})));
       
-      // Si des zones ont des problèmes mais ne sont pas marquées visuellement, forcer un rafraîchissement
-      if (hasProblems) {
-        console.log(`Rafraîchissement de l'affichage des zones (${zones.length} zones, dont ${zones.filter(z => z.problemCount > 0).length} avec problèmes)`);
+      // Comparer avec la structure précédente
+      if (zonesHash !== prevZonesRef.current) {
+        // Mettre à jour l'empreinte
+        prevZonesRef.current = zonesHash;
+        
+        // Log des zones avec problèmes
+        const zonesWithProblems = zones.filter(z => z.problemCount > 0);
+        console.log(`Actualisation immédiate de l'affichage: ${zones.length} zones, dont ${zonesWithProblems.length} avec problèmes`);
+        
+        // Forcer la mise à jour avec un nouvel horodatage - exécution prioritaire
         setLastRefresh(Date.now());
+        
+        // Si des zones ont des problèmes, forcer un rafraîchissement prioritaire du DOM
+        if (zonesWithProblems.length > 0) {
+          // Utiliser requestAnimationFrame pour s'assurer que le rendu est prioritaire
+          requestAnimationFrame(() => {
+            setLastRefresh(Date.now());
+          });
+        }
       }
     }
   }, [zones]);
   
-  // Filtrer et trier les zones - avec useMemo et lastRefresh pour forcer la réévaluation
+  // Filtrer et trier les zones avec useMemo pour éviter les recalculs inutiles
+  // Le lastRefresh force la réévaluation même si la référence aux zones n'a pas changé
   const filteredZones = React.useMemo(() => zones
     .filter(zone => {
       // Filtre de recherche

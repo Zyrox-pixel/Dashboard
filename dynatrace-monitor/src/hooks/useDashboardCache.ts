@@ -43,12 +43,13 @@ export function useDashboardCache(dashboardType: 'vfg' | 'vfe' | 'unified') {
   const pendingRequestRef = useRef<boolean>(false);
 
   // Fonction pour sauvegarder les données dans le cache local
-  const saveToCache = useCallback((activeData: Problem[], recentData: Problem[]) => {
+  const saveToCache = useCallback((activeData: Problem[], recentData: Problem[], managementZonesStatus?: any) => {
     try {
       const cacheKey = CACHE_KEYS[dashboardType];
       const dataToCache = {
         activeProblems: activeData,
         recentProblems: recentData,
+        managementZonesStatus: managementZonesStatus || {},
         timestamp: Date.now()
       };
       
@@ -58,6 +59,17 @@ export function useDashboardCache(dashboardType: 'vfg' | 'vfe' | 'unified') {
       console.error('Erreur lors de la sauvegarde du cache:', error);
     }
   }, [dashboardType]);
+
+  // Fonction pour mettre à jour les Management Zones avec les problèmes actifs
+  const updateManagementZonesWithProblems = useCallback((problems: Problem[]) => {
+    // Cette fonction sera appelée via l'AppContext qui gère les Management Zones
+    // Elle est exposée pour permettre une synchronisation avec les données de problèmes
+    console.log(`Exposing ${problems.length} problems for management zone updates`);
+    
+    // Note: On ne peut pas mettre à jour les MZs directement ici car elles sont gérées par AppContext
+    // Cette fonction sera utilisée par les consommateurs du hook
+    return problems;
+  }, []);
 
   // Fonction pour charger les données depuis le cache local
   const loadFromCache = useCallback(() => {
@@ -80,6 +92,14 @@ export function useDashboardCache(dashboardType: 'vfg' | 'vfe' | 'unified') {
             setRecentProblems(parsedData.recentProblems);
           }
           
+          // Charger les statuts des management zones à partir du cache
+          const managementZonesStatus = parsedData.managementZonesStatus || {};
+          if (Object.keys(managementZonesStatus).length > 0) {
+            console.log(`Statuts des zones chargés depuis le cache pour ${dashboardType}`);
+            // Exposer immédiatement les statuts des zones pour être utilisés par les consommateurs
+            updateManagementZonesWithProblems(parsedData.activeProblems || []);
+          }
+          
           setLastRefreshTime(new Date(parsedData.timestamp));
           return true;
         }
@@ -89,7 +109,13 @@ export function useDashboardCache(dashboardType: 'vfg' | 'vfe' | 'unified') {
       console.error('Erreur lors du chargement du cache:', error);
       return false;
     }
-  }, [dashboardType]);
+  }, [dashboardType, updateManagementZonesWithProblems]);
+
+  // Type pour le statut des management zones
+  interface ManagementZoneStatus {
+    count: number;
+    status: "warning" | "healthy";
+  }
 
   // Fonction de transformation des problèmes bruts en format Problem
   const transformProblemData = useCallback((problem: ProblemResponse): Problem => {
@@ -135,16 +161,6 @@ export function useDashboardCache(dashboardType: 'vfg' | 'vfe' | 'unified') {
     };
   }, []);
 
-  // Fonction pour mettre à jour les Management Zones avec les problèmes actifs
-  const updateManagementZonesWithProblems = useCallback((problems: Problem[]) => {
-    // Cette fonction sera appelée via l'AppContext qui gère les Management Zones
-    // Elle est exposée pour permettre une synchronisation avec les données de problèmes
-    console.log(`Exposing ${problems.length} problems for management zone updates`);
-    
-    // Note: On ne peut pas mettre à jour les MZs directement ici car elles sont gérées par AppContext
-    // Cette fonction sera utilisée par les consommateurs du hook
-    return problems;
-  }, []);
 
   // Fonction pour rafraîchir les données depuis l'API
   const refreshData = useCallback(async (force: boolean = false) => {
@@ -223,8 +239,19 @@ export function useDashboardCache(dashboardType: 'vfg' | 'vfe' | 'unified') {
       const refreshTime = new Date();
       setLastRefreshTime(refreshTime);
       
-      // Sauvegarder les données dans le cache
-      saveToCache(transformedActiveProblems, transformedRecentProblems);
+      // Préparer les données de status des management zones pour le cache
+      const managementZonesStatus: Record<string, ManagementZoneStatus> = {};
+      transformedActiveProblems.forEach(problem => {
+        if (problem.zone) {
+          if (!managementZonesStatus[problem.zone]) {
+            managementZonesStatus[problem.zone] = { count: 0, status: "warning" };
+          }
+          managementZonesStatus[problem.zone].count += 1;
+        }
+      });
+      
+      // Sauvegarder les données dans le cache, y compris les statuts des zones
+      saveToCache(transformedActiveProblems, transformedRecentProblems, managementZonesStatus);
       
       // Marquer que le chargement initial est terminé
       initialLoadCompletedRef.current = true;
