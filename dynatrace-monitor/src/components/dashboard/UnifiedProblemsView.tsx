@@ -80,27 +80,14 @@ const UnifiedProblemsView: React.FC<UnifiedProblemsViewProps> = ({ title, varian
   const [selectedTimeframe, setSelectedTimeframe] = useState<string>("-72h"); // 72h par défaut
 
   // Gérer le changement d'onglet
-  const handleTabChange = async (tab: 'active' | 'recent') => {
+  const handleTabChange = (tab: 'active' | 'recent') => {
     if (tab === activeTab) return; // Ne rien faire si on clique sur l'onglet déjà actif
     
     setActiveTab(tab);
     
-    // Si on passe à l'onglet "récent", s'assurer que les données sont à jour avec la période sélectionnée
-    if (tab === 'recent' && !isRefreshing) {
-      // Ajouter un petit délai pour laisser l'UI se mettre à jour avant de lancer le rafraîchissement
-      setTimeout(async () => {
-        try {
-          setIsRefreshing(true);
-          // Rafraîchir les données avec la période sélectionnée
-          console.log(`Changement vers onglet récent avec période ${selectedTimeframe}`);
-          await refreshCachedData(false, selectedTimeframe);
-        } catch (error) {
-          console.error('Erreur lors du rafraîchissement après changement d\'onglet:', error);
-        } finally {
-          setIsRefreshing(false);
-        }
-      }, 300);
-    }
+    // Ne pas déclencher de rafraîchissement automatique lors du changement d'onglet
+    // pour maintenir un comportement cohérent entre les onglets
+    console.log(`Changement vers onglet ${tab}`);
   };
 
   // Fonction pour obtenir le libellé de la période sélectionnée
