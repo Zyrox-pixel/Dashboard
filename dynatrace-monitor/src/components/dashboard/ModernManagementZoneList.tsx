@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Layers, Search, CheckCircle2, AlertTriangle, LayoutGrid, List, ArrowDownUp, RefreshCw, Filter } from 'lucide-react';
 import ZoneCard from '../common/ZoneCard';
 import { ManagementZone } from '../../api/types';
+import { useZoneStatusPreloader } from '../../hooks/useZoneStatusPreloader';
 
 // Type pour les filtres
 interface ZoneFilters {
@@ -33,6 +34,9 @@ const ModernManagementZoneList: React.FC<ModernManagementZoneListProps> = ({
   loading = false,
   onRefresh
 }) => {
+  // Utiliser le préchargeur de statuts pour les Management Zones
+  const { isPreloaded, applyPreloadedStatuses } = useZoneStatusPreloader();
+  
   // Mode d'affichage fixé en grille
   const viewMode = 'grid';
   
@@ -76,42 +80,125 @@ const ModernManagementZoneList: React.FC<ModernManagementZoneListProps> = ({
     }
   }, [scrolling]);
   
-  // Filtrer et trier les zones
-  const filteredZones = zones
-    .filter(zone => {
-      // Filtre de recherche
-      if (searchTerm && !zone.name.toLowerCase().includes(searchTerm.toLowerCase())) {
-        return false;
-      }
+  // State pour forcer la mise à jour de l'UI quand les données des zones changent
+  const [lastRefresh, setLastRefresh] = useState(Date.now());
+  
+  // Utilise useRef pour suivre la dernière structure de données des zones
+  const prevZonesRef = useRef<string>('');
+  
+  // Ref pour suivre si le composant est monté
+  const isMountedRef = useRef(true);
+  
+  // Effect pour nettoyer le ref quand le composant se démonte
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => { isMountedRef.current = false; };
+  }, []);
+  
+  // Appliquer les statuts préchargés aux zones si disponibles
+  const zonesWithPreloadedStatus = useMemo(() => {
+    if (isPreloaded && zones.length > 0) {
+      console.log(`Appliquer les statuts préchargés aux ${zones.length} Management Zones`);
+      return applyPreloadedStatuses(zones, variant);
+    }
+    return zones;
+  }, [zones, isPreloaded, applyPreloadedStatuses, variant]);
+  
+  useEffect(() => {
+    // Ce useEffect force une mise à jour du composant dès que les zones changent,
+    // avec une priorité maximale pour éliminer la latence visible
+    
+    // Fonction pour mettre à jour l'affichage immédiatement
+    const updateZonesDisplay = () => {
+      if (!isMountedRef.current) return;
       
-      // Filtre de problèmes
-      if (filters.showProblemsOnly && zone.problemCount === 0) {
-        return false;
+      if (zonesWithPreloadedStatus && zonesWithPreloadedStatus.length > 0) {
+        // Créer une empreinte de la structure actuelle des zones avec leurs statuts
+        const zonesHash = JSON.stringify(zonesWithPreloadedStatus.map(z => ({id: z.id, problemCount: z.problemCount, status: z.status})));
+        
+        // Comparer avec la structure précédente
+        if (zonesHash !== prevZonesRef.current) {
+          // Mettre à jour l'empreinte immédiatement
+          prevZonesRef.current = zonesHash;
+          
+          // Log des zones avec problèmes
+          const zonesWithProblems = zonesWithPreloadedStatus.filter(z => z.problemCount > 0);
+          console.log(`Actualisation immédiate de l'affichage: ${zonesWithPreloadedStatus.length} zones, dont ${zonesWithProblems.length} avec problèmes (préchargé: ${isPreloaded})`);
+          
+          // Forcer la mise à jour avec un nouvel horodatage - exécution hautement prioritaire
+          setLastRefresh(Date.now());
+        }
       }
+    };
+    
+    // Utiliser une microtask pour exécution immédiate avec priorité maximale
+    queueMicrotask(updateZonesDisplay);
+    
+    // Assurer que l'affichage est mis à jour avant et après le paint du navigateur
+    // pour éliminer complètement la latence perceptible
+    const firstRender = requestAnimationFrame(() => {
+      updateZonesDisplay();
       
-      // Filtre de statut
-      if (filters.showDegradedOnly && zone.status === 'healthy') {
-        return false;
-      }
+      // Second requestAnimationFrame pour capturer tous les cas de figure
+      const secondRender = requestAnimationFrame(() => {
+        updateZonesDisplay();
+      });
       
-      return true;
-    })
-    .sort((a, b) => {
-      // Tri
-      switch (filters.sortBy) {
-        case 'problems':
-          return b.problemCount - a.problemCount;
-        case 'hosts':
-          return b.hosts - a.hosts;
-        case 'services':
-          return b.services - a.services;
-        case 'availability':
-          return parseFloat(b.availability) - parseFloat(a.availability);
-        case 'name':
-        default:
-          return a.name.localeCompare(b.name);
-      }
+      return () => cancelAnimationFrame(secondRender);
     });
+    
+    return () => cancelAnimationFrame(firstRender);
+  }, [zonesWithPreloadedStatus, isPreloaded]);
+  
+  // Filtrer et trier les zones avec useMemo pour éviter les recalculs inutiles
+  // Le lastRefresh force la réévaluation même si la référence aux zones n'a pas changé
+  const filteredZones = useMemo(() => {
+    // Prioriser l'affichage des zones avec problèmes en premier
+    const zonesWithProblems = zonesWithPreloadedStatus.filter(z => z.problemCount > 0);
+    const zonesWithoutProblems = zonesWithPreloadedStatus.filter(z => z.problemCount === 0);
+    const prioritizedZones = [...zonesWithProblems, ...zonesWithoutProblems];
+    
+    return prioritizedZones
+      .filter(zone => {
+        // Filtre de recherche
+        if (searchTerm && !zone.name.toLowerCase().includes(searchTerm.toLowerCase())) {
+          return false;
+        }
+        
+        // Filtre de problèmes
+        if (filters.showProblemsOnly && zone.problemCount === 0) {
+          return false;
+        }
+        
+        // Filtre de statut
+        if (filters.showDegradedOnly && zone.status === 'healthy') {
+          return false;
+        }
+        
+        return true;
+      })
+      .sort((a, b) => {
+        // Tri prioritaire par problèmes si 'sortBy' n'est pas 'problems'
+        if (filters.sortBy !== 'problems' && a.problemCount !== b.problemCount) {
+          return b.problemCount - a.problemCount;
+        }
+        
+        // Appliquer le tri demandé
+        switch (filters.sortBy) {
+          case 'problems':
+            return b.problemCount - a.problemCount;
+          case 'hosts':
+            return b.hosts - a.hosts;
+          case 'services':
+            return b.services - a.services;
+          case 'availability':
+            return parseFloat(b.availability) - parseFloat(a.availability);
+          case 'name':
+          default:
+            return a.name.localeCompare(b.name);
+        }
+      });
+  }, [zonesWithPreloadedStatus, searchTerm, filters, lastRefresh]);
   
   // Définir les classes CSS pour le thème en fonction de la variante
   const themeColor = variant === 'vfg' ? 'indigo' : 'amber';
@@ -122,6 +209,15 @@ const ModernManagementZoneList: React.FC<ModernManagementZoneListProps> = ({
     const element = document.getElementById(id);
     if (element) {
       element.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+  
+  // Gérer le rafraîchissement avec préchargement
+  const handleRefresh = () => {
+    if (onRefresh) {
+      // Force un nouveau préchargement des statuts
+      console.log('Rafraîchir avec préchargement');
+      onRefresh();
     }
   };
   
@@ -146,13 +242,13 @@ const ModernManagementZoneList: React.FC<ModernManagementZoneListProps> = ({
                 <div className="flex items-center gap-1">
                   <CheckCircle2 size={14} className="text-green-400" />
                   <span className="text-xs text-slate-300">
-                    {zones.filter(z => z.status === 'healthy').length} zones saines
+                    {zonesWithPreloadedStatus.filter(z => z.status === 'healthy').length} zones saines
                   </span>
                 </div>
                 <div className="flex items-center gap-1">
                   <AlertTriangle size={14} className="text-red-400" />
                   <span className="text-xs text-slate-300">
-                    {zones.filter(z => z.problemCount > 0).length} zones avec problèmes
+                    {zonesWithPreloadedStatus.filter(z => z.problemCount > 0).length} zones avec problèmes
                   </span>
                 </div>
               </div>
@@ -164,7 +260,7 @@ const ModernManagementZoneList: React.FC<ModernManagementZoneListProps> = ({
             {/* Rafraîchir */}
             {onRefresh && (
               <button 
-                onClick={onRefresh}
+                onClick={handleRefresh}
                 disabled={loading}
                 className={`p-2 rounded-full ${loading ? 'bg-slate-700 text-slate-500' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}
                 title="Rafraîchir les données"

@@ -6,7 +6,7 @@ import { ManagementZone, Problem, ProcessGroup, Host, Service } from '../../api/
 import ProblemsList from './ProblemsList';
 import PaginatedTable, { Column } from '../common/PaginatedTable';
 import AdvancedFilter, { FilterCategory, FilterValue, FilterItem } from '../common/AdvancedFilter';
-import FilterBadges, { FilterBadge } from '../common/FilterBadges';
+import UnifiedFilterBadges, { FilterBadge } from '../common/UnifiedFilterBadges';
 import {
   exportProblemsToCSV,
   exportHostsToCSV,
@@ -64,7 +64,13 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
   // Filtrer les problèmes pour la zone courante (mémorisé)
   useEffect(() => {
     // Filtrer les problèmes pour la zone courante
+    console.log('[ZoneDetails] Zone actuelle:', zone.name);
+    console.log('[ZoneDetails] Nombre total de problèmes:', problems.length);
+    console.log('[ZoneDetails] Problèmes disponibles:', problems);
+    
     const zoneProblemsFiltered = problems.filter(problem => problem.zone === zone.name);
+    console.log('[ZoneDetails] Problèmes filtrés pour la zone:', zoneProblemsFiltered);
+    
     setFilteredProblems(zoneProblemsFiltered);
   }, [problems, zone.name]);
 
@@ -515,10 +521,10 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
         // Tous les éléments sont sélectionnés
         badges.push({
           id: `${filter.categoryId}-all`,
-          categoryId: filter.categoryId,
-          categoryLabel: category.label,
+          type: filter.categoryId,  // 'categoryId' devient 'type'
+          typeLabel: category.label,  // 'categoryLabel' devient 'typeLabel'
           value: '',
-          label: 'Tous',
+          valueLabel: 'Tous',  // 'label' devient 'valueLabel'
           icon: category.icon
         });
       } else {
@@ -529,10 +535,10 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
           
           badges.push({
             id: `${filter.categoryId}-${value}`,
-            categoryId: filter.categoryId,
-            categoryLabel: category.label,
+            type: filter.categoryId,
+            typeLabel: category.label,
             value,
-            label: item.label,
+            valueLabel: item.label,
             icon: item.icon
           });
         });
@@ -553,10 +559,10 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
         // Tous les éléments sont sélectionnés
         badges.push({
           id: `${filter.categoryId}-all`,
-          categoryId: filter.categoryId,
-          categoryLabel: category.label,
+          type: filter.categoryId,
+          typeLabel: category.label,
           value: '',
-          label: 'Tous',
+          valueLabel: 'Tous',
           icon: category.icon
         });
       } else {
@@ -567,10 +573,10 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
           
           badges.push({
             id: `${filter.categoryId}-${value}`,
-            categoryId: filter.categoryId,
-            categoryLabel: category.label,
+            type: filter.categoryId,
+            typeLabel: category.label,
             value,
-            label: item.label,
+            valueLabel: item.label,
             icon: item.icon
           });
         });
@@ -591,10 +597,10 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
         // Tous les éléments sont sélectionnés
         badges.push({
           id: `${filter.categoryId}-all`,
-          categoryId: filter.categoryId,
-          categoryLabel: category.label,
+          type: filter.categoryId,
+          typeLabel: category.label,
           value: '',
-          label: 'Tous',
+          valueLabel: 'Tous',
           icon: category.icon
         });
       } else {
@@ -605,10 +611,10 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
           
           badges.push({
             id: `${filter.categoryId}-${value}`,
-            categoryId: filter.categoryId,
-            categoryLabel: category.label,
+            type: filter.categoryId,
+            typeLabel: category.label,
             value,
-            label: item.label,
+            valueLabel: item.label,
             icon: item.icon
           });
         });
@@ -1474,7 +1480,7 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
             
             {/* Afficher les badges de filtres actifs */}
             {osFilters.length > 0 && (
-              <FilterBadges
+              <UnifiedFilterBadges
                 badges={getOsFilterBadges}
                 onRemoveBadge={handleRemoveOsFilter}
                 onClearAllBadges={() => setOsFilters([])}
@@ -1587,7 +1593,7 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
 
           {/* Afficher les badges de filtres actifs */}
           {serviceFilters.length > 0 && (
-            <FilterBadges
+            <UnifiedFilterBadges
               badges={getServiceFilterBadges}
               onRemoveBadge={handleRemoveServiceFilter}
               onClearAllBadges={() => setServiceFilters([])}
@@ -1659,7 +1665,7 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
 
           {/* Afficher les badges de filtres actifs */}
           {processFilters.length > 0 && (
-            <FilterBadges
+            <UnifiedFilterBadges
               badges={getProcessFilterBadges}
               onRemoveBadge={handleRemoveProcessFilter}
               onClearAllBadges={() => setProcessFilters([])}
