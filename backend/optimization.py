@@ -1234,37 +1234,39 @@ class OptimizedAPIClient:
                 # On va filtrer manuellement les problèmes liés à notre Management Zone
                 mz_problems = 0
                 for problem in problems_data['problems']:
-                    # Vérification explicite du statut pour les problèmes OPEN
+                    # Vérification du statut pour les problèmes OPEN
+                    # Un problème est considéré comme ouvert s'il a le statut OPEN
+                    # NOTE: Certains problèmes peuvent avoir un endTime mais toujours être OPEN selon Dynatrace
                     if status == "OPEN" and problem.get('status') != 'OPEN':
                         logger.debug(f"Problème {problem.get('id')} ignoré car son statut est {problem.get('status')}")
                         continue
                     
-                    # Vérifier aussi l'heure de fermeture pour les problèmes ouverts
-                    if status == "OPEN" and problem.get('endTime', 0) > 0:
-                        logger.debug(f"Problème {problem.get('id')} ignoré car il a une heure de fermeture")
-                        continue
-                    
                     # Filtrer par date si nécessaire
                     problem_start_time = problem.get('startTime', 0)
+                    end_time = problem.get('endTime', 0)
                     
-                    # Pour le statut ALL, nous voulons inclure tous les problèmes qui étaient actifs pendant la période,
+                    # Pour ALL et OPEN, nous voulons inclure tous les problèmes qui sont actifs,
                     # même s'ils ont commencé avant la limite de temps
                     if time_limit and problem_start_time < time_limit:
-                        # Pour le statut ALL, on vérifie si le problème était toujours actif pendant la période demandée
-                        if status == "ALL":
-                            end_time = problem.get('endTime', 0)
-                            
-                            # Si le problème n'a pas de temps de fin ou s'il s'est terminé après notre limite de temps,
-                            # cela signifie qu'il était actif pendant la période demandée
-                            if end_time == 0 or end_time >= time_limit:
-                                # Inclure ce problème car il était actif pendant la période
-                                logger.debug(f"Problème {problem.get('id')} inclus car actif pendant la période demandée (début: {problem_start_time}, fin: {end_time})")
-                            else:
-                                # Le problème s'est terminé avant notre période
-                                logger.debug(f"Problème {problem.get('id')} ignoré car terminé avant la période: fin {end_time} < {time_limit}")
-                                continue
+                        # Pour le statut ALL ou OPEN, on vérifie si le problème était toujours actif pendant la période demandée
+                        if status in ["ALL", "OPEN"]:
+                            # Pour les problèmes OPEN, inclure tous ceux qui sont encore ouverts, peu importe quand ils ont commencé
+                            if status == "OPEN" and problem.get('status') == 'OPEN':
+                                # Inclure tous les problèmes OPEN, même s'ils ont commencé bien avant la fenêtre de temps
+                                logger.debug(f"Problème OPEN {problem.get('id')} inclus car toujours actif (début: {problem_start_time})")
+                            # Pour le statut ALL, vérifier si le problème était actif pendant la période
+                            elif status == "ALL":
+                                # Si le problème n'a pas de temps de fin ou s'il s'est terminé après notre limite de temps,
+                                # cela signifie qu'il était actif pendant la période demandée
+                                if end_time == 0 or end_time >= time_limit:
+                                    # Inclure ce problème car il était actif pendant la période
+                                    logger.debug(f"Problème {problem.get('id')} inclus car actif pendant la période demandée (début: {problem_start_time}, fin: {end_time})")
+                                else:
+                                    # Le problème s'est terminé avant notre période
+                                    logger.debug(f"Problème {problem.get('id')} ignoré car terminé avant la période: fin {end_time} < {time_limit}")
+                                    continue
                         else:
-                            # Pour les autres statuts, suivre le comportement existant
+                            # Pour les autres statuts (pas OPEN ni ALL), suivre le comportement existant
                             logger.debug(f"Problème {problem.get('id')} ignoré car trop ancien: {problem_start_time} < {time_limit}")
                             continue
                         
