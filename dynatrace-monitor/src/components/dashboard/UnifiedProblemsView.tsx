@@ -95,10 +95,8 @@ const UnifiedProblemsView: React.FC<UnifiedProblemsViewProps> = ({ title, varian
     const newTimeframe = e.target.value;
     setSelectedTimeframe(newTimeframe);
     
-    // Déclencher un rafraîchissement uniquement si l'onglet actif est "recent"
-    if (activeTab === 'recent') {
-      refreshCachedData(true);
-    }
+    // Ne pas déclencher de rafraîchissement automatique lors du changement de période
+    // Cela sera fait manuellement par l'utilisateur via le bouton Rafraîchir
   };
 
   // Fonction de rafraîchissement avec période spécifiée

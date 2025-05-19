@@ -71,9 +71,8 @@ export const AllProblemsView: React.FC<AllProblemsViewProps> = ({ problemType = 
   const handleTimeframeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newTimeframe = e.target.value;
     setSelectedTimeframe(newTimeframe);
-    if (activeTab === 'recent') {
-      handleRefresh();
-    }
+    // Ne pas déclencher de rafraîchissement automatique lors du changement de période
+    // Cela sera fait manuellement par l'utilisateur via le bouton Rafraîchir
   };
 
   // Gérer le changement d'onglet
