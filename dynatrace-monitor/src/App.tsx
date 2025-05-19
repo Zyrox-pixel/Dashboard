@@ -2,14 +2,10 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider } from './contexts/ThemeContext';
 import UnifiedDashboard from './pages/UnifiedDashboard';
-import ActiveProblemsPage from './pages/ActiveProblemsPage';
-import RecentProblemsPage from './pages/RecentProblemsPage';
 import UnifiedProblemsPage from './pages/UnifiedProblemsPage';
 import OverviewDashboard from './pages/OverviewDashboard';
 import { AppProvider } from './contexts/AppContext';
 import { ProblemsProvider } from './contexts/ProblemsContext';
-
-// L'ancien loader n'est plus nécessaire car OverviewDashboard utilise maintenant le contexte ProblemsProvider
 
 function App() {
   return (
@@ -24,14 +20,14 @@ function App() {
               {/* Route pour la page d'aperçu global */}
               <Route path="/overview" element={<OverviewDashboard />} />
             
-            {/* Routes vers le tableau de bord unifié */}
+              {/* Routes vers le tableau de bord unifié */}
             <Route path="/dashboard/:type" element={<UnifiedDashboard />} />
             <Route path="/dashboard/:type/:optimized" element={<UnifiedDashboard />} />
             
-            {/* Nouvelles routes pour les pages de problèmes */}
-            <Route path="/problems/active" element={<ActiveProblemsPage />} />
-            <Route path="/problems/recent" element={<RecentProblemsPage />} />
+            {/* Page des problèmes unifiée */}
             <Route path="/problems/unified" element={<UnifiedProblemsPage />} />
+            <Route path="/problems/active" element={<UnifiedProblemsPage />} />
+            <Route path="/problems/recent" element={<UnifiedProblemsPage />} />
             
             {/* Routes de compatibilité avec l'ancienne structure */}
             <Route path="/vfg" element={<Navigate to="/dashboard/vfg" replace />} />

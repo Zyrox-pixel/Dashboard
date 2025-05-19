@@ -4,35 +4,48 @@ import Layout from '../components/layout/Layout';
 import UnifiedProblemsView from '../components/dashboard/UnifiedProblemsView';
 import AllProblemsView from '../components/common/AllProblemsView';
 
-
 /**
- * Page dédiée à l'affichage unifié des problèmes (actifs et récents)
- * Remplace les pages séparées ActiveProblemsPage et RecentProblemsPage
+ * Page unifiée pour afficher tous les types de problèmes (actifs, récents, tous)
+ * Remplace les anciennes pages séparées
  */
 const UnifiedProblemsPage: React.FC = () => {
-  // Nous n'utilisons pas directement les paramètres d'URL, seulement location
   const location = useLocation();
   
   // Récupérer le paramètre de type de dashboard depuis l'URL
-  // Pour l'URL /problems/unified, utiliser 'all' par défaut, sinon 'vfg'
   const dashboardType = new URLSearchParams(location.search).get('dashboard') || 'all';
   
-  // Déterminer le titre en fonction du type de dashboard
-  const title = dashboardType === 'all'
-    ? "Surveillance des Problèmes - Tous les Environnements"
-    : dashboardType === 'vfg' 
-      ? "Surveillance des Problèmes - Vital for Group" 
-      : "Surveillance des Problèmes - Vital for Entreprise";
+  // Détecter le type de problèmes à afficher en fonction du chemin
+  const problemType = location.pathname.includes('/active') 
+    ? 'active' 
+    : location.pathname.includes('/recent') 
+      ? 'recent' 
+      : 'all';
   
-  // Utiliser le AllProblemsView lorsque dashboard=all pour éviter les problèmes de requêtes en boucle
+  // Déterminer le titre en fonction du type de dashboard et de problèmes
+  let title = "Surveillance des Problèmes";
+  
+  if (dashboardType !== 'all') {
+    title += dashboardType === 'vfg' 
+      ? " - Vital for Group" 
+      : " - Vital for Entreprise";
+  }
+  
+  if (problemType === 'active') {
+    title += " - Problèmes Actifs";
+  } else if (problemType === 'recent') {
+    title += " - Problèmes Récents (72h)";
+  } else {
+    title += " - Tous les Problèmes";
+  }
   return (
     <Layout title={title}>
       {dashboardType === 'all' ? (
-        <AllProblemsView />
+        <AllProblemsView problemType={problemType} />
       ) : (
         <UnifiedProblemsView 
           title={title}
           variant={dashboardType as 'vfg' | 'vfe'}
+          problemType={problemType}
         />
       )}
     </Layout>

@@ -13,6 +13,8 @@ interface UnifiedProblemsViewProps {
   variant: 'vfg' | 'vfe' | 'all';
   /** Filtre de zone optionnel (pour les sous-zones de management) */
   zoneFilter?: string;
+  /** Type de problème à afficher (active, recent, all) */
+  problemType?: 'active' | 'recent' | 'all';
 }
 
 // Clé de session storage pour mémoriser les données
@@ -24,7 +26,7 @@ const CACHE_LIFETIME = 10 * 60 * 1000; // 10 minutes en millisecondes
  * Composant de vue unifiée des problèmes combinant problèmes actifs et récents (72h)
  * dans une interface à onglets moderne et interactive
  */
-const UnifiedProblemsView: React.FC<UnifiedProblemsViewProps> = ({ title, variant, zoneFilter }) => {
+const UnifiedProblemsView: React.FC<UnifiedProblemsViewProps> = ({ title, variant, zoneFilter, problemType }) => {
   const navigate = useNavigate();
   const { activeProblems, problemsLast72h, isLoading, refreshData } = useApp();
 
@@ -32,8 +34,10 @@ const UnifiedProblemsView: React.FC<UnifiedProblemsViewProps> = ({ title, varian
   const initialLoadCompletedRef = useRef<boolean>(false);
   const dataHasBeenLoadedRef = useRef<boolean>(false);
 
-  // État local pour l'onglet actif (actifs ou récents)
-  const [activeTab, setActiveTab] = useState<'active' | 'recent'>('active');
+  // État local pour l'onglet actif (actifs ou récents), initialisé par la prop
+  const [activeTab, setActiveTab] = useState<'active' | 'recent'>(
+    problemType === 'recent' ? 'recent' : 'active'
+  );
 
   // Options prédéfinies pour la sélection de période
   const timeframeOptions = [

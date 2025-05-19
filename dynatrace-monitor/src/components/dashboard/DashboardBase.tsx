@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../layout/Layout';
 import ProblemsList from './ProblemsList';
-import ManagementZoneList from './ManagementZoneList';
 import ModernManagementZoneList from './ModernManagementZoneList';
 import ZoneDetails from './ZoneDetails';
 import { AppContextType } from '../../contexts/AppContext';
