@@ -111,7 +111,7 @@ export const AllProblemsView: React.FC<AllProblemsViewProps> = ({ problemType = 
     downloadCSV(csv, filename);
   };
 
-  // Effet pour récupérer et enregistrer les préférences
+  // Effet pour récupérer les préférences (exécuté une seule fois)
   useEffect(() => {
     // Récupérer les préférences sauvegardées (onglet actif et période)
     const lastTab = sessionStorage.getItem('lastActiveTab') as 'active' | 'recent' | null;
@@ -124,10 +124,22 @@ export const AllProblemsView: React.FC<AllProblemsViewProps> = ({ problemType = 
     if (lastTimeframe) {
       setSelectedTimeframe(lastTimeframe);
     }
-    
+  }, []); // Exécuté uniquement au montage
+  
+  // Effet pour sauvegarder les préférences (sans créer de boucle)
+  useEffect(() => {
     // Sauvegarder les préférences
-    sessionStorage.setItem('lastActiveTab', activeTab);
-    sessionStorage.setItem('lastTimeframe', selectedTimeframe);
+    const savePreferences = () => {
+      sessionStorage.setItem('lastActiveTab', activeTab);
+      sessionStorage.setItem('lastTimeframe', selectedTimeframe);
+    };
+    
+    // Utiliser un timer pour éviter les sauvegardes trop fréquentes
+    const timerId = setTimeout(savePreferences, 300);
+    
+    return () => {
+      clearTimeout(timerId);
+    };
   }, [activeTab, selectedTimeframe]);
 
   // Classes CSS pour les onglets

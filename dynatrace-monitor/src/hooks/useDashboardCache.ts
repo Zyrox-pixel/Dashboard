@@ -149,54 +149,78 @@ export function useDashboardCache(dashboardType: 'vfg' | 'vfe' | 'unified') {
     try {
       console.log(`Rafraîchissement des données ${dashboardType}${force ? ' (forcé)' : ''}`);
       
-      // Déterminer les paramètres API en fonction du type de dashboard
-      const apiType = dashboardType === 'unified' ? undefined : dashboardType;
+      // Récupération différente des données selon le type de dashboard
+      let activeProblemsData: ProblemResponse[] = [];
+      let problems72hData: ProblemResponse[] = [];
       
-      // Récupérer les problèmes actifs
-      const activeProblemsResponse = await api.getProblems("OPEN", "-60d", apiType, force);
-      
-      // Récupérer les problèmes des 72 dernières heures
-      const problems72hResponse = await api.getProblems72h(apiType, undefined, force);
-      
-      // Mettre à jour les états si les données sont valides
-      if (!activeProblemsResponse.error && activeProblemsResponse.data) {
-        const transformedProblems = Array.isArray(activeProblemsResponse.data) 
-          ? activeProblemsResponse.data.map(transformProblemData)
-          : [];
-          
-        setActiveProblems(transformedProblems);
+      if (dashboardType === 'unified') {
+        // Pour l'onglet unifié (VFG + VFE), combiner les résultats des deux tableaux de bord
+        const [vfgActiveResponse, vfeActiveResponse, vfgRecent, vfeRecent] = await Promise.all([
+          api.getProblems("OPEN", "-60d", "vfg", force),
+          api.getProblems("OPEN", "-60d", "vfe", force),
+          api.getProblems72h("vfg", undefined, force),
+          api.getProblems72h("vfe", undefined, force)
+        ]);
+        
+        // Combiner et dédupliquer les problèmes actifs
+        const vfgActiveData = vfgActiveResponse.error ? [] : (vfgActiveResponse.data || []);
+        const vfeActiveData = vfeActiveResponse.error ? [] : (vfeActiveResponse.data || []);
+        const combinedActiveProblems = [...vfgActiveData, ...vfeActiveData];
+        
+        // Dédupliquer par ID
+        const uniqueActiveIds = new Set();
+        activeProblemsData = combinedActiveProblems.filter(problem => {
+          if (!problem.id || uniqueActiveIds.has(problem.id)) return false;
+          uniqueActiveIds.add(problem.id);
+          return true;
+        });
+        
+        // Combiner et dédupliquer les problèmes 72h
+        const vfgRecentData = vfgRecent.error ? [] : (vfgRecent.data || []);
+        const vfeRecentData = vfeRecent.error ? [] : (vfeRecent.data || []);
+        const combinedRecentProblems = [...vfgRecentData, ...vfeRecentData];
+        
+        // Dédupliquer par ID
+        const uniqueRecentIds = new Set();
+        problems72hData = combinedRecentProblems.filter(problem => {
+          if (!problem.id || uniqueRecentIds.has(problem.id)) return false;
+          uniqueRecentIds.add(problem.id);
+          return true;
+        });
+        
+        console.log(`Problèmes actifs unifiés: ${activeProblemsData.length} (VFG: ${vfgActiveData.length}, VFE: ${vfeActiveData.length})`);
+        console.log(`Problèmes récents unifiés: ${problems72hData.length} (VFG: ${vfgRecentData.length}, VFE: ${vfeRecentData.length})`);
+      } else {
+        // Pour les tableaux de bord spécifiques (VFG ou VFE)
+        const activeProblemsResponse = await api.getProblems("OPEN", "-60d", dashboardType, force);
+        const problems72hResponse = await api.getProblems72h(dashboardType, undefined, force);
+        
+        // Extraire les données
+        activeProblemsData = activeProblemsResponse.error ? [] : (activeProblemsResponse.data || []);
+        problems72hData = problems72hResponse.error ? [] : (problems72hResponse.data || []);
       }
       
-      if (!problems72hResponse.error && problems72hResponse.data) {
-        const transformedProblems = Array.isArray(problems72hResponse.data) 
-          ? problems72hResponse.data.map(transformProblemData)
-          : [];
-          
-        setRecentProblems(transformedProblems);
-      }
+      // Transformer et mettre à jour les problèmes actifs
+      const transformedActiveProblems = activeProblemsData.map(transformProblemData);
+      setActiveProblems(transformedActiveProblems);
+      
+      // Transformer et mettre à jour les problèmes récents
+      const transformedRecentProblems = problems72hData.map(transformProblemData);
+      setRecentProblems(transformedRecentProblems);
       
       // Marquer le moment du rafraîchissement
       const refreshTime = new Date();
       setLastRefreshTime(refreshTime);
       
       // Sauvegarder les données dans le cache
-      if (Array.isArray(activeProblemsResponse.data) && Array.isArray(problems72hResponse.data)) {
-        // Transformer les données avant de les sauvegarder
-        const transformedActiveProblems = activeProblemsResponse.data.map(transformProblemData);
-        const transformedRecentProblems = problems72hResponse.data.map(transformProblemData);
-        
-        saveToCache(
-          transformedActiveProblems,
-          transformedRecentProblems
-        );
-      }
+      saveToCache(transformedActiveProblems, transformedRecentProblems);
       
       // Marquer que le chargement initial est terminé
       initialLoadCompletedRef.current = true;
       
       return {
-        activeProblems: activeProblemsResponse.data,
-        recentProblems: problems72hResponse.data
+        activeProblems: transformedActiveProblems,
+        recentProblems: transformedRecentProblems
       };
     } catch (error) {
       console.error(`Erreur lors du rafraîchissement des données ${dashboardType}:`, error);
