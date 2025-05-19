@@ -64,7 +64,13 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
   // Filtrer les problèmes pour la zone courante (mémorisé)
   useEffect(() => {
     // Filtrer les problèmes pour la zone courante
+    console.log('[ZoneDetails] Zone actuelle:', zone.name);
+    console.log('[ZoneDetails] Nombre total de problèmes:', problems.length);
+    console.log('[ZoneDetails] Problèmes disponibles:', problems);
+    
     const zoneProblemsFiltered = problems.filter(problem => problem.zone === zone.name);
+    console.log('[ZoneDetails] Problèmes filtrés pour la zone:', zoneProblemsFiltered);
+    
     setFilteredProblems(zoneProblemsFiltered);
   }, [problems, zone.name]);
 

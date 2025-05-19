@@ -64,8 +64,13 @@ const ProblemsList: React.FC<ProblemsListProps> = ({
   
   // Fonction pour rafraîchir les problèmes directement depuis l'API
   const handleRefreshProblems = async () => {
+    console.log('[ProblemsList] Début du rafraîchissement des problèmes');
+    console.log('[ProblemsList] Type de dashboard:', dashboardType);
+    console.log('[ProblemsList] Zone filter:', zoneFilter);
+    
     // Éviter les rafraîchissements multiples simultanés
     if (isRefreshing) {
+      console.log('[ProblemsList] Rafraîchissement déjà en cours, annulation');
       return;
     }
     

@@ -72,20 +72,71 @@ export const AllProblemsView: React.FC<AllProblemsViewProps> = ({ problemType = 
     }
   };
 
-  // Fonction de chargement des problèmes simplifiée pour le stub
+  // Fonction de chargement des problèmes depuis l'API
   const loadProblems = async (silent: boolean = false) => {
-    // Cette implémentation est simplifiée
+    if (requestInProgress.current) return;
+    requestInProgress.current = true;
+    
     if (!silent) setIsRefreshing(true);
+    setError(null);
     
     try {
-      // Simulation d'un chargement réussi
-      const mockProblems: Problem[] = []; // Remplacé par un appel API réel dans la version complète
-      setActiveProblems(mockProblems);
-      setRecentProblems(mockProblems);
+      console.log("Chargement des problèmes VFG + VFE...");
+      
+      // Récupérer les problèmes actifs pour VFG et VFE séparément
+      const [vfgActiveResponse, vfeActiveResponse, vfgRecentResponse, vfeRecentResponse] = await Promise.all([
+        axios.get(`${API_BASE_URL}/problems?status=OPEN&type=vfg&debug=true`),
+        axios.get(`${API_BASE_URL}/problems?status=OPEN&type=vfe&debug=true`),
+        axios.get(`${API_BASE_URL}/problems-72h?type=vfg&timeframe=${selectedTimeframe}`),
+        axios.get(`${API_BASE_URL}/problems-72h?type=vfe&timeframe=${selectedTimeframe}`)
+      ]);
+      
+      console.log(`VFG problèmes actifs: ${vfgActiveResponse.data.length}, VFE problèmes actifs: ${vfeActiveResponse.data.length}`);
+      console.log(`VFG problèmes récents: ${vfgRecentResponse.data.length}, VFE problèmes récents: ${vfeRecentResponse.data.length}`);
+      
+      // Combiner et dédupliquer les problèmes actifs
+      const combinedActiveProblems = [...vfgActiveResponse.data, ...vfeActiveResponse.data];
+      const uniqueActiveProblems = [];
+      const activeIds = new Set();
+      
+      for (const problem of combinedActiveProblems) {
+        if (!activeIds.has(problem.id)) {
+          activeIds.add(problem.id);
+          uniqueActiveProblems.push(problem);
+        }
+      }
+      
+      // Combiner et dédupliquer les problèmes récents
+      const combinedRecentProblems = [...vfgRecentResponse.data, ...vfeRecentResponse.data];
+      const uniqueRecentProblems = [];
+      const recentIds = new Set();
+      
+      for (const problem of combinedRecentProblems) {
+        if (!recentIds.has(problem.id)) {
+          recentIds.add(problem.id);
+          uniqueRecentProblems.push(problem);
+        }
+      }
+      
+      console.log(`Total problèmes actifs après déduplication: ${uniqueActiveProblems.length}`);
+      console.log(`Total problèmes récents après déduplication: ${uniqueRecentProblems.length}`);
+      
+      // Mettre à jour l'état avec les données formatées
+      setActiveProblems(formatProblems(uniqueActiveProblems, false));
+      setRecentProblems(formatProblems(uniqueRecentProblems, true));
       setLastRefreshTime(new Date());
+      
+      // Sauvegarder les données dans le cache
+      saveDataToSessionStorage(
+        formatProblems(uniqueActiveProblems, false), 
+        formatProblems(uniqueRecentProblems, true)
+      );
+      
       dataHasBeenLoadedRef.current = true;
+      initialLoadComplete.current = true;
+      
     } catch (error) {
-      console.error('Erreur:', error);
+      console.error('Erreur lors du chargement des problèmes:', error);
       setError('Erreur de chargement. Veuillez réessayer.');
     } finally {
       setTimeout(() => {
