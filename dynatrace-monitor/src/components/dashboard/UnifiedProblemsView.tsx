@@ -4,6 +4,7 @@ import { AlertTriangle, Clock, RefreshCw, Filter, CalendarRange, Shield, BarChar
 import ProblemsList from './ProblemsList';
 import { Problem } from '../../api/types';
 import { useApp } from '../../contexts/AppContext';
+import { useDashboardCache } from '../../hooks/useDashboardCache';
 import { exportProblemsToCSV, downloadCSV } from '../../utils/exportUtils';
 
 interface UnifiedProblemsViewProps {
@@ -17,22 +18,42 @@ interface UnifiedProblemsViewProps {
   problemType?: 'active' | 'recent' | 'all';
 }
 
-// Clé de session storage pour mémoriser les données
-const PROBLEMS_CACHE_KEY = 'problemsViewData';
-const PROBLEMS_CONTEXT_CACHE_KEY = 'problemsData'; // Clé utilisée par ProblemsContext
-const CACHE_LIFETIME = 10 * 60 * 1000; // 10 minutes en millisecondes
-
 /**
  * Composant de vue unifiée des problèmes combinant problèmes actifs et récents (72h)
  * dans une interface à onglets moderne et interactive
  */
 const UnifiedProblemsView: React.FC<UnifiedProblemsViewProps> = ({ title, variant, zoneFilter, problemType }) => {
   const navigate = useNavigate();
-  const { activeProblems, problemsLast72h, isLoading, refreshData } = useApp();
+  
+  // Utiliser le contexte normal pour les informations de base
+  const appContext = useApp();
+  
+  // Utiliser notre système de cache intelligent pour les données
+  const dashboardCache = useDashboardCache(variant === 'all' ? 'unified' : variant);
+  const { 
+    activeProblems: cachedActiveProblems, 
+    recentProblems: cachedRecentProblems,
+    isLoading: cacheIsLoading, 
+    error: cacheError,
+    lastRefreshTime: cacheLastRefreshTime,
+    refreshData: refreshCachedData,
+    initialLoadComplete
+  } = dashboardCache;
 
-  // Référence pour éviter de déclencher un rechargement non nécessaire
-  const initialLoadCompletedRef = useRef<boolean>(false);
-  const dataHasBeenLoadedRef = useRef<boolean>(false);
+  // Combiner les données du contexte et du cache
+  const activeProblems = cachedActiveProblems.length > 0 
+    ? cachedActiveProblems 
+    : appContext.activeProblems;
+    
+  const problemsLast72h = cachedRecentProblems.length > 0
+    ? cachedRecentProblems
+    : appContext.problemsLast72h;
+  
+  // État de chargement combiné
+  const isLoading = {
+    ...appContext.isLoading,
+    problems: cacheIsLoading
+  };
 
   // État local pour l'onglet actif (actifs ou récents), initialisé par la prop
   const [activeTab, setActiveTab] = useState<'active' | 'recent'>(
@@ -49,148 +70,14 @@ const UnifiedProblemsView: React.FC<UnifiedProblemsViewProps> = ({ title, varian
     { value: "-30d", label: "30 jours" }
   ];
 
+  // État pour le rafraîchissement manuel
+  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+  
+  // Problèmes à afficher selon l'onglet actif
+  const problemsToDisplay = activeTab === 'active' ? activeProblems : problemsLast72h;
+
   // État local pour la période sélectionnée
   const [selectedTimeframe, setSelectedTimeframe] = useState<string>("-72h"); // 72h par défaut
-
-  // Marqueur pour le rafraîchissement manuel
-  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
-  const [lastRefreshTime, setLastRefreshTime] = useState<Date>(new Date());
-
-  // États pour stocker les problèmes pour chaque onglet - copie locale pour réduire les rechargements
-  const [cachedActiveProblems, setCachedActiveProblems] = useState<Problem[]>([]);
-  const [cachedProblemsLast72h, setCachedProblemsLast72h] = useState<Problem[]>([]);
-
-  // Problèmes à afficher selon l'onglet actif
-  const problemsToDisplay = activeTab === 'active' ? cachedActiveProblems : cachedProblemsLast72h;
-
-  // Méthode pour sauvegarder les données dans le SessionStorage
-  const saveDataToSessionStorage = (activeData: Problem[], recentData: Problem[]) => {
-    if (!activeData || !recentData) return;
-
-    try {
-      const dataToCache = {
-        active: activeData,
-        recent: recentData,
-        variant: variant,
-        timeframe: selectedTimeframe,
-        timestamp: Date.now()
-      };
-
-      sessionStorage.setItem(PROBLEMS_CACHE_KEY, JSON.stringify(dataToCache));
-      console.log(`Données des problèmes (${variant}) mises en cache dans sessionStorage`);
-    } catch (error) {
-      console.error('Erreur lors de la sauvegarde du cache:', error);
-    }
-  };
-
-  // Méthode pour charger les données depuis le SessionStorage
-  const loadDataFromSessionStorage = (): boolean => {
-    try {
-      // Essayer d'abord de charger depuis notre propre cache
-      const cachedData = sessionStorage.getItem(PROBLEMS_CACHE_KEY);
-
-      // Si les données sont trouvées, vérifier leur validité
-      if (cachedData) {
-        const parsedData = JSON.parse(cachedData);
-
-        // Vérifier si les données sont valides, concernent la même variante et ne sont pas trop anciennes
-        if (
-          parsedData &&
-          parsedData.variant === variant &&
-          Date.now() - parsedData.timestamp < CACHE_LIFETIME
-        ) {
-          console.log(`Utilisation des données en cache sessionStorage pour ${variant} (${new Date(parsedData.timestamp).toLocaleTimeString()})`);
-
-          // Restaurer les données et la période
-          setCachedActiveProblems(parsedData.active || []);
-          setCachedProblemsLast72h(parsedData.recent || []);
-          if (parsedData.timeframe) {
-            setSelectedTimeframe(parsedData.timeframe);
-          }
-
-          setLastRefreshTime(new Date(parsedData.timestamp));
-          return true;
-        }
-      }
-
-      // Si aucune donnée n'est trouvée dans notre cache ou si elles ne sont pas valides,
-      // essayer de charger depuis le cache du ProblemsContext
-      const contextCache = localStorage.getItem(PROBLEMS_CONTEXT_CACHE_KEY);
-      if (contextCache) {
-        try {
-          const parsedContextData = JSON.parse(contextCache);
-
-          // Vérifier si les données du contexte sont récentes
-          if (parsedContextData && parsedContextData.timestamp &&
-              Date.now() - parsedContextData.timestamp < CACHE_LIFETIME) {
-
-            console.log(`Utilisation des données du cache ProblemsContext pour ${variant}`);
-
-            // Déterminer les données appropriées selon le variant
-            let activeData = [];
-            let recentData = [];
-
-            if (variant === 'all') {
-              // Pour le variant 'all', prendre toutes les données
-              activeData = [
-                ...(parsedContextData.vfgProblems || []),
-                ...(parsedContextData.vfeProblems || [])
-              ];
-              recentData = [
-                ...(parsedContextData.vfgProblems72h || []),
-                ...(parsedContextData.vfeProblems72h || [])
-              ];
-            } else if (variant === 'vfg') {
-              activeData = parsedContextData.vfgProblems || [];
-              recentData = parsedContextData.vfgProblems72h || [];
-            } else if (variant === 'vfe') {
-              activeData = parsedContextData.vfeProblems || [];
-              recentData = parsedContextData.vfeProblems72h || [];
-            }
-
-            // Dédupliquer les données si nécessaire (pour variant 'all')
-            if (variant === 'all') {
-              const uniqueActiveIds = new Set();
-              const uniqueRecentIds = new Set();
-
-              activeData = activeData.filter((problem: Problem) => {
-                if (!uniqueActiveIds.has(problem.id)) {
-                  uniqueActiveIds.add(problem.id);
-                  return true;
-                }
-                return false;
-              });
-
-              recentData = recentData.filter((problem: Problem) => {
-                if (!uniqueRecentIds.has(problem.id)) {
-                  uniqueRecentIds.add(problem.id);
-                  return true;
-                }
-                return false;
-              });
-            }
-
-            // Mettre à jour nos états avec les données du contexte
-            setCachedActiveProblems(activeData);
-            setCachedProblemsLast72h(recentData);
-            setLastRefreshTime(new Date(parsedContextData.timestamp));
-
-            // Sauvegarder ces données dans notre propre cache pour une utilisation future
-            saveDataToSessionStorage(activeData, recentData);
-
-            return true;
-          }
-        } catch (e) {
-          console.error('Erreur lors du parsing du cache ProblemsContext:', e);
-        }
-      }
-
-      return false;
-    } catch (error) {
-      console.error('Erreur lors du chargement du cache:', error);
-      return false;
-    }
-  };
 
   // Gérer le changement d'onglet
   const handleTabChange = (tab: 'active' | 'recent') => {
@@ -207,24 +94,21 @@ const UnifiedProblemsView: React.FC<UnifiedProblemsViewProps> = ({ title, varian
   const handleTimeframeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newTimeframe = e.target.value;
     setSelectedTimeframe(newTimeframe);
-
+    
     // Déclencher un rafraîchissement uniquement si l'onglet actif est "recent"
     if (activeTab === 'recent') {
-      refreshDataWithTimeframe(newTimeframe);
+      refreshCachedData(true);
     }
   };
 
   // Fonction de rafraîchissement avec période spécifiée
-  const refreshDataWithTimeframe = async (timeframe: string) => {
+  const handleRefresh = async () => {
     if (isRefreshing) return;
 
     setIsRefreshing(true);
     try {
-      // Utilise le variant spécifié (vfg ou vfe), ou null pour 'all' (comportement par défaut)
-      const dashboardType = variant === 'all' ? null : variant;
-      // Passer la période sélectionnée comme troisième paramètre
-      await refreshData(dashboardType as 'vfg' | 'vfe' | undefined, activeTab === 'active', timeframe);
-      setLastRefreshTime(new Date());
+      // Utiliser le système de cache intelligente pour le rafraîchissement
+      await refreshCachedData(true);
     } catch (error) {
       console.error('Erreur lors du rafraîchissement:', error);
     } finally {
@@ -234,12 +118,7 @@ const UnifiedProblemsView: React.FC<UnifiedProblemsViewProps> = ({ title, varian
     }
   };
 
-  // Gérer le rafraîchissement manuel des données
-  const handleRefresh = () => {
-    refreshDataWithTimeframe(selectedTimeframe);
-  };
-
-  // Effet pour charger les données depuis le cache ou les récupérer au premier chargement
+  // Effet pour enregistrer l'onglet et la période sélectionnés
   useEffect(() => {
     // Récupérer les préférences sauvegardées (onglet actif et période)
     const lastTab = sessionStorage.getItem('lastActiveTab') as 'active' | 'recent' | null;
@@ -253,92 +132,17 @@ const UnifiedProblemsView: React.FC<UnifiedProblemsViewProps> = ({ title, varian
       setSelectedTimeframe(lastTimeframe);
     }
 
-    // Si les données ont déjà été chargées, ne pas recharger
-    if (dataHasBeenLoadedRef.current) {
-      return;
-    }
-
-    // Vérifier si on navigue depuis une autre page avec un cache récent
-    const lastNavTime = sessionStorage.getItem('lastNavigation');
-    const isRecentNavigation = lastNavTime && (Date.now() - parseInt(lastNavTime)) < 5000; // 5 secondes
-
-    if (isRecentNavigation) {
-      console.log('Navigation récente détectée, utilisation prioritaire du cache');
-    }
-
-    // Essayer de charger les données depuis le cache
-    const cacheLoaded = loadDataFromSessionStorage();
-
-    // Si le cache n'est pas disponible ou expiré et qu'on n'est pas dans une navigation récente, charger les données
-    if (!cacheLoaded && !isRecentNavigation) {
-      console.log(`Pas de cache valide pour ${variant}, chargement des données`);
-      handleRefresh();
-    } else {
-      // Marquer les données comme chargées même si depuis le cache
-      dataHasBeenLoadedRef.current = true;
-
-      // Si navigation récente, retirer le marqueur
-      if (isRecentNavigation) {
-        sessionStorage.removeItem('lastNavigation');
-      }
-    }
-  }, [variant]); // Dépendance seulement au variant
-
-  // Mise à jour des données de problèmes actifs lorsqu'elles changent dans le contexte
-  useEffect(() => {
-    if (activeProblems && activeProblems.length > 0) {
-      setCachedActiveProblems(activeProblems);
-
-      // Mise à jour du cache seulement si on a des données complètes
-      if (problemsLast72h && problemsLast72h.length > 0) {
-        saveDataToSessionStorage(activeProblems, problemsLast72h);
-      }
-
-      // Marquer que les données ont été chargées
-      if (!dataHasBeenLoadedRef.current) {
-        dataHasBeenLoadedRef.current = true;
-      }
-    }
-  }, [activeProblems]);
-
-  // Mise à jour des données de problèmes récents lorsqu'elles changent dans le contexte
-  useEffect(() => {
-    if (problemsLast72h && problemsLast72h.length > 0) {
-      setCachedProblemsLast72h(problemsLast72h);
-
-      // Mise à jour du cache seulement si on a des données complètes
-      if (activeProblems && activeProblems.length > 0) {
-        saveDataToSessionStorage(activeProblems, problemsLast72h);
-      }
-
-      // Marquer que les données ont été chargées
-      if (!dataHasBeenLoadedRef.current) {
-        dataHasBeenLoadedRef.current = true;
-      }
-    }
-  }, [problemsLast72h]);
+    // Sauvegarder les préférences
+    sessionStorage.setItem('lastActiveTab', activeTab);
+    sessionStorage.setItem('lastTimeframe', selectedTimeframe);
+  }, [activeTab, selectedTimeframe]);
 
   // Retour au tableau de bord
   const handleBackClick = () => {
-    // Forcer la sauvegarde des données avant la navigation
-    if (cachedActiveProblems && cachedActiveProblems.length > 0 &&
-        cachedProblemsLast72h && cachedProblemsLast72h.length > 0) {
-      // Sauvegarder d'abord les données dans notre cache
-      saveDataToSessionStorage(cachedActiveProblems, cachedProblemsLast72h);
-
-      // Signaler globalement la navigation entre les pages avec cache valide
-      sessionStorage.setItem('navigationFromCache', 'true');
-      sessionStorage.setItem('lastActiveTab', activeTab);
-      sessionStorage.setItem('lastTimeframe', selectedTimeframe);
-
-      // Stocker l'horodatage de navigation pour vérifier la fraîcheur des données
-      sessionStorage.setItem('lastNavigation', Date.now().toString());
-
-      console.log('Données sauvegardées avant navigation');
-    } else if (dataHasBeenLoadedRef.current) {
-      // Méthode de secours si les données ne sont pas complètes
-      sessionStorage.setItem('navigationFromCache', 'true');
-    }
+    // Sauvegarder les préférences avant la navigation
+    sessionStorage.setItem('lastActiveTab', activeTab);
+    sessionStorage.setItem('lastTimeframe', selectedTimeframe);
+    sessionStorage.setItem('lastNavigation', Date.now().toString());
 
     if (variant === 'all') {
       // Pour la vue "tous les problèmes", retourner à la page d'accueil
@@ -363,7 +167,7 @@ const UnifiedProblemsView: React.FC<UnifiedProblemsViewProps> = ({ title, varian
   // Fonction pour exporter les problèmes en CSV
   const handleExportCSV = () => {
     // Déterminer quels problèmes exporter en fonction de l'onglet actif
-    const problemsToExport = activeTab === 'active' ? cachedActiveProblems : cachedProblemsLast72h;
+    const problemsToExport = activeTab === 'active' ? activeProblems : problemsLast72h;
 
     // Si aucun problème, ne rien faire
     if (!problemsToExport || problemsToExport.length === 0) {
@@ -395,9 +199,6 @@ const UnifiedProblemsView: React.FC<UnifiedProblemsViewProps> = ({ title, varian
     hoverBg: `hover:bg-${accentColor}-700`,
     icon: activeTab === 'active' ? <AlertTriangle className="text-red-500" size={24} /> : <Clock className="text-amber-500" size={24} />
   };
-
-  // Déterminer si on doit afficher le loading
-  const showLoading = isLoading.problems && !dataHasBeenLoadedRef.current;
 
   return (
     <div className="space-y-6">
@@ -455,9 +256,9 @@ const UnifiedProblemsView: React.FC<UnifiedProblemsViewProps> = ({ title, varian
             )}
           </div>
           <div className="ml-auto flex flex-col items-end">
-            <div className="flex items-center gap-2 text-sm text-slate-400">
+              <div className="flex items-center gap-2 text-sm text-slate-400">
               <Clock size={14} />
-              <span>Dernière actualisation: {lastRefreshTime.toLocaleTimeString()}</span>
+              <span>Dernière actualisation: {cacheLastRefreshTime.toLocaleTimeString()}</span>
             </div>
             <div className="flex items-center justify-center h-10 px-4 rounded-lg bg-slate-800 font-bold mt-2 text-white">
               {problemsToDisplay?.length || 0} problème{(problemsToDisplay?.length || 0) !== 1 ? 's' : ''}
@@ -475,9 +276,9 @@ const UnifiedProblemsView: React.FC<UnifiedProblemsViewProps> = ({ title, varian
           >
             <AlertTriangle size={16} className="text-red-500" />
             <span>Problèmes actifs</span>
-            {cachedActiveProblems?.length > 0 && (
+            {activeProblems?.length > 0 && (
               <span className="ml-2 bg-red-900/60 text-red-200 rounded-full px-2 py-0.5 text-xs">
-                {cachedActiveProblems.length}
+                {activeProblems.length}
               </span>
             )}
           </button>
@@ -488,9 +289,9 @@ const UnifiedProblemsView: React.FC<UnifiedProblemsViewProps> = ({ title, varian
           >
             <Clock size={16} className="text-amber-500" />
             <span>Récents ({getTimeframeLabel(selectedTimeframe)})</span>
-            {cachedProblemsLast72h?.length > 0 && (
+            {problemsLast72h?.length > 0 && (
               <span className="ml-2 bg-amber-900/60 text-amber-200 rounded-full px-2 py-0.5 text-xs">
-                {cachedProblemsLast72h.length}
+                {problemsLast72h.length}
               </span>
             )}
           </button>
@@ -511,7 +312,7 @@ const UnifiedProblemsView: React.FC<UnifiedProblemsViewProps> = ({ title, varian
 
       {/* Contenu de l'onglet actif */}
       <div className="mt-6">
-        {showLoading ? (
+      {isLoading.problems && !initialLoadComplete ? (
           <div className="flex items-center justify-center h-64">
             <div className="w-12 h-12 border-t-4 border-b-4 border-blue-500 rounded-full animate-spin"></div>
             <span className="ml-3 text-slate-400">Chargement des problèmes...</span>

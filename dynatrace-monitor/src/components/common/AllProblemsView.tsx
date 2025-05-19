@@ -5,11 +5,9 @@ import ProblemsList from '../dashboard/ProblemsList';
 import { Problem } from '../../api/types';
 import axios from 'axios';
 import { API_BASE_URL } from '../../api/endpoints';
+import { useDashboardCache } from '../../hooks/useDashboardCache';
 import { exportProblemsToCSV, downloadCSV } from '../../utils/exportUtils';
 
-// Clé de session storage pour mémoriser les données
-const PROBLEMS_CACHE_KEY = 'allProblemsViewData';
-const CACHE_LIFETIME = 10 * 60 * 1000; // 10 minutes en millisecondes
 
 interface AllProblemsViewProps {
   /** Type de problème à afficher par défaut (active, recent, all) */
@@ -22,19 +20,24 @@ interface AllProblemsViewProps {
  */
 export const AllProblemsView: React.FC<AllProblemsViewProps> = ({ problemType = 'active' }) => {
   const navigate = useNavigate();
-  const requestInProgress = useRef<boolean>(false);
-  const dataHasBeenLoadedRef = useRef<boolean>(false);
-  const initialLoadComplete = useRef<boolean>(false);
-
-  // États locaux pour les problèmes
-  const [activeProblems, setActiveProblems] = useState<Problem[]>([]);
-  const [recentProblems, setRecentProblems] = useState<Problem[]>([]);
+  
+  // Utiliser notre système de cache intelligent
+  const dashboardCache = useDashboardCache('unified');
+  const { 
+    activeProblems, 
+    recentProblems, 
+    isLoading, 
+    error, 
+    lastRefreshTime,
+    refreshData, 
+    initialLoadComplete 
+  } = dashboardCache;
+  
+  // États locaux pour l'interface
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<'active' | 'recent'>(
     problemType === 'recent' ? 'recent' : 'active'
   );
-  const [lastRefreshTime, setLastRefreshTime] = useState<Date>(new Date());
-  const [error, setError] = useState<string | null>(null);
   const [selectedTimeframe, setSelectedTimeframe] = useState<string>("-72h");
   
   // Problèmes à afficher selon l'onglet actif
@@ -56,137 +59,42 @@ export const AllProblemsView: React.FC<AllProblemsViewProps> = ({ problemType = 
     return option ? option.label : "72 heures";
   };
 
-  // Fonction de sauvegarde du cache simplifiée
-  const saveDataToSessionStorage = (activeData: Problem[], recentData: Problem[]) => {
-    if (!activeData && !recentData) return;
-    try {
-      sessionStorage.setItem(PROBLEMS_CACHE_KEY, JSON.stringify({
-        active: activeData,
-        recent: recentData,
-        timeframe: selectedTimeframe,
-        activeTab: activeTab,
-        timestamp: Date.now()
-      }));
-    } catch (error) {
-      console.error('Erreur cache:', error);
-    }
-  };
-
-  // Fonction de chargement des problèmes depuis l'API
-  const loadProblems = async (silent: boolean = false) => {
-    if (requestInProgress.current) return;
-    requestInProgress.current = true;
-    
-    if (!silent) setIsRefreshing(true);
-    setError(null);
-    
-    try {
-      console.log("Chargement des problèmes VFG + VFE...");
-      
-      // Récupérer les problèmes actifs pour VFG et VFE séparément
-      const [vfgActiveResponse, vfeActiveResponse, vfgRecentResponse, vfeRecentResponse] = await Promise.all([
-        axios.get(`${API_BASE_URL}/problems?status=OPEN&type=vfg&debug=true`),
-        axios.get(`${API_BASE_URL}/problems?status=OPEN&type=vfe&debug=true`),
-        axios.get(`${API_BASE_URL}/problems-72h?type=vfg&timeframe=${selectedTimeframe}`),
-        axios.get(`${API_BASE_URL}/problems-72h?type=vfe&timeframe=${selectedTimeframe}`)
-      ]);
-      
-      console.log(`VFG problèmes actifs: ${vfgActiveResponse.data.length}, VFE problèmes actifs: ${vfeActiveResponse.data.length}`);
-      console.log(`VFG problèmes récents: ${vfgRecentResponse.data.length}, VFE problèmes récents: ${vfeRecentResponse.data.length}`);
-      
-      // Combiner et dédupliquer les problèmes actifs
-      const combinedActiveProblems = [...vfgActiveResponse.data, ...vfeActiveResponse.data];
-      const uniqueActiveProblems = [];
-      const activeIds = new Set();
-      
-      for (const problem of combinedActiveProblems) {
-        if (!activeIds.has(problem.id)) {
-          activeIds.add(problem.id);
-          uniqueActiveProblems.push(problem);
-        }
-      }
-      
-      // Combiner et dédupliquer les problèmes récents
-      const combinedRecentProblems = [...vfgRecentResponse.data, ...vfeRecentResponse.data];
-      const uniqueRecentProblems = [];
-      const recentIds = new Set();
-      
-      for (const problem of combinedRecentProblems) {
-        if (!recentIds.has(problem.id)) {
-          recentIds.add(problem.id);
-          uniqueRecentProblems.push(problem);
-        }
-      }
-      
-      console.log(`Total problèmes actifs après déduplication: ${uniqueActiveProblems.length}`);
-      console.log(`Total problèmes récents après déduplication: ${uniqueRecentProblems.length}`);
-      
-      // Mettre à jour l'état avec les données formatées
-      setActiveProblems(formatProblems(uniqueActiveProblems, false));
-      setRecentProblems(formatProblems(uniqueRecentProblems, true));
-      setLastRefreshTime(new Date());
-      
-      // Sauvegarder les données dans le cache
-      saveDataToSessionStorage(
-        formatProblems(uniqueActiveProblems, false), 
-        formatProblems(uniqueRecentProblems, true)
-      );
-      
-      dataHasBeenLoadedRef.current = true;
-      initialLoadComplete.current = true;
-      
-    } catch (error) {
-      console.error('Erreur lors du chargement des problèmes:', error);
-      setError('Erreur de chargement. Veuillez réessayer.');
-    } finally {
-      setTimeout(() => {
-        if (!silent) setIsRefreshing(false);
-        requestInProgress.current = false;
-      }, 500);
-    }
-  };
-
-  // Formater les données (fonction stub)
-  const formatProblems = (problems: any[], is72h: boolean): Problem[] => {
-    return problems.map(p => ({
-      id: p.id || `PROB-${Math.random().toString(36).substr(2, 9)}`,
-      title: p.title || "Problème inconnu",
-      code: p.id ? p.id.substring(0, 7) : "UNKNOWN",
-      subtitle: `${p.zone || 'Unknown'} - Impact: ${p.impact || 'MOYEN'}`,
-      time: is72h ? "Récent" : "Actif",
-      type: "Problème de Service",
-      status: "warning",
-      impact: "MOYEN",
-      zone: p.zone || "Non spécifié",
-      servicesImpacted: "0",
-      dt_url: "#",
-      duration: "",
-      resolved: false,
-      host: p.host || "",
-      impacted: p.host || "",
-      impactedEntities: p.impactedEntities,
-      rootCauseEntity: p.rootCauseEntity
-    }));
-  };
-
   // Retour au tableau de bord
   const handleBackClick = () => {
-    if (dataHasBeenLoadedRef.current) {
-      saveDataToSessionStorage(activeProblems, recentProblems);
-      sessionStorage.setItem('lastNavigation', Date.now().toString());
-    }
+    sessionStorage.setItem('lastActiveTab', activeTab);
+    sessionStorage.setItem('lastTimeframe', selectedTimeframe);
+    sessionStorage.setItem('lastNavigation', Date.now().toString());
     navigate('/');
   };
 
   // Gestion du changement de période
   const handleTimeframeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setSelectedTimeframe(e.target.value);
-    if (activeTab === 'recent') loadProblems();
+    const newTimeframe = e.target.value;
+    setSelectedTimeframe(newTimeframe);
+    if (activeTab === 'recent') {
+      handleRefresh();
+    }
   };
 
   // Gérer le changement d'onglet
   const handleTabChange = (tab: 'active' | 'recent') => {
     setActiveTab(tab);
+  };
+
+  // Fonction pour le rafraîchissement manuel
+  const handleRefresh = async () => {
+    if (isRefreshing) return;
+    
+    setIsRefreshing(true);
+    try {
+      await refreshData(true);
+    } catch (error) {
+      console.error('Erreur lors du rafraîchissement:', error);
+    } finally {
+      setTimeout(() => {
+        setIsRefreshing(false);
+      }, 500);
+    }
   };
 
   // Fonction pour exporter les problèmes en CSV
@@ -203,13 +111,24 @@ export const AllProblemsView: React.FC<AllProblemsViewProps> = ({ problemType = 
     downloadCSV(csv, filename);
   };
 
-  // Chargement initial des données
+  // Effet pour récupérer et enregistrer les préférences
   useEffect(() => {
-    loadProblems(false);
-    return () => {
-      requestInProgress.current = false;
-    };
-  }, []);
+    // Récupérer les préférences sauvegardées (onglet actif et période)
+    const lastTab = sessionStorage.getItem('lastActiveTab') as 'active' | 'recent' | null;
+    const lastTimeframe = sessionStorage.getItem('lastTimeframe');
+
+    if (lastTab) {
+      setActiveTab(lastTab);
+    }
+
+    if (lastTimeframe) {
+      setSelectedTimeframe(lastTimeframe);
+    }
+    
+    // Sauvegarder les préférences
+    sessionStorage.setItem('lastActiveTab', activeTab);
+    sessionStorage.setItem('lastTimeframe', selectedTimeframe);
+  }, [activeTab, selectedTimeframe]);
 
   // Classes CSS pour les onglets
   const getTabClasses = (tab: 'active' | 'recent') => {
@@ -234,7 +153,7 @@ export const AllProblemsView: React.FC<AllProblemsViewProps> = ({ problemType = 
         </button>
         
         <button 
-          onClick={() => loadProblems(false)}
+          onClick={handleRefresh}
           disabled={isRefreshing}
           className="flex items-center gap-2 px-4 py-2 rounded-md bg-indigo-600 text-white hover:bg-indigo-700 
             disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
@@ -279,7 +198,7 @@ export const AllProblemsView: React.FC<AllProblemsViewProps> = ({ problemType = 
           <div className="ml-auto flex flex-col items-end">
             <div className="flex items-center gap-2 text-sm text-slate-400">
               <Clock size={14} />
-              <span>Dernière actualisation: {lastRefreshTime.toLocaleTimeString()}</span>
+              <span>Dernière actualisation: {lastRefreshTime?.toLocaleTimeString() || 'Jamais'}</span>
             </div>
             <div className="flex items-center justify-center h-10 px-4 rounded-lg bg-slate-800 font-bold mt-2 text-white">
               {problemsToDisplay?.length || 0} problème{(problemsToDisplay?.length || 0) !== 1 ? 's' : ''}
@@ -343,7 +262,7 @@ export const AllProblemsView: React.FC<AllProblemsViewProps> = ({ problemType = 
       
       {/* Contenu de l'onglet actif */}
       <div className="mt-6">
-        {isRefreshing && problemsToDisplay.length === 0 && !dataHasBeenLoadedRef.current ? (
+      {isLoading && !initialLoadComplete ? (
           <div className="flex items-center justify-center h-64">
             <div className="w-12 h-12 border-t-4 border-b-4 border-blue-500 rounded-full animate-spin"></div>
             <span className="ml-3 text-slate-400">Chargement des problèmes...</span>
@@ -355,7 +274,7 @@ export const AllProblemsView: React.FC<AllProblemsViewProps> = ({ problemType = 
               ? "Tous les problèmes actifs (VFG + VFE)"
               : `Tous les problèmes des ${getTimeframeLabel(selectedTimeframe)} (VFG + VFE)`}
             showRefreshButton={true}
-            onRefresh={() => loadProblems(false)}
+            onRefresh={handleRefresh}
           />
         ) : (
           <div className="flex flex-col items-center justify-center h-64 text-center">
