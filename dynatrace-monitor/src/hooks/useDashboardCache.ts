@@ -135,6 +135,17 @@ export function useDashboardCache(dashboardType: 'vfg' | 'vfe' | 'unified') {
     };
   }, []);
 
+  // Fonction pour mettre à jour les Management Zones avec les problèmes actifs
+  const updateManagementZonesWithProblems = useCallback((problems: Problem[]) => {
+    // Cette fonction sera appelée via l'AppContext qui gère les Management Zones
+    // Elle est exposée pour permettre une synchronisation avec les données de problèmes
+    console.log(`Exposing ${problems.length} problems for management zone updates`);
+    
+    // Note: On ne peut pas mettre à jour les MZs directement ici car elles sont gérées par AppContext
+    // Cette fonction sera utilisée par les consommateurs du hook
+    return problems;
+  }, []);
+
   // Fonction pour rafraîchir les données depuis l'API
   const refreshData = useCallback(async (force: boolean = false) => {
     // Éviter les requêtes multiples simultanées
@@ -284,6 +295,7 @@ export function useDashboardCache(dashboardType: 'vfg' | 'vfe' | 'unified') {
     error,
     lastRefreshTime,
     refreshData,
+    updateManagementZonesWithProblems,
     initialLoadComplete: initialLoadCompletedRef.current
   };
 }

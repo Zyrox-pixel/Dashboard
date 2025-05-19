@@ -55,6 +55,7 @@ const UnifiedDashboard: React.FC = () => {
       isLoading, 
       error, 
       refreshData: refreshCachedData,
+      updateManagementZonesWithProblems,
       initialLoadComplete
     } = dashboardCache;
     
@@ -67,6 +68,45 @@ const UnifiedDashboard: React.FC = () => {
       }
     }, [dashboardProps.variant, initialLoadComplete, refreshCachedData]);
     
+    // Mettre à jour les zones de management avec les problèmes
+    useEffect(() => {
+      if (activeProblems.length > 0) {
+        // Utiliser les problèmes actifs pour mettre à jour les Management Zones
+        updateManagementZonesWithProblems(activeProblems);
+        
+        // Synchroniser manuellement les MZs avec les problèmes pour corriger l'affichage
+        // Mettre à jour le compteur de problèmes pour chaque zone
+        if (appContext.vitalForGroupMZs.length > 0 || appContext.vitalForEntrepriseMZs.length > 0) {
+          const updatedVfgMZs = appContext.vitalForGroupMZs.map(zone => {
+            const zoneProblems = activeProblems.filter(p => p.zone && p.zone.includes(zone.name));
+            return {
+              ...zone,
+              problemCount: zoneProblems.length,
+              status: (zoneProblems.length > 0 ? "warning" : "healthy") as "warning" | "healthy"
+            };
+          });
+          
+          const updatedVfeMZs = appContext.vitalForEntrepriseMZs.map(zone => {
+            const zoneProblems = activeProblems.filter(p => p.zone && p.zone.includes(zone.name));
+            return {
+              ...zone,
+              problemCount: zoneProblems.length,
+              status: (zoneProblems.length > 0 ? "warning" : "healthy") as "warning" | "healthy"
+            };
+          });
+          
+          // Force update de l'état global des MZs
+          if (appContext.vitalForGroupMZs !== updatedVfgMZs) {
+            appContext.vitalForGroupMZs = updatedVfgMZs;
+          }
+          
+          if (appContext.vitalForEntrepriseMZs !== updatedVfeMZs) {
+            appContext.vitalForEntrepriseMZs = updatedVfeMZs;
+          }
+        }
+      }
+    }, [activeProblems, updateManagementZonesWithProblems, appContext]);
+
     // Combiner les données du contexte et du cache
     const enhancedContext = {
       ...appContext,

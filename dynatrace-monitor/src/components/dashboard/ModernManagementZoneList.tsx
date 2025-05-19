@@ -76,8 +76,26 @@ const ModernManagementZoneList: React.FC<ModernManagementZoneListProps> = ({
     }
   }, [scrolling]);
   
-  // Filtrer et trier les zones
-  const filteredZones = zones
+  // Force la mise à jour de l'UI quand les données des zones changent (notamment les problèmes)
+  const [lastRefresh, setLastRefresh] = useState(Date.now());
+  
+  useEffect(() => {
+    // Ce useEffect force une mise à jour du composant quand les zones changent
+    // en particulier leurs propriétés problemCount et status
+    if (zones && zones.length > 0) {
+      // Vérifier si des zones ont des problèmes
+      const hasProblems = zones.some(zone => zone.problemCount > 0);
+      
+      // Si des zones ont des problèmes mais ne sont pas marquées visuellement, forcer un rafraîchissement
+      if (hasProblems) {
+        console.log(`Rafraîchissement de l'affichage des zones (${zones.length} zones, dont ${zones.filter(z => z.problemCount > 0).length} avec problèmes)`);
+        setLastRefresh(Date.now());
+      }
+    }
+  }, [zones]);
+  
+  // Filtrer et trier les zones - avec useMemo et lastRefresh pour forcer la réévaluation
+  const filteredZones = React.useMemo(() => zones
     .filter(zone => {
       // Filtre de recherche
       if (searchTerm && !zone.name.toLowerCase().includes(searchTerm.toLowerCase())) {
@@ -111,7 +129,7 @@ const ModernManagementZoneList: React.FC<ModernManagementZoneListProps> = ({
         default:
           return a.name.localeCompare(b.name);
       }
-    });
+    }), [zones, searchTerm, filters, lastRefresh]);
   
   // Définir les classes CSS pour le thème en fonction de la variante
   const themeColor = variant === 'vfg' ? 'indigo' : 'amber';
