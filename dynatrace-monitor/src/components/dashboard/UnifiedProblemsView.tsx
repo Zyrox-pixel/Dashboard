@@ -80,8 +80,27 @@ const UnifiedProblemsView: React.FC<UnifiedProblemsViewProps> = ({ title, varian
   const [selectedTimeframe, setSelectedTimeframe] = useState<string>("-72h"); // 72h par défaut
 
   // Gérer le changement d'onglet
-  const handleTabChange = (tab: 'active' | 'recent') => {
+  const handleTabChange = async (tab: 'active' | 'recent') => {
+    if (tab === activeTab) return; // Ne rien faire si on clique sur l'onglet déjà actif
+    
     setActiveTab(tab);
+    
+    // Si on passe à l'onglet "récent", s'assurer que les données sont à jour avec la période sélectionnée
+    if (tab === 'recent' && !isRefreshing) {
+      // Ajouter un petit délai pour laisser l'UI se mettre à jour avant de lancer le rafraîchissement
+      setTimeout(async () => {
+        try {
+          setIsRefreshing(true);
+          // Rafraîchir les données avec la période sélectionnée
+          console.log(`Changement vers onglet récent avec période ${selectedTimeframe}`);
+          await refreshCachedData(false, selectedTimeframe);
+        } catch (error) {
+          console.error('Erreur lors du rafraîchissement après changement d\'onglet:', error);
+        } finally {
+          setIsRefreshing(false);
+        }
+      }, 300);
+    }
   };
 
   // Fonction pour obtenir le libellé de la période sélectionnée
@@ -91,12 +110,34 @@ const UnifiedProblemsView: React.FC<UnifiedProblemsViewProps> = ({ title, varian
   };
 
   // Gestion du changement de période
-  const handleTimeframeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+  const handleTimeframeChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newTimeframe = e.target.value;
     setSelectedTimeframe(newTimeframe);
     
-    // Ne pas déclencher de rafraîchissement automatique lors du changement de période
-    // Cela sera fait manuellement par l'utilisateur via le bouton Rafraîchir
+    // Pour l'onglet "récent", rafraîchir automatiquement les données avec la nouvelle période
+    if (activeTab === 'recent') {
+      try {
+        setIsRefreshing(true);
+        // Rafraîchir les données avec un léger délai pour permettre à l'UI de se mettre à jour
+        setTimeout(async () => {
+          try {
+            // Utiliser notre système de cache intelligent pour le rafraîchissement
+            // En passant true pour forcer le rafraîchissement
+            await refreshCachedData(true);
+          } catch (error) {
+            console.error('Erreur lors du rafraîchissement:', error);
+          } finally {
+            // Désactiver l'indicateur de rafraîchissement après un court délai
+            setTimeout(() => {
+              setIsRefreshing(false);
+            }, 500);
+          }
+        }, 100);
+      } catch (error) {
+        console.error('Erreur lors du changement de période:', error);
+        setIsRefreshing(false);
+      }
+    }
   };
 
   // Fonction de rafraîchissement avec période spécifiée
@@ -106,7 +147,13 @@ const UnifiedProblemsView: React.FC<UnifiedProblemsViewProps> = ({ title, varian
     setIsRefreshing(true);
     try {
       // Utiliser le système de cache intelligente pour le rafraîchissement
-      await refreshCachedData(true);
+      // Passer la période actuelle si on est dans l'onglet "récent"
+      if (activeTab === 'recent') {
+        console.log(`Rafraîchissement forcé avec période ${selectedTimeframe}`);
+        await refreshCachedData(true, selectedTimeframe);
+      } else {
+        await refreshCachedData(true);
+      }
     } catch (error) {
       console.error('Erreur lors du rafraîchissement:', error);
     } finally {
@@ -116,7 +163,7 @@ const UnifiedProblemsView: React.FC<UnifiedProblemsViewProps> = ({ title, varian
     }
   };
 
-  // Effet pour enregistrer l'onglet et la période sélectionnés
+  // Effet pour récupérer les préférences sauvegardées (exécuté une seule fois au montage)
   useEffect(() => {
     // Récupérer les préférences sauvegardées (onglet actif et période)
     const lastTab = sessionStorage.getItem('lastActiveTab') as 'active' | 'recent' | null;
@@ -129,10 +176,22 @@ const UnifiedProblemsView: React.FC<UnifiedProblemsViewProps> = ({ title, varian
     if (lastTimeframe) {
       setSelectedTimeframe(lastTimeframe);
     }
-
-    // Sauvegarder les préférences
-    sessionStorage.setItem('lastActiveTab', activeTab);
-    sessionStorage.setItem('lastTimeframe', selectedTimeframe);
+  }, []); // Dépendance vide = exécution uniquement au montage
+  
+  // Effet séparé pour sauvegarder les préférences
+  useEffect(() => {
+    // Utiliser un debounce pour éviter les sauvegardes trop fréquentes
+    const savePreferences = () => {
+      sessionStorage.setItem('lastActiveTab', activeTab);
+      sessionStorage.setItem('lastTimeframe', selectedTimeframe);
+    };
+    
+    // Utiliser un timer pour éviter les sauvegardes trop fréquentes
+    const timerId = setTimeout(savePreferences, 300);
+    
+    return () => {
+      clearTimeout(timerId);
+    };
   }, [activeTab, selectedTimeframe]);
 
   // Retour au tableau de bord

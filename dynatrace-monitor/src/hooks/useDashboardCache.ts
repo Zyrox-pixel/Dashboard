@@ -163,7 +163,7 @@ export function useDashboardCache(dashboardType: 'vfg' | 'vfe' | 'unified') {
 
 
   // Fonction pour rafraîchir les données depuis l'API
-  const refreshData = useCallback(async (force: boolean = false) => {
+  const refreshData = useCallback(async (force: boolean = false, customTimeframe?: string) => {
     // Éviter les requêtes multiples simultanées
     if (pendingRequestRef.current && !force) {
       return;
@@ -174,19 +174,22 @@ export function useDashboardCache(dashboardType: 'vfg' | 'vfe' | 'unified') {
     setError(null);
 
     try {
-      console.log(`Rafraîchissement des données ${dashboardType}${force ? ' (forcé)' : ''}`);
+      console.log(`Rafraîchissement des données ${dashboardType}${force ? ' (forcé)' : ''}${customTimeframe ? ` avec période ${customTimeframe}` : ''}`);
       
       // Récupération différente des données selon le type de dashboard
       let activeProblemsData: ProblemResponse[] = [];
       let problems72hData: ProblemResponse[] = [];
+      
+      // Récupérer la timeframe depuis le sessionStorage si aucune n'est fournie
+      const timeframe = customTimeframe || sessionStorage.getItem('lastTimeframe') || "-72h";
       
       if (dashboardType === 'unified') {
         // Pour l'onglet unifié (VFG + VFE), combiner les résultats des deux tableaux de bord
         const [vfgActiveResponse, vfeActiveResponse, vfgRecent, vfeRecent] = await Promise.all([
           api.getProblems("OPEN", "-60d", "vfg", force),
           api.getProblems("OPEN", "-60d", "vfe", force),
-          api.getProblems72h("vfg", undefined, force),
-          api.getProblems72h("vfe", undefined, force)
+          api.getProblems72h("vfg", undefined, force, timeframe),
+          api.getProblems72h("vfe", undefined, force, timeframe)
         ]);
         
         // Combiner et dédupliquer les problèmes actifs
@@ -202,7 +205,7 @@ export function useDashboardCache(dashboardType: 'vfg' | 'vfe' | 'unified') {
           return true;
         });
         
-        // Combiner et dédupliquer les problèmes 72h
+        // Combiner et dédupliquer les problèmes avec la période spécifiée
         const vfgRecentData = vfgRecent.error ? [] : (vfgRecent.data || []);
         const vfeRecentData = vfeRecent.error ? [] : (vfeRecent.data || []);
         const combinedRecentProblems = [...vfgRecentData, ...vfeRecentData];
@@ -220,11 +223,13 @@ export function useDashboardCache(dashboardType: 'vfg' | 'vfe' | 'unified') {
       } else {
         // Pour les tableaux de bord spécifiques (VFG ou VFE)
         const activeProblemsResponse = await api.getProblems("OPEN", "-60d", dashboardType, force);
-        const problems72hResponse = await api.getProblems72h(dashboardType, undefined, force);
+        const problems72hResponse = await api.getProblems72h(dashboardType, undefined, force, timeframe);
         
         // Extraire les données
         activeProblemsData = activeProblemsResponse.error ? [] : (activeProblemsResponse.data || []);
         problems72hData = problems72hResponse.error ? [] : (problems72hResponse.data || []);
+        
+        console.log(`Problèmes ${dashboardType}: actifs=${activeProblemsData.length}, récents(${timeframe})=${problems72hData.length}`);
       }
       
       // Transformer et mettre à jour les problèmes actifs
