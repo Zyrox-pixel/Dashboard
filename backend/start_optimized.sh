@@ -17,7 +17,6 @@ fi
 
 # Installer ou mettre à jour les dépendances
 echo "Installation/mise à jour des dépendances..."
-pip install -r requirements.txt
 
 # Vérifier la présence du fichier .env
 if [ ! -f ".env" ]; then
