@@ -75,18 +75,18 @@ const HostsPage: React.FC = () => {
         {/* En-tête avec titre et statistiques */}
         <div className="flex justify-between items-center mb-6">
           <div>
-            <h1 className="text-2xl font-bold mb-1">Hosts</h1>
-            <p className="text-sm text-slate-500">
-              Management Zone: <span className="font-medium text-blue-600">{mzAdmin || 'Non configurée'}</span>
-              {mzAdmin && <> • {totalHosts} machines</>}
+            <h1 className="text-2xl font-bold mb-1 text-slate-800 dark:text-white">Hosts</h1>
+            <p className="text-sm text-slate-600 dark:text-slate-300">
+              Management Zone: <span className="font-medium text-blue-700 dark:text-blue-400">{mzAdmin || 'Non configurée'}</span>
+              {mzAdmin && <> • <span className="font-semibold text-slate-700 dark:text-slate-200">{totalHosts}</span> machines</>}
             </p>
-            <p className="text-xs text-slate-400 mt-1">
-              Configuré via la variable mzadmin dans le fichier .of du backend
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+              Configuré via la variable MZ_ADMIN dans le fichier .env du backend
             </p>
           </div>
 
           <div className="flex items-center gap-4">
-            <div className="text-sm text-slate-500">
+            <div className="text-sm text-slate-600 dark:text-slate-300">
               Dernier rafraîchissement: <span className="font-medium">{formattedLastRefreshTime}</span>
             </div>
             <button 
@@ -94,8 +94,8 @@ const HostsPage: React.FC = () => {
               disabled={isLoading}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200
                 ${isLoading 
-                  ? 'bg-slate-200 text-slate-500 cursor-not-allowed' 
-                  : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                  ? 'bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400 cursor-not-allowed' 
+                  : 'bg-blue-100 dark:bg-blue-800/40 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-700/50'
                 }`}
             >
               <RefreshCw size={16} className={`${isLoading ? 'animate-spin' : ''}`} />
@@ -108,25 +108,25 @@ const HostsPage: React.FC = () => {
         <div className="flex justify-between items-center mb-5">
           <div className="relative w-96">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search size={16} className="text-slate-400" />
+              <Search size={16} className="text-slate-400 dark:text-slate-500" />
             </div>
             <input
               type="text"
               placeholder="Rechercher par nom ou système..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-300 focus:border-blue-500 focus:outline-none"
+              className="w-full pl-10 pr-4 py-2 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-800 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-blue-500 focus:outline-none"
             />
           </div>
 
           <div className="flex items-center gap-4">
             <div className="flex items-center">
-              <label htmlFor="itemsPerPage" className="mr-2 text-sm text-slate-500">Afficher:</label>
+              <label htmlFor="itemsPerPage" className="mr-2 text-sm text-slate-600 dark:text-slate-300">Afficher:</label>
               <select
                 id="itemsPerPage"
                 value={itemsPerPage}
                 onChange={(e) => setItemsPerPage(Number(e.target.value))}
-                className="border border-slate-300 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-blue-300 focus:border-blue-500 focus:outline-none"
+                className="border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-800 dark:text-white rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-blue-400 focus:border-blue-500 focus:outline-none"
               >
                 <option value={20}>20</option>
                 <option value={50}>50</option>
@@ -139,140 +139,140 @@ const HostsPage: React.FC = () => {
 
         {/* Affichage des résultats ou messages */}
         {error ? (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-            <div className="flex items-center gap-2 text-red-800">
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900/30 rounded-lg p-4 mb-6">
+            <div className="flex items-center gap-2 text-red-800 dark:text-red-400">
               <AlertCircle size={18} />
               <span className="font-medium">Erreur:</span> {error}
             </div>
           </div>
         ) : !mzAdmin ? (
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
-            <div className="flex items-center gap-2 text-amber-800">
+          <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-900/30 rounded-lg p-4 mb-6">
+            <div className="flex items-center gap-2 text-amber-800 dark:text-amber-400">
               <AlertCircle size={18} />
               <span className="font-medium">Configuration requise:</span> 
-              Veuillez configurer la variable mzadmin dans le fichier .of du backend
+              Veuillez configurer la variable MZ_ADMIN dans le fichier .env du backend
             </div>
           </div>
         ) : (
           <>
             {/* Tableau des hosts */}
-            <div className="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm mb-5">
-              <table className="min-w-full divide-y divide-slate-200">
-                <thead className="bg-slate-50">
+            <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden shadow-sm mb-5">
+              <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
+                <thead className="bg-slate-50 dark:bg-slate-700">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-300 uppercase tracking-wider">
                       Host
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-300 uppercase tracking-wider">
                       OS
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-300 uppercase tracking-wider">
                       CPU
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-300 uppercase tracking-wider">
                       RAM
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-300 uppercase tracking-wider">
                       Actions
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-slate-200">
+                <tbody className="bg-white dark:bg-slate-800 divide-y divide-slate-200 dark:divide-slate-700">
                   {isLoading && paginatedHosts.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="px-6 py-16 text-center text-slate-500">
+                      <td colSpan={5} className="px-6 py-16 text-center text-slate-600 dark:text-slate-300">
                         <div className="flex flex-col items-center">
-                          <div className="animate-spin w-10 h-10 border-4 border-slate-300 border-t-blue-500 rounded-full mb-3"></div>
+                          <div className="animate-spin w-10 h-10 border-4 border-slate-300 dark:border-slate-600 border-t-blue-500 dark:border-t-blue-400 rounded-full mb-3"></div>
                           <p>Chargement des données...</p>
                         </div>
                       </td>
                     </tr>
                   ) : paginatedHosts.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="px-6 py-16 text-center text-slate-500">
+                      <td colSpan={5} className="px-6 py-16 text-center text-slate-600 dark:text-slate-300">
                         <div className="flex flex-col items-center">
-                          <Server size={40} className="text-slate-300 mb-3" />
+                          <Server size={40} className="text-slate-400 dark:text-slate-500 mb-3" />
                           <p>Aucun host trouvé</p>
-                          {searchTerm && <p className="text-sm mt-1">Essayez de modifier votre recherche</p>}
+                          {searchTerm && <p className="text-sm mt-1 text-slate-500 dark:text-slate-400">Essayez de modifier votre recherche</p>}
                         </div>
                       </td>
                     </tr>
                   ) : (
                     paginatedHosts.map((host: Host) => (
-                      <tr key={host.id} className="hover:bg-slate-50">
+                      <tr key={host.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center">
-                            <div className="flex-shrink-0 h-8 w-8 flex items-center justify-center rounded-md bg-blue-100 text-blue-800">
+                            <div className="flex-shrink-0 h-8 w-8 flex items-center justify-center rounded-md bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300">
                               <Server size={16} />
                             </div>
                             <div className="ml-3">
-                              <div className="text-sm font-medium text-slate-900">{host.name}</div>
-                              <div className="text-xs text-slate-500">{host.id.substring(0, 10)}...</div>
+                              <div className="text-sm font-medium text-slate-900 dark:text-white">{host.name}</div>
+                              <div className="text-xs text-slate-500 dark:text-slate-400">{host.id.substring(0, 10)}...</div>
                             </div>
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center">
                             {host.os_version.toLowerCase().includes('windows') ? (
-                              <div className="flex-shrink-0 h-5 w-5 flex items-center justify-center rounded-md bg-blue-100 text-blue-800 mr-2">
+                              <div className="flex-shrink-0 h-5 w-5 flex items-center justify-center rounded-md bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300 mr-2">
                                 <span className="text-xs">W</span>
                               </div>
                             ) : host.os_version.toLowerCase().includes('linux') ? (
-                              <div className="flex-shrink-0 h-5 w-5 flex items-center justify-center rounded-md bg-green-100 text-green-800 mr-2">
+                              <div className="flex-shrink-0 h-5 w-5 flex items-center justify-center rounded-md bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300 mr-2">
                                 <span className="text-xs">L</span>
                               </div>
                             ) : (
-                              <div className="flex-shrink-0 h-5 w-5 flex items-center justify-center rounded-md bg-slate-100 text-slate-800 mr-2">
+                              <div className="flex-shrink-0 h-5 w-5 flex items-center justify-center rounded-md bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-slate-300 mr-2">
                                 <span className="text-xs">O</span>
                               </div>
                             )}
-                            <span className="text-sm text-slate-600">{host.os_version}</span>
+                            <span className="text-sm text-slate-700 dark:text-slate-300">{host.os_version}</span>
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           {host.cpu !== null ? (
                             <div className="flex items-center">
-                              <div className="w-20 bg-slate-200 rounded-full h-2.5">
+                              <div className="w-20 bg-slate-200 dark:bg-slate-700 rounded-full h-2.5">
                                 <div 
                                   className={`h-2.5 rounded-full ${
-                                    host.cpu > 80 ? 'bg-red-500' : 
-                                    host.cpu > 50 ? 'bg-amber-500' : 
-                                    'bg-green-500'
+                                    host.cpu > 80 ? 'bg-red-500 dark:bg-red-600' : 
+                                    host.cpu > 50 ? 'bg-amber-500 dark:bg-amber-600' : 
+                                    'bg-green-500 dark:bg-green-600'
                                   }`}
                                   style={{ width: `${host.cpu}%` }}
                                 ></div>
                               </div>
-                              <span className="ml-2 text-sm text-slate-600">{host.cpu}%</span>
+                              <span className="ml-2 text-sm font-medium text-slate-700 dark:text-slate-300">{host.cpu}%</span>
                             </div>
                           ) : (
-                            <span className="text-sm text-slate-400">Non disponible</span>
+                            <span className="text-sm text-slate-500 dark:text-slate-400">Non disponible</span>
                           )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           {host.ram !== null ? (
                             <div className="flex items-center">
-                              <div className="w-20 bg-slate-200 rounded-full h-2.5">
+                              <div className="w-20 bg-slate-200 dark:bg-slate-700 rounded-full h-2.5">
                                 <div 
                                   className={`h-2.5 rounded-full ${
-                                    host.ram > 80 ? 'bg-red-500' : 
-                                    host.ram > 50 ? 'bg-amber-500' : 
-                                    'bg-green-500'
+                                    host.ram > 80 ? 'bg-red-500 dark:bg-red-600' : 
+                                    host.ram > 50 ? 'bg-amber-500 dark:bg-amber-600' : 
+                                    'bg-green-500 dark:bg-green-600'
                                   }`}
                                   style={{ width: `${host.ram}%` }}
                                 ></div>
                               </div>
-                              <span className="ml-2 text-sm text-slate-600">{host.ram}%</span>
+                              <span className="ml-2 text-sm font-medium text-slate-700 dark:text-slate-300">{host.ram}%</span>
                             </div>
                           ) : (
-                            <span className="text-sm text-slate-400">Non disponible</span>
+                            <span className="text-sm text-slate-500 dark:text-slate-400">Non disponible</span>
                           )}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400">
                           <a 
                             href={host.dt_url} 
                             target="_blank" 
                             rel="noopener noreferrer"
-                            className="text-blue-600 hover:text-blue-800 transition-colors duration-200"
+                            className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors duration-200"
                           >
                             Voir dans Dynatrace
                           </a>
@@ -287,21 +287,21 @@ const HostsPage: React.FC = () => {
             {/* Pagination */}
             {totalPages > 1 && (
               <div className="flex items-center justify-between">
-                <div className="text-sm text-slate-500">
+                <div className="text-sm text-slate-600 dark:text-slate-300">
                   Affichage de {filteredHosts.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0} à {Math.min(currentPage * itemsPerPage, filteredHosts.length)} sur {filteredHosts.length} hosts
                 </div>
                 <div className="flex items-center space-x-2">
                   <button
                     onClick={() => handlePageChange(1)}
                     disabled={currentPage === 1}
-                    className="px-2 py-1 rounded-md border border-slate-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-100"
+                    className="px-2 py-1 rounded-md border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-700"
                   >
                     &laquo;
                   </button>
                   <button
                     onClick={() => handlePageChange(currentPage - 1)}
                     disabled={currentPage === 1}
-                    className="px-2 py-1 rounded-md border border-slate-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-100"
+                    className="px-2 py-1 rounded-md border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-700"
                   >
                     &lsaquo;
                   </button>
@@ -315,8 +315,8 @@ const HostsPage: React.FC = () => {
                         onClick={() => handlePageChange(i + 1)}
                         className={`px-3 py-1 rounded-md ${
                           currentPage === i + 1
-                            ? 'bg-blue-100 text-blue-700 border border-blue-300'
-                            : 'border border-slate-300 hover:bg-slate-100'
+                            ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border border-blue-300 dark:border-blue-700'
+                            : 'border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
                         }`}
                       >
                         {i + 1}
@@ -330,8 +330,8 @@ const HostsPage: React.FC = () => {
                         onClick={() => handlePageChange(1)}
                         className={`px-3 py-1 rounded-md ${
                           currentPage === 1
-                            ? 'bg-blue-100 text-blue-700 border border-blue-300'
-                            : 'border border-slate-300 hover:bg-slate-100'
+                            ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border border-blue-300 dark:border-blue-700'
+                            : 'border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
                         }`}
                       >
                         1
@@ -355,8 +355,8 @@ const HostsPage: React.FC = () => {
                               onClick={() => handlePageChange(pageNum)}
                               className={`px-3 py-1 rounded-md ${
                                 currentPage === pageNum
-                                  ? 'bg-blue-100 text-blue-700 border border-blue-300'
-                                  : 'border border-slate-300 hover:bg-slate-100'
+                                  ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border border-blue-300 dark:border-blue-700'
+                                  : 'border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
                               }`}
                             >
                               {pageNum}
@@ -375,8 +375,8 @@ const HostsPage: React.FC = () => {
                         onClick={() => handlePageChange(totalPages)}
                         className={`px-3 py-1 rounded-md ${
                           currentPage === totalPages
-                            ? 'bg-blue-100 text-blue-700 border border-blue-300'
-                            : 'border border-slate-300 hover:bg-slate-100'
+                            ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border border-blue-300 dark:border-blue-700'
+                            : 'border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
                         }`}
                       >
                         {totalPages}
@@ -387,14 +387,14 @@ const HostsPage: React.FC = () => {
                   <button
                     onClick={() => handlePageChange(currentPage + 1)}
                     disabled={currentPage === totalPages}
-                    className="px-2 py-1 rounded-md border border-slate-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-100"
+                    className="px-2 py-1 rounded-md border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-700"
                   >
                     &rsaquo;
                   </button>
                   <button
                     onClick={() => handlePageChange(totalPages)}
                     disabled={currentPage === totalPages}
-                    className="px-2 py-1 rounded-md border border-slate-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-100"
+                    className="px-2 py-1 rounded-md border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-700"
                   >
                     &raquo;
                   </button>

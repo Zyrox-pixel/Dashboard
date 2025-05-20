@@ -25,36 +25,74 @@ export function useHostsData() {
   // Référence pour les requêtes en cours
   const pendingRequestRef = useRef<boolean>(false);
 
-  // Fonction pour lire la configuration mzadmin depuis le backend
+  // Fonction pour lire la configuration mzadmin depuis le backend avec réessais
   const fetchMzAdminConfig = useCallback(async () => {
     try {
       setIsLoading(true);
-      const response = await api.getMzAdmin();
-      if (response.error) {
-        console.error('Erreur lors de la récupération de la config mzadmin:', response.error);
-        setError(`Erreur de configuration: ${response.error}`);
-        return '';
+      
+      // Vérifier d'abord si nous avons déjà la valeur en mémoire
+      if (mzAdmin) {
+        console.log(`Réutilisation de la MZ Admin déjà en mémoire: ${mzAdmin}`);
+        setConfigLoaded(true);
+        return mzAdmin;
       }
       
-      const mzAdminValue = response.data?.mzadmin || '';
-      if (!mzAdminValue) {
-        setError('Aucune Management Zone admin configurée dans le backend.');
+      // Sinon, essayer de récupérer depuis le backend avec réessais
+      let attempts = 0;
+      const maxAttempts = 3;
+      let lastError = null;
+      
+      while (attempts < maxAttempts) {
+        try {
+          attempts++;
+          const response = await api.getMzAdmin();
+          if (response.error) {
+            lastError = response.error;
+            console.warn(`Tentative ${attempts}/${maxAttempts} échouée: ${response.error}`);
+          } else {
+            const mzAdminValue = response.data?.mzadmin || '';
+            if (!mzAdminValue) {
+              lastError = 'Aucune Management Zone admin configurée dans le backend.';
+              console.warn(`Tentative ${attempts}/${maxAttempts}: MZ admin vide reçue`);
+            } else {
+              console.log(`MZ Admin récupérée depuis le backend: ${mzAdminValue}`);
+              setMzAdmin(mzAdminValue);
+              setConfigLoaded(true);
+              return mzAdminValue;
+            }
+          }
+          
+          // Pause avant la prochaine tentative
+          if (attempts < maxAttempts) {
+            await new Promise(resolve => setTimeout(resolve, 1000 * attempts));
+          }
+        } catch (attemptError) {
+          lastError = attemptError;
+          console.warn(`Tentative ${attempts}/${maxAttempts} échouée avec erreur:`, attemptError);
+          if (attempts < maxAttempts) {
+            await new Promise(resolve => setTimeout(resolve, 1000 * attempts));
+          }
+        }
+      }
+      
+      // Toutes les tentatives ont échoué
+      console.error('Erreur après plusieurs tentatives:', lastError);
+      if (typeof lastError === 'string') {
+        setError(lastError);
       } else {
-        console.log(`MZ Admin récupérée depuis le backend: ${mzAdminValue}`);
-        setMzAdmin(mzAdminValue);
+        setError('Erreur de communication avec le backend.');
       }
-      
       setConfigLoaded(true);
-      return mzAdminValue;
+      return '';
     } catch (error) {
-      console.error('Erreur lors de la récupération de la config MZ admin:', error);
+      console.error('Erreur globale lors de la récupération de la config MZ admin:', error);
       setError('Erreur de communication avec le backend.');
       setConfigLoaded(true);
       return '';
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [mzAdmin]);
 
   // Fonction pour sauvegarder les données dans le cache persistant
   const saveToCache = useCallback((hostsData: Host[]) => {
@@ -169,7 +207,19 @@ export function useHostsData() {
       }
     };
     
-    loadData();
+    // Exécuter loadData et l'enregistrer pour le nettoyage
+    let mounted = true;
+    loadData().catch(err => {
+      if (mounted) {
+        console.error('Erreur lors du chargement des données:', err);
+        setError('Erreur lors du chargement des données');
+      }
+    });
+    
+    // Nettoyage lors du démontage
+    return () => {
+      mounted = false;
+    };
   }, [fetchMzAdminConfig, loadFromCache, refreshData]);
 
   // Retourner les données et fonctions nécessaires
