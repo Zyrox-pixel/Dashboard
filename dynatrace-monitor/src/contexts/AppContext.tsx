@@ -20,6 +20,8 @@ export interface AppStateType {
   problemsLast72h: Problem[]; 
   vitalForGroupMZs: ManagementZone[];
   vitalForEntrepriseMZs: ManagementZone[];
+  vitalForProductionMZs: ManagementZone[];
+  vitalForAnalyticsMZs: ManagementZone[];
   detectionCtlMZs: ManagementZone[];
   securityEncryptionMZs: ManagementZone[];
   selectedZone: string | null;
@@ -34,6 +36,8 @@ export interface AppStateType {
     zoneDetails: boolean;
     vitalForGroupMZs: boolean;
     vitalForEntrepriseMZs: boolean;
+    vitalForProductionMZs: boolean;
+    vitalForAnalyticsMZs: boolean;
     detectionCtlMZs: boolean;
     securityEncryptionMZs: boolean;
     initialLoadComplete: boolean;
@@ -121,6 +125,8 @@ const initialAppState: AppStateType = {
   problemsLast72h: [],
   vitalForGroupMZs: [],
   vitalForEntrepriseMZs: [],
+  vitalForProductionMZs: [],
+  vitalForAnalyticsMZs: [],
   detectionCtlMZs: [],
   securityEncryptionMZs: [],
   selectedZone: null,
@@ -135,6 +141,8 @@ const initialAppState: AppStateType = {
     zoneDetails: false,
     vitalForGroupMZs: true,
     vitalForEntrepriseMZs: true,
+    vitalForProductionMZs: true,
+    vitalForAnalyticsMZs: true,
     detectionCtlMZs: true,
     securityEncryptionMZs: true,
     initialLoadComplete: false
@@ -471,6 +479,8 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
       let summaryResponse: ApiResponse<SummaryData> | undefined;
       let vfgResponse: ApiResponse<VitalForGroupMZsResponse> | undefined;
       let vfeResponse: ApiResponse<VitalForGroupMZsResponse> | undefined;
+      let vfpResponse: ApiResponse<VitalForGroupMZsResponse> | undefined;
+      let vfaResponse: ApiResponse<VitalForGroupMZsResponse> | undefined;
       let detectionResponse: ApiResponse<VitalForGroupMZsResponse> | undefined;
       let securityResponse: ApiResponse<VitalForGroupMZsResponse> | undefined;
       let problemsResponse: ApiResponse<ProblemResponse[]> | undefined;
@@ -491,6 +501,8 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
           apiClient.getSummary(),
           apiClient.getVitalForGroupMZs(),
           apiClient.getVitalForEntrepriseMZs(),
+          apiClient.getVitalForProductionMZs(),
+          apiClient.getVitalForAnalyticsMZs(),
           apiClient.getDetectionCtlMZs(),
           apiClient.getSecurityEncryptionMZs(),
           apiClient.getProblems("OPEN", "-60d", dashboardType, true),  // Force le rafraîchissement pour les problèmes actifs sur 60 jours
@@ -499,10 +511,12 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
         summaryResponse = responses[0] as ApiResponse<SummaryData>;
         vfgResponse = responses[1] as ApiResponse<VitalForGroupMZsResponse>;
         vfeResponse = responses[2] as ApiResponse<VitalForGroupMZsResponse>;
-        detectionResponse = responses[3] as ApiResponse<VitalForGroupMZsResponse>;
-        securityResponse = responses[4] as ApiResponse<VitalForGroupMZsResponse>;
-        problemsResponse = responses[5] as ApiResponse<ProblemResponse[]>;
-        problemsLast72hResponse = responses[6] as ApiResponse<ProblemResponse[]>;
+        vfpResponse = responses[3] as ApiResponse<VitalForGroupMZsResponse>;
+        vfaResponse = responses[4] as ApiResponse<VitalForGroupMZsResponse>;
+        detectionResponse = responses[5] as ApiResponse<VitalForGroupMZsResponse>;
+        securityResponse = responses[6] as ApiResponse<VitalForGroupMZsResponse>;
+        problemsResponse = responses[7] as ApiResponse<ProblemResponse[]>;
+        problemsLast72hResponse = responses[8] as ApiResponse<ProblemResponse[]>;
       }
 
       // Traiter les données du résumé si disponibles et si ce n'est pas un rafraîchissement des problèmes uniquement
@@ -511,9 +525,11 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
         setState(prev => ({ ...prev, summaryData: data as SummaryData }));
       }
       
-      // Traiter les données des MZs VFG, VFE, Detection & CTL, et Security & Encryption si ce n'est pas un rafraîchissement des problèmes uniquement
+      // Traiter les données des MZs VFG, VFE, VFP, VFA, Detection & CTL, et Security & Encryption si ce n'est pas un rafraîchissement des problèmes uniquement
       let vfgMZs: ManagementZone[] = [];
       let vfeMZs: ManagementZone[] = [];
+      let vfpMZs: ManagementZone[] = [];
+      let vfaMZs: ManagementZone[] = [];
       let detectionMZs: ManagementZone[] = [];
       let securityMZs: ManagementZone[] = [];
       
@@ -630,6 +646,120 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
           setState(prev => ({ ...prev, vitalForEntrepriseMZs: vfeMZs }));
         }
         
+        // Traitement des données de Vital for Production
+        if (vfpResponse && !vfpResponse.error && vfpResponse.data?.mzs) {
+          // Obtenir les comptages pour chaque zone en parallèle
+          const mzPromises = vfpResponse.data.mzs.map(async (mzName) => {
+            try {
+              
+              // Récupérer les comptages depuis l'API
+              const response = await fetch(`${API_BASE_URL}/management-zones/counts?zone=${encodeURIComponent(mzName)}`);
+              
+              if (response.ok) {
+                const data = await response.json();
+                const counts = data.counts || { hosts: 0, services: 0, processes: 0 };
+                
+                return {
+                  id: `env-${mzName.replace(/\s+/g, '-')}`,
+                  name: mzName,
+                  code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
+                  icon: getZoneIcon(mzName),
+                  problemCount: 0,
+                  apps: counts.processes,
+                  services: counts.services,
+                  hosts: counts.hosts,
+                  availability: "99.99%", // Pour l'instant, valeur par défaut
+                  status: "healthy" as "healthy" | "warning",
+                  color: getZoneColor(mzName),
+                  dt_url: "#"
+                };
+              } else {
+                // API error handled in catch block
+                throw new Error(`Erreur API ${response.status}`);
+              }
+            } catch (error) {
+              // Error for MZ handled with fallback object
+              // En cas d'erreur, retourner un objet avec des comptages à 0
+              return {
+                id: `env-${mzName.replace(/\s+/g, '-')}`,
+                name: mzName,
+                code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
+                icon: getZoneIcon(mzName),
+                problemCount: 0,
+                apps: 0,
+                services: 0,
+                hosts: 0,
+                availability: "99.99%",
+                status: "healthy" as "healthy" | "warning",
+                color: getZoneColor(mzName),
+                dt_url: "#"
+              };
+            }
+          });
+          
+          // Attendre la résolution de toutes les promesses
+          vfpMZs = await Promise.all(mzPromises);
+          
+          setState(prev => ({ ...prev, vitalForProductionMZs: vfpMZs }));
+        }
+        
+        // Traitement des données de Vital for Analytics
+        if (vfaResponse && !vfaResponse.error && vfaResponse.data?.mzs) {
+          // Obtenir les comptages pour chaque zone en parallèle
+          const mzPromises = vfaResponse.data.mzs.map(async (mzName) => {
+            try {
+              
+              // Récupérer les comptages depuis l'API
+              const response = await fetch(`${API_BASE_URL}/management-zones/counts?zone=${encodeURIComponent(mzName)}`);
+              
+              if (response.ok) {
+                const data = await response.json();
+                const counts = data.counts || { hosts: 0, services: 0, processes: 0 };
+                
+                return {
+                  id: `env-${mzName.replace(/\s+/g, '-')}`,
+                  name: mzName,
+                  code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
+                  icon: getZoneIcon(mzName),
+                  problemCount: 0,
+                  apps: counts.processes,
+                  services: counts.services,
+                  hosts: counts.hosts,
+                  availability: "99.99%", // Pour l'instant, valeur par défaut
+                  status: "healthy" as "healthy" | "warning",
+                  color: getZoneColor(mzName),
+                  dt_url: "#"
+                };
+              } else {
+                // API error handled in catch block
+                throw new Error(`Erreur API ${response.status}`);
+              }
+            } catch (error) {
+              // Error for MZ handled with fallback object
+              // En cas d'erreur, retourner un objet avec des comptages à 0
+              return {
+                id: `env-${mzName.replace(/\s+/g, '-')}`,
+                name: mzName,
+                code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
+                icon: getZoneIcon(mzName),
+                problemCount: 0,
+                apps: 0,
+                services: 0,
+                hosts: 0,
+                availability: "99.99%",
+                status: "healthy" as "healthy" | "warning",
+                color: getZoneColor(mzName),
+                dt_url: "#"
+              };
+            }
+          });
+          
+          // Attendre la résolution de toutes les promesses
+          vfaMZs = await Promise.all(mzPromises);
+          
+          setState(prev => ({ ...prev, vitalForAnalyticsMZs: vfaMZs }));
+        }
+        
         // Traitement des données de Detection & CTL
         if (detectionResponse && !detectionResponse.error && detectionResponse.data?.mzs) {
           // Obtenir les comptages pour chaque zone en parallèle
@@ -741,6 +871,8 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
         // En cas de rafraîchissement des problèmes uniquement, réutiliser les MZs existantes
         vfgMZs = state.vitalForGroupMZs;
         vfeMZs = state.vitalForEntrepriseMZs;
+        vfpMZs = state.vitalForProductionMZs;
+        vfaMZs = state.vitalForAnalyticsMZs;
         detectionMZs = state.detectionCtlMZs;
         securityMZs = state.securityEncryptionMZs;
       }
@@ -841,10 +973,31 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
       };
     });
     
+    // Mettre à jour les compteurs de problèmes pour les MZs VFP et VFA
+    const updatedVfpMZs = vfpMZs.map(zone => {
+      const zoneProblems = problems.filter(p => p.zone && p.zone.includes(zone.name));
+      return {
+        ...zone,
+        problemCount: zoneProblems.length,
+        status: (zoneProblems.length > 0 ? "warning" : "healthy") as "warning" | "healthy"
+      };
+    });
+    
+    const updatedVfaMZs = vfaMZs.map(zone => {
+      const zoneProblems = problems.filter(p => p.zone && p.zone.includes(zone.name));
+      return {
+        ...zone,
+        problemCount: zoneProblems.length,
+        status: (zoneProblems.length > 0 ? "warning" : "healthy") as "warning" | "healthy"
+      };
+    });
+    
     setState(prev => ({
       ...prev,
       vitalForGroupMZs: updatedVfgMZs,
       vitalForEntrepriseMZs: updatedVfeMZs,
+      vitalForProductionMZs: updatedVfpMZs,
+      vitalForAnalyticsMZs: updatedVfaMZs,
       detectionCtlMZs: updatedDetectionMZs,
       securityEncryptionMZs: updatedSecurityMZs
     }));
@@ -956,7 +1109,22 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
         }));
       }
     }
-  }, [state.selectedZone, state.vitalForGroupMZs, state.vitalForEntrepriseMZs, state.detectionCtlMZs, state.securityEncryptionMZs, loadZoneData, apiClient, optimized, getZoneIcon, getZoneColor]);
+  }, [
+    state.selectedZone, 
+    state.vitalForGroupMZs, 
+    state.vitalForEntrepriseMZs, 
+    state.vitalForProductionMZs, 
+    state.vitalForAnalyticsMZs, 
+    state.detectionCtlMZs, 
+    state.securityEncryptionMZs, 
+    loadZoneData, 
+    apiClient, 
+    optimized, 
+    getZoneIcon, 
+    getZoneColor, 
+    setPerformanceMetrics,
+    API_BASE_URL
+  ]);
 
   // Drapeau pour éviter les appels multiples à refreshData
   const refreshInProgressRef = useRef(false);

@@ -623,6 +623,20 @@ class ApiClient {
   }
   
   /**
+   * Récupérer les management zones de Vital for Production
+   */
+  public getVitalForProductionMZs() {
+    return this.get<VitalForGroupMZsResponse>(ENDPOINTS.VITAL_FOR_PRODUCTION_MZS);
+  }
+  
+  /**
+   * Récupérer les management zones de Vital for Analytics
+   */
+  public getVitalForAnalyticsMZs() {
+    return this.get<VitalForGroupMZsResponse>(ENDPOINTS.VITAL_FOR_ANALYTICS_MZS);
+  }
+  
+  /**
    * Récupérer les management zones de Detection & CTL
    */
   public getDetectionCtlMZs() {
