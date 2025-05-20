@@ -7,7 +7,9 @@ const CACHE_KEYS = {
   vfg: 'zone_status_vfg_cache',
   vfe: 'zone_status_vfe_cache',
   vfp: 'zone_status_vfp_cache',
-  vfa: 'zone_status_vfa_cache'
+  vfa: 'zone_status_vfa_cache',
+  detection: 'zone_status_detection_cache',
+  security: 'zone_status_security_cache'
 };
 
 /**
@@ -29,12 +31,16 @@ export function useZoneStatusPreloader() {
     vfg: Record<string, { problemCount: number, status: 'warning' | 'healthy' }>,
     vfe: Record<string, { problemCount: number, status: 'warning' | 'healthy' }>,
     vfp: Record<string, { problemCount: number, status: 'warning' | 'healthy' }>,
-    vfa: Record<string, { problemCount: number, status: 'warning' | 'healthy' }>
+    vfa: Record<string, { problemCount: number, status: 'warning' | 'healthy' }>,
+    detection: Record<string, { problemCount: number, status: 'warning' | 'healthy' }>,
+    security: Record<string, { problemCount: number, status: 'warning' | 'healthy' }>
   }>({
     vfg: {},
     vfe: {},
     vfp: {},
-    vfa: {}
+    vfa: {},
+    detection: {},
+    security: {}
   });
   
   /**
@@ -49,19 +55,30 @@ export function useZoneStatusPreloader() {
     console.log(`Préchargement des statuts de zones (force=${force})`);
     
     try {
-      // Récupérer les problèmes pour VFG et VFE en parallèle
-      const [vfgProblemsResponse, vfeProblemsResponse] = await Promise.all([
+      // Récupérer les problèmes pour tous les types de dashboards en parallèle
+      const [
+        vfgProblemsResponse, 
+        vfeProblemsResponse, 
+        detectionProblemsResponse, 
+        securityProblemsResponse
+      ] = await Promise.all([
         api.getProblems("OPEN", "-60d", "vfg", force),
-        api.getProblems("OPEN", "-60d", "vfe", force)
+        api.getProblems("OPEN", "-60d", "vfe", force),
+        api.getProblems("OPEN", "-60d", "detection", force),
+        api.getProblems("OPEN", "-60d", "security", force)
       ]);
       
       // Extraire les données
       const vfgProblemData = vfgProblemsResponse.error ? [] : (vfgProblemsResponse.data || []);
       const vfeProblemData = vfeProblemsResponse.error ? [] : (vfeProblemsResponse.data || []);
+      const detectionProblemData = detectionProblemsResponse.error ? [] : (detectionProblemsResponse.data || []);
+      const securityProblemData = securityProblemsResponse.error ? [] : (securityProblemsResponse.data || []);
       
       // Cache in-memory pour un accès rapide
       const vfgZoneStatus: Record<string, { problemCount: number, status: 'warning' | 'healthy' }> = {};
       const vfeZoneStatus: Record<string, { problemCount: number, status: 'warning' | 'healthy' }> = {};
+      const detectionZoneStatus: Record<string, { problemCount: number, status: 'warning' | 'healthy' }> = {};
+      const securityZoneStatus: Record<string, { problemCount: number, status: 'warning' | 'healthy' }> = {};
       
       // Traiter les problèmes VFG et créer un index par zone
       vfgProblemData.forEach(problem => {
@@ -85,12 +102,36 @@ export function useZoneStatusPreloader() {
         }
       });
       
+      // Traiter les problèmes Detection CTL et créer un index par zone
+      detectionProblemData.forEach(problem => {
+        if (problem.zone) {
+          if (!detectionZoneStatus[problem.zone]) {
+            detectionZoneStatus[problem.zone] = { problemCount: 0, status: 'healthy' };
+          }
+          detectionZoneStatus[problem.zone].problemCount++;
+          detectionZoneStatus[problem.zone].status = 'warning';
+        }
+      });
+      
+      // Traiter les problèmes Security Encryption et créer un index par zone
+      securityProblemData.forEach(problem => {
+        if (problem.zone) {
+          if (!securityZoneStatus[problem.zone]) {
+            securityZoneStatus[problem.zone] = { problemCount: 0, status: 'healthy' };
+          }
+          securityZoneStatus[problem.zone].problemCount++;
+          securityZoneStatus[problem.zone].status = 'warning';
+        }
+      });
+      
       // Mettre à jour le cache en mémoire
       statusCacheRef.current = {
         vfg: vfgZoneStatus,
         vfe: vfeZoneStatus,
         vfp: {}, // À implémenter plus tard
-        vfa: {}  // À implémenter plus tard
+        vfa: {},  // À implémenter plus tard
+        detection: detectionZoneStatus,
+        security: securityZoneStatus
       };
       
       // Sauvegarder dans localStorage pour persistance
@@ -104,7 +145,17 @@ export function useZoneStatusPreloader() {
         timestamp: Date.now()
       }));
       
-      console.log(`Statuts préchargés: VFG=${Object.keys(vfgZoneStatus).length} zones, VFE=${Object.keys(vfeZoneStatus).length} zones`);
+      localStorage.setItem(CACHE_KEYS.detection, JSON.stringify({
+        zoneStatuses: detectionZoneStatus,
+        timestamp: Date.now()
+      }));
+      
+      localStorage.setItem(CACHE_KEYS.security, JSON.stringify({
+        zoneStatuses: securityZoneStatus,
+        timestamp: Date.now()
+      }));
+      
+      console.log(`Statuts préchargés: VFG=${Object.keys(vfgZoneStatus).length} zones, VFE=${Object.keys(vfeZoneStatus).length} zones, Detection=${Object.keys(detectionZoneStatus).length} zones, Security=${Object.keys(securityZoneStatus).length} zones`);
       
       // Marquer comme préchargé
       setIsPreloaded(true);
@@ -124,19 +175,8 @@ export function useZoneStatusPreloader() {
     // Si pas encore préchargé, renvoyer les zones telles quelles
     if (!isPreloaded) return zones;
     
-    // Pour les nouveaux types (detection, security), mapper vers les types existants
-    let effectiveType: 'vfg' | 'vfe' | 'vfp' | 'vfa';
-    
-    if (dashboardType === 'detection') {
-      effectiveType = 'vfg'; // Maps detection to vfg temporarily
-    } else if (dashboardType === 'security') {
-      effectiveType = 'vfe'; // Maps security to vfe temporarily
-    } else {
-      effectiveType = dashboardType;
-    }
-    
-    // Récupérer les statuts préchargés
-    const statusCache = statusCacheRef.current[effectiveType] || {};
+    // Récupérer les statuts préchargés pour le type de dashboard spécifié
+    const statusCache = statusCacheRef.current[dashboardType] || {};
     
     // Appliquer les statuts aux zones
     return zones.map(zone => {
@@ -167,9 +207,13 @@ export function useZoneStatusPreloader() {
     try {
       const vfgCachedData = localStorage.getItem(CACHE_KEYS.vfg);
       const vfeCachedData = localStorage.getItem(CACHE_KEYS.vfe);
+      const detectionCachedData = localStorage.getItem(CACHE_KEYS.detection);
+      const securityCachedData = localStorage.getItem(CACHE_KEYS.security);
       
       let vfgStatusCache = {};
       let vfeStatusCache = {};
+      let detectionStatusCache = {};
+      let securityStatusCache = {};
       let needsRefresh = true;
       
       if (vfgCachedData) {
@@ -190,16 +234,41 @@ export function useZoneStatusPreloader() {
         }
       }
       
+      if (detectionCachedData) {
+        const parsedData = JSON.parse(detectionCachedData);
+        // Vérifier que les données ne sont pas trop anciennes (30 min)
+        if (parsedData.timestamp && Date.now() - parsedData.timestamp < 30 * 60 * 1000) {
+          detectionStatusCache = parsedData.zoneStatuses || {};
+          needsRefresh = false;
+        }
+      }
+      
+      if (securityCachedData) {
+        const parsedData = JSON.parse(securityCachedData);
+        // Vérifier que les données ne sont pas trop anciennes (30 min)
+        if (parsedData.timestamp && Date.now() - parsedData.timestamp < 30 * 60 * 1000) {
+          securityStatusCache = parsedData.zoneStatuses || {};
+          needsRefresh = false;
+        }
+      }
+      
       // Mettre à jour le cache en mémoire
       statusCacheRef.current = {
         vfg: vfgStatusCache,
         vfe: vfeStatusCache,
         vfp: {}, // À implémenter plus tard
-        vfa: {}  // À implémenter plus tard
+        vfa: {},  // À implémenter plus tard
+        detection: detectionStatusCache,
+        security: securityStatusCache
       };
       
       // Si les données sont valides, marquer comme préchargé
-      if (!needsRefresh && (Object.keys(vfgStatusCache).length > 0 || Object.keys(vfeStatusCache).length > 0)) {
+      if (!needsRefresh && (
+          Object.keys(vfgStatusCache).length > 0 || 
+          Object.keys(vfeStatusCache).length > 0 ||
+          Object.keys(detectionStatusCache).length > 0 ||
+          Object.keys(securityStatusCache).length > 0
+        )) {
         console.log(`Statuts de zones chargés depuis le cache local`);
         setIsPreloaded(true);
       } else {
