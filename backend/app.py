@@ -66,7 +66,7 @@ def get_vital_for_group_mzs():
     # Diviser la chaîne en liste de MZs
     return [mz.strip() for mz in vfg_mz_string.split(',')]
 
-# Nouvel endpoint pour obtenir les Management Zones de Vital for Group
+# Endpoint pour obtenir les Management Zones de Vital for Entreprise
 @app.route('/api/vital-for-entreprise-mzs', methods=['GET'])
 def get_vital_for_entreprise_mzs_endpoint():
     try:
@@ -92,6 +92,72 @@ def get_vital_for_entreprise_mzs_endpoint():
         })
     except Exception as e:
         logger.error(f"Erreur lors de la récupération des MZs Vital for Entreprise: {e}")
+        # Retourner une réponse même en cas d'erreur
+        return jsonify({
+            'mzs': [],
+            'source': 'env_file',
+            'error': str(e)
+        }), 500
+
+# Endpoint pour obtenir les Management Zones de Detection & CTL
+@app.route('/api/detection-ctl-mzs', methods=['GET'])
+def get_detection_ctl_mzs_endpoint():
+    try:
+        # Récupérer directement la liste depuis la variable d'environnement
+        dct_mz_string = os.environ.get('DCT_MZ_LIST', '')
+        
+        # Logging pour debug
+        logger.info(f"DCT_MZ_LIST from .env: {dct_mz_string}")
+        
+        # Si la variable n'est pas définie, retourner une liste vide
+        if not dct_mz_string:
+            logger.warning("DCT_MZ_LIST is empty or not defined in .env file")
+            return jsonify({'mzs': [], 'source': 'env_file'})
+        
+        # Diviser la chaîne en liste de MZs
+        dct_mzs = [mz.strip() for mz in dct_mz_string.split(',')]
+        logger.info(f"Parsed DCT MZs: {dct_mzs}")
+        
+        # Format de réponse simple
+        return jsonify({
+            'mzs': dct_mzs,
+            'source': 'env_file'  # Indique que les données viennent du fichier .env
+        })
+    except Exception as e:
+        logger.error(f"Erreur lors de la récupération des MZs Detection & CTL: {e}")
+        # Retourner une réponse même en cas d'erreur
+        return jsonify({
+            'mzs': [],
+            'source': 'env_file',
+            'error': str(e)
+        }), 500
+
+# Endpoint pour obtenir les Management Zones de Security & Encryption
+@app.route('/api/security-encryption-mzs', methods=['GET'])
+def get_security_encryption_mzs_endpoint():
+    try:
+        # Récupérer directement la liste depuis la variable d'environnement
+        sec_mz_string = os.environ.get('SEC_MZ_LIST', '')
+        
+        # Logging pour debug
+        logger.info(f"SEC_MZ_LIST from .env: {sec_mz_string}")
+        
+        # Si la variable n'est pas définie, retourner une liste vide
+        if not sec_mz_string:
+            logger.warning("SEC_MZ_LIST is empty or not defined in .env file")
+            return jsonify({'mzs': [], 'source': 'env_file'})
+        
+        # Diviser la chaîne en liste de MZs
+        sec_mzs = [mz.strip() for mz in sec_mz_string.split(',')]
+        logger.info(f"Parsed SEC MZs: {sec_mzs}")
+        
+        # Format de réponse simple
+        return jsonify({
+            'mzs': sec_mzs,
+            'source': 'env_file'  # Indique que les données viennent du fichier .env
+        })
+    except Exception as e:
+        logger.error(f"Erreur lors de la récupération des MZs Security & Encryption: {e}")
         # Retourner une réponse même en cas d'erreur
         return jsonify({
             'mzs': [],

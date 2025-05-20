@@ -5,7 +5,9 @@ import { api } from '../api';
 // Clés pour le stockage local des statuts préchargés
 const CACHE_KEYS = {
   vfg: 'zone_status_vfg_cache',
-  vfe: 'zone_status_vfe_cache'
+  vfe: 'zone_status_vfe_cache',
+  dct: 'zone_status_dct_cache',
+  sec: 'zone_status_sec_cache'
 };
 
 /**
@@ -22,13 +24,17 @@ export function useZoneStatusPreloader() {
   // Référence aux minuteries
   const refreshTimerRef = useRef<NodeJS.Timeout | null>(null);
   
-  // Stockage global des statuts de zones (vfg et vfe)
+  // Stockage global des statuts de zones pour tous les types de dashboard
   const statusCacheRef = useRef<{
     vfg: Record<string, { problemCount: number, status: 'warning' | 'healthy' }>,
-    vfe: Record<string, { problemCount: number, status: 'warning' | 'healthy' }>
+    vfe: Record<string, { problemCount: number, status: 'warning' | 'healthy' }>,
+    dct: Record<string, { problemCount: number, status: 'warning' | 'healthy' }>,
+    sec: Record<string, { problemCount: number, status: 'warning' | 'healthy' }>
   }>({
     vfg: {},
-    vfe: {}
+    vfe: {},
+    dct: {},
+    sec: {}
   });
   
   /**
@@ -43,19 +49,25 @@ export function useZoneStatusPreloader() {
     console.log(`Préchargement des statuts de zones (force=${force})`);
     
     try {
-      // Récupérer les problèmes pour VFG et VFE en parallèle
-      const [vfgProblemsResponse, vfeProblemsResponse] = await Promise.all([
+      // Récupérer les problèmes pour tous les types de dashboard en parallèle
+      const [vfgProblemsResponse, vfeProblemsResponse, dctProblemsResponse, secProblemsResponse] = await Promise.all([
         api.getProblems("OPEN", "-60d", "vfg", force),
-        api.getProblems("OPEN", "-60d", "vfe", force)
+        api.getProblems("OPEN", "-60d", "vfe", force),
+        api.getProblems("OPEN", "-60d", "dct", force),
+        api.getProblems("OPEN", "-60d", "sec", force)
       ]);
       
       // Extraire les données
       const vfgProblemData = vfgProblemsResponse.error ? [] : (vfgProblemsResponse.data || []);
       const vfeProblemData = vfeProblemsResponse.error ? [] : (vfeProblemsResponse.data || []);
+      const dctProblemData = dctProblemsResponse.error ? [] : (dctProblemsResponse.data || []);
+      const secProblemData = secProblemsResponse.error ? [] : (secProblemsResponse.data || []);
       
       // Cache in-memory pour un accès rapide
       const vfgZoneStatus: Record<string, { problemCount: number, status: 'warning' | 'healthy' }> = {};
       const vfeZoneStatus: Record<string, { problemCount: number, status: 'warning' | 'healthy' }> = {};
+      const dctZoneStatus: Record<string, { problemCount: number, status: 'warning' | 'healthy' }> = {};
+      const secZoneStatus: Record<string, { problemCount: number, status: 'warning' | 'healthy' }> = {};
       
       // Traiter les problèmes VFG et créer un index par zone
       vfgProblemData.forEach(problem => {
@@ -79,10 +91,35 @@ export function useZoneStatusPreloader() {
         }
       });
       
+      // Traiter les problèmes DCT et créer un index par zone
+      dctProblemData.forEach(problem => {
+        if (problem.zone) {
+          if (!dctZoneStatus[problem.zone]) {
+            dctZoneStatus[problem.zone] = { problemCount: 0, status: 'healthy' };
+          }
+          dctZoneStatus[problem.zone].problemCount++;
+          dctZoneStatus[problem.zone].status = 'warning';
+        }
+      });
+      
+      // Traiter les problèmes SEC et créer un index par zone
+      secProblemData.forEach(problem => {
+        if (problem.zone) {
+          if (!secZoneStatus[problem.zone]) {
+            secZoneStatus[problem.zone] = { problemCount: 0, status: 'healthy' };
+          }
+          secZoneStatus[problem.zone].problemCount++;
+          secZoneStatus[problem.zone].status = 'warning';
+        }
+      });
+      
       // Mettre à jour le cache en mémoire
       statusCacheRef.current = {
+        ...statusCacheRef.current,
         vfg: vfgZoneStatus,
-        vfe: vfeZoneStatus
+        vfe: vfeZoneStatus,
+        dct: dctZoneStatus,
+        sec: secZoneStatus
       };
       
       // Sauvegarder dans localStorage pour persistance
@@ -96,7 +133,17 @@ export function useZoneStatusPreloader() {
         timestamp: Date.now()
       }));
       
-      console.log(`Statuts préchargés: VFG=${Object.keys(vfgZoneStatus).length} zones, VFE=${Object.keys(vfeZoneStatus).length} zones`);
+      localStorage.setItem(CACHE_KEYS.dct, JSON.stringify({
+        zoneStatuses: dctZoneStatus,
+        timestamp: Date.now()
+      }));
+      
+      localStorage.setItem(CACHE_KEYS.sec, JSON.stringify({
+        zoneStatuses: secZoneStatus,
+        timestamp: Date.now()
+      }));
+      
+      console.log(`Statuts préchargés: VFG=${Object.keys(vfgZoneStatus).length} zones, VFE=${Object.keys(vfeZoneStatus).length} zones, DCT=${Object.keys(dctZoneStatus).length} zones, SEC=${Object.keys(secZoneStatus).length} zones`);
       
       // Marquer comme préchargé
       setIsPreloaded(true);
@@ -112,7 +159,7 @@ export function useZoneStatusPreloader() {
    * Fonction pour appliquer les statuts préchargés aux Management Zones
    * Cette fonction doit être appelée au moment de la création des zones
    */
-  const applyPreloadedStatuses = (zones: any[], dashboardType: 'vfg' | 'vfe') => {
+  const applyPreloadedStatuses = (zones: any[], dashboardType: 'vfg' | 'vfe' | 'dct' | 'sec') => {
     // Si pas encore préchargé, renvoyer les zones telles quelles
     if (!isPreloaded) return zones;
     
@@ -136,7 +183,7 @@ export function useZoneStatusPreloader() {
   /**
    * Fonction pour récupérer immédiatement les problèmes associés à une zone
    */
-  const getProblemsForZone = (zoneName: string, dashboardType: 'vfg' | 'vfe'): Problem[] => {
+  const getProblemsForZone = (zoneName: string, dashboardType: 'vfg' | 'vfe' | 'dct' | 'sec'): Problem[] => {
     // Cette fonction pourrait être utilisée pour obtenir la liste des problèmes
     // spécifiques à une zone sans nouvelle requête API
     return [];
@@ -174,7 +221,9 @@ export function useZoneStatusPreloader() {
       // Mettre à jour le cache en mémoire
       statusCacheRef.current = {
         vfg: vfgStatusCache,
-        vfe: vfeStatusCache
+        vfe: vfeStatusCache,
+        dct: {},
+        sec: {}
       };
       
       // Si les données sont valides, marquer comme préchargé

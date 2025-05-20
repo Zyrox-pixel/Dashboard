@@ -623,6 +623,20 @@ class ApiClient {
   }
 
   /**
+   * Récupérer les management zones de Detection & CTL
+   */
+  public getDetectionCtlMZs() {
+    return this.get<VitalForGroupMZsResponse>(ENDPOINTS.DETECTION_CTL_MZS);
+  }
+
+  /**
+   * Récupérer les management zones de Security & Encryption
+   */
+  public getSecurityEncryptionMZs() {
+    return this.get<VitalForGroupMZsResponse>(ENDPOINTS.SECURITY_ENCRYPTION_MZS);
+  }
+
+  /**
    * Définir la management zone actuelle
    */
   public setManagementZone(name: string) {

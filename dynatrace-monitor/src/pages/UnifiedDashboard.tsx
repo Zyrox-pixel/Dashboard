@@ -28,13 +28,23 @@ const UnifiedDashboard: React.FC = () => {
       case 'vfe':
         return {
           title: isOptimized ? "Vital for Entreprise (Optimisé)" : "Vital for Entreprise",
-          variant: 'vfe' as 'vfg' | 'vfe',
+          variant: 'vfe' as 'vfg' | 'vfe' | 'dct' | 'sec',
+        };
+      case 'dct':
+        return {
+          title: isOptimized ? "Détection & CTL (Optimisé)" : "Détection & CTL",
+          variant: 'dct' as 'vfg' | 'vfe' | 'dct' | 'sec',
+        };
+      case 'sec':
+        return {
+          title: isOptimized ? "Security & Encryption (Optimisé)" : "Security & Encryption",
+          variant: 'sec' as 'vfg' | 'vfe' | 'dct' | 'sec',
         };
       case 'vfg':
       default:
         return {
           title: isOptimized ? "Vital for Group (Optimisé)" : "Vital for Group",
-          variant: 'vfg' as 'vfg' | 'vfe',
+          variant: 'vfg' as 'vfg' | 'vfe' | 'dct' | 'sec',
         };
     }
   }, [type, isOptimized]);
@@ -133,7 +143,7 @@ const UnifiedDashboard: React.FC = () => {
         ...appContext.isLoading,
         problems: isLoading
       },
-      refreshData: async (variant?: 'vfg' | 'vfe', active?: boolean, timeframe?: string) => {
+      refreshData: async (variant?: 'vfg' | 'vfe' | 'dct' | 'sec', active?: boolean, timeframe?: string) => {
         // Utiliser notre système de cache pour le rafraîchissement
         await refreshCachedData(true);
         // Appeler aussi le refreshData original pour maintenir la compatibilité

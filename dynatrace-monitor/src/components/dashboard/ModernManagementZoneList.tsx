@@ -16,7 +16,7 @@ interface ModernManagementZoneListProps {
   onZoneClick: (zoneId: string) => void;
   title?: string;
   subtitle?: string;
-  variant?: 'vfg' | 'vfe';
+  variant?: 'vfg' | 'vfe' | 'dct' | 'sec';
   loading?: boolean;
   onRefresh?: () => void;
 }

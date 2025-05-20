@@ -48,9 +48,13 @@ function App() {
                 {/* Routes de compatibilité avec l'ancienne structure */}
                 <Route path="/vfg" element={<Navigate to="/dashboard/vfg" replace />} />
                 <Route path="/vfe" element={<Navigate to="/dashboard/vfe" replace />} />
+                <Route path="/dct" element={<Navigate to="/dashboard/dct" replace />} />
+                <Route path="/sec" element={<Navigate to="/dashboard/sec" replace />} />
                 <Route path="/optimized" element={<Navigate to="/dashboard/vfg/true" replace />} />
                 <Route path="/vfg-optimized" element={<Navigate to="/dashboard/vfg/true" replace />} />
                 <Route path="/vfe-optimized" element={<Navigate to="/dashboard/vfe/true" replace />} />
+                <Route path="/dct-optimized" element={<Navigate to="/dashboard/dct/true" replace />} />
+                <Route path="/sec-optimized" element={<Navigate to="/dashboard/sec/true" replace />} />
                 
                 {/* Routes supplémentaires pour la compatibilité */}
                 <Route path="/problems" element={<Navigate to="/problems/unified" replace />} />

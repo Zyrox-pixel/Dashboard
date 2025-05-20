@@ -10,7 +10,7 @@ import { Shield, Loader, AlertTriangle, RefreshCw, Clock, BarChart, ChevronLeft,
 
 interface DashboardBaseProps {
   title: string;
-  variant: 'vfg' | 'vfe';
+  variant: 'vfg' | 'vfe' | 'dct' | 'sec';
   optimized?: boolean;
   context: AppContextType;
 }

@@ -8,7 +8,7 @@ import { useApp } from '../../contexts/AppContext';
 import { useTheme } from '../../contexts/ThemeContext';
 
 // Définir les types pour les fonctions
-type MenuItemKey = 'home' | 'problems' | 'vfg' | 'vfe' | 'activity' | 'settings';
+type MenuItemKey = 'home' | 'problems' | 'vfg' | 'vfe' | 'dct' | 'sec' | 'activity' | 'settings';
 type ColorType = 'indigo' | 'amber' | 'red' | 'blue' | 'green' | 'purple';
 
 const Sidebar: React.FC = () => {
@@ -264,6 +264,66 @@ const Sidebar: React.FC = () => {
               
               {/* Animation subtile d'arrière-plan pour les éléments actifs */}
               {activeItem === 'vfe' && (
+                <div className="absolute inset-0 -z-10 rounded-xl overflow-hidden">
+                  <div className="absolute inset-0 opacity-20 bg-grid-pattern"></div>
+                </div>
+              )}
+            </Link>
+            
+            {/* Detection & CTL */}
+            <Link 
+              to="/dct"
+              onClick={() => setActiveItem('dct')}
+              className={getVitalItemClass('dct', 'blue')}
+            >
+              {getIconGlow('dct', 'blue')}
+              <div className={`relative flex-shrink-0 ${getIconClass('dct')}`}>
+                <Shield
+                  size={18} 
+                  className={`${isDarkTheme ? 'text-blue-400' : 'text-blue-600'} 
+                            ${activeItem === 'dct' ? 'animate-pulse-slow' : ''}`} 
+                />
+              </div>
+              
+              {!sidebarCollapsed && (
+                <span className={`text-sm font-medium whitespace-nowrap transition-all duration-300
+                                ${activeItem === 'dct' ? 'tracking-wide' : ''}`}>
+                  Détection & CTL
+                </span>
+              )}
+              
+              {/* Animation subtile d'arrière-plan pour les éléments actifs */}
+              {activeItem === 'dct' && (
+                <div className="absolute inset-0 -z-10 rounded-xl overflow-hidden">
+                  <div className="absolute inset-0 opacity-20 bg-grid-pattern"></div>
+                </div>
+              )}
+            </Link>
+            
+            {/* Security & Encryption */}
+            <Link 
+              to="/sec"
+              onClick={() => setActiveItem('sec')}
+              className={getVitalItemClass('sec', 'green')}
+            >
+              {getIconGlow('sec', 'green')}
+              <div className={`relative flex-shrink-0 ${getIconClass('sec')}`}>
+                <Activity
+                  size={18} 
+                  className={`${isDarkTheme ? 'text-green-400' : 'text-green-600'} 
+                            ${activeItem === 'sec' ? 'animate-pulse-slow' : ''}`} 
+                />
+              </div>
+              
+              {!sidebarCollapsed && (
+                <span className={`text-sm font-medium whitespace-nowrap transition-all duration-300
+                                ${activeItem === 'sec' ? 'tracking-wide' : ''}`}>
+                  Security & Encryption
+                </span>
+              )}
+              
+              {/* Animation subtile d'arrière-plan pour les éléments actifs */}
+              {activeItem === 'sec' && (
                 <div className="absolute inset-0 -z-10 rounded-xl overflow-hidden">
                   <div className="absolute inset-0 opacity-20 bg-grid-pattern"></div>
                 </div>

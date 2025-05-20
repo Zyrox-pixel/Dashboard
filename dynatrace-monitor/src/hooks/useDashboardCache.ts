@@ -14,6 +14,8 @@ interface DashboardCache {
 const CACHE_KEYS = {
   vfg: 'dashboard_vfg_cache',
   vfe: 'dashboard_vfe_cache',
+  dct: 'dashboard_dct_cache',
+  sec: 'dashboard_sec_cache',
   unified: 'dashboard_unified_cache'
 };
 
@@ -25,7 +27,7 @@ const CACHE_LIFETIME = 5 * 60 * 1000;
  * Permet de charger les données une seule fois, de les mettre à jour automatiquement
  * et de les récupérer instantanément depuis le cache lors des visites ultérieures
  */
-export function useDashboardCache(dashboardType: 'vfg' | 'vfe' | 'unified') {
+export function useDashboardCache(dashboardType: 'vfg' | 'vfe' | 'dct' | 'sec' | 'unified') {
   // États pour stocker les données et le statut de chargement
   const [activeProblems, setActiveProblems] = useState<Problem[]>([]);
   const [recentProblems, setRecentProblems] = useState<Problem[]>([]);
