@@ -10,7 +10,7 @@ import { Shield, Loader, AlertTriangle, RefreshCw, Clock, BarChart, ChevronLeft,
 
 interface DashboardBaseProps {
   title: string;
-  variant: 'vfg' | 'vfe' | 'vfp' | 'vfa';
+  variant: 'vfg' | 'vfe' | 'vfp' | 'vfa' | 'detection' | 'security';
   optimized?: boolean;
   context: AppContextType;
 }
@@ -58,6 +58,10 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
         return vitalForGroupMZs;
       case 'vfe':
         return vitalForEntrepriseMZs;
+      case 'detection':
+        return context.detectionCtlMZs;
+      case 'security':
+        return context.securityEncryptionMZs;
       case 'vfp':
         return vitalForGroupMZs; // Temporairement, utiliser vfg pour vfp
       case 'vfa':
@@ -148,6 +152,32 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
           borderLight: 'border-amber-200',
           borderDark: 'border-amber-800',
           hoverBg: 'hover:bg-amber-700',
+        };
+      case 'detection':
+        return {
+          accent: 'text-emerald-500',
+          accentBg: 'bg-emerald-500',
+          text: 'text-emerald-600',
+          darkText: 'text-emerald-400',
+          bgLight: 'bg-emerald-100',
+          bgLightOpacity: 'bg-emerald-500/10',
+          bgDark: 'bg-emerald-900/20',
+          borderLight: 'border-emerald-200',
+          borderDark: 'border-emerald-800',
+          hoverBg: 'hover:bg-emerald-700',
+        };
+      case 'security':
+        return {
+          accent: 'text-orange-500',
+          accentBg: 'bg-orange-500',
+          text: 'text-orange-600',
+          darkText: 'text-orange-400',
+          bgLight: 'bg-orange-100',
+          bgLightOpacity: 'bg-orange-500/10',
+          bgDark: 'bg-orange-900/20',
+          borderLight: 'border-orange-200',
+          borderDark: 'border-orange-800',
+          hoverBg: 'hover:bg-orange-700',
         };
       case 'vfp':
         return {
@@ -474,6 +504,10 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
                         return 'Supervision des applications critiques du groupe.';
                       case 'vfe':
                         return 'Supervision des applications critiques pour l\'entreprise.';
+                      case 'detection':
+                        return 'Supervision des applications de détection et contrôle.';
+                      case 'security':
+                        return 'Supervision des applications de sécurité et chiffrement.';
                       case 'vfp':
                         return 'Supervision des applications critiques pour la production.';
                       case 'vfa':
@@ -546,6 +580,10 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
                   return "Management Zones Vital for Group";
                 case 'vfe':
                   return "Management Zones Vital for Enterprise";
+                case 'detection':
+                  return "Management Zones Détection & CTL";
+                case 'security':
+                  return "Management Zones Security & Encryption";
                 case 'vfp':
                   return "Management Zones Vital for Production";
                 case 'vfa':

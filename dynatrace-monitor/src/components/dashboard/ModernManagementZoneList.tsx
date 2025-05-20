@@ -16,7 +16,7 @@ interface ModernManagementZoneListProps {
   onZoneClick: (zoneId: string) => void;
   title?: string;
   subtitle?: string;
-  variant?: 'vfg' | 'vfe' | 'vfp' | 'vfa';
+  variant?: 'vfg' | 'vfe' | 'vfp' | 'vfa' | 'detection' | 'security';
   loading?: boolean;
   onRefresh?: () => void;
 }
@@ -207,6 +207,10 @@ const ModernManagementZoneList: React.FC<ModernManagementZoneListProps> = ({
         return 'indigo';
       case 'vfe':
         return 'amber';
+      case 'detection':
+        return 'emerald';
+      case 'security':
+        return 'orange';
       case 'vfp':
         return 'green';
       case 'vfa':

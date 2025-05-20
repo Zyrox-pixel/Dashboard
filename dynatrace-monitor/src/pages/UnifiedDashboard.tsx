@@ -28,33 +28,33 @@ const UnifiedDashboard: React.FC = () => {
       case 'vfe':
         return {
           title: isOptimized ? "Vital for Entreprise (Optimisé)" : "Vital for Entreprise",
-          variant: 'vfe' as 'vfg' | 'vfe' | 'vfp' | 'vfa',
+          variant: 'vfe' as 'vfg' | 'vfe' | 'vfp' | 'vfa' | 'detection' | 'security',
         };
       case 'detection':
         return {
           title: isOptimized ? "Détection & CTL (Optimisé)" : "Détection & CTL",
-          variant: 'vfg' as 'vfg' | 'vfe' | 'vfp' | 'vfa', // Mapping detection vers vfg temporairement
+          variant: 'detection' as 'vfg' | 'vfe' | 'vfp' | 'vfa' | 'detection' | 'security',
         };
       case 'security':
         return {
           title: isOptimized ? "Security & Encryption (Optimisé)" : "Security & Encryption",
-          variant: 'vfe' as 'vfg' | 'vfe' | 'vfp' | 'vfa', // Mapping security vers vfe temporairement
+          variant: 'security' as 'vfg' | 'vfe' | 'vfp' | 'vfa' | 'detection' | 'security',
         };
       case 'vfp':
         return {
           title: isOptimized ? "Vital for Production (Optimisé)" : "Vital for Production",
-          variant: 'vfp' as 'vfg' | 'vfe' | 'vfp' | 'vfa',
+          variant: 'vfp' as 'vfg' | 'vfe' | 'vfp' | 'vfa' | 'detection' | 'security',
         };
       case 'vfa':
         return {
           title: isOptimized ? "Vital for Analytics (Optimisé)" : "Vital for Analytics",
-          variant: 'vfa' as 'vfg' | 'vfe' | 'vfp' | 'vfa',
+          variant: 'vfa' as 'vfg' | 'vfe' | 'vfp' | 'vfa' | 'detection' | 'security',
         };
       case 'vfg':
       default:
         return {
           title: isOptimized ? "Vital for Group (Optimisé)" : "Vital for Group",
-          variant: 'vfg' as 'vfg' | 'vfe' | 'vfp' | 'vfa',
+          variant: 'vfg' as 'vfg' | 'vfe' | 'vfp' | 'vfa' | 'detection' | 'security',
         };
     }
   }, [type, isOptimized]);

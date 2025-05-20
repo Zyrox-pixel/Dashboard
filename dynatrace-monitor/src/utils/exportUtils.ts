@@ -3,13 +3,13 @@ import { Problem, Host, Service, ProcessGroup } from '../api/types';
 /**
  * Convertit un tableau de problèmes en format CSV
  * @param problems Tableau de problèmes à exporter
- * @param filterType Type de vue (vfg, vfe, all)
- * @param datePrefix Préfixe de date pour le nom de fichier (format: YYYYMMDD)
+ * @param filterType Type de vue (vfg, vfe, vfp, vfa, detection, security, all)
+ * @param mgmtZone Zone de management optionnelle pour le filtrage
  * @returns Un objet contenant le contenu CSV et le nom du fichier
  */
 export const exportProblemsToCSV = (
   problems: Problem[],
-  filterType: 'vfg' | 'vfe' | 'all',
+  filterType: 'vfg' | 'vfe' | 'vfp' | 'vfa' | 'detection' | 'security' | 'all',
   mgmtZone?: string
 ): { csv: string; filename: string } => {
   // Créer l'en-tête du CSV selon les nouvelles exigences
@@ -89,7 +89,7 @@ export const exportProblemsToCSV = (
     '"=========================================="',
     `"       EXPORT PROBLEMES DYNATRACE        "`,
     '"=========================================="',
-    `"Management Zone: ${mgmtZone || (filterType === 'all' ? 'VFE + VFG' : filterType.toUpperCase())}"`,
+    `"Management Zone: ${mgmtZone || (filterType === 'all' ? 'TOUTES ZONES' : filterType.toUpperCase())}"`,
     `"Date d'extraction: ${formattedDateTime}"`,
     '"=========================================="',
     '""',  // Ligne vide pour séparer l'en-tête des données
@@ -116,6 +116,18 @@ export const exportProblemsToCSV = (
       break;
     case 'vfe':
       zoneLabel = 'VFE';
+      break;
+    case 'vfp':
+      zoneLabel = 'VFP';
+      break;
+    case 'vfa':
+      zoneLabel = 'VFA';
+      break;
+    case 'detection':
+      zoneLabel = 'DETECTION';
+      break;
+    case 'security':
+      zoneLabel = 'SECURITY';
       break;
     case 'all':
       zoneLabel = 'ALL';

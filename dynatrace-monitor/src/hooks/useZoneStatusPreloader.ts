@@ -120,12 +120,23 @@ export function useZoneStatusPreloader() {
    * Fonction pour appliquer les statuts préchargés aux Management Zones
    * Cette fonction doit être appelée au moment de la création des zones
    */
-  const applyPreloadedStatuses = (zones: any[], dashboardType: 'vfg' | 'vfe' | 'vfp' | 'vfa') => {
+  const applyPreloadedStatuses = (zones: any[], dashboardType: 'vfg' | 'vfe' | 'vfp' | 'vfa' | 'detection' | 'security') => {
     // Si pas encore préchargé, renvoyer les zones telles quelles
     if (!isPreloaded) return zones;
     
+    // Pour les nouveaux types (detection, security), mapper vers les types existants
+    let effectiveType: 'vfg' | 'vfe' | 'vfp' | 'vfa';
+    
+    if (dashboardType === 'detection') {
+      effectiveType = 'vfg'; // Maps detection to vfg temporarily
+    } else if (dashboardType === 'security') {
+      effectiveType = 'vfe'; // Maps security to vfe temporarily
+    } else {
+      effectiveType = dashboardType;
+    }
+    
     // Récupérer les statuts préchargés
-    const statusCache = statusCacheRef.current[dashboardType] || {};
+    const statusCache = statusCacheRef.current[effectiveType] || {};
     
     // Appliquer les statuts aux zones
     return zones.map(zone => {
@@ -144,7 +155,7 @@ export function useZoneStatusPreloader() {
   /**
    * Fonction pour récupérer immédiatement les problèmes associés à une zone
    */
-  const getProblemsForZone = (zoneName: string, dashboardType: 'vfg' | 'vfe' | 'vfp' | 'vfa'): Problem[] => {
+  const getProblemsForZone = (zoneName: string, dashboardType: 'vfg' | 'vfe' | 'vfp' | 'vfa' | 'detection' | 'security'): Problem[] => {
     // Cette fonction pourrait être utilisée pour obtenir la liste des problèmes
     // spécifiques à une zone sans nouvelle requête API
     return [];
