@@ -160,6 +160,9 @@ const HostsPage: React.FC = () => {
                       OS
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-300 uppercase tracking-wider">
+                      Code
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-300 uppercase tracking-wider">
                       CPU
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-300 uppercase tracking-wider">
@@ -173,16 +176,44 @@ const HostsPage: React.FC = () => {
                 <tbody className="bg-white dark:bg-slate-800 divide-y divide-slate-200 dark:divide-slate-700">
   {isLoading && paginatedHosts.length === 0 ? (
     <tr>
-      <td colSpan={5} className="px-6 py-16 text-center text-slate-600 dark:text-slate-300">
-        <div className="flex flex-col items-center">
+      <td colSpan={6} className="px-6 py-24 text-center text-slate-600 dark:text-slate-300">
+        <div className="flex flex-col items-center max-w-xl mx-auto">
+          {/* Spinner amélioré avec animation de pulse */}
           <div className="relative">
-            <div className="animate-spin w-14 h-14 border-4 border-slate-300/30 dark:border-slate-600/30 border-t-blue-500 dark:border-t-blue-400 rounded-full mb-3"></div>
             <div className="absolute inset-0 flex items-center justify-center">
-              <div className="animate-pulse w-8 h-8 bg-blue-100 dark:bg-blue-900/40 rounded-full"></div>
+              <div className="w-20 h-20 rounded-full bg-blue-100/50 dark:bg-blue-900/20 animate-pulse"></div>
+            </div>
+            <div className="animate-spin w-24 h-24 border-4 border-slate-200/40 dark:border-slate-700/40 border-t-blue-500 dark:border-t-blue-400 rounded-full"></div>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-16 h-16 flex items-center justify-center">
+                <Server size={28} className="text-blue-600 dark:text-blue-400" />
+              </div>
             </div>
           </div>
-          <h3 className="font-medium text-lg mb-1 text-blue-600 dark:text-blue-400">Chargement en cours</h3>
-          <p className="text-slate-500 dark:text-slate-400 max-w-xs text-center">Les données des hosts sont en cours de récupération, merci de patienter...</p>
+          
+          {/* Titre et texte explicatif */}
+          <h3 className="font-semibold text-xl mt-6 mb-2 text-blue-600 dark:text-blue-400">Récupération des hosts</h3>
+          <p className="text-slate-500 dark:text-slate-400 text-center mb-6">Nous récupérons les données des hosts depuis Dynatrace. Cette opération peut prendre quelques instants...</p>
+          
+          {/* Barre de progression animée */}
+          <div className="w-full max-w-md h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden mb-1">
+            <div className="h-full bg-gradient-to-r from-blue-400 to-indigo-500 dark:from-blue-500 dark:to-indigo-600 rounded-full"
+                 style={{width: '80%', animation: 'progress-bar-animation 2s infinite ease-in-out alternate'}}>
+            </div>
+          </div>
+          <p className="text-xs text-slate-400 dark:text-slate-500">Récupération des lots de données...</p>
+          
+          {/* Style pour l'animation de la barre de progression */}
+          <style>
+            {`
+              @keyframes progress-bar-animation {
+                0% { width: 15%; }
+                50% { width: 40%; }
+                75% { width: 65%; }
+                100% { width: 85%; }
+              }
+            `}
+          </style>
         </div>
       </td>
     </tr>
@@ -227,6 +258,25 @@ const HostsPage: React.FC = () => {
                             )}
                             <span className="text-sm text-slate-700 dark:text-slate-300">{host.os_version}</span>
                           </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {host.code ? (
+                            <div className="flex items-center">
+                              <div className="flex-shrink-0 h-5 w-5 flex items-center justify-center rounded-md bg-purple-100 dark:bg-purple-900/50 text-purple-800 dark:text-purple-300 mr-2">
+                                <span className="text-xs">C</span>
+                              </div>
+                              <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{host.code}</span>
+                            </div>
+                          ) : host.metadata?.Code ? (
+                            <div className="flex items-center">
+                              <div className="flex-shrink-0 h-5 w-5 flex items-center justify-center rounded-md bg-purple-100 dark:bg-purple-900/50 text-purple-800 dark:text-purple-300 mr-2">
+                                <span className="text-xs">C</span>
+                              </div>
+                              <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{host.metadata.Code}</span>
+                            </div>
+                          ) : (
+                            <span className="text-sm text-slate-500 dark:text-slate-400">Non disponible</span>
+                          )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           {host.cpu !== null ? (

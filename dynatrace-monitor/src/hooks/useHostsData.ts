@@ -236,8 +236,9 @@ export function useHostsData() {
     localStorage.setItem(FIRST_LOAD_DONE_KEY, 'true');
   }, []);
 
-  // Effet pour charger la configuration et les données uniquement au premier accès
+  // Effet pour charger la configuration et les données dès que l'utilisateur arrive sur la page
   useEffect(() => {
+    console.log('Initialisation du chargement automatique des hosts dès l\'arrivée sur la page');
     const loadData = async () => {
       // IMPORTANT: Toujours récupérer d'abord la config mzadmin depuis le backend
       // pour garantir qu'on a la valeur la plus récente du .env
