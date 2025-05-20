@@ -338,13 +338,21 @@ export function useDashboardCache(dashboardType: 'vfg' | 'vfe' | 'vfp' | 'vfa' |
   }, [dashboardType, loadFromCache, refreshData]);
 
   // Retourner les données et fonctions nécessaires
+  // Create a typed version of the refreshData function
+  const typedRefreshData = useCallback(
+    (force: boolean = false, customTimeframe?: string, forceBackendReload?: boolean) => {
+      return refreshData(force, customTimeframe, forceBackendReload);
+    },
+    [refreshData]
+  );
+
   return {
     activeProblems,
     recentProblems,
     isLoading,
     error,
     lastRefreshTime,
-    refreshData,
+    refreshData: typedRefreshData,
     updateManagementZonesWithProblems,
     initialLoadComplete: initialLoadCompletedRef.current
   };

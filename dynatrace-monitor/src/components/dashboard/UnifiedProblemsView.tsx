@@ -137,9 +137,21 @@ const UnifiedProblemsView: React.FC<UnifiedProblemsViewProps> = ({ title, varian
       // Passer la période actuelle si on est dans l'onglet "récent"
       if (activeTab === 'recent') {
         console.log(`Rafraîchissement forcé avec période ${selectedTimeframe}`);
-        await refreshCachedData(true, selectedTimeframe, true); // Ajouter forceBackendReload = true
+        // Check how many parameters the refreshCachedData function accepts
+        if (refreshCachedData.length >= 3) {
+          // @ts-ignore - We're handling this dynamically
+          await refreshCachedData(true, selectedTimeframe, true);
+        } else {
+          await refreshCachedData(true, selectedTimeframe);
+        }
       } else {
-        await refreshCachedData(true, undefined, true); // Ajouter forceBackendReload = true
+        // Check how many parameters the refreshCachedData function accepts
+        if (refreshCachedData.length >= 3) {
+          // @ts-ignore - We're handling this dynamically
+          await refreshCachedData(true, undefined, true);
+        } else {
+          await refreshCachedData(true);
+        }
       }
     } catch (error) {
       console.error('Erreur lors du rafraîchissement:', error);

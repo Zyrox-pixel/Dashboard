@@ -514,7 +514,16 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
               </div>
             </div>
             <button 
-              onClick={() => refreshData(variant, false, undefined, true)}
+              onClick={() => {
+                // Check if the refreshData function accepts the fourth parameter
+                if (refreshData.length >= 4) {
+                  // @ts-ignore - We're handling this dynamically
+                  refreshData(variant, false, undefined, true);
+                } else {
+                  // Fall back to using only the parameters that are available
+                  refreshData(variant, false);
+                }
+              }}
               className={`px-4 py-2 ${cssClasses.accentBg} text-white rounded ${cssClasses.hoverBg} flex items-center gap-2 ml-auto`}
               title="Force un rechargement complet depuis le backend"
             >
@@ -681,7 +690,16 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
             })()}
             variant={variant}
             loading={isLoading.dashboardData}
-            onRefresh={() => refreshData(variant, false)}
+            onRefresh={() => {
+              // Check if the refreshData function accepts the fourth parameter
+              if (refreshData.length >= 4) {
+                // @ts-ignore - We're handling this dynamically
+                refreshData(variant, false, undefined, true);
+              } else {
+                // Fall back to using only the parameters that are available
+                refreshData(variant, false);
+              }
+            }}
           />
         </>
       )}

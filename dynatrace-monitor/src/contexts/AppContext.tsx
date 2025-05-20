@@ -1686,13 +1686,26 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
     setState(prev => ({ ...prev, activeTab: tab }));
   }, []);
 
+  // Create a typed version of the refreshData function
+  const typedRefreshData = useCallback(
+    (
+      dashboardType?: 'vfg' | 'vfe' | 'vfp' | 'vfa' | 'detection' | 'security',
+      refreshProblemsOnly?: boolean,
+      timeframe?: string,
+      forceBackendReload?: boolean
+    ): Promise<void> => {
+      return refreshData(dashboardType, refreshProblemsOnly, timeframe, forceBackendReload);
+    },
+    [refreshData]
+  );
+
   // Valeur du contexte
   const contextValue = useMemo<AppContextType>(() => ({
     ...state,
     setSelectedZone: setSelectedZoneAndLoadData,
     setSidebarCollapsed,
     setActiveTab,
-    refreshData,
+    refreshData: typedRefreshData,
     performanceMetrics: state.performanceMetrics || performanceMetrics,
     ...(optimized ? {
       loadZoneData
@@ -1702,7 +1715,7 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
     setSelectedZoneAndLoadData,
     setSidebarCollapsed,
     setActiveTab,
-    refreshData,
+    typedRefreshData,
     optimized,
     loadZoneData,
     performanceMetrics
