@@ -138,19 +138,12 @@ const HostsPage: React.FC = () => {
         </div>
 
         {/* Affichage des résultats ou messages */}
-        {error ? (
-          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900/30 rounded-lg p-4 mb-6">
-            <div className="flex items-center gap-2 text-red-800 dark:text-red-400">
-              <AlertCircle size={18} />
-              <span className="font-medium">Erreur:</span> {error}
-            </div>
-          </div>
-        ) : !mzAdmin ? (
+        {!mzAdmin || error ? (
           <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-900/30 rounded-lg p-4 mb-6">
             <div className="flex items-center gap-2 text-amber-800 dark:text-amber-400">
               <AlertCircle size={18} />
-              <span className="font-medium">Configuration requise:</span> 
-              Veuillez configurer la variable MZ_ADMIN dans le fichier .env du backend
+              <span className="font-medium">Chargement impossible:</span> 
+              Impossible de charger les données des hôtes. Veuillez rafraîchir la page ou réessayer plus tard.
             </div>
           </div>
         ) : (

@@ -25,16 +25,36 @@ export function useHostsData() {
   // Référence pour les requêtes en cours
   const pendingRequestRef = useRef<boolean>(false);
 
-  // Fonction pour lire la configuration mzadmin depuis le backend avec réessais
+  // Fonction pour lire la configuration mzadmin depuis le backend ou le cache persistent
   const fetchMzAdminConfig = useCallback(async () => {
     try {
       setIsLoading(true);
       
-      // Vérifier d'abord si nous avons déjà la valeur en mémoire
+      // 1. D'abord, vérifier si nous avons déjà la valeur en mémoire
       if (mzAdmin) {
         console.log(`Réutilisation de la MZ Admin déjà en mémoire: ${mzAdmin}`);
         setConfigLoaded(true);
         return mzAdmin;
+      }
+
+      // 2. Ensuite, essayer de récupérer depuis le cache localStorage global
+      try {
+        const cachedGlobalData = localStorage.getItem(HOSTS_CACHE_KEY);
+        if (cachedGlobalData) {
+          const parsedData = JSON.parse(cachedGlobalData);
+          if (parsedData.mzAdmin && parsedData.hosts && Array.isArray(parsedData.hosts)) {
+            console.log(`Récupération de la MZ Admin depuis le cache global: ${parsedData.mzAdmin}`);
+            setMzAdmin(parsedData.mzAdmin);
+            setHosts(parsedData.hosts);
+            setTotalHosts(parsedData.total || parsedData.hosts.length);
+            setLastRefreshTime(new Date(parsedData.timestamp));
+            setConfigLoaded(true);
+            return parsedData.mzAdmin;
+          }
+        }
+      } catch (cacheError) {
+        console.warn('Erreur lors de la lecture du cache global:', cacheError);
+        // Continue to backend fetch on cache error
       }
       
       // Sinon, essayer de récupérer depuis le backend avec réessais
@@ -118,13 +138,21 @@ export function useHostsData() {
       if (cachedData) {
         const parsedData = JSON.parse(cachedData);
         
-        // Vérifier que les données sont pour la bonne MZ admin
-        if (parsedData.mzAdmin === mzAdmin && parsedData.hosts && Array.isArray(parsedData.hosts)) {
-          console.log(`Utilisation des données en cache pour ${parsedData.hosts.length} hosts de ${mzAdmin}`);
+        // On utilise le cache si on a des données valides, même si la MZ est différente
+        // Cela garantit que nous avons toujours quelque chose à afficher
+        if (parsedData.hosts && Array.isArray(parsedData.hosts) && parsedData.hosts.length > 0) {
+          console.log(`Utilisation des données en cache pour ${parsedData.hosts.length} hosts`);
           
           setHosts(parsedData.hosts);
           setTotalHosts(parsedData.total || parsedData.hosts.length);
           setLastRefreshTime(new Date(parsedData.timestamp));
+
+          // Si la MZ en cache est différente de la MZ en mémoire mais valide, mettons à jour la MZ en mémoire
+          if (parsedData.mzAdmin && (!mzAdmin || parsedData.mzAdmin !== mzAdmin)) {
+            console.log(`Mise à jour de la MZ Admin depuis le cache: ${parsedData.mzAdmin}`);
+            setMzAdmin(parsedData.mzAdmin);
+          }
+          
           return true;
         }
       }
@@ -139,7 +167,28 @@ export function useHostsData() {
   const refreshData = useCallback(async (forceRefresh: boolean = false) => {
     // Vérifier si une MZ admin est configurée
     if (!mzAdmin) {
-      setError('Aucune Management Zone admin configurée. Vérifiez le fichier .of du backend.');
+      setError('Impossible de charger les données des hôtes. Veuillez rafraîchir la page.');
+      
+      // Essayer de charger depuis le cache même sans MZ admin actuelle
+      try {
+        const fallbackCache = localStorage.getItem(HOSTS_CACHE_KEY);
+        if (fallbackCache) {
+          const parsedCache = JSON.parse(fallbackCache);
+          if (parsedCache.hosts && Array.isArray(parsedCache.hosts) && parsedCache.hosts.length > 0) {
+            console.log('Utilisation des données en cache de secours');
+            setHosts(parsedCache.hosts);
+            setTotalHosts(parsedCache.total || parsedCache.hosts.length);
+            setLastRefreshTime(new Date(parsedCache.timestamp));
+            if (parsedCache.mzAdmin) {
+              setMzAdmin(parsedCache.mzAdmin);
+              return parsedCache.hosts;
+            }
+          }
+        }
+      } catch (e) {
+        console.error('Erreur lors de la tentative de récupération du cache de secours:', e);
+      }
+      
       return null;
     }
 
@@ -193,26 +242,36 @@ export function useHostsData() {
   // Effet pour charger la configuration et les données au démarrage
   useEffect(() => {
     const loadData = async () => {
-      // Récupérer d'abord la config mzadmin depuis le backend
+      // D'abord, essayer de charger depuis le cache
+      // Cela permet d'afficher immédiatement des données si disponibles
+      const cacheLoaded = loadFromCache();
+      
+      // Récupérer ensuite la config mzadmin depuis le backend
+      // même si les données du cache ont été chargées
       const loadedMzAdmin = await fetchMzAdminConfig();
       
-      if (loadedMzAdmin) {
-        // Tenter de charger depuis le cache d'abord
-        const cacheLoaded = loadFromCache();
-        
-        // Si pas de données en cache, charger depuis l'API
-        if (!cacheLoaded) {
-          refreshData();
-        }
+      // Si nous avons une MZ admin et pas de données en cache, charger depuis l'API
+      if (loadedMzAdmin && !cacheLoaded) {
+        await refreshData();
+      } 
+      // Si nous n'avons pas de MZ admin mais des données en cache, c'est ok de continuer
+      // Si nous n'avons ni MZ admin ni données en cache, refreshData affichera l'erreur
+      else if (!loadedMzAdmin && !cacheLoaded) {
+        refreshData();
       }
     };
     
     // Exécuter loadData et l'enregistrer pour le nettoyage
     let mounted = true;
-    loadData().catch(err => {
+    const loadingPromise = loadData();
+    
+    loadingPromise.catch(err => {
       if (mounted) {
         console.error('Erreur lors du chargement des données:', err);
-        setError('Erreur lors du chargement des données');
+        setError('Impossible de charger les données des hôtes. Veuillez rafraîchir la page.');
+        
+        // Une dernière tentative de récupération depuis le cache en cas d'erreur
+        loadFromCache();
       }
     });
     
@@ -221,6 +280,14 @@ export function useHostsData() {
       mounted = false;
     };
   }, [fetchMzAdminConfig, loadFromCache, refreshData]);
+  
+  // Effet secondaire pour s'assurer que les données ne sont jamais perdues après le premier rendu
+  useEffect(() => {
+    // Si nous avons des hosts en mémoire, sauvegardons-les toujours dans le cache
+    if (hosts.length > 0 && mzAdmin) {
+      saveToCache(hosts);
+    }
+  }, [hosts, mzAdmin, saveToCache]);
 
   // Retourner les données et fonctions nécessaires
   return {
