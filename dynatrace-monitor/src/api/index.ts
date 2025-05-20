@@ -651,6 +651,13 @@ class ApiClient {
   }
 
   /**
+   * Récupérer la Management Zone Admin configurée dans le fichier .of du backend
+   */
+  public getMzAdmin() {
+    return this.get<{mzadmin: string}>(ENDPOINTS.MZ_ADMIN);
+  }
+
+  /**
    * Définir la management zone actuelle
    */
   public setManagementZone(name: string) {

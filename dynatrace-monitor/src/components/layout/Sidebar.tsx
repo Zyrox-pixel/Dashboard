@@ -8,7 +8,7 @@ import { useApp } from '../../contexts/AppContext';
 import { useTheme } from '../../contexts/ThemeContext';
 
 // Définir les types pour les fonctions
-type MenuItemKey = 'home' | 'problems' | 'vfg' | 'vfe' | 'detection' | 'security' | 'activity' | 'settings';
+type MenuItemKey = 'home' | 'problems' | 'vfg' | 'vfe' | 'detection' | 'security' | 'hosts' | 'activity' | 'settings';
 type ColorType = 'indigo' | 'amber' | 'red' | 'blue' | 'green' | 'purple' | 'cyan' | 'pink';
 
 const Sidebar: React.FC = () => {
@@ -25,6 +25,7 @@ const Sidebar: React.FC = () => {
     else if (path.startsWith('/vfe')) setActiveItem('vfe');
     else if (path.startsWith('/detection')) setActiveItem('detection');
     else if (path.startsWith('/security')) setActiveItem('security');
+    else if (path.startsWith('/hosts')) setActiveItem('hosts');
   }, []);
 
   const toggleSidebar = () => {
@@ -271,7 +272,18 @@ const Sidebar: React.FC = () => {
                 </div>
               )}
             </Link>
+          </nav>
+        </div>
 
+        {/* Domain */}
+        <div className={`px-4 mt-4 ${sidebarCollapsed ? 'text-center' : ''}`}>
+          <div className={`text-xs font-semibold uppercase tracking-wider mb-3 mt-2 ${
+            isDarkTheme ? 'text-slate-500' : 'text-slate-400'
+          }`}>
+            {!sidebarCollapsed ? 'Domain' : ''}
+          </div>
+          
+          <nav className="space-y-2">
             {/* Detection & CTL */}
             <Link 
               to="/detection"
@@ -331,7 +343,47 @@ const Sidebar: React.FC = () => {
                 </div>
               )}
             </Link>
-            
+          </nav>
+        </div>
+        
+        {/* Inventory section */}
+        <div className={`px-4 mt-4 ${sidebarCollapsed ? 'text-center' : ''}`}>
+          <div className={`text-xs font-semibold uppercase tracking-wider mb-3 mt-2 ${
+            isDarkTheme ? 'text-slate-500' : 'text-slate-400'
+          }`}>
+            {!sidebarCollapsed ? 'Inventory' : ''}
+          </div>
+          
+          <nav className="space-y-2">
+            {/* Hosts */}
+            <Link 
+              to="/hosts"
+              onClick={() => setActiveItem('hosts')}
+              className={getVitalItemClass('hosts', 'green')}
+            >
+              {getIconGlow('hosts', 'green')}
+              <div className={`relative flex-shrink-0 ${getIconClass('hosts')}`}>
+                <Layers 
+                  size={18} 
+                  className={`${isDarkTheme ? 'text-green-400' : 'text-green-600'} 
+                            ${activeItem === 'hosts' ? 'animate-pulse-slow' : ''}`} 
+                />
+              </div>
+              
+              {!sidebarCollapsed && (
+                <span className={`text-sm font-medium whitespace-nowrap transition-all duration-300
+                                ${activeItem === 'hosts' ? 'tracking-wide' : ''}`}>
+                  Hosts
+                </span>
+              )}
+              
+              {/* Animation subtile d'arrière-plan pour les éléments actifs */}
+              {activeItem === 'hosts' && (
+                <div className="absolute inset-0 -z-10 rounded-xl overflow-hidden">
+                  <div className="absolute inset-0 opacity-20 bg-grid-pattern"></div>
+                </div>
+              )}
+            </Link>
           </nav>
         </div>
         

@@ -1481,6 +1481,26 @@ def refresh_cache(cache_type):
     api_client.clear_cache(f"{cache_type}:")
     return jsonify({'success': True, 'message': f'Cache {cache_type} effacé avec succès'})
 
+@app.route('/api/mz-admin', methods=['GET'])
+def get_mz_admin():
+    """Endpoint pour récupérer la Management Zone configurée pour l'onglet Hosts"""
+    try:
+        # Récupérer la valeur de MZ_ADMIN depuis le fichier .env
+        mz_admin = os.environ.get('MZ_ADMIN', '')
+        
+        # Log pour debug
+        logger.info(f"Récupération de la MZ admin: {mz_admin}")
+        
+        return jsonify({
+            'mzadmin': mz_admin
+        })
+    except Exception as e:
+        logger.error(f"Erreur lors de la récupération de MZ_ADMIN: {e}")
+        return jsonify({
+            'mzadmin': '',
+            'error': str(e)
+        }), 500
+
 @app.route('/api/performance', methods=['GET'])
 def get_performance():
     """Endpoint pour obtenir des statistiques de performance"""

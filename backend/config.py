@@ -14,7 +14,12 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
     # Configuration Dynatrace
-
+    DT_ENV_URL = os.getenv('DT_ENV_URL', '')
+    API_TOKEN = os.getenv('API_TOKEN', '')
+    
+    # Configuration des Management Zones
+    MZ_NAME = os.getenv('MZ_NAME', 'PRODSEC - AP03566 - ACESID')
+    MZ_ADMIN = os.getenv('MZ_ADMIN', 'PRODSEC - AP11564 - OCSP')  # MZ pour l'onglet Hosts
     
     # Configuration du planificateur
     SCHEDULER_INTERVAL_MINUTES = int(os.getenv('SCHEDULER_INTERVAL_MINUTES', '5'))

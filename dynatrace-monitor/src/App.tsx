@@ -4,6 +4,7 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import UnifiedDashboard from './pages/UnifiedDashboard';
 import UnifiedProblemsPage from './pages/UnifiedProblemsPage';
 import OverviewDashboard from './pages/OverviewDashboard';
+import HostsPage from './pages/HostsPage';
 import { AppProvider } from './contexts/AppContext';
 import { ProblemsProvider } from './contexts/ProblemsContext';
 import { useZoneStatusPreloader } from './hooks/useZoneStatusPreloader';
@@ -60,7 +61,7 @@ function App() {
                 
                 {/* Routes supplémentaires pour la compatibilité */}
                 <Route path="/problems" element={<Navigate to="/problems/unified" replace />} />
-                <Route path="/hosts" element={<Navigate to="/dashboard/vfg" replace />} />
+                <Route path="/hosts" element={<HostsPage />} />
                 <Route path="/services" element={<Navigate to="/dashboard/vfg" replace />} />
                 <Route path="/other" element={<Navigate to="/overview" replace />} />
                 
