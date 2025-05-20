@@ -883,7 +883,8 @@ class OptimizedAPIClient:
     def get_hosts_metrics_parallel(self, host_ids, from_time, to_time):
         """
         Récupère les métriques pour plusieurs hôtes en parallèle
-        Optimisé pour gérer de grands nombres d'hôtes
+        Optimisé pour gérer de très grands nombres d'hôtes (au-delà de 400)
+        Utilise un traitement par lots avec taille de lot dynamique
         
         Args:
             host_ids (list): Liste des IDs d'hôtes
@@ -893,24 +894,61 @@ class OptimizedAPIClient:
         Returns:
             list: Métriques pour tous les hôtes
         """
+        # Augmentation de la taille par défaut des lots pour accommoder plus d'hôtes
+        # Taille de lot adaptée selon le nombre total d'hôtes
+        if len(host_ids) > 1000:
+            chunk_size = 50  # Lots plus grands pour >1000 hôtes
+        elif len(host_ids) > 500:
+            chunk_size = 30  # Lots moyens pour >500 hôtes
+        else:
+            # Utiliser la taille de lot configurée ou 20 par défaut
+            chunk_size = int(os.environ.get('REQUEST_CHUNK_SIZE', 20))
+            
+        logger.info(f"Récupération des métriques pour {len(host_ids)} hôtes avec une taille de lot de {chunk_size}")
+        
         # Si trop d'hôtes, traiter par lots
-        chunk_size = int(os.environ.get('REQUEST_CHUNK_SIZE', 15))
         if len(host_ids) > chunk_size:
-            logger.info(f"Traitement par lots de {len(host_ids)} hôtes")
+            # Estimation du temps de traitement pour la progression
+            total_chunks = (len(host_ids) + chunk_size - 1) // chunk_size
+            estimated_chunk_time = 10  # secondes estimées par lot
+            estimated_total_time = total_chunks * estimated_chunk_time
+            logger.info(f"Traitement par lots de {len(host_ids)} hôtes en {total_chunks} lots. Temps estimé: ~{estimated_total_time/60:.1f} minutes")
+            
             all_host_metrics = []
+            start_time = time.time()
             
             # Diviser les IDs en lots plus petits
             for i in range(0, len(host_ids), chunk_size):
                 chunk_ids = host_ids[i:i + chunk_size]
-                logger.info(f"Traitement du lot {i//chunk_size + 1}/{(len(host_ids) + chunk_size - 1)//chunk_size} ({len(chunk_ids)} hôtes)")
+                chunk_num = i//chunk_size + 1
+                elapsed_time = time.time() - start_time
+                
+                # Calculer le temps restant estimé
+                if chunk_num > 1:
+                    time_per_chunk = elapsed_time / (chunk_num - 1)
+                    remaining_chunks = total_chunks - chunk_num + 1
+                    remaining_time = time_per_chunk * remaining_chunks
+                    logger.info(f"Traitement du lot {chunk_num}/{total_chunks} ({len(chunk_ids)} hôtes) - Temps restant estimé: ~{remaining_time/60:.1f} minutes")
+                else:
+                    logger.info(f"Traitement du lot {chunk_num}/{total_chunks} ({len(chunk_ids)} hôtes)")
                 
                 # Traiter ce lot
                 chunk_metrics = self._process_host_chunk(chunk_ids, from_time, to_time)
                 all_host_metrics.extend(chunk_metrics)
                 
+                # Log de progression après chaque lot
+                current_progress = (chunk_num / total_chunks) * 100
+                logger.info(f"Progression: {current_progress:.1f}% ({chunk_num}/{total_chunks} lots)")
+                
                 # Petite pause entre les lots pour éviter de surcharger l'API
+                # Pause plus courte pour les grands jeux de données
                 if i + chunk_size < len(host_ids):
-                    time.sleep(1)
+                    pause_time = 0.5 if len(host_ids) > 500 else 1
+                    time.sleep(pause_time)
+            
+            # Calcul du temps total
+            total_time = time.time() - start_time
+            logger.info(f"Traitement terminé pour {len(host_ids)} hôtes en {total_time/60:.1f} minutes")
             
             return all_host_metrics
         else:
@@ -919,7 +957,8 @@ class OptimizedAPIClient:
 
     def _process_host_chunk(self, host_ids, from_time, to_time):
         """
-        Traite un lot d'hôtes
+        Traite un lot d'hôtes avec optimisations pour les grands lots
+        Réduit le nombre total de requêtes API et gère efficacement l'historique des métriques
         """
         # Préparer les requêtes pour la récupération des détails des hôtes avec ID explicite
         host_details_queries = []
@@ -983,9 +1022,17 @@ class OptimizedAPIClient:
             ram_metrics[host_id] = all_metric_results[result_index]
             result_index += 1
         
-        # Pour l'historique, ne le faire que pour un sous-ensemble si trop nombreux
-        history_sample_size = min(len(host_ids), 5)  # Limiter l'historique aux 5 premiers hôtes
-        history_host_ids = host_ids[:history_sample_size]
+        # Pour l'historique, optimiser l'échantillonnage pour les grands nombres d'hôtes
+        if len(host_ids) > 100:
+            # Pour les très grands jeux de données, échantillonner de manière distribuée
+            # Par exemple, prendre un hôte tous les N hôtes pour avoir une représentation
+            sample_rate = max(1, len(host_ids) // 10)  # Prendre environ 10 hôtes
+            history_host_ids = host_ids[::sample_rate][:5]  # Limiter à 5 au maximum
+            logger.info(f"Pour les historiques avec {len(host_ids)} hôtes: échantillonnage 1/{sample_rate} (total: {len(history_host_ids)} hôtes)")
+        else:
+            # Pour les petits ensembles, prendre les 5 premiers comme avant
+            history_sample_size = min(len(host_ids), 5)
+            history_host_ids = host_ids[:history_sample_size]
         
         # Préparer les requêtes d'historique avec clés explicites
         history_queries = []
