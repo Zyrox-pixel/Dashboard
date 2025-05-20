@@ -23,7 +23,11 @@ export const ENDPOINTS = {
   CURRENT_MANAGEMENT_ZONE: '/current-management-zone',
   SET_MANAGEMENT_ZONE: '/set-management-zone',
   VITAL_FOR_GROUP_MZS: '/vital-for-group-mzs',
-  VITAL_FOR_ENTREPRISE_MZS: '/vital-for-entreprise-mzs', // Nouvel endpoint pour VFE
+  VITAL_FOR_ENTREPRISE_MZS: '/vital-for-entreprise-mzs',
+  VITAL_FOR_PRODUCTION_MZS: '/vital-for-production-mzs',
+  VITAL_FOR_ANALYTICS_MZS: '/vital-for-analytics-mzs',
+  DETECTION_CTL_MZS: '/detection-ctl-mzs',
+  SECURITY_ENCRYPTION_MZS: '/security-encryption-mzs',
   
   // Endpoint de rafraîchissement du cache
   REFRESH_CACHE: (cacheType: string) => `/refresh/${cacheType}`

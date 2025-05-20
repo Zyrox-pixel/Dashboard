@@ -25,9 +25,28 @@ const UnifiedProblemsPage: React.FC = () => {
   let title = "Surveillance des Problèmes";
   
   if (dashboardType !== 'all') {
-    title += dashboardType === 'vfg' 
-      ? " - Vital for Group" 
-      : " - Vital for Entreprise";
+    switch (dashboardType) {
+      case 'vfg':
+        title += " - Vital for Group";
+        break;
+      case 'vfe':
+        title += " - Vital for Entreprise";
+        break;
+      case 'detection':
+        title += " - Détection & CTL";
+        break;
+      case 'security':
+        title += " - Security & Encryption";
+        break;
+      case 'vfp':
+        title += " - Vital for Production";
+        break;
+      case 'vfa':
+        title += " - Vital for Analytics";
+        break;
+      default:
+        title += " - " + dashboardType.toUpperCase();
+    }
   }
   
   if (problemType === 'active') {
@@ -44,7 +63,7 @@ const UnifiedProblemsPage: React.FC = () => {
       ) : (
         <UnifiedProblemsView 
           title={title}
-          variant={dashboardType as 'vfg' | 'vfe'}
+          variant={dashboardType as 'vfg' | 'vfe' | 'detection' | 'security' | 'vfp' | 'vfa'}
           problemType={problemType}
         />
       )}

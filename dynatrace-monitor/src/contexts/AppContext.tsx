@@ -20,6 +20,10 @@ export interface AppStateType {
   problemsLast72h: Problem[]; 
   vitalForGroupMZs: ManagementZone[];
   vitalForEntrepriseMZs: ManagementZone[];
+  vitalForProductionMZs: ManagementZone[];
+  vitalForAnalyticsMZs: ManagementZone[];
+  detectionCtlMZs: ManagementZone[];
+  securityEncryptionMZs: ManagementZone[];
   selectedZone: string | null;
   sidebarCollapsed: boolean;
   activeTab: string;
@@ -32,6 +36,10 @@ export interface AppStateType {
     zoneDetails: boolean;
     vitalForGroupMZs: boolean;
     vitalForEntrepriseMZs: boolean;
+    vitalForProductionMZs: boolean;
+    vitalForAnalyticsMZs: boolean;
+    detectionCtlMZs: boolean;
+    securityEncryptionMZs: boolean;
     initialLoadComplete: boolean;
     dashboardData?: boolean;
   };
@@ -53,7 +61,7 @@ export interface AppActionsType {
   setSelectedZone: (zoneId: string | null) => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
   setActiveTab: (tab: string) => void;
-  refreshData: (dashboardType?: 'vfg' | 'vfe', refreshProblemsOnly?: boolean, timeframe?: string) => Promise<void>;
+  refreshData: (dashboardType?: 'vfg' | 'vfe' | 'vfp' | 'vfa' | 'detection' | 'security', refreshProblemsOnly?: boolean, timeframe?: string) => Promise<void>;
   loadZoneData?: (zoneId: string) => Promise<void>;
 }
 
@@ -117,6 +125,10 @@ const initialAppState: AppStateType = {
   problemsLast72h: [],
   vitalForGroupMZs: [],
   vitalForEntrepriseMZs: [],
+  vitalForProductionMZs: [],
+  vitalForAnalyticsMZs: [],
+  detectionCtlMZs: [],
+  securityEncryptionMZs: [],
   selectedZone: null,
   sidebarCollapsed: false,
   activeTab: 'hosts',
@@ -129,6 +141,10 @@ const initialAppState: AppStateType = {
     zoneDetails: false,
     vitalForGroupMZs: true,
     vitalForEntrepriseMZs: true,
+    vitalForProductionMZs: true,
+    vitalForAnalyticsMZs: true,
+    detectionCtlMZs: true,
+    securityEncryptionMZs: true,
     initialLoadComplete: false
   },
   error: null,
@@ -189,25 +205,74 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
     return <span className="text-blue-500">⚙️</span>;
   }, []);
 
-  // Fonction optimisée pour charger les données d'une zone
+  // Fonction optimisée pour charger les données d'une zone avec prise en charge flexible des IDs de zone
   const loadZoneData = useCallback(async (zoneId: string) => {
     setState(prev => ({ ...prev, isLoading: { ...prev.isLoading, zoneDetails: true } }));
     const startTime = performance.now();
     
     try {
-      // Chercher la zone dans les deux collections
+      // Étape 1: Tentative directe - chercher la zone exacte dans les deux collections
       let selectedZoneObj = state.vitalForGroupMZs.find(zone => zone.id === zoneId) ||
-                           state.vitalForEntrepriseMZs.find(zone => zone.id === zoneId);
+                           state.vitalForEntrepriseMZs.find(zone => zone.id === zoneId) ||
+                           state.vitalForProductionMZs.find(zone => zone.id === zoneId) ||
+                           state.vitalForAnalyticsMZs.find(zone => zone.id === zoneId) ||
+                           state.detectionCtlMZs.find(zone => zone.id === zoneId) ||
+                           state.securityEncryptionMZs.find(zone => zone.id === zoneId);
       
+      // Étape 2: Si pas trouvé, utiliser des approches plus flexibles
       if (!selectedZoneObj) {
-        // Zone not found error handled in state update
+        console.log(`Zone avec ID exact '${zoneId}' non trouvée, essai avec approche flexible...`);
+        
+        // Approche 2.1: Nettoyer l'ID de la zone pour comparaison
+        const cleanZoneId = zoneId.replace(/^env-/, '').replace(/-+/g, ' ').trim();
+        
+        // Recherche dans toutes les collections avec le nom nettoyé
+        const allZones = [
+          ...state.vitalForGroupMZs,
+          ...state.vitalForEntrepriseMZs,
+          ...state.vitalForProductionMZs,
+          ...state.vitalForAnalyticsMZs,
+          ...state.detectionCtlMZs,
+          ...state.securityEncryptionMZs
+        ];
+        
+        // Approche 2.2: Chercher par nom nettoyé - correspondance partielle
+        selectedZoneObj = allZones.find(zone => {
+          const cleanZoneName = zone.name.trim();
+          return cleanZoneName.toLowerCase().includes(cleanZoneId.toLowerCase()) || 
+                 cleanZoneId.toLowerCase().includes(cleanZoneName.toLowerCase());
+        });
+        
+        // Approche 2.3: Extraire des parties de l'ID et chercher des correspondances
+        if (!selectedZoneObj) {
+          const parts = zoneId.replace(/^env-/, '').split(/[-_]+/);
+          for (const part of parts) {
+            if (part.length > 3) {  // Ignorer les petites parties
+              selectedZoneObj = allZones.find(zone => 
+                zone.name.toLowerCase().includes(part.toLowerCase())
+              );
+              if (selectedZoneObj) {
+                console.log(`Zone trouvée par partie de l'ID: ${part} -> ${selectedZoneObj.name}`);
+                break;
+              }
+            }
+          }
+        }
+      }
+      
+      // Vérifier si nous avons trouvé une zone correspondante
+      if (!selectedZoneObj) {
+        // Zone non trouvée après toutes les tentatives
         setState(prev => ({ 
           ...prev, 
-          error: `Zone introuvable (ID: ${zoneId})`,
+          error: `Zone introuvable (ID: ${zoneId}). Vérifiez l'identifiant de la zone ou essayez avec un autre ID.`,
           isLoading: { ...prev.isLoading, zoneDetails: false }
         }));
         return;
       }
+      
+      // Log la correspondance trouvée
+      console.log(`Zone correspondante trouvée: ${selectedZoneObj.name} (${selectedZoneObj.id}) pour l'ID demandé: ${zoneId}`);
       
       // Définir la management zone
       try {
@@ -412,10 +477,20 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
     } finally {
       setState(prev => ({ ...prev, isLoading: { ...prev.isLoading, zoneDetails: false } }));
     }
-  }, [state.vitalForGroupMZs, state.vitalForEntrepriseMZs, apiClient, optimized, getProcessIcon]);
+  }, [
+    state.vitalForGroupMZs,
+    state.vitalForEntrepriseMZs,
+    state.vitalForProductionMZs,
+    state.vitalForAnalyticsMZs,
+    state.detectionCtlMZs,
+    state.securityEncryptionMZs,
+    apiClient,
+    optimized,
+    getProcessIcon
+  ]);
 
   // Fonction pour charger toutes les données
-  const loadAllData = useCallback(async (dashboardType?: 'vfg' | 'vfe', refreshProblemsOnly?: boolean, silentMode: boolean = false, timeframe?: string) => {
+  const loadAllData = useCallback(async (dashboardType?: 'vfg' | 'vfe' | 'vfp' | 'vfa' | 'detection' | 'security', refreshProblemsOnly?: boolean, silentMode: boolean = false, timeframe?: string) => {
     // Modification de la fonction pour utiliser async/await avec Promise.all
     const startTime = performance.now();
     
@@ -463,6 +538,10 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
       let summaryResponse: ApiResponse<SummaryData> | undefined;
       let vfgResponse: ApiResponse<VitalForGroupMZsResponse> | undefined;
       let vfeResponse: ApiResponse<VitalForGroupMZsResponse> | undefined;
+      let vfpResponse: ApiResponse<VitalForGroupMZsResponse> | undefined;
+      let vfaResponse: ApiResponse<VitalForGroupMZsResponse> | undefined;
+      let detectionResponse: ApiResponse<VitalForGroupMZsResponse> | undefined;
+      let securityResponse: ApiResponse<VitalForGroupMZsResponse> | undefined;
       let problemsResponse: ApiResponse<ProblemResponse[]> | undefined;
       let problemsLast72hResponse: ApiResponse<ProblemResponse[]> | undefined;
       
@@ -481,14 +560,22 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
           apiClient.getSummary(),
           apiClient.getVitalForGroupMZs(),
           apiClient.getVitalForEntrepriseMZs(),
+          apiClient.getVitalForProductionMZs(),
+          apiClient.getVitalForAnalyticsMZs(),
+          apiClient.getDetectionCtlMZs(),
+          apiClient.getSecurityEncryptionMZs(),
           apiClient.getProblems("OPEN", "-60d", dashboardType, true),  // Force le rafraîchissement pour les problèmes actifs sur 60 jours
           apiClient.getProblems72h(dashboardType, undefined, true, timeframe)   // Utilise le nouvel endpoint dédié pour les problèmes avec la période spécifiée
         ]);
         summaryResponse = responses[0] as ApiResponse<SummaryData>;
         vfgResponse = responses[1] as ApiResponse<VitalForGroupMZsResponse>;
         vfeResponse = responses[2] as ApiResponse<VitalForGroupMZsResponse>;
-        problemsResponse = responses[3] as ApiResponse<ProblemResponse[]>;
-        problemsLast72hResponse = responses[4] as ApiResponse<ProblemResponse[]>;
+        vfpResponse = responses[3] as ApiResponse<VitalForGroupMZsResponse>;
+        vfaResponse = responses[4] as ApiResponse<VitalForGroupMZsResponse>;
+        detectionResponse = responses[5] as ApiResponse<VitalForGroupMZsResponse>;
+        securityResponse = responses[6] as ApiResponse<VitalForGroupMZsResponse>;
+        problemsResponse = responses[7] as ApiResponse<ProblemResponse[]>;
+        problemsLast72hResponse = responses[8] as ApiResponse<ProblemResponse[]>;
       }
 
       // Traiter les données du résumé si disponibles et si ce n'est pas un rafraîchissement des problèmes uniquement
@@ -497,9 +584,13 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
         setState(prev => ({ ...prev, summaryData: data as SummaryData }));
       }
       
-      // Traiter les données des MZs VFG et VFE si ce n'est pas un rafraîchissement des problèmes uniquement
+      // Traiter les données des MZs VFG, VFE, VFP, VFA, Detection & CTL, et Security & Encryption si ce n'est pas un rafraîchissement des problèmes uniquement
       let vfgMZs: ManagementZone[] = [];
       let vfeMZs: ManagementZone[] = [];
+      let vfpMZs: ManagementZone[] = [];
+      let vfaMZs: ManagementZone[] = [];
+      let detectionMZs: ManagementZone[] = [];
+      let securityMZs: ManagementZone[] = [];
       
       if (!refreshProblemsOnly) {
         if (vfgResponse && !vfgResponse.error && vfgResponse.data?.mzs) {
@@ -613,10 +704,236 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
           
           setState(prev => ({ ...prev, vitalForEntrepriseMZs: vfeMZs }));
         }
+        
+        // Traitement des données de Vital for Production
+        if (vfpResponse && !vfpResponse.error && vfpResponse.data?.mzs) {
+          // Obtenir les comptages pour chaque zone en parallèle
+          const mzPromises = vfpResponse.data.mzs.map(async (mzName) => {
+            try {
+              
+              // Récupérer les comptages depuis l'API
+              const response = await fetch(`${API_BASE_URL}/management-zones/counts?zone=${encodeURIComponent(mzName)}`);
+              
+              if (response.ok) {
+                const data = await response.json();
+                const counts = data.counts || { hosts: 0, services: 0, processes: 0 };
+                
+                return {
+                  id: `env-${mzName.replace(/\s+/g, '-')}`,
+                  name: mzName,
+                  code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
+                  icon: getZoneIcon(mzName),
+                  problemCount: 0,
+                  apps: counts.processes,
+                  services: counts.services,
+                  hosts: counts.hosts,
+                  availability: "99.99%", // Pour l'instant, valeur par défaut
+                  status: "healthy" as "healthy" | "warning",
+                  color: getZoneColor(mzName),
+                  dt_url: "#"
+                };
+              } else {
+                // API error handled in catch block
+                throw new Error(`Erreur API ${response.status}`);
+              }
+            } catch (error) {
+              // Error for MZ handled with fallback object
+              // En cas d'erreur, retourner un objet avec des comptages à 0
+              return {
+                id: `env-${mzName.replace(/\s+/g, '-')}`,
+                name: mzName,
+                code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
+                icon: getZoneIcon(mzName),
+                problemCount: 0,
+                apps: 0,
+                services: 0,
+                hosts: 0,
+                availability: "99.99%",
+                status: "healthy" as "healthy" | "warning",
+                color: getZoneColor(mzName),
+                dt_url: "#"
+              };
+            }
+          });
+          
+          // Attendre la résolution de toutes les promesses
+          vfpMZs = await Promise.all(mzPromises);
+          
+          setState(prev => ({ ...prev, vitalForProductionMZs: vfpMZs }));
+        }
+        
+        // Traitement des données de Vital for Analytics
+        if (vfaResponse && !vfaResponse.error && vfaResponse.data?.mzs) {
+          // Obtenir les comptages pour chaque zone en parallèle
+          const mzPromises = vfaResponse.data.mzs.map(async (mzName) => {
+            try {
+              
+              // Récupérer les comptages depuis l'API
+              const response = await fetch(`${API_BASE_URL}/management-zones/counts?zone=${encodeURIComponent(mzName)}`);
+              
+              if (response.ok) {
+                const data = await response.json();
+                const counts = data.counts || { hosts: 0, services: 0, processes: 0 };
+                
+                return {
+                  id: `env-${mzName.replace(/\s+/g, '-')}`,
+                  name: mzName,
+                  code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
+                  icon: getZoneIcon(mzName),
+                  problemCount: 0,
+                  apps: counts.processes,
+                  services: counts.services,
+                  hosts: counts.hosts,
+                  availability: "99.99%", // Pour l'instant, valeur par défaut
+                  status: "healthy" as "healthy" | "warning",
+                  color: getZoneColor(mzName),
+                  dt_url: "#"
+                };
+              } else {
+                // API error handled in catch block
+                throw new Error(`Erreur API ${response.status}`);
+              }
+            } catch (error) {
+              // Error for MZ handled with fallback object
+              // En cas d'erreur, retourner un objet avec des comptages à 0
+              return {
+                id: `env-${mzName.replace(/\s+/g, '-')}`,
+                name: mzName,
+                code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
+                icon: getZoneIcon(mzName),
+                problemCount: 0,
+                apps: 0,
+                services: 0,
+                hosts: 0,
+                availability: "99.99%",
+                status: "healthy" as "healthy" | "warning",
+                color: getZoneColor(mzName),
+                dt_url: "#"
+              };
+            }
+          });
+          
+          // Attendre la résolution de toutes les promesses
+          vfaMZs = await Promise.all(mzPromises);
+          
+          setState(prev => ({ ...prev, vitalForAnalyticsMZs: vfaMZs }));
+        }
+        
+        // Traitement des données de Detection & CTL
+        if (detectionResponse && !detectionResponse.error && detectionResponse.data?.mzs) {
+          // Obtenir les comptages pour chaque zone en parallèle
+          const mzPromises = detectionResponse.data.mzs.map(async (mzName) => {
+            try {
+              // Récupérer les comptages depuis l'API
+              const response = await fetch(`${API_BASE_URL}/management-zones/counts?zone=${encodeURIComponent(mzName)}`);
+              
+              if (response.ok) {
+                const data = await response.json();
+                const counts = data.counts || { hosts: 0, services: 0, processes: 0 };
+                
+                return {
+                  id: `env-${mzName.replace(/\s+/g, '-')}`,
+                  name: mzName,
+                  code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
+                  icon: getZoneIcon(mzName),
+                  problemCount: 0,
+                  apps: counts.processes,
+                  services: counts.services,
+                  hosts: counts.hosts,
+                  availability: "99.99%", // Pour l'instant, valeur par défaut
+                  status: "healthy" as "healthy" | "warning",
+                  color: getZoneColor(mzName),
+                  dt_url: "#"
+                };
+              } else {
+                throw new Error(`Erreur API ${response.status}`);
+              }
+            } catch (error) {
+              // En cas d'erreur, retourner un objet avec des comptages à 0
+              return {
+                id: `env-${mzName.replace(/\s+/g, '-')}`,
+                name: mzName,
+                code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
+                icon: getZoneIcon(mzName),
+                problemCount: 0,
+                apps: 0,
+                services: 0,
+                hosts: 0,
+                availability: "99.99%",
+                status: "healthy" as "healthy" | "warning",
+                color: getZoneColor(mzName),
+                dt_url: "#"
+              };
+            }
+          });
+          
+          // Attendre la résolution de toutes les promesses
+          detectionMZs = await Promise.all(mzPromises);
+          
+          setState(prev => ({ ...prev, detectionCtlMZs: detectionMZs }));
+        }
+        
+        // Traitement des données de Security & Encryption
+        if (securityResponse && !securityResponse.error && securityResponse.data?.mzs) {
+          // Obtenir les comptages pour chaque zone en parallèle
+          const mzPromises = securityResponse.data.mzs.map(async (mzName) => {
+            try {
+              // Récupérer les comptages depuis l'API
+              const response = await fetch(`${API_BASE_URL}/management-zones/counts?zone=${encodeURIComponent(mzName)}`);
+              
+              if (response.ok) {
+                const data = await response.json();
+                const counts = data.counts || { hosts: 0, services: 0, processes: 0 };
+                
+                return {
+                  id: `env-${mzName.replace(/\s+/g, '-')}`,
+                  name: mzName,
+                  code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
+                  icon: getZoneIcon(mzName),
+                  problemCount: 0,
+                  apps: counts.processes,
+                  services: counts.services,
+                  hosts: counts.hosts,
+                  availability: "99.99%", // Pour l'instant, valeur par défaut
+                  status: "healthy" as "healthy" | "warning",
+                  color: getZoneColor(mzName),
+                  dt_url: "#"
+                };
+              } else {
+                throw new Error(`Erreur API ${response.status}`);
+              }
+            } catch (error) {
+              // En cas d'erreur, retourner un objet avec des comptages à 0
+              return {
+                id: `env-${mzName.replace(/\s+/g, '-')}`,
+                name: mzName,
+                code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
+                icon: getZoneIcon(mzName),
+                problemCount: 0,
+                apps: 0,
+                services: 0,
+                hosts: 0,
+                availability: "99.99%",
+                status: "healthy" as "healthy" | "warning",
+                color: getZoneColor(mzName),
+                dt_url: "#"
+              };
+            }
+          });
+          
+          // Attendre la résolution de toutes les promesses
+          securityMZs = await Promise.all(mzPromises);
+          
+          setState(prev => ({ ...prev, securityEncryptionMZs: securityMZs }));
+        }
       } else {
         // En cas de rafraîchissement des problèmes uniquement, réutiliser les MZs existantes
         vfgMZs = state.vitalForGroupMZs;
         vfeMZs = state.vitalForEntrepriseMZs;
+        vfpMZs = state.vitalForProductionMZs;
+        vfaMZs = state.vitalForAnalyticsMZs;
+        detectionMZs = state.detectionCtlMZs;
+        securityMZs = state.securityEncryptionMZs;
       }
       
       // Traiter les données des problèmes actifs
@@ -697,10 +1014,51 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
       };
     });
     
+    const updatedDetectionMZs = detectionMZs.map(zone => {
+      const zoneProblems = problems.filter(p => p.zone && p.zone.includes(zone.name));
+      return {
+        ...zone,
+        problemCount: zoneProblems.length,
+        status: (zoneProblems.length > 0 ? "warning" : "healthy") as "warning" | "healthy"
+      };
+    });
+    
+    const updatedSecurityMZs = securityMZs.map(zone => {
+      const zoneProblems = problems.filter(p => p.zone && p.zone.includes(zone.name));
+      return {
+        ...zone,
+        problemCount: zoneProblems.length,
+        status: (zoneProblems.length > 0 ? "warning" : "healthy") as "warning" | "healthy"
+      };
+    });
+    
+    // Mettre à jour les compteurs de problèmes pour les MZs VFP et VFA
+    const updatedVfpMZs = vfpMZs.map(zone => {
+      const zoneProblems = problems.filter(p => p.zone && p.zone.includes(zone.name));
+      return {
+        ...zone,
+        problemCount: zoneProblems.length,
+        status: (zoneProblems.length > 0 ? "warning" : "healthy") as "warning" | "healthy"
+      };
+    });
+    
+    const updatedVfaMZs = vfaMZs.map(zone => {
+      const zoneProblems = problems.filter(p => p.zone && p.zone.includes(zone.name));
+      return {
+        ...zone,
+        problemCount: zoneProblems.length,
+        status: (zoneProblems.length > 0 ? "warning" : "healthy") as "warning" | "healthy"
+      };
+    });
+    
     setState(prev => ({
       ...prev,
       vitalForGroupMZs: updatedVfgMZs,
-      vitalForEntrepriseMZs: updatedVfeMZs
+      vitalForEntrepriseMZs: updatedVfeMZs,
+      vitalForProductionMZs: updatedVfpMZs,
+      vitalForAnalyticsMZs: updatedVfaMZs,
+      detectionCtlMZs: updatedDetectionMZs,
+      securityEncryptionMZs: updatedSecurityMZs
     }));
   }
 }
@@ -802,13 +1160,30 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
             problems: false, 
             vitalForGroupMZs: !refreshProblemsOnly ? false : prev.isLoading.vitalForGroupMZs,
             vitalForEntrepriseMZs: !refreshProblemsOnly ? false : prev.isLoading.vitalForEntrepriseMZs,
+            detectionCtlMZs: !refreshProblemsOnly ? false : prev.isLoading.detectionCtlMZs,
+            securityEncryptionMZs: !refreshProblemsOnly ? false : prev.isLoading.securityEncryptionMZs,
             initialLoadComplete: !refreshProblemsOnly ? true : prev.isLoading.initialLoadComplete,
             dashboardData: false
           } 
         }));
       }
     }
-  }, [state.selectedZone, state.vitalForGroupMZs, state.vitalForEntrepriseMZs, loadZoneData, apiClient, optimized, getZoneIcon, getZoneColor]);
+  }, [
+    state.selectedZone, 
+    state.vitalForGroupMZs, 
+    state.vitalForEntrepriseMZs, 
+    state.vitalForProductionMZs, 
+    state.vitalForAnalyticsMZs, 
+    state.detectionCtlMZs, 
+    state.securityEncryptionMZs, 
+    loadZoneData, 
+    apiClient, 
+    optimized, 
+    getZoneIcon, 
+    getZoneColor, 
+    setPerformanceMetrics,
+    API_BASE_URL
+  ]);
 
   // Drapeau pour éviter les appels multiples à refreshData
   const refreshInProgressRef = useRef(false);
@@ -816,7 +1191,7 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
   const refreshTimeoutIdRef = useRef<number | null>(null);
 
   // Fonction pour rafraîchir les données - version non bloquante améliorée avec prise en charge de la période
-  const refreshData = useCallback(async (dashboardType?: 'vfg' | 'vfe', refreshProblemsOnly?: boolean, timeframe?: string): Promise<void> => {
+  const refreshData = useCallback(async (dashboardType?: 'vfg' | 'vfe' | 'vfp' | 'vfa' | 'detection' | 'security', refreshProblemsOnly?: boolean, timeframe?: string): Promise<void> => {
     // Éviter les appels multiples simultanés
     if (refreshInProgressRef.current) {
       console.log("Un rafraîchissement est déjà en cours, nouvelle demande ignorée");
@@ -979,8 +1354,15 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
       }
       
       
-      // Récupérer le type de dashboard actuel (vfg ou vfe)
-      const currentDashboardType = window.location.pathname.includes('vfe') ? 'vfe' : 'vfg';
+      // Récupérer le type de dashboard actuel
+      let currentDashboardType = 'vfg';
+      if (window.location.pathname.includes('vfe')) {
+        currentDashboardType = 'vfe';
+      } else if (window.location.pathname.includes('detection')) {
+        currentDashboardType = 'detection';
+      } else if (window.location.pathname.includes('security')) {
+        currentDashboardType = 'security';
+      }
       
       // NE PAS mettre à jour l'indicateur de chargement pour un rafraîchissement en arrière-plan
       // Les rafraîchissements automatiques doivent être transparents pour l'utilisateur
@@ -1103,9 +1485,44 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
         // Récupérer les comptages à jour pour la zone sélectionnée
         console.log(`Récupération prioritaire des comptages pour ${zoneId}`);
         
-        // Trouver la zone dans l'une des collections
-        const selectedZone = state.vitalForGroupMZs.find((z: ManagementZone) => z.id === zoneId) || 
-                           state.vitalForEntrepriseMZs.find((z: ManagementZone) => z.id === zoneId);
+        // Recherche dans toutes les collections avec le même algorithme que dans loadZoneData
+        const allZones = [
+          ...state.vitalForGroupMZs,
+          ...state.vitalForEntrepriseMZs,
+          ...state.vitalForProductionMZs,
+          ...state.vitalForAnalyticsMZs,
+          ...state.detectionCtlMZs,
+          ...state.securityEncryptionMZs
+        ];
+        
+        // Étape 1: Tentative directe avec ID exact
+        let selectedZone = allZones.find(z => z.id === zoneId);
+        
+        // Étape 2: Si pas trouvé, essayer des méthodes de correspondance flexibles
+        if (!selectedZone) {
+          // Nettoyer l'ID de la zone pour comparaison
+          const cleanZoneId = zoneId.replace(/^env-/, '').replace(/-+/g, ' ').trim();
+          
+          // Chercher par nom nettoyé (correspondance partielle)
+          selectedZone = allZones.find(zone => {
+            const cleanZoneName = zone.name.trim();
+            return cleanZoneName.toLowerCase().includes(cleanZoneId.toLowerCase()) || 
+                   cleanZoneId.toLowerCase().includes(cleanZoneName.toLowerCase());
+          });
+          
+          // Si toujours pas trouvé, essayer par parties de l'ID
+          if (!selectedZone) {
+            const parts = zoneId.replace(/^env-/, '').split(/[-_]+/);
+            for (const part of parts) {
+              if (part.length > 3) {  // Ignorer les petites parties
+                selectedZone = allZones.find(zone => 
+                  zone.name.toLowerCase().includes(part.toLowerCase())
+                );
+                if (selectedZone) break;
+              }
+            }
+          }
+        }
         
         if (selectedZone) {
           // Forcer un préchargement spécifique des données de services pour cette zone
@@ -1118,9 +1535,22 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
                 const servicesData = Array.isArray(servicesResponse.data) ? servicesResponse.data : [];
                 const servicesCount = servicesData.length;
                 
-                      
-                // Mettre à jour immédiatement le comptage des services pour cette zone
-                const isVFG = state.vitalForGroupMZs.some((zone: ManagementZone) => zone.id === zoneId);
+                // Vérifier que selectedZone est toujours défini à ce point
+                if (!selectedZone) {
+                  console.error("selectedZone est undefined, impossible de continuer");
+                  return;
+                }
+                
+                // Déterminer à quelle collection appartient la zone
+                const zoneId = selectedZone.id; // Utiliser selectedZone qui est garanti d'exister
+                const isVFG = state.vitalForGroupMZs.some(z => z.id === zoneId);
+                const isVFE = state.vitalForEntrepriseMZs.some(z => z.id === zoneId);
+                const isVFP = state.vitalForProductionMZs.some(z => z.id === zoneId);
+                const isVFA = state.vitalForAnalyticsMZs.some(z => z.id === zoneId);
+                const isDetection = state.detectionCtlMZs.some(z => z.id === zoneId);
+                const isSecurity = state.securityEncryptionMZs.some(z => z.id === zoneId);
+                
+                // Mettre à jour la collection appropriée
                 if (isVFG) {
                   setState(prev => ({
                     ...prev,
@@ -1128,10 +1558,38 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
                       zone.id === zoneId ? {...zone, services: servicesCount} : zone
                     )
                   }));
-                } else {
+                } else if (isVFE) {
                   setState(prev => ({
                     ...prev,
                     vitalForEntrepriseMZs: prev.vitalForEntrepriseMZs.map(zone => 
+                      zone.id === zoneId ? {...zone, services: servicesCount} : zone
+                    )
+                  }));
+                } else if (isVFP) {
+                  setState(prev => ({
+                    ...prev,
+                    vitalForProductionMZs: prev.vitalForProductionMZs.map(zone => 
+                      zone.id === zoneId ? {...zone, services: servicesCount} : zone
+                    )
+                  }));
+                } else if (isVFA) {
+                  setState(prev => ({
+                    ...prev,
+                    vitalForAnalyticsMZs: prev.vitalForAnalyticsMZs.map(zone => 
+                      zone.id === zoneId ? {...zone, services: servicesCount} : zone
+                    )
+                  }));
+                } else if (isDetection) {
+                  setState(prev => ({
+                    ...prev,
+                    detectionCtlMZs: prev.detectionCtlMZs.map(zone => 
+                      zone.id === zoneId ? {...zone, services: servicesCount} : zone
+                    )
+                  }));
+                } else if (isSecurity) {
+                  setState(prev => ({
+                    ...prev,
+                    securityEncryptionMZs: prev.securityEncryptionMZs.map(zone => 
                       zone.id === zoneId ? {...zone, services: servicesCount} : zone
                     )
                   }));
@@ -1156,7 +1614,16 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
         loadZoneData(zoneId);
       }
     }
-  }, [loadZoneData, state.vitalForGroupMZs, state.vitalForEntrepriseMZs, apiClient]);
+  }, [
+    loadZoneData, 
+    state.vitalForGroupMZs, 
+    state.vitalForEntrepriseMZs,
+    state.vitalForProductionMZs,
+    state.vitalForAnalyticsMZs,
+    state.detectionCtlMZs,
+    state.securityEncryptionMZs,
+    apiClient
+  ]);
 
   // Fonctions pour modifier l'état
   const setSidebarCollapsed = useCallback((collapsed: boolean) => {

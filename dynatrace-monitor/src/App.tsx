@@ -45,12 +45,18 @@ function App() {
                 <Route path="/problems/active" element={<UnifiedProblemsPage />} />
                 <Route path="/problems/recent" element={<UnifiedProblemsPage />} />
                 
-                {/* Routes de compatibilité avec l'ancienne structure */}
+                {/* Routes pour les applications */}
                 <Route path="/vfg" element={<Navigate to="/dashboard/vfg" replace />} />
                 <Route path="/vfe" element={<Navigate to="/dashboard/vfe" replace />} />
+                <Route path="/detection" element={<Navigate to="/dashboard/detection" replace />} />
+                <Route path="/security" element={<Navigate to="/dashboard/security" replace />} />
+                
+                {/* Routes pour les versions optimisées */}
                 <Route path="/optimized" element={<Navigate to="/dashboard/vfg/true" replace />} />
                 <Route path="/vfg-optimized" element={<Navigate to="/dashboard/vfg/true" replace />} />
                 <Route path="/vfe-optimized" element={<Navigate to="/dashboard/vfe/true" replace />} />
+                <Route path="/detection-optimized" element={<Navigate to="/dashboard/detection/true" replace />} />
+                <Route path="/security-optimized" element={<Navigate to="/dashboard/security/true" replace />} />
                 
                 {/* Routes supplémentaires pour la compatibilité */}
                 <Route path="/problems" element={<Navigate to="/problems/unified" replace />} />

@@ -621,6 +621,34 @@ class ApiClient {
   public getVitalForEntrepriseMZs() {
     return this.get<VitalForGroupMZsResponse>(ENDPOINTS.VITAL_FOR_ENTREPRISE_MZS);
   }
+  
+  /**
+   * Récupérer les management zones de Vital for Production
+   */
+  public getVitalForProductionMZs() {
+    return this.get<VitalForGroupMZsResponse>(ENDPOINTS.VITAL_FOR_PRODUCTION_MZS);
+  }
+  
+  /**
+   * Récupérer les management zones de Vital for Analytics
+   */
+  public getVitalForAnalyticsMZs() {
+    return this.get<VitalForGroupMZsResponse>(ENDPOINTS.VITAL_FOR_ANALYTICS_MZS);
+  }
+  
+  /**
+   * Récupérer les management zones de Detection & CTL
+   */
+  public getDetectionCtlMZs() {
+    return this.get<VitalForGroupMZsResponse>(ENDPOINTS.DETECTION_CTL_MZS);
+  }
+
+  /**
+   * Récupérer les management zones de Security & Encryption
+   */
+  public getSecurityEncryptionMZs() {
+    return this.get<VitalForGroupMZsResponse>(ENDPOINTS.SECURITY_ENCRYPTION_MZS);
+  }
 
   /**
    * Définir la management zone actuelle

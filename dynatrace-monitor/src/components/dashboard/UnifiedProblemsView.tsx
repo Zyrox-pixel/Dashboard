@@ -10,8 +10,8 @@ import { exportProblemsToCSV, downloadCSV } from '../../utils/exportUtils';
 interface UnifiedProblemsViewProps {
   /** Titre principal de la vue */
   title: string;
-  /** Variante du dashboard (vfg, vfe ou all) */
-  variant: 'vfg' | 'vfe' | 'all';
+  /** Variante du dashboard (vfg, vfe, detection, security ou all) */
+  variant: 'vfg' | 'vfe' | 'detection' | 'security' | 'vfp' | 'vfa' | 'all';
   /** Filtre de zone optionnel (pour les sous-zones de management) */
   zoneFilter?: string;
   /** Type de problème à afficher (active, recent, all) */
@@ -231,7 +231,30 @@ const UnifiedProblemsView: React.FC<UnifiedProblemsViewProps> = ({ title, varian
   };
 
   // Déterminer les couleurs d'accentuation en fonction de la variante
-  const accentColor = variant === 'vfg' ? 'blue' : 'amber';
+  let accentColor = 'blue';
+  
+  switch(variant) {
+    case 'vfg':
+      accentColor = 'blue';
+      break;
+    case 'vfe':
+      accentColor = 'amber';
+      break;
+    case 'detection':
+      accentColor = 'emerald';
+      break;
+    case 'security':
+      accentColor = 'orange';
+      break;
+    case 'vfp':
+      accentColor = 'green';
+      break;
+    case 'vfa':
+      accentColor = 'purple';
+      break;
+    default:
+      accentColor = 'blue';
+  }
 
   // Constantes CSS pour l'accentuation des couleurs
   const cssVariant = {
