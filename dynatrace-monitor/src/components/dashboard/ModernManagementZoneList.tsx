@@ -234,8 +234,8 @@ const ModernManagementZoneList: React.FC<ModernManagementZoneListProps> = ({
   // Gérer le rafraîchissement avec préchargement
   const handleRefresh = () => {
     if (onRefresh) {
-      // Force un nouveau préchargement des statuts
-      console.log('Rafraîchir avec préchargement');
+      // Force un nouveau préchargement des statuts et un rechargement complet depuis le backend
+      console.log('Rafraîchir avec préchargement et forcer le rechargement depuis le backend');
       onRefresh();
     }
   };
@@ -282,7 +282,7 @@ const ModernManagementZoneList: React.FC<ModernManagementZoneListProps> = ({
                 onClick={handleRefresh}
                 disabled={loading}
                 className={`p-2 rounded-full ${loading ? 'bg-slate-700 text-slate-500' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}
-                title="Rafraîchir les données"
+                title="Force un rechargement complet depuis le backend"
               >
                 <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
               </button>

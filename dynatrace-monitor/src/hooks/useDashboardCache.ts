@@ -167,7 +167,7 @@ export function useDashboardCache(dashboardType: 'vfg' | 'vfe' | 'vfp' | 'vfa' |
 
 
   // Fonction pour rafraîchir les données depuis l'API
-  const refreshData = useCallback(async (force: boolean = false, customTimeframe?: string) => {
+  const refreshData = useCallback(async (force: boolean = false, customTimeframe?: string, forceBackendReload?: boolean) => {
     // Éviter les requêtes multiples simultanées
     if (pendingRequestRef.current && !force) {
       return;
@@ -176,6 +176,20 @@ export function useDashboardCache(dashboardType: 'vfg' | 'vfe' | 'vfp' | 'vfa' |
     pendingRequestRef.current = true;
     setIsLoading(true);
     setError(null);
+    
+    // Si on force le rechargement depuis le backend, effacer les caches locaux
+    if (forceBackendReload) {
+      console.log("Forçage du rechargement complet depuis le backend - nettoyage des caches locaux");
+      // Nettoyer les caches localStorage et sessionStorage
+      Object.keys(localStorage).forEach(key => {
+        if (key.startsWith('dashboard_') || key.includes('_cache')) {
+          localStorage.removeItem(key);
+        }
+      });
+      
+      // Forcer le paramètre force à true pour s'assurer que l'API ignre son cache
+      force = true;
+    }
 
     try {
       console.log(`Rafraîchissement des données ${dashboardType}${force ? ' (forcé)' : ''}${customTimeframe ? ` avec période ${customTimeframe}` : ''}`);

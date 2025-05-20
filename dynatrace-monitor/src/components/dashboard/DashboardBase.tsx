@@ -514,8 +514,9 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
               </div>
             </div>
             <button 
-              onClick={() => refreshData()}
+              onClick={() => refreshData(variant, false, undefined, true)}
               className={`px-4 py-2 ${cssClasses.accentBg} text-white rounded ${cssClasses.hoverBg} flex items-center gap-2 ml-auto`}
+              title="Force un rechargement complet depuis le backend"
             >
               <RefreshCw size={16} />
               <span>Rafraîchir</span>

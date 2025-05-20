@@ -2,8 +2,9 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Host, ApiResponse } from '../api/types';
 import { api } from '../api';
 
-// Cache key for hosts data
-const HOSTS_CACHE_KEY = 'hosts_data_cache';
+// Cache keys
+const HOSTS_CACHE_KEY = 'hosts_data_cache_v2'; // Incrémenté pour forcer la réinitialisation du cache
+const MZ_ADMIN_VERSION_KEY = 'mz_admin_version'; // Pour suivre les changements de configuration
 
 /**
  * Hook personnalisé pour gérer les données des hosts
@@ -37,25 +38,9 @@ export function useHostsData() {
         return mzAdmin;
       }
 
-      // 2. Ensuite, essayer de récupérer depuis le cache localStorage global
-      try {
-        const cachedGlobalData = localStorage.getItem(HOSTS_CACHE_KEY);
-        if (cachedGlobalData) {
-          const parsedData = JSON.parse(cachedGlobalData);
-          if (parsedData.mzAdmin && parsedData.hosts && Array.isArray(parsedData.hosts)) {
-            console.log(`Récupération de la MZ Admin depuis le cache global: ${parsedData.mzAdmin}`);
-            setMzAdmin(parsedData.mzAdmin);
-            setHosts(parsedData.hosts);
-            setTotalHosts(parsedData.total || parsedData.hosts.length);
-            setLastRefreshTime(new Date(parsedData.timestamp));
-            setConfigLoaded(true);
-            return parsedData.mzAdmin;
-          }
-        }
-      } catch (cacheError) {
-        console.warn('Erreur lors de la lecture du cache global:', cacheError);
-        // Continue to backend fetch on cache error
-      }
+      // 2. Continuer directement à la récupération depuis le backend
+      // N'utilisez PAS le cache pour la valeur de MZ_ADMIN - toujours récupérer depuis le backend
+      // Seulement le cache des données de hosts est conservé
       
       // Sinon, essayer de récupérer depuis le backend avec réessais
       let attempts = 0;
@@ -138,20 +123,16 @@ export function useHostsData() {
       if (cachedData) {
         const parsedData = JSON.parse(cachedData);
         
-        // On utilise le cache si on a des données valides, même si la MZ est différente
-        // Cela garantit que nous avons toujours quelque chose à afficher
+        // On utilise le cache uniquement pour les données des hosts, pas pour la MZ
         if (parsedData.hosts && Array.isArray(parsedData.hosts) && parsedData.hosts.length > 0) {
           console.log(`Utilisation des données en cache pour ${parsedData.hosts.length} hosts`);
           
           setHosts(parsedData.hosts);
           setTotalHosts(parsedData.total || parsedData.hosts.length);
           setLastRefreshTime(new Date(parsedData.timestamp));
-
-          // Si la MZ en cache est différente de la MZ en mémoire mais valide, mettons à jour la MZ en mémoire
-          if (parsedData.mzAdmin && (!mzAdmin || parsedData.mzAdmin !== mzAdmin)) {
-            console.log(`Mise à jour de la MZ Admin depuis le cache: ${parsedData.mzAdmin}`);
-            setMzAdmin(parsedData.mzAdmin);
-          }
+          
+          // Ne pas mettre à jour la MZ Admin depuis le cache
+          // La valeur de MZ Admin doit toujours venir du backend, pas du cache
           
           return true;
         }
@@ -161,7 +142,7 @@ export function useHostsData() {
       console.error('Erreur lors du chargement du cache:', error);
       return false;
     }
-  }, [mzAdmin]);
+  }, []);
 
   // Fonction pour rafraîchir les données depuis l'API
   const refreshData = useCallback(async (forceRefresh: boolean = false) => {
@@ -242,22 +223,26 @@ export function useHostsData() {
   // Effet pour charger la configuration et les données au démarrage
   useEffect(() => {
     const loadData = async () => {
-      // D'abord, essayer de charger depuis le cache
-      // Cela permet d'afficher immédiatement des données si disponibles
-      const cacheLoaded = loadFromCache();
-      
-      // Récupérer ensuite la config mzadmin depuis le backend
-      // même si les données du cache ont été chargées
+      // IMPORTANT: Toujours récupérer d'abord la config mzadmin depuis le backend
+      // pour garantir qu'on a la valeur la plus récente du .env
       const loadedMzAdmin = await fetchMzAdminConfig();
       
-      // Si nous avons une MZ admin et pas de données en cache, charger depuis l'API
+      // Après avoir récupéré la MZ du backend, vérifier si on a un cache pour les hosts
+      // mais seulement pour les données, pas pour la configuration de la MZ
+      const cacheLoaded = loadFromCache();
+      
+      // Si nous avons une MZ admin (du backend) et pas de données en cache, charger depuis l'API
       if (loadedMzAdmin && !cacheLoaded) {
         await refreshData();
       } 
-      // Si nous n'avons pas de MZ admin mais des données en cache, c'est ok de continuer
+      // Si nous n'avons pas de MZ admin mais des données en cache, c'est ok de continuer avec le cache
       // Si nous n'avons ni MZ admin ni données en cache, refreshData affichera l'erreur
       else if (!loadedMzAdmin && !cacheLoaded) {
         refreshData();
+      }
+      // Si nous avons une MZ admin et des données en cache, rafraîchir en arrière-plan
+      else if (loadedMzAdmin && cacheLoaded) {
+        setTimeout(() => refreshData(true), 2000); // Délai pour permettre l'affichage des données en cache d'abord
       }
     };
     
@@ -282,12 +267,23 @@ export function useHostsData() {
   }, [fetchMzAdminConfig, loadFromCache, refreshData]);
   
   // Effet secondaire pour s'assurer que les données ne sont jamais perdues après le premier rendu
+  // et pour forcer un rafraîchissement quand la MZ change
   useEffect(() => {
     // Si nous avons des hosts en mémoire, sauvegardons-les toujours dans le cache
     if (hosts.length > 0 && mzAdmin) {
-      saveToCache(hosts);
+      // Sauvegarder les données mais aussi vérifier si la MZ a changé
+      const previousMzVersion = localStorage.getItem(MZ_ADMIN_VERSION_KEY);
+      if (previousMzVersion !== mzAdmin) {
+        console.log(`Détection d'un changement de MZ Admin: ${previousMzVersion} -> ${mzAdmin}`);  
+        localStorage.setItem(MZ_ADMIN_VERSION_KEY, mzAdmin);
+        // Si la MZ a changé, force un rafraîchissement des données
+        refreshData(true);
+      } else {
+        // Sinon, juste sauvegarder le cache normalement
+        saveToCache(hosts);
+      }
     }
-  }, [hosts, mzAdmin, saveToCache]);
+  }, [hosts, mzAdmin, saveToCache, refreshData]);
 
   // Retourner les données et fonctions nécessaires
   return {

@@ -1485,20 +1485,31 @@ def refresh_cache(cache_type):
 def get_mz_admin():
     """Endpoint pour récupérer la Management Zone configurée pour l'onglet Hosts"""
     try:
-        # Récupérer la valeur de MZ_ADMIN depuis le fichier .env
+        # Force le rechargement des variables d'environnement depuis le fichier .env
+        from dotenv import load_dotenv
+        load_dotenv(override=True)  # override=True pour forcer le rechargement
+        
+        # Récupérer la valeur fraîchement chargée de MZ_ADMIN
         mz_admin = os.environ.get('MZ_ADMIN', '')
         
-        # Log pour debug
-        logger.info(f"Récupération de la MZ admin: {mz_admin}")
+        # Log pour debug avec timestamp pour voir quand la valeur est récupérée
+        current_time = datetime.now().strftime('%H:%M:%S')
+        logger.info(f"[{current_time}] Récupération de la MZ admin: {mz_admin}")
+        
+        # Ajouter le paramètre nocache pour éviter le cache côté client
+        if 'nocache' in request.args:
+            logger.info(f"Demande sans cache reçue: {request.args.get('nocache')}")
         
         return jsonify({
-            'mzadmin': mz_admin
+            'mzadmin': mz_admin,
+            'timestamp': current_time
         })
     except Exception as e:
         logger.error(f"Erreur lors de la récupération de MZ_ADMIN: {e}")
         return jsonify({
             'mzadmin': '',
-            'error': str(e)
+            'error': str(e),
+            'timestamp': datetime.now().strftime('%H:%M:%S')
         }), 500
 
 @app.route('/api/performance', methods=['GET'])

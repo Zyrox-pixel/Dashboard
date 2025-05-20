@@ -708,7 +708,7 @@ const ProblemsList: React.FC<ProblemsListProps> = ({
                   bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-500 hover:to-indigo-600
                   text-white shadow-md border border-indigo-400/30
                   disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
-                title="Rafraîchir les problèmes en temps réel"
+                title="Force un rechargement complet depuis le backend"
               >
                 <RefreshCw size={14} className={`${isRefreshing ? 'animate-spin' : ''}`} />
                 <span className="hidden sm:inline">{isRefreshing ? 'Rafraîchissement...' : 'Rafraîchir les données'}</span>
