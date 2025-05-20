@@ -171,15 +171,21 @@ const HostsPage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-slate-800 divide-y divide-slate-200 dark:divide-slate-700">
-                  {isLoading && paginatedHosts.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} className="px-6 py-16 text-center text-slate-600 dark:text-slate-300">
-                        <div className="flex flex-col items-center">
-                          <div className="animate-spin w-10 h-10 border-4 border-slate-300 dark:border-slate-600 border-t-blue-500 dark:border-t-blue-400 rounded-full mb-3"></div>
-                          <p>Chargement des données...</p>
-                        </div>
-                      </td>
-                    </tr>
+  {isLoading && paginatedHosts.length === 0 ? (
+    <tr>
+      <td colSpan={5} className="px-6 py-16 text-center text-slate-600 dark:text-slate-300">
+        <div className="flex flex-col items-center">
+          <div className="relative">
+            <div className="animate-spin w-14 h-14 border-4 border-slate-300/30 dark:border-slate-600/30 border-t-blue-500 dark:border-t-blue-400 rounded-full mb-3"></div>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="animate-pulse w-8 h-8 bg-blue-100 dark:bg-blue-900/40 rounded-full"></div>
+            </div>
+          </div>
+          <h3 className="font-medium text-lg mb-1 text-blue-600 dark:text-blue-400">Chargement en cours</h3>
+          <p className="text-slate-500 dark:text-slate-400 max-w-xs text-center">Les données des hosts sont en cours de récupération, merci de patienter...</p>
+        </div>
+      </td>
+    </tr>
                   ) : paginatedHosts.length === 0 ? (
                     <tr>
                       <td colSpan={5} className="px-6 py-16 text-center text-slate-600 dark:text-slate-300">

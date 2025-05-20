@@ -1,15 +1,18 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Host, ApiResponse } from '../api/types';
 import { api } from '../api';
+import { ENDPOINTS } from '../api/endpoints';
 
 // Cache keys
-const HOSTS_CACHE_KEY = 'hosts_data_cache_v2'; // Incrémenté pour forcer la réinitialisation du cache
+const HOSTS_CACHE_KEY = 'hosts_data_cache_v3'; // Incrémenté pour forcer la réinitialisation du cache
 const MZ_ADMIN_VERSION_KEY = 'mz_admin_version'; // Pour suivre les changements de configuration
+const FIRST_LOAD_DONE_KEY = 'hosts_first_load_done'; // Pour suivre si le premier chargement a été effectué
 
 /**
  * Hook personnalisé pour gérer les données des hosts
  * Implémente une stratégie de mise en cache durable pour les données
- * La MZ admin est récupérée depuis le backend (configurée dans le fichier .of)
+ * La MZ admin est récupérée depuis le backend (configurée dans le fichier .env)
+ * Le chargement n'est effectué qu'une seule fois et uniquement rafraîchi manuellement
  */
 export function useHostsData() {
   // États pour stocker les données et le statut
@@ -50,7 +53,10 @@ export function useHostsData() {
       while (attempts < maxAttempts) {
         try {
           attempts++;
-          const response = await api.getMzAdmin();
+          // Utiliser le bon endpoint pour récupérer la MZ admin
+          const response = await api.get<{mzadmin: string}>('/mz-admin', {
+            params: { nocache: Date.now() }
+          }, false);
           if (response.error) {
             lastError = response.error;
             console.warn(`Tentative ${attempts}/${maxAttempts} échouée: ${response.error}`);
@@ -220,7 +226,17 @@ export function useHostsData() {
     }
   }, [mzAdmin, saveToCache]);
 
-  // Effet pour charger la configuration et les données au démarrage
+  // Fonction pour vérifier si le premier chargement a déjà été effectué
+  const isFirstLoadDone = useCallback(() => {
+    return localStorage.getItem(FIRST_LOAD_DONE_KEY) === 'true';
+  }, []);
+
+  // Fonction pour marquer le premier chargement comme effectué
+  const markFirstLoadDone = useCallback(() => {
+    localStorage.setItem(FIRST_LOAD_DONE_KEY, 'true');
+  }, []);
+
+  // Effet pour charger la configuration et les données uniquement au premier accès
   useEffect(() => {
     const loadData = async () => {
       // IMPORTANT: Toujours récupérer d'abord la config mzadmin depuis le backend
@@ -228,21 +244,31 @@ export function useHostsData() {
       const loadedMzAdmin = await fetchMzAdminConfig();
       
       // Après avoir récupéré la MZ du backend, vérifier si on a un cache pour les hosts
-      // mais seulement pour les données, pas pour la configuration de la MZ
       const cacheLoaded = loadFromCache();
       
-      // Si nous avons une MZ admin (du backend) et pas de données en cache, charger depuis l'API
-      if (loadedMzAdmin && !cacheLoaded) {
-        await refreshData();
-      } 
-      // Si nous n'avons pas de MZ admin mais des données en cache, c'est ok de continuer avec le cache
-      // Si nous n'avons ni MZ admin ni données en cache, refreshData affichera l'erreur
-      else if (!loadedMzAdmin && !cacheLoaded) {
-        refreshData();
-      }
-      // Si nous avons une MZ admin et des données en cache, rafraîchir en arrière-plan
-      else if (loadedMzAdmin && cacheLoaded) {
-        setTimeout(() => refreshData(true), 2000); // Délai pour permettre l'affichage des données en cache d'abord
+      // Vérifier si c'est le premier chargement
+      const firstLoadDone = isFirstLoadDone();
+      
+      if (!firstLoadDone) {
+        // Premier chargement: charger depuis l'API si MZ admin est configurée et pas de cache
+        console.log('Premier chargement des données hosts');
+        if (loadedMzAdmin && !cacheLoaded) {
+          await refreshData(true);
+        } else if (!loadedMzAdmin && !cacheLoaded) {
+          refreshData(true);
+        }
+        
+        // Marquer le premier chargement comme effectué même si nous avons utilisé le cache
+        markFirstLoadDone();
+      } else if (cacheLoaded) {
+        // Si ce n'est pas le premier chargement et que nous avons des données en cache,
+        // utiliser uniquement le cache sans rafraîchissement automatique
+        console.log('Utilisation des données en cache sans rafraîchissement automatique');
+      } else if (loadedMzAdmin && !cacheLoaded) {
+        // Si pas de données en cache mais MZ admin configurée, 
+        // charger les données (cas rare où le cache aurait été effacé)
+        console.log('Cache non trouvé, chargement des données depuis l\'API');
+        await refreshData(true);
       }
     };
     
@@ -264,26 +290,22 @@ export function useHostsData() {
     return () => {
       mounted = false;
     };
-  }, [fetchMzAdminConfig, loadFromCache, refreshData]);
+  }, [fetchMzAdminConfig, loadFromCache, refreshData, isFirstLoadDone, markFirstLoadDone]);
   
-  // Effet secondaire pour s'assurer que les données ne sont jamais perdues après le premier rendu
-  // et pour forcer un rafraîchissement quand la MZ change
+  // Effet secondaire pour sauvegarder les données dans le cache
   useEffect(() => {
-    // Si nous avons des hosts en mémoire, sauvegardons-les toujours dans le cache
+    // Si nous avons des hosts en mémoire, sauvegardons-les dans le cache
     if (hosts.length > 0 && mzAdmin) {
-      // Sauvegarder les données mais aussi vérifier si la MZ a changé
+      saveToCache(hosts);
+      
+      // Sauvegarder la version de MZ pour référence future
       const previousMzVersion = localStorage.getItem(MZ_ADMIN_VERSION_KEY);
       if (previousMzVersion !== mzAdmin) {
-        console.log(`Détection d'un changement de MZ Admin: ${previousMzVersion} -> ${mzAdmin}`);  
+        console.log(`Mise à jour de la référence MZ Admin: ${previousMzVersion} -> ${mzAdmin}`);  
         localStorage.setItem(MZ_ADMIN_VERSION_KEY, mzAdmin);
-        // Si la MZ a changé, force un rafraîchissement des données
-        refreshData(true);
-      } else {
-        // Sinon, juste sauvegarder le cache normalement
-        saveToCache(hosts);
       }
     }
-  }, [hosts, mzAdmin, saveToCache, refreshData]);
+  }, [hosts, mzAdmin, saveToCache]);
 
   // Retourner les données et fonctions nécessaires
   return {
@@ -294,6 +316,7 @@ export function useHostsData() {
     lastRefreshTime,
     mzAdmin,
     configLoaded,
-    refreshData
+    refreshData,
+    isFirstLoadDone
   };
 }
