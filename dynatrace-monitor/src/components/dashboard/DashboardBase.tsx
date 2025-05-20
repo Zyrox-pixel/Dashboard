@@ -79,12 +79,40 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
     const zoneId = queryParams.get('zoneId');
 
     if (zoneId && !selectedZone) {
-      // Vérifier si cette zone existe dans la liste actuelle
-      const zoneExists = zones.some(zone => zone.id === zoneId);
-      if (zoneExists) {
-        setSelectedZone(zoneId);
+      // Rechercher la zone par ID ou par nom (plus flexiblement)
+      let foundZone = zones.find(zone => zone.id === zoneId);
+      
+      // Si nous ne trouvons pas exactement le même ID, essayons de trouver une correspondance approximative
+      if (!foundZone) {
+        // Nettoyer l'ID de la zone pour comparaison
+        const cleanZoneId = zoneId.replace(/^env-/, '').replace(/-+/g, ' ').trim();
+        
+        // Chercher par nom nettoyé
+        foundZone = zones.find(zone => {
+          const cleanZoneName = zone.name.trim();
+          return cleanZoneName.includes(cleanZoneId) || cleanZoneId.includes(cleanZoneName);
+        });
+        
+        // Si toujours pas trouvé, essayons d'extraire l'ID de la zone à partir du zoneId
+        if (!foundZone) {
+          // Extraire l'ID potentiel de la zone (comme PRODSEC, AP24581, etc.)
+          const parts = zoneId.replace(/^env-/, '').split(/[-_]+/);
+          for (const part of parts) {
+            if (part.length > 3) {  // Ignorer les petites parties
+              foundZone = zones.find(zone => zone.name.includes(part));
+              if (foundZone) break;
+            }
+          }
+        }
+      }
+      
+      if (foundZone) {
+        console.log(`Zone trouvée: ${foundZone.name} (${foundZone.id}) pour l'ID demandé: ${zoneId}`);
+        setSelectedZone(foundZone.id);
         // Naviguer à #details pour s'assurer que l'utilisateur voit les détails
         window.location.hash = 'details';
+      } else {
+        console.error(`Impossible de trouver une zone correspondant à l'ID: ${zoneId}`);
       }
     }
   }, [zones, selectedZone, setSelectedZone]);
@@ -247,8 +275,13 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
     setActiveTab(tab);
   };
   
-  // Trouver la zone sélectionnée
+  // Trouver la zone sélectionnée - amélioré pour gestion d'erreur
   const currentZone = zones.find(zone => zone.id === selectedZone);
+  
+  // Log pour aider au diagnostic
+  if (selectedZone && !currentZone) {
+    console.error(`Zone introuvable (ID: ${selectedZone}). Liste des zones disponibles:`, zones.map(z => ({ id: z.id, name: z.name })));
+  }
   
   // Formatter le temps de chargement pour l'affichage (pour version optimisée)
   const formatLoadTime = (timeMs: number): string => {

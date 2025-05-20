@@ -205,25 +205,74 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
     return <span className="text-blue-500">⚙️</span>;
   }, []);
 
-  // Fonction optimisée pour charger les données d'une zone
+  // Fonction optimisée pour charger les données d'une zone avec prise en charge flexible des IDs de zone
   const loadZoneData = useCallback(async (zoneId: string) => {
     setState(prev => ({ ...prev, isLoading: { ...prev.isLoading, zoneDetails: true } }));
     const startTime = performance.now();
     
     try {
-      // Chercher la zone dans les deux collections
+      // Étape 1: Tentative directe - chercher la zone exacte dans les deux collections
       let selectedZoneObj = state.vitalForGroupMZs.find(zone => zone.id === zoneId) ||
-                           state.vitalForEntrepriseMZs.find(zone => zone.id === zoneId);
+                           state.vitalForEntrepriseMZs.find(zone => zone.id === zoneId) ||
+                           state.vitalForProductionMZs.find(zone => zone.id === zoneId) ||
+                           state.vitalForAnalyticsMZs.find(zone => zone.id === zoneId) ||
+                           state.detectionCtlMZs.find(zone => zone.id === zoneId) ||
+                           state.securityEncryptionMZs.find(zone => zone.id === zoneId);
       
+      // Étape 2: Si pas trouvé, utiliser des approches plus flexibles
       if (!selectedZoneObj) {
-        // Zone not found error handled in state update
+        console.log(`Zone avec ID exact '${zoneId}' non trouvée, essai avec approche flexible...`);
+        
+        // Approche 2.1: Nettoyer l'ID de la zone pour comparaison
+        const cleanZoneId = zoneId.replace(/^env-/, '').replace(/-+/g, ' ').trim();
+        
+        // Recherche dans toutes les collections avec le nom nettoyé
+        const allZones = [
+          ...state.vitalForGroupMZs,
+          ...state.vitalForEntrepriseMZs,
+          ...state.vitalForProductionMZs,
+          ...state.vitalForAnalyticsMZs,
+          ...state.detectionCtlMZs,
+          ...state.securityEncryptionMZs
+        ];
+        
+        // Approche 2.2: Chercher par nom nettoyé - correspondance partielle
+        selectedZoneObj = allZones.find(zone => {
+          const cleanZoneName = zone.name.trim();
+          return cleanZoneName.toLowerCase().includes(cleanZoneId.toLowerCase()) || 
+                 cleanZoneId.toLowerCase().includes(cleanZoneName.toLowerCase());
+        });
+        
+        // Approche 2.3: Extraire des parties de l'ID et chercher des correspondances
+        if (!selectedZoneObj) {
+          const parts = zoneId.replace(/^env-/, '').split(/[-_]+/);
+          for (const part of parts) {
+            if (part.length > 3) {  // Ignorer les petites parties
+              selectedZoneObj = allZones.find(zone => 
+                zone.name.toLowerCase().includes(part.toLowerCase())
+              );
+              if (selectedZoneObj) {
+                console.log(`Zone trouvée par partie de l'ID: ${part} -> ${selectedZoneObj.name}`);
+                break;
+              }
+            }
+          }
+        }
+      }
+      
+      // Vérifier si nous avons trouvé une zone correspondante
+      if (!selectedZoneObj) {
+        // Zone non trouvée après toutes les tentatives
         setState(prev => ({ 
           ...prev, 
-          error: `Zone introuvable (ID: ${zoneId})`,
+          error: `Zone introuvable (ID: ${zoneId}). Vérifiez l'identifiant de la zone ou essayez avec un autre ID.`,
           isLoading: { ...prev.isLoading, zoneDetails: false }
         }));
         return;
       }
+      
+      // Log la correspondance trouvée
+      console.log(`Zone correspondante trouvée: ${selectedZoneObj.name} (${selectedZoneObj.id}) pour l'ID demandé: ${zoneId}`);
       
       // Définir la management zone
       try {
@@ -428,7 +477,17 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
     } finally {
       setState(prev => ({ ...prev, isLoading: { ...prev.isLoading, zoneDetails: false } }));
     }
-  }, [state.vitalForGroupMZs, state.vitalForEntrepriseMZs, apiClient, optimized, getProcessIcon]);
+  }, [
+    state.vitalForGroupMZs,
+    state.vitalForEntrepriseMZs,
+    state.vitalForProductionMZs,
+    state.vitalForAnalyticsMZs,
+    state.detectionCtlMZs,
+    state.securityEncryptionMZs,
+    apiClient,
+    optimized,
+    getProcessIcon
+  ]);
 
   // Fonction pour charger toutes les données
   const loadAllData = useCallback(async (dashboardType?: 'vfg' | 'vfe' | 'vfp' | 'vfa' | 'detection' | 'security', refreshProblemsOnly?: boolean, silentMode: boolean = false, timeframe?: string) => {
@@ -1426,9 +1485,44 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
         // Récupérer les comptages à jour pour la zone sélectionnée
         console.log(`Récupération prioritaire des comptages pour ${zoneId}`);
         
-        // Trouver la zone dans l'une des collections
-        const selectedZone = state.vitalForGroupMZs.find((z: ManagementZone) => z.id === zoneId) || 
-                           state.vitalForEntrepriseMZs.find((z: ManagementZone) => z.id === zoneId);
+        // Recherche dans toutes les collections avec le même algorithme que dans loadZoneData
+        const allZones = [
+          ...state.vitalForGroupMZs,
+          ...state.vitalForEntrepriseMZs,
+          ...state.vitalForProductionMZs,
+          ...state.vitalForAnalyticsMZs,
+          ...state.detectionCtlMZs,
+          ...state.securityEncryptionMZs
+        ];
+        
+        // Étape 1: Tentative directe avec ID exact
+        let selectedZone = allZones.find(z => z.id === zoneId);
+        
+        // Étape 2: Si pas trouvé, essayer des méthodes de correspondance flexibles
+        if (!selectedZone) {
+          // Nettoyer l'ID de la zone pour comparaison
+          const cleanZoneId = zoneId.replace(/^env-/, '').replace(/-+/g, ' ').trim();
+          
+          // Chercher par nom nettoyé (correspondance partielle)
+          selectedZone = allZones.find(zone => {
+            const cleanZoneName = zone.name.trim();
+            return cleanZoneName.toLowerCase().includes(cleanZoneId.toLowerCase()) || 
+                   cleanZoneId.toLowerCase().includes(cleanZoneName.toLowerCase());
+          });
+          
+          // Si toujours pas trouvé, essayer par parties de l'ID
+          if (!selectedZone) {
+            const parts = zoneId.replace(/^env-/, '').split(/[-_]+/);
+            for (const part of parts) {
+              if (part.length > 3) {  // Ignorer les petites parties
+                selectedZone = allZones.find(zone => 
+                  zone.name.toLowerCase().includes(part.toLowerCase())
+                );
+                if (selectedZone) break;
+              }
+            }
+          }
+        }
         
         if (selectedZone) {
           // Forcer un préchargement spécifique des données de services pour cette zone
@@ -1441,9 +1535,22 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
                 const servicesData = Array.isArray(servicesResponse.data) ? servicesResponse.data : [];
                 const servicesCount = servicesData.length;
                 
-                      
-                // Mettre à jour immédiatement le comptage des services pour cette zone
-                const isVFG = state.vitalForGroupMZs.some((zone: ManagementZone) => zone.id === zoneId);
+                // Vérifier que selectedZone est toujours défini à ce point
+                if (!selectedZone) {
+                  console.error("selectedZone est undefined, impossible de continuer");
+                  return;
+                }
+                
+                // Déterminer à quelle collection appartient la zone
+                const zoneId = selectedZone.id; // Utiliser selectedZone qui est garanti d'exister
+                const isVFG = state.vitalForGroupMZs.some(z => z.id === zoneId);
+                const isVFE = state.vitalForEntrepriseMZs.some(z => z.id === zoneId);
+                const isVFP = state.vitalForProductionMZs.some(z => z.id === zoneId);
+                const isVFA = state.vitalForAnalyticsMZs.some(z => z.id === zoneId);
+                const isDetection = state.detectionCtlMZs.some(z => z.id === zoneId);
+                const isSecurity = state.securityEncryptionMZs.some(z => z.id === zoneId);
+                
+                // Mettre à jour la collection appropriée
                 if (isVFG) {
                   setState(prev => ({
                     ...prev,
@@ -1451,10 +1558,38 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
                       zone.id === zoneId ? {...zone, services: servicesCount} : zone
                     )
                   }));
-                } else {
+                } else if (isVFE) {
                   setState(prev => ({
                     ...prev,
                     vitalForEntrepriseMZs: prev.vitalForEntrepriseMZs.map(zone => 
+                      zone.id === zoneId ? {...zone, services: servicesCount} : zone
+                    )
+                  }));
+                } else if (isVFP) {
+                  setState(prev => ({
+                    ...prev,
+                    vitalForProductionMZs: prev.vitalForProductionMZs.map(zone => 
+                      zone.id === zoneId ? {...zone, services: servicesCount} : zone
+                    )
+                  }));
+                } else if (isVFA) {
+                  setState(prev => ({
+                    ...prev,
+                    vitalForAnalyticsMZs: prev.vitalForAnalyticsMZs.map(zone => 
+                      zone.id === zoneId ? {...zone, services: servicesCount} : zone
+                    )
+                  }));
+                } else if (isDetection) {
+                  setState(prev => ({
+                    ...prev,
+                    detectionCtlMZs: prev.detectionCtlMZs.map(zone => 
+                      zone.id === zoneId ? {...zone, services: servicesCount} : zone
+                    )
+                  }));
+                } else if (isSecurity) {
+                  setState(prev => ({
+                    ...prev,
+                    securityEncryptionMZs: prev.securityEncryptionMZs.map(zone => 
                       zone.id === zoneId ? {...zone, services: servicesCount} : zone
                     )
                   }));
@@ -1479,7 +1614,16 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
         loadZoneData(zoneId);
       }
     }
-  }, [loadZoneData, state.vitalForGroupMZs, state.vitalForEntrepriseMZs, apiClient]);
+  }, [
+    loadZoneData, 
+    state.vitalForGroupMZs, 
+    state.vitalForEntrepriseMZs,
+    state.vitalForProductionMZs,
+    state.vitalForAnalyticsMZs,
+    state.detectionCtlMZs,
+    state.securityEncryptionMZs,
+    apiClient
+  ]);
 
   // Fonctions pour modifier l'état
   const setSidebarCollapsed = useCallback((collapsed: boolean) => {

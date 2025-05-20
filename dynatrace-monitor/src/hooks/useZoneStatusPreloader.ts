@@ -175,19 +175,53 @@ export function useZoneStatusPreloader() {
     // Si pas encore préchargé, renvoyer les zones telles quelles
     if (!isPreloaded) return zones;
     
-    // Récupérer les statuts préchargés pour le type de dashboard spécifié
-    const statusCache = statusCacheRef.current[dashboardType] || {};
+    console.log(`Applying preloaded statuses for ${dashboardType} - ${zones.length} zones`);
     
-    // Appliquer les statuts aux zones
+    // Pour les nouveaux types (detection, security), nous allons tenter de faire des correspondances plus flexibles
+    let effectiveTypes: ('vfg' | 'vfe' | 'vfp' | 'vfa' | 'detection' | 'security')[] = [dashboardType];
+    
+    // Si c'est un type de dashboard plus récent, essayons de faire correspondre avec les types existants
+    // car nous pourrions ne pas avoir de cache pour ce type exact
+    if (dashboardType === 'detection' || dashboardType === 'security') {
+      console.log(`Dashboard type ${dashboardType} detected, adding fallback types`);
+      // Ajouter des types de repli pour les nouveaux dashboards
+      effectiveTypes = [...effectiveTypes, 'vfg', 'vfe'];
+    }
+    
+    // Appliquer les statuts aux zones en essayant tous les types effectifs
     return zones.map(zone => {
-      // Si nous avons un statut préchargé pour cette zone, l'appliquer
-      if (statusCache[zone.name]) {
-        return {
-          ...zone,
-          problemCount: statusCache[zone.name].problemCount,
-          status: statusCache[zone.name].status
-        };
+      // Essayer de trouver un statut dans n'importe lequel des types effectifs
+      for (const type of effectiveTypes) {
+        // Utiliser type assertion pour aider TypeScript à comprendre que le type est valide
+        const statusCache = statusCacheRef.current[type as keyof typeof statusCacheRef.current] || {};
+        
+        // Essayer d'abord par le nom exact
+        if (statusCache[zone.name]) {
+          return {
+            ...zone,
+            problemCount: statusCache[zone.name].problemCount,
+            status: statusCache[zone.name].status
+          };
+        }
+        
+        // Si le nom exact ne fonctionne pas, essayons une correspondance partielle
+        // Ceci est utile pour les cas où les noms de zones peuvent varier légèrement
+        const zoneName = zone.name.toLowerCase();
+        for (const cachedZoneName in statusCache) {
+          if (
+            zoneName.includes(cachedZoneName.toLowerCase()) || 
+            cachedZoneName.toLowerCase().includes(zoneName)
+          ) {
+            return {
+              ...zone,
+              problemCount: statusCache[cachedZoneName].problemCount,
+              status: statusCache[cachedZoneName].status
+            };
+          }
+        }
       }
+      
+      // Si aucune correspondance n'est trouvée, retourner la zone telle quelle
       return zone;
     });
   };
