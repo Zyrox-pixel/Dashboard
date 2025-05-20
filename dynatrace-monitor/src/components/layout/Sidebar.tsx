@@ -2,14 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   ChevronLeft, Home, AlertTriangle, Star, Award, Grid, 
-  Layers, Shield, Activity, Command, Settings
+  Layers, Shield, Activity, Command, Settings, Key
 } from 'lucide-react';
 import { useApp } from '../../contexts/AppContext';
 import { useTheme } from '../../contexts/ThemeContext';
 
 // Définir les types pour les fonctions
-type MenuItemKey = 'home' | 'problems' | 'vfg' | 'vfe' | 'activity' | 'settings';
-type ColorType = 'indigo' | 'amber' | 'red' | 'blue' | 'green' | 'purple';
+type MenuItemKey = 'home' | 'problems' | 'vfg' | 'vfe' | 'detection' | 'security' | 'activity' | 'settings';
+type ColorType = 'indigo' | 'amber' | 'red' | 'blue' | 'green' | 'purple' | 'cyan' | 'pink';
 
 const Sidebar: React.FC = () => {
   const { sidebarCollapsed, setSidebarCollapsed } = useApp();
@@ -23,6 +23,8 @@ const Sidebar: React.FC = () => {
     else if (path.startsWith('/problems')) setActiveItem('problems');
     else if (path.startsWith('/vfg')) setActiveItem('vfg');
     else if (path.startsWith('/vfe')) setActiveItem('vfe');
+    else if (path.startsWith('/detection')) setActiveItem('detection');
+    else if (path.startsWith('/security')) setActiveItem('security');
   }, []);
 
   const toggleSidebar = () => {
@@ -264,6 +266,66 @@ const Sidebar: React.FC = () => {
               
               {/* Animation subtile d'arrière-plan pour les éléments actifs */}
               {activeItem === 'vfe' && (
+                <div className="absolute inset-0 -z-10 rounded-xl overflow-hidden">
+                  <div className="absolute inset-0 opacity-20 bg-grid-pattern"></div>
+                </div>
+              )}
+            </Link>
+
+            {/* Detection & CTL */}
+            <Link 
+              to="/detection"
+              onClick={() => setActiveItem('detection')}
+              className={getVitalItemClass('detection', 'blue')}
+            >
+              {getIconGlow('detection', 'blue')}
+              <div className={`relative flex-shrink-0 ${getIconClass('detection')}`}>
+                <Shield 
+                  size={18} 
+                  className={`${isDarkTheme ? 'text-blue-400' : 'text-blue-600'} 
+                            ${activeItem === 'detection' ? 'animate-pulse-slow' : ''}`} 
+                />
+              </div>
+              
+              {!sidebarCollapsed && (
+                <span className={`text-sm font-medium whitespace-nowrap transition-all duration-300
+                                ${activeItem === 'detection' ? 'tracking-wide' : ''}`}>
+                  Détection & CTL
+                </span>
+              )}
+              
+              {/* Animation subtile d'arrière-plan pour les éléments actifs */}
+              {activeItem === 'detection' && (
+                <div className="absolute inset-0 -z-10 rounded-xl overflow-hidden">
+                  <div className="absolute inset-0 opacity-20 bg-grid-pattern"></div>
+                </div>
+              )}
+            </Link>
+            
+            {/* Security & Encryption */}
+            <Link 
+              to="/security"
+              onClick={() => setActiveItem('security')}
+              className={getVitalItemClass('security', 'red')}
+            >
+              {getIconGlow('security', 'red')}
+              <div className={`relative flex-shrink-0 ${getIconClass('security')}`}>
+                <Key 
+                  size={18} 
+                  className={`${isDarkTheme ? 'text-red-400' : 'text-red-600'} 
+                            ${activeItem === 'security' ? 'animate-pulse-slow' : ''}`} 
+                />
+              </div>
+              
+              {!sidebarCollapsed && (
+                <span className={`text-sm font-medium whitespace-nowrap transition-all duration-300
+                                ${activeItem === 'security' ? 'tracking-wide' : ''}`}>
+                  Security & Encryption
+                </span>
+              )}
+              
+              {/* Animation subtile d'arrière-plan pour les éléments actifs */}
+              {activeItem === 'security' && (
                 <div className="absolute inset-0 -z-10 rounded-xl overflow-hidden">
                   <div className="absolute inset-0 opacity-20 bg-grid-pattern"></div>
                 </div>

@@ -10,7 +10,7 @@ import { Shield, Loader, AlertTriangle, RefreshCw, Clock, BarChart, ChevronLeft,
 
 interface DashboardBaseProps {
   title: string;
-  variant: 'vfg' | 'vfe';
+  variant: 'vfg' | 'vfe' | 'vfp' | 'vfa';
   optimized?: boolean;
   context: AppContextType;
 }
@@ -52,7 +52,22 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
   const [loadingProgress, setLoadingProgress] = useState(0);
   
   // Déterminer les zones à afficher selon la variante
-  const zones = variant === 'vfg' ? vitalForGroupMZs : vitalForEntrepriseMZs;
+  const determineZones = () => {
+    switch(variant) {
+      case 'vfg':
+        return vitalForGroupMZs;
+      case 'vfe':
+        return vitalForEntrepriseMZs;
+      case 'vfp':
+        return vitalForGroupMZs; // Temporairement, utiliser vfg pour vfp
+      case 'vfa':
+        return vitalForEntrepriseMZs; // Temporairement, utiliser vfe pour vfa
+      default:
+        return vitalForGroupMZs;
+    }
+  };
+  
+  const zones = determineZones();
 
   // Vérifier si une zone est spécifiée dans l'URL
   useEffect(() => {
@@ -106,18 +121,77 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
   }, [isLoading.zoneDetails, selectedZone, loadingProgress]);
   
   // Déterminer les classes CSS selon la variante (pas de template strings dynamiques)
-  const cssClasses = {
-    accent: variant === 'vfg' ? 'text-blue-500' : 'text-amber-500',
-    accentBg: variant === 'vfg' ? 'bg-blue-500' : 'bg-amber-500',
-    text: variant === 'vfg' ? 'text-blue-600' : 'text-amber-600',
-    darkText: variant === 'vfg' ? 'text-blue-400' : 'text-amber-400',
-    bgLight: variant === 'vfg' ? 'bg-blue-100' : 'bg-amber-100',
-    bgLightOpacity: variant === 'vfg' ? 'bg-blue-500/10' : 'bg-amber-500/10',
-    bgDark: variant === 'vfg' ? 'bg-blue-900/20' : 'bg-amber-900/20',
-    borderLight: variant === 'vfg' ? 'border-blue-200' : 'border-amber-200',
-    borderDark: variant === 'vfg' ? 'border-blue-800' : 'border-amber-800',
-    hoverBg: variant === 'vfg' ? 'hover:bg-blue-700' : 'hover:bg-amber-700',
+  const determineCssClasses = () => {
+    switch(variant) {
+      case 'vfg':
+        return {
+          accent: 'text-blue-500',
+          accentBg: 'bg-blue-500',
+          text: 'text-blue-600',
+          darkText: 'text-blue-400',
+          bgLight: 'bg-blue-100',
+          bgLightOpacity: 'bg-blue-500/10',
+          bgDark: 'bg-blue-900/20',
+          borderLight: 'border-blue-200',
+          borderDark: 'border-blue-800',
+          hoverBg: 'hover:bg-blue-700',
+        };
+      case 'vfe':
+        return {
+          accent: 'text-amber-500',
+          accentBg: 'bg-amber-500',
+          text: 'text-amber-600',
+          darkText: 'text-amber-400',
+          bgLight: 'bg-amber-100',
+          bgLightOpacity: 'bg-amber-500/10',
+          bgDark: 'bg-amber-900/20',
+          borderLight: 'border-amber-200',
+          borderDark: 'border-amber-800',
+          hoverBg: 'hover:bg-amber-700',
+        };
+      case 'vfp':
+        return {
+          accent: 'text-green-500',
+          accentBg: 'bg-green-500',
+          text: 'text-green-600',
+          darkText: 'text-green-400',
+          bgLight: 'bg-green-100',
+          bgLightOpacity: 'bg-green-500/10',
+          bgDark: 'bg-green-900/20',
+          borderLight: 'border-green-200',
+          borderDark: 'border-green-800',
+          hoverBg: 'hover:bg-green-700',
+        };
+      case 'vfa':
+        return {
+          accent: 'text-purple-500',
+          accentBg: 'bg-purple-500',
+          text: 'text-purple-600',
+          darkText: 'text-purple-400',
+          bgLight: 'bg-purple-100',
+          bgLightOpacity: 'bg-purple-500/10',
+          bgDark: 'bg-purple-900/20',
+          borderLight: 'border-purple-200',
+          borderDark: 'border-purple-800',
+          hoverBg: 'hover:bg-purple-700',
+        };
+      default:
+        return {
+          accent: 'text-blue-500',
+          accentBg: 'bg-blue-500',
+          text: 'text-blue-600',
+          darkText: 'text-blue-400',
+          bgLight: 'bg-blue-100',
+          bgLightOpacity: 'bg-blue-500/10',
+          bgDark: 'bg-blue-900/20',
+          borderLight: 'border-blue-200',
+          borderDark: 'border-blue-800',
+          hoverBg: 'hover:bg-blue-700',
+        };
+    }
   };
+  
+  const cssClasses = determineCssClasses();
   
   // Gérer le clic sur une zone
   const handleZoneClick = (zoneId: string) => {
@@ -394,9 +468,20 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
               <div>
                 <h2 className={`text-lg font-semibold ${cssClasses.text} dark:${cssClasses.darkText} mb-1`}>{title}</h2>
                 <p className="text-slate-600 dark:text-slate-300">
-                  {variant === 'vfg' 
-                    ? 'Supervision des applications critiques du groupe.'
-                    : 'Supervision des applications critiques pour l\'entreprise.'}
+                  {(() => {
+                    switch(variant) {
+                      case 'vfg':
+                        return 'Supervision des applications critiques du groupe.';
+                      case 'vfe':
+                        return 'Supervision des applications critiques pour l\'entreprise.';
+                      case 'vfp':
+                        return 'Supervision des applications critiques pour la production.';
+                      case 'vfa':
+                        return 'Supervision des applications critiques pour les analyses.';
+                      default:
+                        return 'Supervision des applications critiques.';
+                    }
+                  })()}
                   {optimized && ' (Version optimisée)'}
                 </p>
               </div>
@@ -455,7 +540,20 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
           <ModernManagementZoneList 
             zones={zones} 
             onZoneClick={handleZoneClick}
-            title={variant === 'vfg' ? "Management Zones Vital for Group" : "Management Zones Vital for Enterprise"}
+            title={(() => {
+              switch(variant) {
+                case 'vfg':
+                  return "Management Zones Vital for Group";
+                case 'vfe':
+                  return "Management Zones Vital for Enterprise";
+                case 'vfp':
+                  return "Management Zones Vital for Production";
+                case 'vfa':
+                  return "Management Zones Vital for Analytics";
+                default:
+                  return "Management Zones";
+              }
+            })()}
             variant={variant}
             loading={isLoading.dashboardData}
             onRefresh={() => refreshData(variant, false)}

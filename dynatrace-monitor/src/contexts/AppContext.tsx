@@ -20,6 +20,8 @@ export interface AppStateType {
   problemsLast72h: Problem[]; 
   vitalForGroupMZs: ManagementZone[];
   vitalForEntrepriseMZs: ManagementZone[];
+  detectionCtlMZs: ManagementZone[];
+  securityEncryptionMZs: ManagementZone[];
   selectedZone: string | null;
   sidebarCollapsed: boolean;
   activeTab: string;
@@ -32,6 +34,8 @@ export interface AppStateType {
     zoneDetails: boolean;
     vitalForGroupMZs: boolean;
     vitalForEntrepriseMZs: boolean;
+    detectionCtlMZs: boolean;
+    securityEncryptionMZs: boolean;
     initialLoadComplete: boolean;
     dashboardData?: boolean;
   };
@@ -53,7 +57,7 @@ export interface AppActionsType {
   setSelectedZone: (zoneId: string | null) => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
   setActiveTab: (tab: string) => void;
-  refreshData: (dashboardType?: 'vfg' | 'vfe', refreshProblemsOnly?: boolean, timeframe?: string) => Promise<void>;
+  refreshData: (dashboardType?: 'vfg' | 'vfe' | 'vfp' | 'vfa' | 'detection' | 'security', refreshProblemsOnly?: boolean, timeframe?: string) => Promise<void>;
   loadZoneData?: (zoneId: string) => Promise<void>;
 }
 
@@ -117,6 +121,8 @@ const initialAppState: AppStateType = {
   problemsLast72h: [],
   vitalForGroupMZs: [],
   vitalForEntrepriseMZs: [],
+  detectionCtlMZs: [],
+  securityEncryptionMZs: [],
   selectedZone: null,
   sidebarCollapsed: false,
   activeTab: 'hosts',
@@ -129,6 +135,8 @@ const initialAppState: AppStateType = {
     zoneDetails: false,
     vitalForGroupMZs: true,
     vitalForEntrepriseMZs: true,
+    detectionCtlMZs: true,
+    securityEncryptionMZs: true,
     initialLoadComplete: false
   },
   error: null,
@@ -415,7 +423,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
   }, [state.vitalForGroupMZs, state.vitalForEntrepriseMZs, apiClient, optimized, getProcessIcon]);
 
   // Fonction pour charger toutes les données
-  const loadAllData = useCallback(async (dashboardType?: 'vfg' | 'vfe', refreshProblemsOnly?: boolean, silentMode: boolean = false, timeframe?: string) => {
+  const loadAllData = useCallback(async (dashboardType?: 'vfg' | 'vfe' | 'vfp' | 'vfa' | 'detection' | 'security', refreshProblemsOnly?: boolean, silentMode: boolean = false, timeframe?: string) => {
     // Modification de la fonction pour utiliser async/await avec Promise.all
     const startTime = performance.now();
     
@@ -463,6 +471,8 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
       let summaryResponse: ApiResponse<SummaryData> | undefined;
       let vfgResponse: ApiResponse<VitalForGroupMZsResponse> | undefined;
       let vfeResponse: ApiResponse<VitalForGroupMZsResponse> | undefined;
+      let detectionResponse: ApiResponse<VitalForGroupMZsResponse> | undefined;
+      let securityResponse: ApiResponse<VitalForGroupMZsResponse> | undefined;
       let problemsResponse: ApiResponse<ProblemResponse[]> | undefined;
       let problemsLast72hResponse: ApiResponse<ProblemResponse[]> | undefined;
       
@@ -481,14 +491,18 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
           apiClient.getSummary(),
           apiClient.getVitalForGroupMZs(),
           apiClient.getVitalForEntrepriseMZs(),
+          apiClient.getDetectionCtlMZs(),
+          apiClient.getSecurityEncryptionMZs(),
           apiClient.getProblems("OPEN", "-60d", dashboardType, true),  // Force le rafraîchissement pour les problèmes actifs sur 60 jours
           apiClient.getProblems72h(dashboardType, undefined, true, timeframe)   // Utilise le nouvel endpoint dédié pour les problèmes avec la période spécifiée
         ]);
         summaryResponse = responses[0] as ApiResponse<SummaryData>;
         vfgResponse = responses[1] as ApiResponse<VitalForGroupMZsResponse>;
         vfeResponse = responses[2] as ApiResponse<VitalForGroupMZsResponse>;
-        problemsResponse = responses[3] as ApiResponse<ProblemResponse[]>;
-        problemsLast72hResponse = responses[4] as ApiResponse<ProblemResponse[]>;
+        detectionResponse = responses[3] as ApiResponse<VitalForGroupMZsResponse>;
+        securityResponse = responses[4] as ApiResponse<VitalForGroupMZsResponse>;
+        problemsResponse = responses[5] as ApiResponse<ProblemResponse[]>;
+        problemsLast72hResponse = responses[6] as ApiResponse<ProblemResponse[]>;
       }
 
       // Traiter les données du résumé si disponibles et si ce n'est pas un rafraîchissement des problèmes uniquement
@@ -497,9 +511,11 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
         setState(prev => ({ ...prev, summaryData: data as SummaryData }));
       }
       
-      // Traiter les données des MZs VFG et VFE si ce n'est pas un rafraîchissement des problèmes uniquement
+      // Traiter les données des MZs VFG, VFE, Detection & CTL, et Security & Encryption si ce n'est pas un rafraîchissement des problèmes uniquement
       let vfgMZs: ManagementZone[] = [];
       let vfeMZs: ManagementZone[] = [];
+      let detectionMZs: ManagementZone[] = [];
+      let securityMZs: ManagementZone[] = [];
       
       if (!refreshProblemsOnly) {
         if (vfgResponse && !vfgResponse.error && vfgResponse.data?.mzs) {
@@ -613,10 +629,120 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
           
           setState(prev => ({ ...prev, vitalForEntrepriseMZs: vfeMZs }));
         }
+        
+        // Traitement des données de Detection & CTL
+        if (detectionResponse && !detectionResponse.error && detectionResponse.data?.mzs) {
+          // Obtenir les comptages pour chaque zone en parallèle
+          const mzPromises = detectionResponse.data.mzs.map(async (mzName) => {
+            try {
+              // Récupérer les comptages depuis l'API
+              const response = await fetch(`${API_BASE_URL}/management-zones/counts?zone=${encodeURIComponent(mzName)}`);
+              
+              if (response.ok) {
+                const data = await response.json();
+                const counts = data.counts || { hosts: 0, services: 0, processes: 0 };
+                
+                return {
+                  id: `env-${mzName.replace(/\s+/g, '-')}`,
+                  name: mzName,
+                  code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
+                  icon: getZoneIcon(mzName),
+                  problemCount: 0,
+                  apps: counts.processes,
+                  services: counts.services,
+                  hosts: counts.hosts,
+                  availability: "99.99%", // Pour l'instant, valeur par défaut
+                  status: "healthy" as "healthy" | "warning",
+                  color: getZoneColor(mzName),
+                  dt_url: "#"
+                };
+              } else {
+                throw new Error(`Erreur API ${response.status}`);
+              }
+            } catch (error) {
+              // En cas d'erreur, retourner un objet avec des comptages à 0
+              return {
+                id: `env-${mzName.replace(/\s+/g, '-')}`,
+                name: mzName,
+                code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
+                icon: getZoneIcon(mzName),
+                problemCount: 0,
+                apps: 0,
+                services: 0,
+                hosts: 0,
+                availability: "99.99%",
+                status: "healthy" as "healthy" | "warning",
+                color: getZoneColor(mzName),
+                dt_url: "#"
+              };
+            }
+          });
+          
+          // Attendre la résolution de toutes les promesses
+          detectionMZs = await Promise.all(mzPromises);
+          
+          setState(prev => ({ ...prev, detectionCtlMZs: detectionMZs }));
+        }
+        
+        // Traitement des données de Security & Encryption
+        if (securityResponse && !securityResponse.error && securityResponse.data?.mzs) {
+          // Obtenir les comptages pour chaque zone en parallèle
+          const mzPromises = securityResponse.data.mzs.map(async (mzName) => {
+            try {
+              // Récupérer les comptages depuis l'API
+              const response = await fetch(`${API_BASE_URL}/management-zones/counts?zone=${encodeURIComponent(mzName)}`);
+              
+              if (response.ok) {
+                const data = await response.json();
+                const counts = data.counts || { hosts: 0, services: 0, processes: 0 };
+                
+                return {
+                  id: `env-${mzName.replace(/\s+/g, '-')}`,
+                  name: mzName,
+                  code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
+                  icon: getZoneIcon(mzName),
+                  problemCount: 0,
+                  apps: counts.processes,
+                  services: counts.services,
+                  hosts: counts.hosts,
+                  availability: "99.99%", // Pour l'instant, valeur par défaut
+                  status: "healthy" as "healthy" | "warning",
+                  color: getZoneColor(mzName),
+                  dt_url: "#"
+                };
+              } else {
+                throw new Error(`Erreur API ${response.status}`);
+              }
+            } catch (error) {
+              // En cas d'erreur, retourner un objet avec des comptages à 0
+              return {
+                id: `env-${mzName.replace(/\s+/g, '-')}`,
+                name: mzName,
+                code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
+                icon: getZoneIcon(mzName),
+                problemCount: 0,
+                apps: 0,
+                services: 0,
+                hosts: 0,
+                availability: "99.99%",
+                status: "healthy" as "healthy" | "warning",
+                color: getZoneColor(mzName),
+                dt_url: "#"
+              };
+            }
+          });
+          
+          // Attendre la résolution de toutes les promesses
+          securityMZs = await Promise.all(mzPromises);
+          
+          setState(prev => ({ ...prev, securityEncryptionMZs: securityMZs }));
+        }
       } else {
         // En cas de rafraîchissement des problèmes uniquement, réutiliser les MZs existantes
         vfgMZs = state.vitalForGroupMZs;
         vfeMZs = state.vitalForEntrepriseMZs;
+        detectionMZs = state.detectionCtlMZs;
+        securityMZs = state.securityEncryptionMZs;
       }
       
       // Traiter les données des problèmes actifs
@@ -697,10 +823,30 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
       };
     });
     
+    const updatedDetectionMZs = detectionMZs.map(zone => {
+      const zoneProblems = problems.filter(p => p.zone && p.zone.includes(zone.name));
+      return {
+        ...zone,
+        problemCount: zoneProblems.length,
+        status: (zoneProblems.length > 0 ? "warning" : "healthy") as "warning" | "healthy"
+      };
+    });
+    
+    const updatedSecurityMZs = securityMZs.map(zone => {
+      const zoneProblems = problems.filter(p => p.zone && p.zone.includes(zone.name));
+      return {
+        ...zone,
+        problemCount: zoneProblems.length,
+        status: (zoneProblems.length > 0 ? "warning" : "healthy") as "warning" | "healthy"
+      };
+    });
+    
     setState(prev => ({
       ...prev,
       vitalForGroupMZs: updatedVfgMZs,
-      vitalForEntrepriseMZs: updatedVfeMZs
+      vitalForEntrepriseMZs: updatedVfeMZs,
+      detectionCtlMZs: updatedDetectionMZs,
+      securityEncryptionMZs: updatedSecurityMZs
     }));
   }
 }
@@ -802,13 +948,15 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
             problems: false, 
             vitalForGroupMZs: !refreshProblemsOnly ? false : prev.isLoading.vitalForGroupMZs,
             vitalForEntrepriseMZs: !refreshProblemsOnly ? false : prev.isLoading.vitalForEntrepriseMZs,
+            detectionCtlMZs: !refreshProblemsOnly ? false : prev.isLoading.detectionCtlMZs,
+            securityEncryptionMZs: !refreshProblemsOnly ? false : prev.isLoading.securityEncryptionMZs,
             initialLoadComplete: !refreshProblemsOnly ? true : prev.isLoading.initialLoadComplete,
             dashboardData: false
           } 
         }));
       }
     }
-  }, [state.selectedZone, state.vitalForGroupMZs, state.vitalForEntrepriseMZs, loadZoneData, apiClient, optimized, getZoneIcon, getZoneColor]);
+  }, [state.selectedZone, state.vitalForGroupMZs, state.vitalForEntrepriseMZs, state.detectionCtlMZs, state.securityEncryptionMZs, loadZoneData, apiClient, optimized, getZoneIcon, getZoneColor]);
 
   // Drapeau pour éviter les appels multiples à refreshData
   const refreshInProgressRef = useRef(false);
@@ -816,7 +964,7 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
   const refreshTimeoutIdRef = useRef<number | null>(null);
 
   // Fonction pour rafraîchir les données - version non bloquante améliorée avec prise en charge de la période
-  const refreshData = useCallback(async (dashboardType?: 'vfg' | 'vfe', refreshProblemsOnly?: boolean, timeframe?: string): Promise<void> => {
+  const refreshData = useCallback(async (dashboardType?: 'vfg' | 'vfe' | 'vfp' | 'vfa' | 'detection' | 'security', refreshProblemsOnly?: boolean, timeframe?: string): Promise<void> => {
     // Éviter les appels multiples simultanés
     if (refreshInProgressRef.current) {
       console.log("Un rafraîchissement est déjà en cours, nouvelle demande ignorée");
@@ -979,8 +1127,15 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
       }
       
       
-      // Récupérer le type de dashboard actuel (vfg ou vfe)
-      const currentDashboardType = window.location.pathname.includes('vfe') ? 'vfe' : 'vfg';
+      // Récupérer le type de dashboard actuel
+      let currentDashboardType = 'vfg';
+      if (window.location.pathname.includes('vfe')) {
+        currentDashboardType = 'vfe';
+      } else if (window.location.pathname.includes('detection')) {
+        currentDashboardType = 'detection';
+      } else if (window.location.pathname.includes('security')) {
+        currentDashboardType = 'security';
+      }
       
       // NE PAS mettre à jour l'indicateur de chargement pour un rafraîchissement en arrière-plan
       // Les rafraîchissements automatiques doivent être transparents pour l'utilisateur

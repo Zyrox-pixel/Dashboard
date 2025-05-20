@@ -5,7 +5,9 @@ import { api } from '../api';
 // Clés pour le stockage local des statuts préchargés
 const CACHE_KEYS = {
   vfg: 'zone_status_vfg_cache',
-  vfe: 'zone_status_vfe_cache'
+  vfe: 'zone_status_vfe_cache',
+  vfp: 'zone_status_vfp_cache',
+  vfa: 'zone_status_vfa_cache'
 };
 
 /**
@@ -22,13 +24,17 @@ export function useZoneStatusPreloader() {
   // Référence aux minuteries
   const refreshTimerRef = useRef<NodeJS.Timeout | null>(null);
   
-  // Stockage global des statuts de zones (vfg et vfe)
+  // Stockage global des statuts de zones
   const statusCacheRef = useRef<{
     vfg: Record<string, { problemCount: number, status: 'warning' | 'healthy' }>,
-    vfe: Record<string, { problemCount: number, status: 'warning' | 'healthy' }>
+    vfe: Record<string, { problemCount: number, status: 'warning' | 'healthy' }>,
+    vfp: Record<string, { problemCount: number, status: 'warning' | 'healthy' }>,
+    vfa: Record<string, { problemCount: number, status: 'warning' | 'healthy' }>
   }>({
     vfg: {},
-    vfe: {}
+    vfe: {},
+    vfp: {},
+    vfa: {}
   });
   
   /**
@@ -82,7 +88,9 @@ export function useZoneStatusPreloader() {
       // Mettre à jour le cache en mémoire
       statusCacheRef.current = {
         vfg: vfgZoneStatus,
-        vfe: vfeZoneStatus
+        vfe: vfeZoneStatus,
+        vfp: {}, // À implémenter plus tard
+        vfa: {}  // À implémenter plus tard
       };
       
       // Sauvegarder dans localStorage pour persistance
@@ -112,7 +120,7 @@ export function useZoneStatusPreloader() {
    * Fonction pour appliquer les statuts préchargés aux Management Zones
    * Cette fonction doit être appelée au moment de la création des zones
    */
-  const applyPreloadedStatuses = (zones: any[], dashboardType: 'vfg' | 'vfe') => {
+  const applyPreloadedStatuses = (zones: any[], dashboardType: 'vfg' | 'vfe' | 'vfp' | 'vfa') => {
     // Si pas encore préchargé, renvoyer les zones telles quelles
     if (!isPreloaded) return zones;
     
@@ -136,7 +144,7 @@ export function useZoneStatusPreloader() {
   /**
    * Fonction pour récupérer immédiatement les problèmes associés à une zone
    */
-  const getProblemsForZone = (zoneName: string, dashboardType: 'vfg' | 'vfe'): Problem[] => {
+  const getProblemsForZone = (zoneName: string, dashboardType: 'vfg' | 'vfe' | 'vfp' | 'vfa'): Problem[] => {
     // Cette fonction pourrait être utilisée pour obtenir la liste des problèmes
     // spécifiques à une zone sans nouvelle requête API
     return [];
@@ -174,7 +182,9 @@ export function useZoneStatusPreloader() {
       // Mettre à jour le cache en mémoire
       statusCacheRef.current = {
         vfg: vfgStatusCache,
-        vfe: vfeStatusCache
+        vfe: vfeStatusCache,
+        vfp: {}, // À implémenter plus tard
+        vfa: {}  // À implémenter plus tard
       };
       
       // Si les données sont valides, marquer comme préchargé

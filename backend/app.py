@@ -66,7 +66,31 @@ def get_vital_for_group_mzs():
     # Diviser la chaîne en liste de MZs
     return [mz.strip() for mz in vfg_mz_string.split(',')]
 
-# Nouvel endpoint pour obtenir les Management Zones de Vital for Group
+# Fonction pour obtenir la liste des MZs Detection & CTL
+def get_detection_ctl_mzs():
+    # Récupérer la liste depuis la variable d'environnement
+    detection_ctl_mz_string = os.environ.get('DETECTION_CTL_MZ_LIST', '')
+    
+    # Si la variable n'est pas définie, retourner une liste vide
+    if not detection_ctl_mz_string:
+        return []
+    
+    # Diviser la chaîne en liste de MZs
+    return [mz.strip() for mz in detection_ctl_mz_string.split(',')]
+
+# Fonction pour obtenir la liste des MZs Security & Encryption
+def get_security_encryption_mzs():
+    # Récupérer la liste depuis la variable d'environnement
+    security_encryption_mz_string = os.environ.get('SECURITY_ENCRYPTION_MZ_LIST', '')
+    
+    # Si la variable n'est pas définie, retourner une liste vide
+    if not security_encryption_mz_string:
+        return []
+    
+    # Diviser la chaîne en liste de MZs
+    return [mz.strip() for mz in security_encryption_mz_string.split(',')]
+
+# Endpoint pour obtenir les Management Zones de Vital for Entreprise
 @app.route('/api/vital-for-entreprise-mzs', methods=['GET'])
 def get_vital_for_entreprise_mzs_endpoint():
     try:
@@ -124,6 +148,70 @@ def get_vital_for_group_mzs_endpoint():
         })
     except Exception as e:
         logger.error(f"Erreur lors de la récupération des MZs Vital for Group: {e}")
+        # Retourner une réponse même en cas d'erreur
+        return jsonify({
+            'mzs': [],
+            'source': 'env_file',
+            'error': str(e)
+        }), 500
+
+@app.route('/api/detection-ctl-mzs', methods=['GET'])
+def get_detection_ctl_mzs_endpoint():
+    try:
+        # Récupérer directement la liste depuis la variable d'environnement
+        detection_ctl_mz_string = os.environ.get('DETECTION_CTL_MZ_LIST', '')
+        
+        # Logging pour debug
+        logger.info(f"DETECTION_CTL_MZ_LIST from .env: {detection_ctl_mz_string}")
+        
+        # Si la variable n'est pas définie, retourner une liste vide
+        if not detection_ctl_mz_string:
+            logger.warning("DETECTION_CTL_MZ_LIST is empty or not defined in .env file")
+            return jsonify({'mzs': [], 'source': 'env_file'})
+        
+        # Diviser la chaîne en liste de MZs
+        detection_ctl_mzs = [mz.strip() for mz in detection_ctl_mz_string.split(',')]
+        logger.info(f"Parsed Detection & CTL MZs: {detection_ctl_mzs}")
+        
+        # Format de réponse simple
+        return jsonify({
+            'mzs': detection_ctl_mzs,
+            'source': 'env_file'  # Indique que les données viennent du fichier .env
+        })
+    except Exception as e:
+        logger.error(f"Erreur lors de la récupération des MZs Detection & CTL: {e}")
+        # Retourner une réponse même en cas d'erreur
+        return jsonify({
+            'mzs': [],
+            'source': 'env_file',
+            'error': str(e)
+        }), 500
+
+@app.route('/api/security-encryption-mzs', methods=['GET'])
+def get_security_encryption_mzs_endpoint():
+    try:
+        # Récupérer directement la liste depuis la variable d'environnement
+        security_encryption_mz_string = os.environ.get('SECURITY_ENCRYPTION_MZ_LIST', '')
+        
+        # Logging pour debug
+        logger.info(f"SECURITY_ENCRYPTION_MZ_LIST from .env: {security_encryption_mz_string}")
+        
+        # Si la variable n'est pas définie, retourner une liste vide
+        if not security_encryption_mz_string:
+            logger.warning("SECURITY_ENCRYPTION_MZ_LIST is empty or not defined in .env file")
+            return jsonify({'mzs': [], 'source': 'env_file'})
+        
+        # Diviser la chaîne en liste de MZs
+        security_encryption_mzs = [mz.strip() for mz in security_encryption_mz_string.split(',')]
+        logger.info(f"Parsed Security & Encryption MZs: {security_encryption_mzs}")
+        
+        # Format de réponse simple
+        return jsonify({
+            'mzs': security_encryption_mzs,
+            'source': 'env_file'  # Indique que les données viennent du fichier .env
+        })
+    except Exception as e:
+        logger.error(f"Erreur lors de la récupération des MZs Security & Encryption: {e}")
         # Retourner une réponse même en cas d'erreur
         return jsonify({
             'mzs': [],
@@ -246,7 +334,7 @@ def get_problems_72h():
             logger.info("TENTATIVE ALTERNATIVE: Utilisation directe de la fonction test_get_problems qui fonctionne")
             
             # Si c'est un type de dashboard spécifique, récupérer les problèmes pour toutes les zones
-            if dashboard_type in ['vfg', 'vfe']:
+            if dashboard_type in ['vfg', 'vfe', 'detection', 'security']:
                 # Si un filtre de zone est fourni, l'utiliser au lieu de toutes les zones
                 if zone_filter:
                     problems = test_get_problems(management_zone_name=zone_filter, time_from=timeframe, status="OPEN,CLOSED")
@@ -262,7 +350,17 @@ def get_problems_72h():
                     return jsonify(formatted_problems)
                 
                 # Récupérer la liste des MZs pour ce dashboard type
-                mz_list_var = 'VFG_MZ_LIST' if dashboard_type == 'vfg' else 'VFE_MZ_LIST'
+                if dashboard_type == 'vfg':
+                    mz_list_var = 'VFG_MZ_LIST'
+                elif dashboard_type == 'vfe':
+                    mz_list_var = 'VFE_MZ_LIST'
+                elif dashboard_type == 'detection':
+                    mz_list_var = 'DETECTION_CTL_MZ_LIST'
+                elif dashboard_type == 'security':
+                    mz_list_var = 'SECURITY_ENCRYPTION_MZ_LIST'
+                else:
+                    mz_list_var = 'VFG_MZ_LIST'  # Fallback au cas où
+                    
                 mz_string = os.environ.get(mz_list_var, '')
                 
                 if not mz_string:
@@ -374,8 +472,8 @@ def get_problems_72h():
         # SI MÉTHODE ALTERNATIVE ÉCHOUE, ON REVIENT À L'IMPLÉMENTATION STANDARD
         logger.info("Utilisation de l'implémentation standard")
         
-        # Si un type de dashboard est spécifié (vfg ou vfe)
-        if dashboard_type in ['vfg', 'vfe']:
+        # Si un type de dashboard est spécifié
+        if dashboard_type in ['vfg', 'vfe', 'detection', 'security']:
             # Si un filtre de zone est fourni, l'utiliser au lieu de toutes les zones
             if zone_filter:
                 logger.info(f"Filtrage par zone spécifique: {zone_filter} pour dashboard {dashboard_type}")
@@ -400,7 +498,17 @@ def get_problems_72h():
                     return jsonify([])
             
             # Récupérer la liste des MZs pour ce dashboard type
-            mz_list_var = 'VFG_MZ_LIST' if dashboard_type == 'vfg' else 'VFE_MZ_LIST'
+            if dashboard_type == 'vfg':
+                mz_list_var = 'VFG_MZ_LIST'
+            elif dashboard_type == 'vfe':
+                mz_list_var = 'VFE_MZ_LIST'
+            elif dashboard_type == 'detection':
+                mz_list_var = 'DETECTION_CTL_MZ_LIST'
+            elif dashboard_type == 'security':
+                mz_list_var = 'SECURITY_ENCRYPTION_MZ_LIST'
+            else:
+                mz_list_var = 'VFG_MZ_LIST'  # Fallback au cas où
+                
             mz_string = os.environ.get(mz_list_var, '')
             
             logger.info(f"Valeur de {mz_list_var}: '{mz_string}'")
@@ -608,8 +716,8 @@ def get_problems():
         # Ajouter des détails sur l'état de l'environnement pour le débogage
         logger.info(f"Variables d'environnement: DT_ENV_URL={DT_ENV_URL}, API_TOKEN={'présent' if API_TOKEN else 'manquant'}")
         
-        # Si un type de dashboard est spécifié (vfg ou vfe)
-        if dashboard_type in ['vfg', 'vfe']:
+        # Si un type de dashboard est spécifié
+        if dashboard_type in ['vfg', 'vfe', 'detection', 'security']:
             # Si un filtre de zone est fourni, l'utiliser à la place de la liste complète
             if zone_filter:
                 logger.info(f"Filtrage par zone spécifique: {zone_filter} pour dashboard {dashboard_type}")
@@ -632,7 +740,17 @@ def get_problems():
                     return []
             
             # Comportement normal pour tous les problèmes du dashboard
-            mz_list_var = 'VFG_MZ_LIST' if dashboard_type == 'vfg' else 'VFE_MZ_LIST'
+            if dashboard_type == 'vfg':
+                mz_list_var = 'VFG_MZ_LIST'
+            elif dashboard_type == 'vfe':
+                mz_list_var = 'VFE_MZ_LIST'
+            elif dashboard_type == 'detection':
+                mz_list_var = 'DETECTION_CTL_MZ_LIST'
+            elif dashboard_type == 'security':
+                mz_list_var = 'SECURITY_ENCRYPTION_MZ_LIST'
+            else:
+                mz_list_var = 'VFG_MZ_LIST'  # Fallback au cas où
+                
             mz_string = os.environ.get(mz_list_var, '')
             
             if not mz_string:

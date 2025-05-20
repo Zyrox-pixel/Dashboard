@@ -28,13 +28,33 @@ const UnifiedDashboard: React.FC = () => {
       case 'vfe':
         return {
           title: isOptimized ? "Vital for Entreprise (Optimisé)" : "Vital for Entreprise",
-          variant: 'vfe' as 'vfg' | 'vfe',
+          variant: 'vfe' as 'vfg' | 'vfe' | 'vfp' | 'vfa',
+        };
+      case 'detection':
+        return {
+          title: isOptimized ? "Détection & CTL (Optimisé)" : "Détection & CTL",
+          variant: 'vfg' as 'vfg' | 'vfe' | 'vfp' | 'vfa', // Mapping detection vers vfg temporairement
+        };
+      case 'security':
+        return {
+          title: isOptimized ? "Security & Encryption (Optimisé)" : "Security & Encryption",
+          variant: 'vfe' as 'vfg' | 'vfe' | 'vfp' | 'vfa', // Mapping security vers vfe temporairement
+        };
+      case 'vfp':
+        return {
+          title: isOptimized ? "Vital for Production (Optimisé)" : "Vital for Production",
+          variant: 'vfp' as 'vfg' | 'vfe' | 'vfp' | 'vfa',
+        };
+      case 'vfa':
+        return {
+          title: isOptimized ? "Vital for Analytics (Optimisé)" : "Vital for Analytics",
+          variant: 'vfa' as 'vfg' | 'vfe' | 'vfp' | 'vfa',
         };
       case 'vfg':
       default:
         return {
           title: isOptimized ? "Vital for Group (Optimisé)" : "Vital for Group",
-          variant: 'vfg' as 'vfg' | 'vfe',
+          variant: 'vfg' as 'vfg' | 'vfe' | 'vfp' | 'vfa',
         };
     }
   }, [type, isOptimized]);
@@ -77,7 +97,10 @@ const UnifiedDashboard: React.FC = () => {
           updateManagementZonesWithProblems(activeProblems);
           
           // Synchroniser immédiatement les MZs avec les problèmes
-          if (appContext.vitalForGroupMZs.length > 0 || appContext.vitalForEntrepriseMZs.length > 0) {
+          if (appContext.vitalForGroupMZs.length > 0 || 
+             appContext.vitalForEntrepriseMZs.length > 0 || 
+             appContext.detectionCtlMZs.length > 0 || 
+             appContext.securityEncryptionMZs.length > 0) {
             console.log(`Mise à jour immédiate des statuts de zones pour ${activeProblems.length} problèmes`);
             
             const updatedVfgMZs = appContext.vitalForGroupMZs.map(zone => {
@@ -97,6 +120,24 @@ const UnifiedDashboard: React.FC = () => {
                 status: (zoneProblems.length > 0 ? "warning" : "healthy") as "warning" | "healthy"
               };
             });
+
+            const updatedDetectionMZs = appContext.detectionCtlMZs.map(zone => {
+              const zoneProblems = activeProblems.filter(p => p.zone && p.zone.includes(zone.name));
+              return {
+                ...zone,
+                problemCount: zoneProblems.length,
+                status: (zoneProblems.length > 0 ? "warning" : "healthy") as "warning" | "healthy"
+              };
+            });
+
+            const updatedSecurityMZs = appContext.securityEncryptionMZs.map(zone => {
+              const zoneProblems = activeProblems.filter(p => p.zone && p.zone.includes(zone.name));
+              return {
+                ...zone,
+                problemCount: zoneProblems.length,
+                status: (zoneProblems.length > 0 ? "warning" : "healthy") as "warning" | "healthy"
+              };
+            });
             
             // Force update de l'état global des MZs
             if (appContext.vitalForGroupMZs !== updatedVfgMZs) {
@@ -105,6 +146,14 @@ const UnifiedDashboard: React.FC = () => {
             
             if (appContext.vitalForEntrepriseMZs !== updatedVfeMZs) {
               appContext.vitalForEntrepriseMZs = updatedVfeMZs;
+            }
+
+            if (appContext.detectionCtlMZs !== updatedDetectionMZs) {
+              appContext.detectionCtlMZs = updatedDetectionMZs;
+            }
+            
+            if (appContext.securityEncryptionMZs !== updatedSecurityMZs) {
+              appContext.securityEncryptionMZs = updatedSecurityMZs;
             }
           }
         }
@@ -133,7 +182,7 @@ const UnifiedDashboard: React.FC = () => {
         ...appContext.isLoading,
         problems: isLoading
       },
-      refreshData: async (variant?: 'vfg' | 'vfe', active?: boolean, timeframe?: string) => {
+      refreshData: async (variant?: 'vfg' | 'vfe' | 'vfp' | 'vfa' | 'detection' | 'security', active?: boolean, timeframe?: string) => {
         // Utiliser notre système de cache pour le rafraîchissement
         await refreshCachedData(true);
         // Appeler aussi le refreshData original pour maintenir la compatibilité

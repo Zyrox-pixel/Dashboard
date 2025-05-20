@@ -16,7 +16,7 @@ interface ModernManagementZoneListProps {
   onZoneClick: (zoneId: string) => void;
   title?: string;
   subtitle?: string;
-  variant?: 'vfg' | 'vfe';
+  variant?: 'vfg' | 'vfe' | 'vfp' | 'vfa';
   loading?: boolean;
   onRefresh?: () => void;
 }
@@ -201,7 +201,22 @@ const ModernManagementZoneList: React.FC<ModernManagementZoneListProps> = ({
   }, [zonesWithPreloadedStatus, searchTerm, filters, lastRefresh]);
   
   // Définir les classes CSS pour le thème en fonction de la variante
-  const themeColor = variant === 'vfg' ? 'indigo' : 'amber';
+  const determineThemeColor = () => {
+    switch(variant) {
+      case 'vfg':
+        return 'indigo';
+      case 'vfe':
+        return 'amber';
+      case 'vfp':
+        return 'green';
+      case 'vfa':
+        return 'purple';
+      default:
+        return 'indigo';
+    }
+  };
+  
+  const themeColor = determineThemeColor();
   
   // Défilement fluide vers une section
   const scrollToSection = (id: string) => {
