@@ -28,6 +28,7 @@ export const ENDPOINTS = {
   VITAL_FOR_ANALYTICS_MZS: '/vital-for-analytics-mzs',
   DETECTION_CTL_MZS: '/detection-ctl-mzs',
   SECURITY_ENCRYPTION_MZS: '/security-encryption-mzs',
+  MZ_ADMIN: '/mz-admin',
   
   // Endpoint de rafraîchissement du cache
   REFRESH_CACHE: (cacheType: string) => `/refresh/${cacheType}`

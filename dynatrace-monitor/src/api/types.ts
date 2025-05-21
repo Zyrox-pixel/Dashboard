@@ -101,6 +101,8 @@ export interface Host {
   cpu_history?: MetricHistory[]; 
   ram_history?: MetricHistory[]; 
   dt_url: string;
+  code?: string; // Métadonnée Custom pour Code du host
+  metadata?: { [key: string]: string }; // Autres métadonnées personnalisées
 }
 
 // Type pour les services

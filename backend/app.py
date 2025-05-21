@@ -962,6 +962,73 @@ def get_summary():
         logger.error(f"Erreur lors de la récupération du résumé: {e}")
         return {'error': str(e)}
 
+# Fonction pour récupérer tous les hôtes avec pagination
+def get_all_hosts_with_pagination(management_zone_name):
+    """
+    Récupère tous les hôtes avec pagination complète pour dépasser la limite de 400 éléments.
+    
+    Args:
+        management_zone_name (str): Nom de la Management Zone pour filtrer les hôtes.
+        
+    Returns:
+        list: Liste des entités hôtes récupérées.
+    """
+    logger.info(f"Récupération complète des hôtes avec pagination pour la MZ: {management_zone_name}")
+    
+    # Utiliser la fonction build_entity_selector
+    entity_selector = build_entity_selector("HOST", management_zone_name)
+    
+    all_hosts = []
+    page_num = 1
+    
+    # Paramètres initiaux pour la première requête
+    current_params = {
+        "entitySelector": entity_selector,
+        "fields": "+properties,+fromRelationships",
+        "pageSize": 1000  # Taille de page maximale pour réduire le nombre d'appels
+    }
+    
+    while True:
+        if 'nextPageKey' in current_params:
+            logger.info(f"Récupération de la page {page_num} des hôtes avec nextPageKey: {current_params['nextPageKey'][:20]}...")
+        else:
+            logger.info(f"Récupération de la page {page_num} des hôtes avec les paramètres initiaux")
+        
+        try:
+            # Utiliser la méthode query_api existante (qui utilise déjà le cache et gère les erreurs)
+            if 'nextPageKey' in current_params:
+                # Pour les pages suivantes, utiliser l'API avec nextPageKey
+                # Dans ce cas, il faut convertir le nextPageKey en paramètres de requête directement
+                hosts_data = api_client.query_api("entities", current_params)
+            else:
+                # Pour la première page, utiliser les paramètres normaux
+                hosts_data = api_client.query_api("entities", current_params)
+            
+            # Extraire les hôtes de cette page
+            hosts_on_page = hosts_data.get('entities', [])
+            all_hosts.extend(hosts_on_page)
+            
+            logger.info(f"Page {page_num}: {len(hosts_on_page)} hôtes récupérés. Total jusqu'à présent: {len(all_hosts)}.")
+            
+            # Vérifier s'il y a une page suivante
+            next_page_key = hosts_data.get("nextPageKey")
+            if next_page_key:
+                # Pour les pages suivantes, seuls nextPageKey et pageSize sont nécessaires
+                current_params = {'nextPageKey': next_page_key}
+                page_num += 1
+                # Petite pause pour ne pas surcharger l'API
+                time.sleep(0.2)
+            else:
+                # Plus de pages à récupérer
+                break
+                
+        except Exception as e:
+            logger.error(f"Erreur lors de la récupération des hôtes (page {page_num}): {e}")
+            break
+    
+    logger.info(f"Récupération terminée. Nombre total d'hôtes: {len(all_hosts)}")
+    return all_hosts
+
 @app.route('/api/hosts', methods=['GET'])
 @cached('hosts')
 @time_execution
@@ -976,23 +1043,19 @@ def get_hosts():
         if not current_mz:
             return {'error': 'Aucune Management Zone définie'}
         
-        # Utiliser la fonction build_entity_selector
-        entity_selector = build_entity_selector("HOST", current_mz)
-        
-        # Récupérer les entités hôtes avec une taille de page augmentée
-        logger.info(f"Récupération des hôtes pour {current_mz} avec une taille de page de 1000")
-        hosts_data = api_client.query_api("entities", {
-            "entitySelector": entity_selector,
-            "fields": "+properties,+fromRelationships",
-            "pageSize": 1000  # Augmenter la taille de la page pour récupérer jusqu'à 1000 hôtes
-        })
+        # Récupérer tous les hôtes avec pagination complète
+        logger.info(f"Récupération complète des hôtes pour {current_mz} avec pagination")
+        all_hosts = get_all_hosts_with_pagination(current_mz)
         
         # Extraire les IDs des hôtes
-        host_ids = [host.get('entityId') for host in hosts_data.get('entities', [])]
+        host_ids = [host.get('entityId') for host in all_hosts]
         
         # Si aucun hôte n'est trouvé, retourner une liste vide
         if not host_ids:
+            logger.warning(f"Aucun hôte trouvé pour la management zone {current_mz}")
             return []
+        
+        logger.info(f"Récupération des métriques pour {len(host_ids)} hôtes en parallèle")
         
         # Récupérer les métriques pour tous les hôtes en parallèle
         return api_client.get_hosts_metrics_parallel(host_ids, from_time, to_time)
@@ -1480,6 +1543,37 @@ def refresh_cache(cache_type):
     # Sinon, effacer uniquement le cache spécifié
     api_client.clear_cache(f"{cache_type}:")
     return jsonify({'success': True, 'message': f'Cache {cache_type} effacé avec succès'})
+
+@app.route('/api/mz-admin', methods=['GET'])
+def get_mz_admin():
+    """Endpoint pour récupérer la Management Zone configurée pour l'onglet Hosts"""
+    try:
+        # Force le rechargement des variables d'environnement depuis le fichier .env
+        from dotenv import load_dotenv
+        load_dotenv(override=True)  # override=True pour forcer le rechargement
+        
+        # Récupérer la valeur fraîchement chargée de MZ_ADMIN
+        mz_admin = os.environ.get('MZ_ADMIN', '')
+        
+        # Log pour debug avec timestamp pour voir quand la valeur est récupérée
+        current_time = datetime.now().strftime('%H:%M:%S')
+        logger.info(f"[{current_time}] Récupération de la MZ admin: {mz_admin}")
+        
+        # Ajouter le paramètre nocache pour éviter le cache côté client
+        if 'nocache' in request.args:
+            logger.info(f"Demande sans cache reçue: {request.args.get('nocache')}")
+        
+        return jsonify({
+            'mzadmin': mz_admin,
+            'timestamp': current_time
+        })
+    except Exception as e:
+        logger.error(f"Erreur lors de la récupération de MZ_ADMIN: {e}")
+        return jsonify({
+            'mzadmin': '',
+            'error': str(e),
+            'timestamp': datetime.now().strftime('%H:%M:%S')
+        }), 500
 
 @app.route('/api/performance', methods=['GET'])
 def get_performance():

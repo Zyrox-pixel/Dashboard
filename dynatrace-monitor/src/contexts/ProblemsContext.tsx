@@ -149,9 +149,9 @@ export const ProblemsProvider: React.FC<{children: React.ReactNode}> = ({ childr
   
   // Rafraîchir les problèmes VFG
   const refreshVFG = async (force = false) => {
-    // Vérifier si un chargement récent a eu lieu (moins de 10 secondes - optimisé)
+    // Vérifier si un chargement récent a eu lieu (moins de 5 minutes - optimisé)
     const now = Date.now();
-    if (!force && now - lastFetchTimeRef.current.vfg < 10000) {
+    if (!force && now - lastFetchTimeRef.current.vfg < 300000) {
       return;
     }
 
@@ -197,9 +197,9 @@ export const ProblemsProvider: React.FC<{children: React.ReactNode}> = ({ childr
   
   // Rafraîchir les problèmes VFE
   const refreshVFE = async (force = false) => {
-    // Vérifier si un chargement récent a eu lieu (moins de 10 secondes - optimisé)
+    // Vérifier si un chargement récent a eu lieu (moins de 5 minutes - optimisé)
     const now = Date.now();
-    if (!force && now - lastFetchTimeRef.current.vfe < 10000) {
+    if (!force && now - lastFetchTimeRef.current.vfe < 300000) {
       return;
     }
 

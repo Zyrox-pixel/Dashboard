@@ -651,6 +651,17 @@ class ApiClient {
   }
 
   /**
+   * Récupérer la Management Zone Admin configurée dans le fichier .env du backend
+   * Force un rafraîchissement à chaque fois pour s'assurer d'avoir la dernière valeur
+   */
+  public getMzAdmin() {
+    // Utiliser un paramètre nocache pour forcer le contournement du cache
+    return this.get<{mzadmin: string}>(ENDPOINTS.MZ_ADMIN, {
+      params: { nocache: Date.now() }
+    }, false); // false pour forcer le non-cache
+  }
+
+  /**
    * Définir la management zone actuelle
    */
   public setManagementZone(name: string) {

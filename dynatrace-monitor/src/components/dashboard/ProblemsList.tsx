@@ -274,10 +274,10 @@ const ProblemsList: React.FC<ProblemsListProps> = ({
       // Désactiver l'indicateur de chargement
       setIsRefreshing(false);
       
-      // Définir un délai minimum avant d'autoriser un nouveau rafraîchissement (500ms)
+      // Définir un délai minimum avant d'autoriser un nouveau rafraîchissement (3 secondes)
       setTimeout(() => {
-        // Ce code est vide mais le timeout garantit que isRefreshing a été à true pendant au moins 500ms
-      }, 500);
+        // Ce code est vide mais le timeout garantit que isRefreshing a été à true pendant au moins 3 secondes
+      }, 3000);
     }
   };
 
@@ -708,7 +708,7 @@ const ProblemsList: React.FC<ProblemsListProps> = ({
                   bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-500 hover:to-indigo-600
                   text-white shadow-md border border-indigo-400/30
                   disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
-                title="Rafraîchir les problèmes en temps réel"
+                title="Force un rechargement complet depuis le backend"
               >
                 <RefreshCw size={14} className={`${isRefreshing ? 'animate-spin' : ''}`} />
                 <span className="hidden sm:inline">{isRefreshing ? 'Rafraîchissement...' : 'Rafraîchir les données'}</span>

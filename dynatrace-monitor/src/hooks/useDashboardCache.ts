@@ -21,8 +21,8 @@ const CACHE_KEYS = {
   unified: 'dashboard_unified_cache'
 };
 
-// Durée de vie du cache en millisecondes (5 minutes)
-const CACHE_LIFETIME = 5 * 60 * 1000;
+// Durée de vie du cache en millisecondes (15 minutes)
+const CACHE_LIFETIME = 15 * 60 * 1000;
 
 /**
  * Hook personnalisé pour gérer le cache des tableaux de bord
@@ -167,7 +167,7 @@ export function useDashboardCache(dashboardType: 'vfg' | 'vfe' | 'vfp' | 'vfa' |
 
 
   // Fonction pour rafraîchir les données depuis l'API
-  const refreshData = useCallback(async (force: boolean = false, customTimeframe?: string) => {
+  const refreshData = useCallback(async (force: boolean = false, customTimeframe?: string, forceBackendReload?: boolean) => {
     // Éviter les requêtes multiples simultanées
     if (pendingRequestRef.current && !force) {
       return;
@@ -176,6 +176,20 @@ export function useDashboardCache(dashboardType: 'vfg' | 'vfe' | 'vfp' | 'vfa' |
     pendingRequestRef.current = true;
     setIsLoading(true);
     setError(null);
+    
+    // Si on force le rechargement depuis le backend, effacer les caches locaux
+    if (forceBackendReload) {
+      console.log("Forçage du rechargement complet depuis le backend - nettoyage des caches locaux");
+      // Nettoyer les caches localStorage et sessionStorage
+      Object.keys(localStorage).forEach(key => {
+        if (key.startsWith('dashboard_') || key.includes('_cache')) {
+          localStorage.removeItem(key);
+        }
+      });
+      
+      // Forcer le paramètre force à true pour s'assurer que l'API ignre son cache
+      force = true;
+    }
 
     try {
       console.log(`Rafraîchissement des données ${dashboardType}${force ? ' (forcé)' : ''}${customTimeframe ? ` avec période ${customTimeframe}` : ''}`);
@@ -324,13 +338,21 @@ export function useDashboardCache(dashboardType: 'vfg' | 'vfe' | 'vfp' | 'vfa' |
   }, [dashboardType, loadFromCache, refreshData]);
 
   // Retourner les données et fonctions nécessaires
+  // Create a typed version of the refreshData function
+  const typedRefreshData = useCallback(
+    (force: boolean = false, customTimeframe?: string, forceBackendReload?: boolean) => {
+      return refreshData(force, customTimeframe, forceBackendReload);
+    },
+    [refreshData]
+  );
+
   return {
     activeProblems,
     recentProblems,
     isLoading,
     error,
     lastRefreshTime,
-    refreshData,
+    refreshData: typedRefreshData,
     updateManagementZonesWithProblems,
     initialLoadComplete: initialLoadCompletedRef.current
   };

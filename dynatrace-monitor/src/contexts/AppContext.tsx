@@ -61,7 +61,7 @@ export interface AppActionsType {
   setSelectedZone: (zoneId: string | null) => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
   setActiveTab: (tab: string) => void;
-  refreshData: (dashboardType?: 'vfg' | 'vfe' | 'vfp' | 'vfa' | 'detection' | 'security', refreshProblemsOnly?: boolean, timeframe?: string) => Promise<void>;
+  refreshData: (dashboardType?: 'vfg' | 'vfe' | 'vfp' | 'vfa' | 'detection' | 'security', refreshProblemsOnly?: boolean, timeframe?: string, forceBackendReload?: boolean) => Promise<void>;
   loadZoneData?: (zoneId: string) => Promise<void>;
 }
 
@@ -490,9 +490,21 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
   ]);
 
   // Fonction pour charger toutes les données
-  const loadAllData = useCallback(async (dashboardType?: 'vfg' | 'vfe' | 'vfp' | 'vfa' | 'detection' | 'security', refreshProblemsOnly?: boolean, silentMode: boolean = false, timeframe?: string) => {
+  const loadAllData = useCallback(async (dashboardType?: 'vfg' | 'vfe' | 'vfp' | 'vfa' | 'detection' | 'security', refreshProblemsOnly?: boolean, silentMode: boolean = false, timeframe?: string, forceBackendReload?: boolean) => {
     // Modification de la fonction pour utiliser async/await avec Promise.all
     const startTime = performance.now();
+
+    // Si forceBackendReload est demandé, on va nettoyer le cache de l'API
+    if (forceBackendReload) {
+      console.log("Forçage du rechargement depuis le backend - nettoyage du cache API");
+      // Utiliser refreshCache pour forcer le rechargement depuis le backend
+      try {
+        await apiClient.refreshCache('all');
+        console.log("Cache API nettoyé avec succès");
+      } catch (error) {
+        console.error("Erreur lors du nettoyage du cache API:", error);
+      }
+    }
     
     // Ne mettre à jour les indicateurs de chargement que si nous ne sommes pas en mode silencieux
     if (!silentMode) {
@@ -501,10 +513,10 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
         isLoading: { 
           ...prev.isLoading, 
           problems: true, 
-          vitalForGroupMZs: !refreshProblemsOnly,
-          vitalForEntrepriseMZs: !refreshProblemsOnly,
+          vitalForGroupMZs: !refreshProblemsOnly || !!forceBackendReload,
+          vitalForEntrepriseMZs: !refreshProblemsOnly || !!forceBackendReload,
           initialLoadComplete: false,
-          dashboardData: !refreshProblemsOnly
+          dashboardData: !refreshProblemsOnly || !!forceBackendReload
         },
         error: null 
       }));
@@ -554,6 +566,25 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
         problemsResponse = responses[0] as ApiResponse<ProblemResponse[]>;
         problemsLast72hResponse = responses[1] as ApiResponse<ProblemResponse[]>;
         console.log('Rafraîchissement des problèmes uniquement terminé');
+        
+        // Si on force le rechargement complet depuis le backend, recharger aussi les informations de zones
+        if (forceBackendReload) {
+          console.log("Forçage du rechargement complet des MZs en plus des problèmes");
+          const mzResponses = await Promise.all([
+            apiClient.getVitalForGroupMZs(),
+            apiClient.getVitalForEntrepriseMZs(),
+            apiClient.getVitalForProductionMZs(),
+            apiClient.getVitalForAnalyticsMZs(),
+            apiClient.getDetectionCtlMZs(),
+            apiClient.getSecurityEncryptionMZs()
+          ]);
+          vfgResponse = mzResponses[0] as ApiResponse<VitalForGroupMZsResponse>;
+          vfeResponse = mzResponses[1] as ApiResponse<VitalForGroupMZsResponse>;
+          vfpResponse = mzResponses[2] as ApiResponse<VitalForGroupMZsResponse>;
+          vfaResponse = mzResponses[3] as ApiResponse<VitalForGroupMZsResponse>;
+          detectionResponse = mzResponses[4] as ApiResponse<VitalForGroupMZsResponse>;
+          securityResponse = mzResponses[5] as ApiResponse<VitalForGroupMZsResponse>;
+        }
       } else {
         // Chargement complet de toutes les données
         const responses = await Promise.all([
@@ -1191,7 +1222,7 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
   const refreshTimeoutIdRef = useRef<number | null>(null);
 
   // Fonction pour rafraîchir les données - version non bloquante améliorée avec prise en charge de la période
-  const refreshData = useCallback(async (dashboardType?: 'vfg' | 'vfe' | 'vfp' | 'vfa' | 'detection' | 'security', refreshProblemsOnly?: boolean, timeframe?: string): Promise<void> => {
+  const refreshData = useCallback(async (dashboardType?: 'vfg' | 'vfe' | 'vfp' | 'vfa' | 'detection' | 'security', refreshProblemsOnly?: boolean, timeframe?: string, forceBackendReload?: boolean): Promise<void> => {
     // Éviter les appels multiples simultanés
     if (refreshInProgressRef.current) {
       console.log("Un rafraîchissement est déjà en cours, nouvelle demande ignorée");
@@ -1204,9 +1235,29 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
       refreshTimeoutIdRef.current = null;
     }
 
+    // Si on force le rechargement depuis le backend, effacer les caches locaux
+    if (forceBackendReload) {
+      console.log("Forçage du rechargement complet depuis le backend - nettoyage des caches");
+      // Nettoyer les caches SessionStorage
+      Object.keys(sessionStorage).forEach(key => {
+        if (key.startsWith('dashboard_') || 
+            key.startsWith('problems') || 
+            key.includes('_cache') || 
+            key.includes('dynatrace_monitor')) {
+          sessionStorage.removeItem(key);
+        }
+      });
+      
+      // Forcer l'utilisation du paramètre force=true dans les appels API
+      refreshProblemsOnly = true; // Pour s'assurer qu'on rafraîchisse au moins les problèmes
+      
+      // Avertir l'utilisateur
+      console.log("Caches nettoyés, rechargement forcé depuis le backend en cours...");
+    }
+
     // Vérifier si l'utilisateur navigue depuis un cache existant
     const isNavigatingFromCache = sessionStorage.getItem('navigationFromCache') === 'true';
-    if (isNavigatingFromCache && !refreshProblemsOnly) {
+    if (isNavigatingFromCache && !refreshProblemsOnly && !forceBackendReload) {
       console.log("Navigation depuis un cache existant, pas de rechargement automatique");
       sessionStorage.removeItem('navigationFromCache');
       return;
@@ -1230,8 +1281,8 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
 
     // Gérer les erreurs dans la fonction
     try {
-      // Vérifier s'il existe des données en cache pour la page de problèmes unifié
-      if (window.location.pathname.includes('/problems/unified') && !refreshProblemsOnly) {
+      // Ne pas utiliser le cache si on force le rechargement
+      if (!forceBackendReload && window.location.pathname.includes('/problems/unified') && !refreshProblemsOnly) {
         // Essayer de lire le cache des problèmes
         const cachedData = sessionStorage.getItem('problemsViewData');
         if (cachedData) {
@@ -1256,7 +1307,7 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
       }
 
       // Exécuter loadAllData de manière non bloquante si on est dans un contexte de zone détaillée
-      if (refreshProblemsOnly && state.selectedZone) {
+      if ((refreshProblemsOnly || forceBackendReload) && state.selectedZone) {
 
         // Mettre à jour l'état pour indiquer le chargement des problèmes
         setState(prev => ({
@@ -1271,7 +1322,8 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
         await new Promise<void>((resolve, reject) => {
           const asyncTimeoutId = window.setTimeout(async () => {
             try {
-              await loadAllData(dashboardType, true, false, effectiveTimeframe);
+              // Passer forceBackendReload comme cinquième paramètre
+              await loadAllData(dashboardType, true, false, effectiveTimeframe, forceBackendReload);
               resolve();
             } catch (error) {
               // Async refresh error handled in reject
@@ -1292,7 +1344,7 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
         });
       } else {
         // Dans les autres cas, exécuter normalement
-        await loadAllData(dashboardType, refreshProblemsOnly || false, false, effectiveTimeframe);
+        await loadAllData(dashboardType, refreshProblemsOnly || false, false, effectiveTimeframe, forceBackendReload);
       }
     } catch (error) {
       // Error in refreshData handled by updating state
@@ -1443,8 +1495,8 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
       }
     };
     
-    // Rafraîchir automatiquement les problèmes actifs toutes les 10 minutes (au lieu de 5)
-    const refreshInterval = 600000; // 10 minutes en millisecondes
+    // Rafraîchir automatiquement les problèmes actifs toutes les 15 minutes
+    const refreshInterval = 900000; // 15 minutes en millisecondes
     
     
     // Nettoyer tout intervalle existant
@@ -1634,13 +1686,26 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
     setState(prev => ({ ...prev, activeTab: tab }));
   }, []);
 
+  // Create a typed version of the refreshData function
+  const typedRefreshData = useCallback(
+    (
+      dashboardType?: 'vfg' | 'vfe' | 'vfp' | 'vfa' | 'detection' | 'security',
+      refreshProblemsOnly?: boolean,
+      timeframe?: string,
+      forceBackendReload?: boolean
+    ): Promise<void> => {
+      return refreshData(dashboardType, refreshProblemsOnly, timeframe, forceBackendReload);
+    },
+    [refreshData]
+  );
+
   // Valeur du contexte
   const contextValue = useMemo<AppContextType>(() => ({
     ...state,
     setSelectedZone: setSelectedZoneAndLoadData,
     setSidebarCollapsed,
     setActiveTab,
-    refreshData,
+    refreshData: typedRefreshData,
     performanceMetrics: state.performanceMetrics || performanceMetrics,
     ...(optimized ? {
       loadZoneData
@@ -1650,7 +1715,7 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
     setSelectedZoneAndLoadData,
     setSidebarCollapsed,
     setActiveTab,
-    refreshData,
+    typedRefreshData,
     optimized,
     loadZoneData,
     performanceMetrics
