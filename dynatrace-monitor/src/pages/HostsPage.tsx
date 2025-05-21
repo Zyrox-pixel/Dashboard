@@ -153,22 +153,22 @@ const HostsPage: React.FC = () => {
               <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
                 <thead className="bg-slate-50 dark:bg-slate-700">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-300 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-300 uppercase tracking-wider w-[40%]">
                       Host
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-300 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-300 uppercase tracking-wider w-[20%]">
                       OS
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-300 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-300 uppercase tracking-wider w-[10%]">
                       Code
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-300 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-300 uppercase tracking-wider w-[10%]">
                       CPU
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-300 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-300 uppercase tracking-wider w-[10%]">
                       RAM
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-300 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-300 uppercase tracking-wider w-[10%]">
                       Actions
                     </th>
                   </tr>
@@ -230,7 +230,7 @@ const HostsPage: React.FC = () => {
                   ) : (
                     paginatedHosts.map((host: Host) => (
                       <tr key={host.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-6 py-4">
                           <div className="flex items-center">
                             <div className="flex-shrink-0 h-8 w-8 flex items-center justify-center rounded-md bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300">
                               <Server size={16} />
@@ -241,7 +241,7 @@ const HostsPage: React.FC = () => {
                             </div>
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-6 py-4">
                           <div className="flex items-center">
                             {host.os_version.toLowerCase().includes('windows') ? (
                               <div className="flex-shrink-0 h-5 w-5 flex items-center justify-center rounded-md bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300 mr-2">
@@ -259,7 +259,7 @@ const HostsPage: React.FC = () => {
                             <span className="text-sm text-slate-700 dark:text-slate-300">{host.os_version}</span>
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-6 py-4">
                           {host.code ? (
                             <div className="flex items-center">
                               <div className="flex-shrink-0 h-5 w-5 flex items-center justify-center rounded-md bg-purple-100 dark:bg-purple-900/50 text-purple-800 dark:text-purple-300 mr-2">
@@ -278,7 +278,7 @@ const HostsPage: React.FC = () => {
                             <span className="text-sm text-slate-500 dark:text-slate-400">Non disponible</span>
                           )}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-6 py-4">
                           {host.cpu !== null ? (
                             <div className="flex items-center">
                               <div className="w-20 bg-slate-200 dark:bg-slate-700 rounded-full h-2.5">
@@ -297,7 +297,7 @@ const HostsPage: React.FC = () => {
                             <span className="text-sm text-slate-500 dark:text-slate-400">Non disponible</span>
                           )}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-6 py-4">
                           {host.ram !== null ? (
                             <div className="flex items-center">
                               <div className="w-20 bg-slate-200 dark:bg-slate-700 rounded-full h-2.5">
@@ -316,7 +316,7 @@ const HostsPage: React.FC = () => {
                             <span className="text-sm text-slate-500 dark:text-slate-400">Non disponible</span>
                           )}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400">
+                        <td className="px-6 py-4 text-sm text-slate-500 dark:text-slate-400">
                           <a 
                             href={host.dt_url} 
                             target="_blank" 
