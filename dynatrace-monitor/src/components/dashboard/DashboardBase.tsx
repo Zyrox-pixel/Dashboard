@@ -81,16 +81,16 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
   const zones = determineZones();
   
   // Déterminer si nous devons afficher le loader pour ce type de dashboard
-  const shouldShowProblemsLoader = isLoading.problems && !initialProblemsLoaded[variant];
+  const shouldShowProblemsLoader = isLoading.problems;
   
   // Effet pour mettre à jour initialProblemsLoaded quand les problèmes sont chargés
   useEffect(() => {
-    if (!isLoading.problems && activeProblems.length > 0 && !initialProblemsLoaded[variant]) {
+    if (!isLoading.problems && !initialProblemsLoaded[variant]) {
       const newState = { ...initialProblemsLoaded, [variant]: true };
       setInitialProblemsLoaded(newState);
       sessionStorage.setItem('initialProblemsLoaded', JSON.stringify(newState));
     }
-  }, [isLoading.problems, activeProblems.length, variant, initialProblemsLoaded]);
+  }, [isLoading.problems, variant, initialProblemsLoaded]);
 
   // Vérifier si une zone est spécifiée dans l'URL
   useEffect(() => {
