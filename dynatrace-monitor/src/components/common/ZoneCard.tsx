@@ -224,8 +224,10 @@ const ZoneCard: React.FC<ZoneCardProps> = ({
             </div>
             <div className="w-full h-2 bg-slate-900/80 rounded-full overflow-hidden shadow-inner">
               <div 
-                className={`h-full rounded-full bg-gradient-to-r ${
-                  zone.problemCount > 0 ? 'from-red-500 to-red-600 animate-wave' : 'from-green-500 to-green-600 animate-shimmer'
+                className={`h-full rounded-full ${
+                  zone.problemCount > 0 
+                    ? 'bg-gradient-to-r from-red-500 via-red-700 to-red-500 animate-wave'
+                    : 'bg-gradient-to-r from-green-500 to-green-600 animate-shimmer'
                 }`}
                 style={{ width: `${Math.min(100, availabilityPercent)}%`, backgroundSize: '200% 200%' }}
               ></div>
@@ -354,8 +356,10 @@ const ZoneCard: React.FC<ZoneCardProps> = ({
           </div>
           <div className="w-full h-1.5 bg-slate-900/80 rounded-full overflow-hidden shadow-inner">
             <div 
-              className={`h-full rounded-full bg-gradient-to-r ${
-                zone.problemCount > 0 ? 'from-red-500 to-red-600 animate-wave' : 'from-green-500 to-green-600 animate-shimmer'
+              className={`h-full rounded-full ${
+                zone.problemCount > 0 
+                  ? 'bg-gradient-to-r from-red-500 via-red-700 to-red-500 animate-wave' 
+                  : 'bg-gradient-to-r from-green-500 to-green-600 animate-shimmer'
               }`}
               style={{ width: `${Math.min(100, availabilityPercent)}%`, backgroundSize: '200% 200%' }}
             ></div>

@@ -87,7 +87,7 @@ module.exports = {
         'shimmer': 'shimmer 2s infinite',
         'spin-slow': 'spin 3s linear infinite',
         'spin-reverse': 'spin 2s linear infinite reverse',
-        'wave': 'wave 3s ease infinite',
+        'wave': 'wave 1.5s ease-in-out infinite',
         'subtle-bounce': 'subtle-bounce 2s ease-in-out infinite',
         'glow-pulse': 'glow-pulse 2s infinite',
       },
