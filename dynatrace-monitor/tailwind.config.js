@@ -87,6 +87,9 @@ module.exports = {
         'shimmer': 'shimmer 2s infinite',
         'spin-slow': 'spin 3s linear infinite',
         'spin-reverse': 'spin 2s linear infinite reverse',
+        'wave': 'wave 3s ease infinite',
+        'subtle-bounce': 'subtle-bounce 2s ease-in-out infinite',
+        'glow-pulse': 'glow-pulse 2s infinite',
       },
       boxShadow: {
         'inner-light': 'inset 0 2px 4px 0 rgba(255, 255, 255, 0.05)',
@@ -121,6 +124,19 @@ module.exports = {
         'shimmer': {
           '0%': { backgroundPosition: '-200% 0' },
           '100%': { backgroundPosition: '200% 0' },
+        },
+        'wave': {
+          '0%': { backgroundPosition: '0% 50%' },
+          '50%': { backgroundPosition: '100% 50%' },
+          '100%': { backgroundPosition: '0% 50%' },
+        },
+        'subtle-bounce': {
+          '0%, 100%': { transform: 'translateY(0)' },
+          '50%': { transform: 'translateY(-2px)' },
+        },
+        'glow-pulse': {
+          '0%, 100%': { boxShadow: '0 0 5px rgba(99, 102, 241, 0.3)' },
+          '50%': { boxShadow: '0 0 15px rgba(99, 102, 241, 0.5)' },
         },
       },
       backgroundImage: {

@@ -61,7 +61,7 @@ const ZoneCard: React.FC<ZoneCardProps> = ({
   if (variant === 'compact') {
     return (
       <div 
-        className={`rounded-xl overflow-hidden transition-all duration-300 cursor-pointer ${getDesignClasses()} ${
+        className={`rounded-xl overflow-hidden transition-all duration-300 cursor-pointer shadow-md border border-slate-700/10 ${getDesignClasses()} ${
           highlighted ? 'ring-2 ring-indigo-500/70 ring-offset-2 ring-offset-slate-900' : ''
         }`}
         onClick={() => onZoneClick(zone.id)}
@@ -92,13 +92,15 @@ const ZoneCard: React.FC<ZoneCardProps> = ({
           </div>
           
           <div className="grid grid-cols-2 gap-2 mb-2">
-            <div className="bg-slate-900/70 rounded-lg p-2 text-center shadow-md border border-slate-700/40">
+            <div className="bg-slate-900/70 rounded-lg p-2 text-center shadow-md border border-slate-700/40 relative animate-subtle-bounce" style={{animationDelay: '0ms'}}>
               <p className="text-xs text-slate-500 tracking-wide">Services</p>
               <p className="text-lg font-bold text-white">{zone.services}</p>
+              <div className="absolute inset-0 rounded-lg opacity-0 hover:opacity-30 bg-gradient-to-br from-blue-500/20 to-transparent transition-opacity duration-300 pointer-events-none"></div>
             </div>
-            <div className="bg-slate-900/70 rounded-lg p-2 text-center shadow-md border border-slate-700/40">
+            <div className="bg-slate-900/70 rounded-lg p-2 text-center shadow-md border border-slate-700/40 relative animate-subtle-bounce" style={{animationDelay: '100ms'}}>
               <p className="text-xs text-slate-500 tracking-wide">Hôtes</p>
               <p className="text-lg font-bold text-white">{zone.hosts}</p>
+              <div className="absolute inset-0 rounded-lg opacity-0 hover:opacity-30 bg-gradient-to-br from-purple-500/20 to-transparent transition-opacity duration-300 pointer-events-none"></div>
             </div>
           </div>
           
@@ -129,7 +131,7 @@ const ZoneCard: React.FC<ZoneCardProps> = ({
   if (variant === 'expanded') {
     return (
       <div 
-        className={`rounded-xl overflow-hidden transition-all duration-300 cursor-pointer ${getDesignClasses()} ${
+        className={`rounded-xl overflow-hidden transition-all duration-300 cursor-pointer shadow-md border border-slate-700/10 ${getDesignClasses()} ${
           highlighted ? 'ring-2 ring-indigo-500/70 ring-offset-2 ring-offset-slate-900' : ''
         }`}
         onClick={() => onZoneClick(zone.id)}
@@ -189,26 +191,29 @@ const ZoneCard: React.FC<ZoneCardProps> = ({
           
           {/* Statistiques principales */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
-            <div className="glass-dark rounded-lg p-3 border border-slate-700/50 transform-gpu hover:-translate-y-1 hover:border-blue-700/30 transition-all duration-300 shadow-md">
+            <div className="glass-dark rounded-lg p-3 border border-slate-700/50 transform-gpu hover:-translate-y-1 hover:border-blue-700/30 transition-all duration-300 shadow-lg animate-subtle-bounce" style={{animationDelay: '0ms'}}>
               <div className="flex items-center gap-2 mb-2">
                 <Activity size={14} className="text-blue-400" />
                 <span className="text-sm text-slate-300">Services</span>
               </div>
               <p className="text-2xl font-bold text-white text-shadow-sm">{zone.services}</p>
+              <div className="absolute inset-0 rounded-lg opacity-0 hover:opacity-30 bg-gradient-to-br from-blue-500/20 to-transparent transition-opacity duration-300 pointer-events-none"></div>
             </div>
-            <div className="glass-dark rounded-lg p-3 border border-slate-700/50 transform-gpu hover:-translate-y-1 hover:border-purple-700/30 transition-all duration-300 shadow-md">
+            <div className="glass-dark rounded-lg p-3 border border-slate-700/50 transform-gpu hover:-translate-y-1 hover:border-purple-700/30 transition-all duration-300 shadow-lg animate-subtle-bounce relative" style={{animationDelay: '100ms'}}>
               <div className="flex items-center gap-2 mb-2">
                 <Server size={14} className="text-purple-400" />
                 <span className="text-sm text-slate-300">Hôtes</span>
               </div>
               <p className="text-2xl font-bold text-white text-shadow-sm">{zone.hosts}</p>
+              <div className="absolute inset-0 rounded-lg opacity-0 hover:opacity-30 bg-gradient-to-br from-purple-500/20 to-transparent transition-opacity duration-300 pointer-events-none"></div>
             </div>
-            <div className="glass-dark rounded-lg p-3 border border-slate-700/50 transform-gpu hover:-translate-y-1 hover:border-emerald-700/30 transition-all duration-300 shadow-md">
+            <div className="glass-dark rounded-lg p-3 border border-slate-700/50 transform-gpu hover:-translate-y-1 hover:border-emerald-700/30 transition-all duration-300 shadow-lg animate-subtle-bounce relative" style={{animationDelay: '200ms'}}>
               <div className="flex items-center gap-2 mb-2">
                 <Database size={14} className="text-emerald-400" />
                 <span className="text-sm text-slate-300">Applications</span>
               </div>
               <p className="text-2xl font-bold text-white text-shadow-sm">{zone.apps}</p>
+              <div className="absolute inset-0 rounded-lg opacity-0 hover:opacity-30 bg-gradient-to-br from-emerald-500/20 to-transparent transition-opacity duration-300 pointer-events-none"></div>
             </div>
           </div>
           
@@ -216,20 +221,13 @@ const ZoneCard: React.FC<ZoneCardProps> = ({
           <div className="mb-3">
             <div className="flex items-center justify-between mb-1">
               <span className="text-xs text-slate-400 tracking-wide">Disponibilité</span>
-              <span className={`text-sm font-medium ${
-                availabilityPercent >= 99.9 ? 'text-green-400' : 
-                availabilityPercent >= 99 ? 'text-blue-400' : 
-                availabilityPercent >= 95 ? 'text-yellow-400' : 'text-red-400'
-              }`}>{zone.availability}</span>
             </div>
             <div className="w-full h-2 bg-slate-900/80 rounded-full overflow-hidden shadow-inner">
               <div 
-                className={`h-full rounded-full ${
-                  availabilityPercent >= 99.9 ? 'bg-gradient-to-r from-green-500 to-green-600 animate-shimmer' : 
-                  availabilityPercent >= 99 ? 'bg-gradient-to-r from-blue-500 to-blue-600 animate-shimmer' : 
-                  availabilityPercent >= 95 ? 'bg-gradient-to-r from-yellow-500 to-yellow-600 animate-shimmer' : 'bg-gradient-to-r from-red-500 to-red-600 animate-shimmer'
+                className={`h-full rounded-full bg-gradient-to-r ${
+                  zone.problemCount > 0 ? 'from-red-500 to-red-600 animate-wave' : 'from-green-500 to-green-600 animate-shimmer'
                 }`}
-                style={{ width: `${Math.min(100, availabilityPercent)}%` }}
+                style={{ width: `${Math.min(100, availabilityPercent)}%`, backgroundSize: '200% 200%' }}
               ></div>
             </div>
           </div>
@@ -263,7 +261,7 @@ const ZoneCard: React.FC<ZoneCardProps> = ({
   // Version standard (par défaut)
   return (
     <div 
-      className={`rounded-xl overflow-hidden transition-all duration-300 cursor-pointer ${getDesignClasses()} ${
+      className={`rounded-xl overflow-hidden transition-all duration-300 cursor-pointer shadow-md border border-slate-700/10 ${getDesignClasses()} ${
         highlighted ? 'ring-2 ring-indigo-500/70 ring-offset-2 ring-offset-slate-900' : ''
       }`}
       onClick={() => onZoneClick(zone.id)}
@@ -323,26 +321,29 @@ const ZoneCard: React.FC<ZoneCardProps> = ({
         
         {/* Statistiques */}
         <div className="grid grid-cols-3 gap-2">
-          <div className="glass-dark rounded-lg p-2 text-center shadow-md border border-slate-700/40 hover:border-blue-700/30 transition-all duration-300">
+          <div className="glass-dark rounded-lg p-2 text-center shadow-md border border-slate-700/40 hover:border-blue-700/30 transition-all duration-300 relative animate-subtle-bounce" style={{animationDelay: '0ms'}}>
             <div className="flex items-center justify-center gap-1 mb-1">
               <Activity size={12} className="text-blue-400" />
               <span className="text-xs text-slate-500 tracking-wide">Services</span>
             </div>
             <p className="text-lg font-bold text-white text-shadow-sm">{zone.services}</p>
+            <div className="absolute inset-0 rounded-lg opacity-0 hover:opacity-30 bg-gradient-to-br from-blue-500/20 to-transparent transition-opacity duration-300 pointer-events-none"></div>
           </div>
-          <div className="glass-dark rounded-lg p-2 text-center shadow-md border border-slate-700/40 hover:border-purple-700/30 transition-all duration-300">
+          <div className="glass-dark rounded-lg p-2 text-center shadow-md border border-slate-700/40 hover:border-purple-700/30 transition-all duration-300 relative animate-subtle-bounce" style={{animationDelay: '100ms'}}>
             <div className="flex items-center justify-center gap-1 mb-1">
               <Server size={12} className="text-purple-400" />
               <span className="text-xs text-slate-500 tracking-wide">Hôtes</span>
             </div>
             <p className="text-lg font-bold text-white text-shadow-sm">{zone.hosts}</p>
+            <div className="absolute inset-0 rounded-lg opacity-0 hover:opacity-30 bg-gradient-to-br from-purple-500/20 to-transparent transition-opacity duration-300 pointer-events-none"></div>
           </div>
-          <div className="glass-dark rounded-lg p-2 text-center shadow-md border border-slate-700/40 hover:border-emerald-700/30 transition-all duration-300">
+          <div className="glass-dark rounded-lg p-2 text-center shadow-md border border-slate-700/40 hover:border-emerald-700/30 transition-all duration-300 relative animate-subtle-bounce" style={{animationDelay: '200ms'}}>
             <div className="flex items-center justify-center gap-1 mb-1">
               <BarChart size={12} className="text-emerald-400" />
               <span className="text-xs text-slate-500 tracking-wide">Apps</span>
             </div>
             <p className="text-lg font-bold text-white text-shadow-sm">{zone.apps}</p>
+            <div className="absolute inset-0 rounded-lg opacity-0 hover:opacity-30 bg-gradient-to-br from-emerald-500/20 to-transparent transition-opacity duration-300 pointer-events-none"></div>
           </div>
         </div>
         
@@ -350,20 +351,13 @@ const ZoneCard: React.FC<ZoneCardProps> = ({
         <div className="mt-3 mb-2">
           <div className="flex items-center justify-between mb-1">
             <span className="text-xs text-slate-400 tracking-wide">Disponibilité</span>
-            <span className={`text-xs font-medium ${
-              availabilityPercent >= 99.9 ? 'text-green-400' : 
-              availabilityPercent >= 99 ? 'text-blue-400' : 
-              availabilityPercent >= 95 ? 'text-yellow-400' : 'text-red-400'
-            }`}>{zone.availability}</span>
           </div>
           <div className="w-full h-1.5 bg-slate-900/80 rounded-full overflow-hidden shadow-inner">
             <div 
-              className={`h-full rounded-full ${
-                availabilityPercent >= 99.9 ? 'bg-gradient-to-r from-green-500 to-green-600 animate-shimmer' : 
-                availabilityPercent >= 99 ? 'bg-gradient-to-r from-blue-500 to-blue-600 animate-shimmer' : 
-                availabilityPercent >= 95 ? 'bg-gradient-to-r from-yellow-500 to-yellow-600 animate-shimmer' : 'bg-gradient-to-r from-red-500 to-red-600 animate-shimmer'
+              className={`h-full rounded-full bg-gradient-to-r ${
+                zone.problemCount > 0 ? 'from-red-500 to-red-600 animate-wave' : 'from-green-500 to-green-600 animate-shimmer'
               }`}
-              style={{ width: `${Math.min(100, availabilityPercent)}%` }}
+              style={{ width: `${Math.min(100, availabilityPercent)}%`, backgroundSize: '200% 200%' }}
             ></div>
           </div>
         </div>
