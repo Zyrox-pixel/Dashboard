@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useHostsData } from '../hooks/useHostsData';
 import Layout from '../components/layout/Layout';
-import { RefreshCw, Server, Database, HardDrive, Search, AlertCircle, Filter, Monitor, ArrowUp, ArrowDown, Cpu } from 'lucide-react';
+import { RefreshCw, Server, Database, HardDrive, Search, AlertCircle, Filter, Monitor, ArrowUp, ArrowDown, Cpu, FileDown } from 'lucide-react';
 import AdvancedFilter, { FilterCategory, FilterValue, FilterItem } from '../components/common/AdvancedFilter';
 import UnifiedFilterBadges, { FilterBadge } from '../components/common/UnifiedFilterBadges';
 import { Host } from '../api/types';
+import { exportHostsToCSV, downloadCSV } from '../utils/exportUtils';
 
 const HostsPage: React.FC = () => {
   // État pour la pagination et le filtrage
@@ -528,10 +529,30 @@ const HostsPage: React.FC = () => {
             </p>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <div className="text-sm text-slate-600 dark:text-slate-300">
               Dernier rafraîchissement: <span className="font-medium">{formattedLastRefreshTime}</span>
             </div>
+            
+            {/* Bouton export CSV */}
+            <button
+              onClick={() => {
+                // Utiliser les hosts filtrés (avec les filtres de recherche, OS et performances)
+                const { csv, filename } = exportHostsToCSV(filteredHosts, mzAdmin || 'All_Hosts');
+                downloadCSV(csv, filename);
+              }}
+              disabled={isLoading || filteredHosts.length === 0}
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-200
+                ${(isLoading || filteredHosts.length === 0)
+                  ? 'bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400 cursor-not-allowed'
+                  : 'bg-green-100 dark:bg-green-800/40 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-700/50'
+                }`}
+              title="Exporter les données filtrées en CSV"
+            >
+              <FileDown size={16} />
+              <span>Exporter CSV</span>
+            </button>
+            
             <button 
               onClick={handleRefresh}
               disabled={isLoading}
