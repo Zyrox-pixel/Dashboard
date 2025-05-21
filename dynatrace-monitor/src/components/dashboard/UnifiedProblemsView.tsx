@@ -158,7 +158,7 @@ const UnifiedProblemsView: React.FC<UnifiedProblemsViewProps> = ({ title, varian
     } finally {
       setTimeout(() => {
         setIsRefreshing(false);
-      }, 500); // Délai minimum pour éviter des rafraîchissements trop rapides
+      }, 3000); // Délai minimum pour éviter des rafraîchissements trop rapides
     }
   };
 

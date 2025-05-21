@@ -274,10 +274,10 @@ const ProblemsList: React.FC<ProblemsListProps> = ({
       // Désactiver l'indicateur de chargement
       setIsRefreshing(false);
       
-      // Définir un délai minimum avant d'autoriser un nouveau rafraîchissement (500ms)
+      // Définir un délai minimum avant d'autoriser un nouveau rafraîchissement (3 secondes)
       setTimeout(() => {
-        // Ce code est vide mais le timeout garantit que isRefreshing a été à true pendant au moins 500ms
-      }, 500);
+        // Ce code est vide mais le timeout garantit que isRefreshing a été à true pendant au moins 3 secondes
+      }, 3000);
     }
   };
 

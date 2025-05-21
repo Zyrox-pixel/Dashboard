@@ -1495,8 +1495,8 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
       }
     };
     
-    // Rafraîchir automatiquement les problèmes actifs toutes les 10 minutes (au lieu de 5)
-    const refreshInterval = 600000; // 10 minutes en millisecondes
+    // Rafraîchir automatiquement les problèmes actifs toutes les 15 minutes
+    const refreshInterval = 900000; // 15 minutes en millisecondes
     
     
     // Nettoyer tout intervalle existant

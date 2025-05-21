@@ -316,10 +316,10 @@ export function useZoneStatusPreloader() {
       preloadZoneStatuses(false);
     }
     
-    // Rafraîchissement automatique toutes les 5 minutes
+    // Rafraîchissement automatique toutes les 15 minutes
     refreshTimerRef.current = setInterval(() => {
       preloadZoneStatuses(false);
-    }, 5 * 60 * 1000);
+    }, 15 * 60 * 1000);
     
     return () => {
       if (refreshTimerRef.current) {

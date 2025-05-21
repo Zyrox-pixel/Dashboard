@@ -21,8 +21,8 @@ const CACHE_KEYS = {
   unified: 'dashboard_unified_cache'
 };
 
-// Durée de vie du cache en millisecondes (5 minutes)
-const CACHE_LIFETIME = 5 * 60 * 1000;
+// Durée de vie du cache en millisecondes (15 minutes)
+const CACHE_LIFETIME = 15 * 60 * 1000;
 
 /**
  * Hook personnalisé pour gérer le cache des tableaux de bord
