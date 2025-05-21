@@ -526,9 +526,6 @@ const HostsPage: React.FC = () => {
               Management Zone: <span className="font-medium text-blue-700 dark:text-blue-400">{mzAdmin || 'Non configurée'}</span>
               {mzAdmin && <> • <span className="font-semibold text-slate-700 dark:text-slate-200">{totalHosts}</span> machines</>}
             </p>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-              Configuré via la variable MZ_ADMIN dans le fichier .env du backend
-            </p>
           </div>
 
           <div className="flex items-center gap-4">
