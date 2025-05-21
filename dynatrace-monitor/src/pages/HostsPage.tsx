@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useHostsData } from '../hooks/useHostsData';
 import Layout from '../components/layout/Layout';
-import { RefreshCw, Server, Database, HardDrive, Search, AlertCircle, Filter, Monitor } from 'lucide-react';
+import { RefreshCw, Server, Database, HardDrive, Search, AlertCircle, Filter, Monitor, ArrowUp, ArrowDown } from 'lucide-react';
 import AdvancedFilter, { FilterCategory, FilterValue, FilterItem } from '../components/common/AdvancedFilter';
 import UnifiedFilterBadges, { FilterBadge } from '../components/common/UnifiedFilterBadges';
 import { Host } from '../api/types';
@@ -15,6 +15,12 @@ const HostsPage: React.FC = () => {
   // États pour les filtres avancés
   const [showAdvancedFilter, setShowAdvancedFilter] = useState<boolean>(false);
   const [osFilters, setOsFilters] = useState<FilterValue[]>([]);
+  
+  // État pour le tri
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'ascending' | 'descending' | null }>({
+    key: '',
+    direction: null
+  });
   
   // Utiliser notre hook personnalisé pour les données des hosts
   const { 
@@ -193,6 +199,21 @@ const HostsPage: React.FC = () => {
     });
   }, []);
 
+  // Fonction pour gérer le tri des colonnes
+  const requestSort = (key: string) => {
+    let direction: 'ascending' | 'descending' | null = 'ascending';
+    
+    if (sortConfig.key === key) {
+      if (sortConfig.direction === 'ascending') {
+        direction = 'descending';
+      } else if (sortConfig.direction === 'descending') {
+        direction = null;
+      }
+    }
+    
+    setSortConfig({ key, direction });
+  };
+
   // Calculer les hosts filtrés en fonction de la recherche et des filtres
   const filteredHosts = useMemo(() => {
     // Commencer par filtrer par termes de recherche
@@ -235,8 +256,49 @@ const HostsPage: React.FC = () => {
       });
     }
     
+    // Appliquer le tri si configuré
+    if (sortConfig.key && sortConfig.direction) {
+      filtered = [...filtered].sort((a, b) => {
+        // TypeScript ne peut pas déduire que sortConfig.key est une clé valide de Host
+        // Créons donc une fonction pour obtenir la valeur typée
+        const getValue = (host: Host, key: string): any => {
+          switch(key) {
+            case 'name': return host.name;
+            case 'os_version': return host.os_version;
+            case 'code': return host.code || '';
+            case 'cpu': return host.cpu;
+            case 'ram': return host.ram;
+            default: return '';
+          }
+        };
+        
+        const aValue = getValue(a, sortConfig.key);
+        const bValue = getValue(b, sortConfig.key);
+        
+        // Gestion de valeurs nulles
+        if (aValue === null && bValue === null) {
+          return 0;
+        }
+        if (aValue === null) {
+          return 1; // Null values are considered greater
+        }
+        if (bValue === null) {
+          return -1;
+        }
+
+        // Comparaison standard
+        if (aValue < bValue) {
+          return sortConfig.direction === 'ascending' ? -1 : 1;
+        }
+        if (aValue > bValue) {
+          return sortConfig.direction === 'ascending' ? 1 : -1;
+        }
+        return 0;
+      });
+    }
+    
     return filtered;
-  }, [hosts, searchTerm, osFilters]);
+  }, [hosts, searchTerm, osFilters, sortConfig]);
 
   // Calculer les hosts paginés
   const paginatedHosts = useMemo(() => {
@@ -385,20 +447,90 @@ const HostsPage: React.FC = () => {
               <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
                 <thead className="bg-slate-50 dark:bg-slate-700">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-300 uppercase tracking-wider w-[40%]">
-                      Host
+                    <th 
+                      className="px-6 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-300 uppercase tracking-wider w-[40%] cursor-pointer"
+                      onClick={() => requestSort('name')}
+                    >
+                      <div className="flex items-center">
+                        <span>Host</span>
+                        {sortConfig.key === 'name' && (
+                          <span className="ml-1">
+                            {sortConfig.direction === 'ascending' ? (
+                              <ArrowUp size={14} />
+                            ) : sortConfig.direction === 'descending' ? (
+                              <ArrowDown size={14} />
+                            ) : null}
+                          </span>
+                        )}
+                      </div>
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-300 uppercase tracking-wider w-[20%]">
-                      OS
+                    <th 
+                      className="px-6 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-300 uppercase tracking-wider w-[20%] cursor-pointer"
+                      onClick={() => requestSort('os_version')}
+                    >
+                      <div className="flex items-center">
+                        <span>OS</span>
+                        {sortConfig.key === 'os_version' && (
+                          <span className="ml-1">
+                            {sortConfig.direction === 'ascending' ? (
+                              <ArrowUp size={14} />
+                            ) : sortConfig.direction === 'descending' ? (
+                              <ArrowDown size={14} />
+                            ) : null}
+                          </span>
+                        )}
+                      </div>
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-300 uppercase tracking-wider w-[10%]">
-                      Code
+                    <th 
+                      className="px-6 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-300 uppercase tracking-wider w-[10%] cursor-pointer"
+                      onClick={() => requestSort('code')}
+                    >
+                      <div className="flex items-center">
+                        <span>Code</span>
+                        {sortConfig.key === 'code' && (
+                          <span className="ml-1">
+                            {sortConfig.direction === 'ascending' ? (
+                              <ArrowUp size={14} />
+                            ) : sortConfig.direction === 'descending' ? (
+                              <ArrowDown size={14} />
+                            ) : null}
+                          </span>
+                        )}
+                      </div>
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-300 uppercase tracking-wider w-[10%]">
-                      CPU
+                    <th 
+                      className="px-6 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-300 uppercase tracking-wider w-[10%] cursor-pointer"
+                      onClick={() => requestSort('cpu')}
+                    >
+                      <div className="flex items-center">
+                        <span>CPU</span>
+                        {sortConfig.key === 'cpu' && (
+                          <span className="ml-1">
+                            {sortConfig.direction === 'ascending' ? (
+                              <ArrowUp size={14} />
+                            ) : sortConfig.direction === 'descending' ? (
+                              <ArrowDown size={14} />
+                            ) : null}
+                          </span>
+                        )}
+                      </div>
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-300 uppercase tracking-wider w-[10%]">
-                      RAM
+                    <th 
+                      className="px-6 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-300 uppercase tracking-wider w-[10%] cursor-pointer"
+                      onClick={() => requestSort('ram')}
+                    >
+                      <div className="flex items-center">
+                        <span>RAM</span>
+                        {sortConfig.key === 'ram' && (
+                          <span className="ml-1">
+                            {sortConfig.direction === 'ascending' ? (
+                              <ArrowUp size={14} />
+                            ) : sortConfig.direction === 'descending' ? (
+                              <ArrowDown size={14} />
+                            ) : null}
+                          </span>
+                        )}
+                      </div>
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-300 uppercase tracking-wider w-[10%]">
                       Actions
