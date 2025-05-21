@@ -1,7 +1,9 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useHostsData } from '../hooks/useHostsData';
 import Layout from '../components/layout/Layout';
-import { RefreshCw, Server, Database, HardDrive, Search, AlertCircle } from 'lucide-react';
+import { RefreshCw, Server, Database, HardDrive, Search, AlertCircle, Filter, Monitor } from 'lucide-react';
+import AdvancedFilter, { FilterCategory, FilterValue, FilterItem } from '../components/common/AdvancedFilter';
+import UnifiedFilterBadges, { FilterBadge } from '../components/common/UnifiedFilterBadges';
 import { Host } from '../api/types';
 
 const HostsPage: React.FC = () => {
@@ -9,6 +11,10 @@ const HostsPage: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
   const [itemsPerPage, setItemsPerPage] = useState(50);
+  
+  // États pour les filtres avancés
+  const [showAdvancedFilter, setShowAdvancedFilter] = useState<boolean>(false);
+  const [osFilters, setOsFilters] = useState<FilterValue[]>([]);
   
   // Utiliser notre hook personnalisé pour les données des hosts
   const { 
@@ -21,15 +27,216 @@ const HostsPage: React.FC = () => {
     refreshData
   } = useHostsData();
 
-  // Calculer les hosts filtrés en fonction de la recherche
-  const filteredHosts = useMemo(() => {
-    if (!searchTerm.trim()) return hosts;
+  // Helper pour obtenir l'icône du système d'exploitation
+  const getOsIcon = (osVersion: string = '', small: boolean = false) => {
+    const size = small ? 14 : 18;
+    const os = osVersion.toLowerCase();
     
-    return hosts.filter(host => 
-      host.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      host.os_version.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  }, [hosts, searchTerm]);
+    if (os.includes('linux')) {
+      return <span className="text-orange-500">🐧</span>;
+    } else if (os.includes('windows')) {
+      return <span className="text-blue-500">🪟</span>;
+    } else if (os.includes('mac') || os.includes('darwin')) {
+      return <span className="text-gray-500">🍎</span>;
+    } else if (os.includes('unix') || os.includes('aix')) {
+      return <span className="text-purple-500">🖥️</span>;
+    }
+    
+    return <Monitor size={size} className="text-slate-400" />;
+  };
+
+  // Extraire la liste des OS uniques des hôtes
+  const uniqueOperatingSystems = useMemo(() => {
+    if (!hosts || hosts.length === 0) return [];
+    
+    const osSet = new Set<string>();
+    
+    hosts.forEach(host => {
+      if (host.os_version) {
+        // Simplifions la détection des OS pour le filtrage
+        let osType = "Autre";
+        
+        if (host.os_version.toLowerCase().includes('linux')) {
+          osType = "Linux";
+        } else if (host.os_version.toLowerCase().includes('windows')) {
+          osType = "Windows";
+        } else if (host.os_version.toLowerCase().includes('unix')) {
+          osType = "Unix";
+        } else if (host.os_version.toLowerCase().includes('aix')) {
+          osType = "AIX";
+        } else if (host.os_version.toLowerCase().includes('mac') || host.os_version.toLowerCase().includes('darwin')) {
+          osType = "MacOS";
+        }
+        
+        osSet.add(osType);
+      }
+    });
+    
+    return Array.from(osSet);
+  }, [hosts]);
+  
+  // Préparer les catégories de filtres pour les OS
+  const osFilterCategories = useMemo((): FilterCategory[] => {
+    // Calculer toutes les versions OS par type
+    const osVersionsByType = new Map<string, {version: string, count: number}[]>();
+    
+    hosts.forEach(host => {
+      if (!host.os_version) return;
+      
+      // Déterminer le type d'OS
+      let osType = "Autre";
+      if (host.os_version.toLowerCase().includes('linux')) {
+        osType = "Linux";
+      } else if (host.os_version.toLowerCase().includes('windows')) {
+        osType = "Windows";
+      } else if (host.os_version.toLowerCase().includes('unix')) {
+        osType = "Unix";
+      } else if (host.os_version.toLowerCase().includes('aix')) {
+        osType = "AIX";
+      } else if (host.os_version.toLowerCase().includes('mac') || host.os_version.toLowerCase().includes('darwin')) {
+        osType = "MacOS";
+      }
+      
+      // Récupérer les versions existantes pour ce type d'OS
+      const versions = osVersionsByType.get(osType) || [];
+      
+      // Trouver si cette version existe déjà
+      const existingVersion = versions.find(v => v.version === host.os_version);
+      
+      if (existingVersion) {
+        existingVersion.count++;
+      } else {
+        versions.push({ version: host.os_version, count: 1 });
+      }
+      
+      osVersionsByType.set(osType, versions);
+    });
+    
+    // Convertir la map en catégories de filtres
+    return Array.from(osVersionsByType.entries()).map(([osType, versions]) => ({
+      id: osType,
+      label: osType,
+      icon: getOsIcon(osType),
+      items: versions.map(v => ({
+        id: v.version,
+        label: v.version,
+        value: v.version,
+        count: v.count,
+        icon: getOsIcon(osType, true)
+      }))
+    }));
+  }, [hosts]);
+
+  // Convertir les filtres en badges pour l'affichage
+  const getOsFilterBadges = useMemo((): FilterBadge[] => {
+    const badges: FilterBadge[] = [];
+    
+    osFilters.forEach(filter => {
+      const category = osFilterCategories.find(c => c.id === filter.categoryId);
+      if (!category) return;
+      
+      if (filter.values.length === 0) {
+        // Tous les éléments sont sélectionnés
+        badges.push({
+          id: `${filter.categoryId}-all`,
+          type: filter.categoryId,  // 'categoryId' devient 'type'
+          typeLabel: category.label,  // 'categoryLabel' devient 'typeLabel'
+          value: '',
+          valueLabel: 'Tous',  // 'label' devient 'valueLabel'
+          icon: category.icon
+        });
+      } else {
+        // Éléments spécifiques sélectionnés
+        filter.values.forEach(value => {
+          const item = category.items.find(i => i.value === value);
+          if (!item) return;
+          
+          badges.push({
+            id: `${filter.categoryId}-${value}`,
+            type: filter.categoryId,
+            typeLabel: category.label,
+            value,
+            valueLabel: item.label,
+            icon: item.icon
+          });
+        });
+      }
+    });
+    
+    return badges;
+  }, [osFilters, osFilterCategories]);
+
+  // Gérer la suppression d'un filtre OS
+  const handleRemoveOsFilter = useCallback((categoryId: string, value?: string) => {
+    setOsFilters(prev => {
+      const newFilters = [...prev];
+      const filterIndex = newFilters.findIndex(f => f.categoryId === categoryId);
+      
+      if (filterIndex === -1) return prev;
+      
+      if (!value) {
+        // Supprimer tout le filtre
+        return newFilters.filter(f => f.categoryId !== categoryId);
+      }
+      
+      // Supprimer une valeur spécifique
+      const filter = {...newFilters[filterIndex]};
+      filter.values = filter.values.filter(v => v !== value);
+      
+      if (filter.values.length === 0) {
+        // Si plus aucune valeur, supprimer le filtre
+        return newFilters.filter(f => f.categoryId !== categoryId);
+      }
+      
+      newFilters[filterIndex] = filter;
+      return newFilters;
+    });
+  }, []);
+
+  // Calculer les hosts filtrés en fonction de la recherche et des filtres
+  const filteredHosts = useMemo(() => {
+    // Commencer par filtrer par termes de recherche
+    let filtered = searchTerm.trim() 
+      ? hosts.filter(host => 
+          host.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          host.os_version.toLowerCase().includes(searchTerm.toLowerCase())
+        )
+      : hosts;
+    
+    // Ensuite, appliquer les filtres OS
+    if (osFilters.length > 0) {
+      filtered = filtered.filter(host => {
+        const osVersion = host.os_version || '';
+        
+        // Déterminer le type d'OS
+        let hostOsType = "Autre";
+        if (osVersion.toLowerCase().includes('linux')) {
+          hostOsType = "Linux";
+        } else if (osVersion.toLowerCase().includes('windows')) {
+          hostOsType = "Windows";
+        } else if (osVersion.toLowerCase().includes('unix')) {
+          hostOsType = "Unix";
+        } else if (osVersion.toLowerCase().includes('aix')) {
+          hostOsType = "AIX";
+        } else if (osVersion.toLowerCase().includes('mac') || osVersion.toLowerCase().includes('darwin')) {
+          hostOsType = "MacOS";
+        }
+        
+        // Vérifier si ce type d'OS est sélectionné
+        const osTypeFilter = osFilters.find(f => f.categoryId === hostOsType);
+        
+        if (!osTypeFilter) return false;
+        
+        // Si values est vide, toutes les versions sont sélectionnées
+        if (osTypeFilter.values.length === 0) return true;
+        
+        // Sinon, vérifier si cette version spécifique est sélectionnée
+        return osTypeFilter.values.includes(osVersion);
+      });
+    }
+    
+    return filtered;
+  }, [hosts, searchTerm, osFilters]);
 
   // Calculer les hosts paginés
   const paginatedHosts = useMemo(() => {
@@ -45,7 +252,7 @@ const HostsPage: React.FC = () => {
   // Effet pour réinitialiser la page courante lorsque le filtrage change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, itemsPerPage]);
+  }, [searchTerm, itemsPerPage, osFilters]);
 
   // Gérer le changement de page
   const handlePageChange = (page: number) => {
@@ -106,17 +313,31 @@ const HostsPage: React.FC = () => {
 
         {/* Barre de recherche et contrôles */}
         <div className="flex justify-between items-center mb-5">
-          <div className="relative w-96">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search size={16} className="text-slate-400 dark:text-slate-500" />
+          <div className="flex items-center gap-3">
+            <div className="relative w-96">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Search size={16} className="text-slate-400 dark:text-slate-500" />
+              </div>
+              <input
+                type="text"
+                placeholder="Rechercher par nom ou système..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-800 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-blue-500 focus:outline-none"
+              />
             </div>
-            <input
-              type="text"
-              placeholder="Rechercher par nom ou système..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-800 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-blue-500 focus:outline-none"
-            />
+            
+            <button
+              onClick={() => setShowAdvancedFilter(true)}
+              className={`flex items-center gap-1 px-3 py-2 rounded-md border text-sm ${
+                osFilters.length > 0
+                  ? 'border-indigo-600 bg-indigo-600/10 text-indigo-600 dark:border-indigo-500 dark:bg-indigo-900/30 dark:text-indigo-400'
+                  : 'border-slate-300 text-slate-600 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700'
+              }`}
+            >
+              <Filter size={16} />
+              <span>Filtrer par OS {osFilters.length > 0 && `(${osFilters.length})`}</span>
+            </button>
           </div>
 
           <div className="flex items-center gap-4">
@@ -138,6 +359,17 @@ const HostsPage: React.FC = () => {
         </div>
 
         {/* Affichage des résultats ou messages */}
+        {/* Afficher les badges de filtres actifs */}
+        {osFilters.length > 0 && (
+          <div className="mb-5">
+            <UnifiedFilterBadges
+              badges={getOsFilterBadges}
+              onRemoveBadge={handleRemoveOsFilter}
+              onClearAllBadges={() => setOsFilters([])}
+            />
+          </div>
+        )}
+
         {!mzAdmin || error ? (
           <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-900/30 rounded-lg p-4 mb-6">
             <div className="flex items-center gap-2 text-amber-800 dark:text-amber-400">
@@ -453,6 +685,20 @@ const HostsPage: React.FC = () => {
           </>
         )}
       </div>
+
+      {/* Popup du filtre avancé */}
+      {showAdvancedFilter && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <AdvancedFilter
+            title="Filtrer par système d'exploitation"
+            description="Sélectionnez un type d'OS pour voir toutes ses versions, ou cliquez sur une version spécifique."
+            categories={osFilterCategories}
+            selectedFilters={osFilters}
+            onFilterChange={setOsFilters}
+            onClose={() => setShowAdvancedFilter(false)}
+          />
+        </div>
+      )}
     </Layout>
   );
 };
