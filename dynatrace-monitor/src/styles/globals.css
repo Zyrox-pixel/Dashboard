@@ -107,6 +107,39 @@
     backdrop-filter: blur(12px);
     transform: translateY(5px);
   }
+  
+  /* Effet 3D amélioré */
+  .card-3d-effect {
+    transform-style: preserve-3d;
+    transition: all 0.3s ease;
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.4), 0 6px 6px rgba(0, 0, 0, 0.3);
+    position: relative;
+    backface-visibility: hidden;
+  }
+  
+  .card-3d-effect:before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(0,0,0,0) 100%);
+    z-index: 1;
+    pointer-events: none;
+    border-radius: inherit;
+  }
+  
+  .card-3d-effect:hover {
+    transform: translateY(-8px) rotateX(5deg) rotateY(3deg);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5), 0 12px 12px rgba(0, 0, 0, 0.3);
+  }
+  
+  .card-3d-effect:active {
+    transform: translateY(-2px) rotateX(2deg);
+    box-shadow: 0 8px 15px rgba(0, 0, 0, 0.3), 0 4px 4px rgba(0, 0, 0, 0.2);
+    transition: all 0.1s ease;
+  }
 
   .tooltip-trigger:hover .tooltip {
     @apply visible opacity-100;

@@ -26,14 +26,14 @@ const ZoneCard: React.FC<ZoneCardProps> = ({
   const getDesignClasses = () => {
     switch (design) {
       case 'glass':
-        return 'glass-card';
+        return 'glass-card card-3d-effect';
       case 'neumorph':
-        return 'card-neu';
+        return 'card-neu card-3d-effect';
       case '3d':
-        return 'card-3d';
+        return 'card-3d card-3d-effect';
       case 'modern':
       default:
-        return 'card card-hover';
+        return 'card card-hover card-3d-effect';
     }
   };
   
@@ -61,7 +61,7 @@ const ZoneCard: React.FC<ZoneCardProps> = ({
   if (variant === 'compact') {
     return (
       <div 
-        className={`rounded-xl overflow-hidden transition-all duration-300 cursor-pointer shadow-md border border-slate-700/10 ${getDesignClasses()} ${
+        className={`rounded-xl overflow-hidden transition-all duration-300 cursor-pointer shadow-lg border border-slate-700/10 transform perspective-1000 hover:translate-y-[-2px] hover:shadow-xl active:translate-y-0 active:shadow-inner ${getDesignClasses()} ${
           highlighted ? 'ring-2 ring-indigo-500/70 ring-offset-2 ring-offset-slate-900' : ''
         }`}
         onClick={() => onZoneClick(zone.id)}
@@ -131,7 +131,7 @@ const ZoneCard: React.FC<ZoneCardProps> = ({
   if (variant === 'expanded') {
     return (
       <div 
-        className={`rounded-xl overflow-hidden transition-all duration-300 cursor-pointer shadow-md border border-slate-700/10 ${getDesignClasses()} ${
+        className={`rounded-xl overflow-hidden transition-all duration-300 cursor-pointer shadow-lg border border-slate-700/10 transform perspective-1000 hover:translate-y-[-2px] hover:shadow-xl active:translate-y-0 active:shadow-inner ${getDesignClasses()} ${
           highlighted ? 'ring-2 ring-indigo-500/70 ring-offset-2 ring-offset-slate-900' : ''
         }`}
         onClick={() => onZoneClick(zone.id)}
@@ -217,11 +217,8 @@ const ZoneCard: React.FC<ZoneCardProps> = ({
             </div>
           </div>
           
-          {/* Barre de disponibilité */}
+          {/* Barre d'état */}
           <div className="mb-3">
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-xs text-slate-400 tracking-wide">Disponibilité</span>
-            </div>
             <div className="w-full h-2 bg-slate-900/80 rounded-full overflow-hidden shadow-inner">
               <div 
                 className={`h-full rounded-full ${
@@ -263,7 +260,7 @@ const ZoneCard: React.FC<ZoneCardProps> = ({
   // Version standard (par défaut)
   return (
     <div 
-      className={`rounded-xl overflow-hidden transition-all duration-300 cursor-pointer shadow-md border border-slate-700/10 ${getDesignClasses()} ${
+      className={`rounded-xl overflow-hidden transition-all duration-300 cursor-pointer shadow-lg border border-slate-700/10 transform hover:translate-y-[-2px] hover:shadow-xl active:translate-y-0 active:shadow-inner ${getDesignClasses()} ${
         highlighted ? 'ring-2 ring-indigo-500/70 ring-offset-2 ring-offset-slate-900' : ''
       }`}
       onClick={() => onZoneClick(zone.id)}
@@ -349,11 +346,8 @@ const ZoneCard: React.FC<ZoneCardProps> = ({
           </div>
         </div>
         
-        {/* Disponibilité */}
+        {/* Barre d'état */}
         <div className="mt-3 mb-2">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-xs text-slate-400 tracking-wide">Disponibilité</span>
-          </div>
           <div className="w-full h-1.5 bg-slate-900/80 rounded-full overflow-hidden shadow-inner">
             <div 
               className={`h-full rounded-full ${
