@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useHostsData } from '../hooks/useHostsData';
 import Layout from '../components/layout/Layout';
-import { RefreshCw, Server, Database, HardDrive, Search, AlertCircle, Filter, Monitor, ArrowUp, ArrowDown } from 'lucide-react';
+import { RefreshCw, Server, Database, HardDrive, Search, AlertCircle, Filter, Monitor, ArrowUp, ArrowDown, Cpu } from 'lucide-react';
 import AdvancedFilter, { FilterCategory, FilterValue, FilterItem } from '../components/common/AdvancedFilter';
 import UnifiedFilterBadges, { FilterBadge } from '../components/common/UnifiedFilterBadges';
 import { Host } from '../api/types';
@@ -14,7 +14,9 @@ const HostsPage: React.FC = () => {
   
   // États pour les filtres avancés
   const [showAdvancedFilter, setShowAdvancedFilter] = useState<boolean>(false);
+  const [filterType, setFilterType] = useState<'os' | 'performance' | null>(null);
   const [osFilters, setOsFilters] = useState<FilterValue[]>([]);
+  const [performanceFilters, setPerformanceFilters] = useState<FilterValue[]>([]);
   
   // État pour le tri
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'ascending' | 'descending' | null }>({
@@ -214,6 +216,137 @@ const HostsPage: React.FC = () => {
     setSortConfig({ key, direction });
   };
 
+  // Catégories de filtres pour les performances (CPU et RAM)
+  const performanceFilterCategories = useMemo((): FilterCategory[] => {
+    // Catégorie CPU
+    const cpuCategory: FilterCategory = {
+      id: 'cpu',
+      label: 'CPU',
+      icon: <Cpu size={18} />,
+      items: [
+        {
+          id: 'cpu_low',
+          label: 'Normal (<50%)',
+          value: 'cpu_low',
+          count: hosts.filter(h => h.cpu !== null && h.cpu < 50).length,
+          icon: <span className="text-green-500">✓</span>
+        },
+        {
+          id: 'cpu_medium',
+          label: 'Moyen (50-75%)',
+          value: 'cpu_medium',
+          count: hosts.filter(h => h.cpu !== null && h.cpu >= 50 && h.cpu < 75).length,
+          icon: <span className="text-yellow-500">⚠</span>
+        },
+        {
+          id: 'cpu_high',
+          label: 'Élevé (>75%)',
+          value: 'cpu_high',
+          count: hosts.filter(h => h.cpu !== null && h.cpu >= 75).length,
+          icon: <span className="text-red-500">⛔</span>
+        }
+      ]
+    };
+
+    // Catégorie RAM
+    const ramCategory: FilterCategory = {
+      id: 'ram',
+      label: 'RAM',
+      icon: <HardDrive size={18} />,
+      items: [
+        {
+          id: 'ram_low',
+          label: 'Normal (<50%)',
+          value: 'ram_low',
+          count: hosts.filter(h => h.ram !== null && h.ram < 50).length,
+          icon: <span className="text-green-500">✓</span>
+        },
+        {
+          id: 'ram_medium',
+          label: 'Moyen (50-75%)',
+          value: 'ram_medium',
+          count: hosts.filter(h => h.ram !== null && h.ram >= 50 && h.ram < 75).length,
+          icon: <span className="text-yellow-500">⚠</span>
+        },
+        {
+          id: 'ram_high',
+          label: 'Élevé (>75%)',
+          value: 'ram_high',
+          count: hosts.filter(h => h.ram !== null && h.ram >= 75).length,
+          icon: <span className="text-red-500">⛔</span>
+        }
+      ]
+    };
+
+    return [cpuCategory, ramCategory];
+  }, [hosts]);
+
+  // Convertir les filtres de performance en badges
+  const getPerformanceFilterBadges = useMemo((): FilterBadge[] => {
+    const badges: FilterBadge[] = [];
+    
+    performanceFilters.forEach(filter => {
+      const category = performanceFilterCategories.find(c => c.id === filter.categoryId);
+      if (!category) return;
+      
+      if (filter.values.length === 0) {
+        // Tous les éléments sont sélectionnés
+        badges.push({
+          id: `${filter.categoryId}-all`,
+          type: filter.categoryId,
+          typeLabel: category.label,
+          value: '',
+          valueLabel: 'Tous',
+          icon: category.icon
+        });
+      } else {
+        // Éléments spécifiques sélectionnés
+        filter.values.forEach(value => {
+          const item = category.items.find(i => i.value === value);
+          if (!item) return;
+          
+          badges.push({
+            id: `${filter.categoryId}-${value}`,
+            type: filter.categoryId,
+            typeLabel: category.label,
+            value,
+            valueLabel: item.label,
+            icon: item.icon
+          });
+        });
+      }
+    });
+    
+    return badges;
+  }, [performanceFilters, performanceFilterCategories]);
+
+  // Gérer la suppression d'un filtre de performance
+  const handleRemovePerformanceFilter = useCallback((categoryId: string, value?: string) => {
+    setPerformanceFilters(prev => {
+      const newFilters = [...prev];
+      const filterIndex = newFilters.findIndex(f => f.categoryId === categoryId);
+      
+      if (filterIndex === -1) return prev;
+      
+      if (!value) {
+        // Supprimer tout le filtre
+        return newFilters.filter(f => f.categoryId !== categoryId);
+      }
+      
+      // Supprimer une valeur spécifique
+      const filter = {...newFilters[filterIndex]};
+      filter.values = filter.values.filter(v => v !== value);
+      
+      if (filter.values.length === 0) {
+        // Si plus aucune valeur, supprimer le filtre
+        return newFilters.filter(f => f.categoryId !== categoryId);
+      }
+      
+      newFilters[filterIndex] = filter;
+      return newFilters;
+    });
+  }, []);
+
   // Calculer les hosts filtrés en fonction de la recherche et des filtres
   const filteredHosts = useMemo(() => {
     // Commencer par filtrer par termes de recherche
@@ -253,6 +386,50 @@ const HostsPage: React.FC = () => {
         
         // Sinon, vérifier si cette version spécifique est sélectionnée
         return osTypeFilter.values.includes(osVersion);
+      });
+    }
+    
+    // Appliquer les filtres de performance
+    if (performanceFilters.length > 0) {
+      filtered = filtered.filter(host => {
+        // Vérifier chaque type de filtre de performance
+        return performanceFilters.every(filter => {
+          // Si aucune valeur sélectionnée, considérer comme un match
+          if (filter.values.length === 0) return true;
+          
+          switch (filter.categoryId) {
+            case 'cpu':
+              if (host.cpu === null) return false;
+              
+              return filter.values.some(value => {
+                if (value === 'cpu_low') {
+                  return host.cpu !== null && host.cpu < 50;
+                } else if (value === 'cpu_medium') {
+                  return host.cpu !== null && host.cpu >= 50 && host.cpu < 75;
+                } else if (value === 'cpu_high') {
+                  return host.cpu !== null && host.cpu >= 75;
+                }
+                return false;
+              });
+              
+            case 'ram':
+              if (host.ram === null) return false;
+              
+              return filter.values.some(value => {
+                if (value === 'ram_low') {
+                  return host.ram !== null && host.ram < 50;
+                } else if (value === 'ram_medium') {
+                  return host.ram !== null && host.ram >= 50 && host.ram < 75;
+                } else if (value === 'ram_high') {
+                  return host.ram !== null && host.ram >= 75;
+                }
+                return false;
+              });
+              
+            default:
+              return true;
+          }
+        });
       });
     }
     
@@ -298,7 +475,7 @@ const HostsPage: React.FC = () => {
     }
     
     return filtered;
-  }, [hosts, searchTerm, osFilters, sortConfig]);
+  }, [hosts, searchTerm, osFilters, performanceFilters, sortConfig]);
 
   // Calculer les hosts paginés
   const paginatedHosts = useMemo(() => {
@@ -314,7 +491,7 @@ const HostsPage: React.FC = () => {
   // Effet pour réinitialiser la page courante lorsque le filtrage change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, itemsPerPage, osFilters]);
+  }, [searchTerm, itemsPerPage, osFilters, performanceFilters]);
 
   // Gérer le changement de page
   const handlePageChange = (page: number) => {
@@ -389,17 +566,37 @@ const HostsPage: React.FC = () => {
               />
             </div>
             
-            <button
-              onClick={() => setShowAdvancedFilter(true)}
-              className={`flex items-center gap-1 px-3 py-2 rounded-md border text-sm ${
-                osFilters.length > 0
-                  ? 'border-indigo-600 bg-indigo-600/10 text-indigo-600 dark:border-indigo-500 dark:bg-indigo-900/30 dark:text-indigo-400'
-                  : 'border-slate-300 text-slate-600 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700'
-              }`}
-            >
-              <Filter size={16} />
-              <span>Filtrer par OS {osFilters.length > 0 && `(${osFilters.length})`}</span>
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  setFilterType('os');
+                  setShowAdvancedFilter(true);
+                }}
+                className={`flex items-center gap-1 px-3 py-2 rounded-md border text-sm ${
+                  osFilters.length > 0
+                    ? 'border-indigo-600 bg-indigo-600/10 text-indigo-600 dark:border-indigo-500 dark:bg-indigo-900/30 dark:text-indigo-400'
+                    : 'border-slate-300 text-slate-600 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700'
+                }`}
+              >
+                <Filter size={16} />
+                <span>Filtrer par OS {osFilters.length > 0 && `(${osFilters.length})`}</span>
+              </button>
+              
+              <button
+                onClick={() => {
+                  setFilterType('performance');
+                  setShowAdvancedFilter(true);
+                }}
+                className={`flex items-center gap-1 px-3 py-2 rounded-md border text-sm ${
+                  performanceFilters.length > 0
+                    ? 'border-green-600 bg-green-600/10 text-green-600 dark:border-green-500 dark:bg-green-900/30 dark:text-green-400'
+                    : 'border-slate-300 text-slate-600 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700'
+                }`}
+              >
+                <Cpu size={16} />
+                <span>Filtrer par performances {performanceFilters.length > 0 && `(${performanceFilters.length})`}</span>
+              </button>
+            </div>
           </div>
 
           <div className="flex items-center gap-4">
@@ -422,13 +619,25 @@ const HostsPage: React.FC = () => {
 
         {/* Affichage des résultats ou messages */}
         {/* Afficher les badges de filtres actifs */}
-        {osFilters.length > 0 && (
+        {(osFilters.length > 0 || performanceFilters.length > 0) && (
           <div className="mb-5">
-            <UnifiedFilterBadges
-              badges={getOsFilterBadges}
-              onRemoveBadge={handleRemoveOsFilter}
-              onClearAllBadges={() => setOsFilters([])}
-            />
+            {osFilters.length > 0 && (
+              <UnifiedFilterBadges
+                badges={getOsFilterBadges}
+                onRemoveBadge={handleRemoveOsFilter}
+                onClearAllBadges={() => setOsFilters([])}
+                showLabel={performanceFilters.length === 0}
+              />
+            )}
+            
+            {performanceFilters.length > 0 && (
+              <UnifiedFilterBadges
+                badges={getPerformanceFilterBadges}
+                onRemoveBadge={handleRemovePerformanceFilter}
+                onClearAllBadges={() => setPerformanceFilters([])}
+                showLabel={osFilters.length === 0}
+              />
+            )}
           </div>
         )}
 
@@ -821,14 +1030,27 @@ const HostsPage: React.FC = () => {
       {/* Popup du filtre avancé */}
       {showAdvancedFilter && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <AdvancedFilter
-            title="Filtrer par système d'exploitation"
-            description="Sélectionnez un type d'OS pour voir toutes ses versions, ou cliquez sur une version spécifique."
-            categories={osFilterCategories}
-            selectedFilters={osFilters}
-            onFilterChange={setOsFilters}
-            onClose={() => setShowAdvancedFilter(false)}
-          />
+          {filterType === 'os' && (
+            <AdvancedFilter
+              title="Filtrer par système d'exploitation"
+              description="Sélectionnez un type d'OS pour voir toutes ses versions, ou cliquez sur une version spécifique."
+              categories={osFilterCategories}
+              selectedFilters={osFilters}
+              onFilterChange={setOsFilters}
+              onClose={() => setShowAdvancedFilter(false)}
+            />
+          )}
+          
+          {filterType === 'performance' && (
+            <AdvancedFilter
+              title="Filtrer par performances"
+              description="Sélectionnez les plages d'utilisation CPU et RAM qui vous intéressent."
+              categories={performanceFilterCategories}
+              selectedFilters={performanceFilters}
+              onFilterChange={setPerformanceFilters}
+              onClose={() => setShowAdvancedFilter(false)}
+            />
+          )}
         </div>
       )}
     </Layout>
