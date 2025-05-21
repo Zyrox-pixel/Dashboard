@@ -15,11 +15,12 @@ const Sidebar: React.FC = () => {
   const { sidebarCollapsed, setSidebarCollapsed } = useApp();
   const { isDarkTheme } = useTheme();
   const [activeItem, setActiveItem] = useState<MenuItemKey>('home');
+  const [hoverItem, setHoverItem] = useState<string | null>(null);
   
   // Effet pour suivre la page active
   useEffect(() => {
     const path = window.location.pathname;
-    if (path === '/') setActiveItem('home');
+    if (path === '/' || path.startsWith('/overview')) setActiveItem('home');
     else if (path.startsWith('/problems')) setActiveItem('problems');
     else if (path.startsWith('/vfg')) setActiveItem('vfg');
     else if (path.startsWith('/vfe')) setActiveItem('vfe');
@@ -32,49 +33,54 @@ const Sidebar: React.FC = () => {
     setSidebarCollapsed(!sidebarCollapsed);
   };
   
-  // Générer une classe CSS pour les éléments de menu avec animation
+  // Générer une classe CSS premium pour les éléments de menu
   const getMenuItemClass = (itemKey: MenuItemKey): string => {
+    const isActive = activeItem === itemKey;
+    
     const baseClasses = `group relative flex items-center gap-3 py-3.5 rounded-xl
-                        ${sidebarCollapsed ? 'px-0 justify-center mx-1' : 'px-3 mx-3'} 
-                        transition-all duration-200 ease-in-out`;
+                        ${sidebarCollapsed ? 'px-0 justify-center mx-1' : 'px-3.5 mx-3'} 
+                        transition-all duration-300`;
     
     // Si l'élément est actif
-    if (activeItem === itemKey) {
+    if (isActive) {
       return `${baseClasses} ${
         isDarkTheme 
-          ? 'bg-gradient-to-r from-indigo-900/80 to-purple-900/40 text-white shadow-md shadow-indigo-900/30' 
-          : 'bg-gradient-to-r from-indigo-100 to-purple-100 text-indigo-800 shadow-sm shadow-indigo-200'
+          ? 'bg-gradient-to-r from-indigo-900/80 via-indigo-900/60 to-indigo-800/40 text-white shadow-lg shadow-indigo-900/30 border border-indigo-700/50' 
+          : 'bg-gradient-to-r from-indigo-100 via-indigo-50 to-white text-indigo-700 shadow-md shadow-indigo-200/50 border border-indigo-200'
       }`;
     }
     
-    // Élément inactif
+    // Animation au survol
     return `${baseClasses} ${
       isDarkTheme 
-        ? 'text-slate-400 hover:bg-slate-800/70 hover:text-white' 
-        : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+        ? 'text-slate-400 hover:bg-gradient-to-r hover:from-slate-800/70 hover:via-slate-800/50 hover:to-transparent hover:text-white hover:border hover:border-slate-700/30' 
+        : 'text-slate-600 hover:bg-gradient-to-r hover:from-slate-100 hover:via-slate-50 hover:to-white hover:text-slate-900 hover:border hover:border-slate-200/70'
     }`;
   };
   
-  // Animation spéciale pour Vital for Group et Enterprise
+  // Animation spéciale pour Vital for Group/Enterprise et Domain
   const getVitalItemClass = (itemKey: MenuItemKey, color: ColorType): string => {
+    const isActive = activeItem === itemKey;
+    
+    // Classes de base avec transitions fluides
     const baseClasses = `group relative flex items-center gap-3 py-3.5 rounded-xl
-                        ${sidebarCollapsed ? 'px-0 justify-center mx-1' : 'px-3 mx-3'} 
+                        ${sidebarCollapsed ? 'px-0 justify-center mx-1' : 'px-3.5 mx-3'} 
                         transition-all duration-300 ease-out`;
     
-    // Si l'élément est actif
-    if (activeItem === itemKey) {
+    // Si l'élément est actif - style premium avec dégradé enrichi
+    if (isActive) {
       return `${baseClasses} ${
         isDarkTheme 
-          ? `bg-gradient-to-r from-${color}-900/60 to-${color}-800/30 text-white shadow-md shadow-${color}-900/30` 
-          : `bg-gradient-to-r from-${color}-100 to-${color}-50 text-${color}-800 shadow-sm shadow-${color}-200`
+          ? `bg-gradient-to-r from-${color}-900/70 via-${color}-800/50 to-${color}-900/30 text-white shadow-lg shadow-${color}-900/40 border border-${color}-700/50` 
+          : `bg-gradient-to-r from-${color}-100 via-${color}-50 to-white text-${color}-700 shadow-md shadow-${color}-300/40 border border-${color}-200/70`
       }`;
     }
     
-    // Élément inactif avec effet de lueur
+    // Élément inactif avec effet de lueur au survol
     return `${baseClasses} ${
       isDarkTheme 
-        ? `text-${color}-400 hover:bg-${color}-900/20 hover:text-${color}-300 hover:shadow-sm hover:shadow-${color}-800/20` 
-        : `text-${color}-600 hover:bg-${color}-50 hover:text-${color}-700 hover:shadow-sm hover:shadow-${color}-200`
+        ? `text-${color}-400 hover:bg-gradient-to-r hover:from-${color}-900/30 hover:to-transparent hover:text-${color}-300 hover:shadow-sm hover:border hover:border-${color}-700/30 hover:shadow-${color}-900/20` 
+        : `text-${color}-600 hover:bg-gradient-to-r hover:from-${color}-50 hover:to-transparent hover:text-${color}-700 hover:shadow-sm hover:border hover:border-${color}-200/70 hover:shadow-${color}-200/30`
     }`;
   };
   
@@ -82,7 +88,7 @@ const Sidebar: React.FC = () => {
   const getIconClass = (itemKey: MenuItemKey): string => {
     const baseClasses = "flex-shrink-0 transition-transform duration-300";
     return activeItem === itemKey 
-      ? `${baseClasses} scale-110` 
+      ? `${baseClasses} scale-110 animate-pulse-subtle` 
       : baseClasses;
   };
   
@@ -94,7 +100,7 @@ const Sidebar: React.FC = () => {
       <div 
         className={`absolute inset-0 w-10 h-10 rounded-full 
                    ${activeItem === itemKey ? `bg-${color}-600/20 animate-pulse-slow` : 'bg-transparent'} 
-                   blur-md transition-opacity duration-500 opacity-70`}
+                   blur-xl transition-opacity duration-500 opacity-70`}
         style={{ left: sidebarCollapsed ? '50%' : '14px', transform: sidebarCollapsed ? 'translateX(-50%)' : 'none' }}
       ></div>
     );
@@ -104,21 +110,27 @@ const Sidebar: React.FC = () => {
     <aside 
       className={`fixed h-full z-30 transition-all duration-500 ease-out ${
         isDarkTheme 
-          ? 'bg-gradient-to-b from-slate-900 via-slate-900 to-slate-800 border-r border-slate-700/40 shadow-xl shadow-black/30' 
-          : 'bg-gradient-to-b from-white to-slate-50 border-r border-slate-200 shadow-lg shadow-slate-200/30'
+          ? 'bg-gradient-to-b from-slate-900 via-slate-950 to-slate-900 border-r border-slate-800/40 shadow-xl shadow-black/40' 
+          : 'bg-gradient-to-b from-white via-slate-50 to-white border-r border-slate-200/70 shadow-lg shadow-slate-200/30'
       } ${sidebarCollapsed ? 'w-16' : 'w-64'}`}
     >
       {/* En-tête avec logo et bouton de collapse */}
       <div className={`h-20 flex items-center px-5 ${
-        isDarkTheme ? 'border-b border-slate-700/50' : 'border-b border-slate-200/70'
+        isDarkTheme ? 'border-b border-slate-800/50' : 'border-b border-slate-200/70'
       }`}>
         <div className="flex items-center gap-3 overflow-hidden">
-          {/* Logo avec effet de lueur */}
+          {/* Logo avec effet premium */}
           <div className="relative">
-            <div className={`absolute inset-0 w-9 h-9 bg-blue-500 rounded-full blur-md opacity-60 ${
+            <div className={`absolute inset-0 w-9 h-9 bg-indigo-500/30 rounded-full blur-xl opacity-70 ${
               isDarkTheme ? 'animate-pulse-slow' : ''
             }`}></div>
-            <Shield className="text-indigo-500 relative z-10 flex-shrink-0" size={22} />
+            <div className={`relative z-10 p-2 rounded-full ${
+              isDarkTheme 
+                ? 'bg-gradient-to-br from-indigo-900/80 to-indigo-800/50 border border-indigo-700/50' 
+                : 'bg-gradient-to-br from-indigo-100 to-white border border-indigo-200'
+            }`}>
+              <Shield className={`${isDarkTheme ? 'text-indigo-400' : 'text-indigo-600'} flex-shrink-0`} size={16} />
+            </div>
           </div>
           
           {/* Titre avec animation d'apparition */}
@@ -126,7 +138,9 @@ const Sidebar: React.FC = () => {
             <div className="overflow-hidden">
               <div className="flex flex-col">
                 <span className={`font-bold text-base whitespace-nowrap ${
-                  isDarkTheme ? 'text-white' : 'text-slate-800'
+                  isDarkTheme 
+                    ? 'text-gradient text-shadow-sm' 
+                    : 'text-indigo-700'
                 }`}>
                   PRODSEC Monitor
                 </span>
@@ -138,16 +152,16 @@ const Sidebar: React.FC = () => {
           )}
         </div>
         
-        {/* Bouton de collapse avec animation */}
+        {/* Bouton de collapse avec animation premium */}
         <button
           onClick={toggleSidebar}
           className={`ml-auto w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300 ${
             isDarkTheme
-              ? 'bg-slate-800 text-slate-300 hover:bg-indigo-900 hover:text-indigo-400 hover:shadow-md hover:shadow-indigo-900/30'
-              : 'bg-slate-100 text-slate-500 hover:bg-indigo-100 hover:text-indigo-600 hover:shadow-sm hover:shadow-indigo-300/30'
+              ? 'bg-slate-800 text-slate-300 hover:bg-indigo-900 hover:text-indigo-400 hover:shadow-md hover:shadow-indigo-900/30 border border-slate-700/50'
+              : 'bg-slate-100 text-slate-500 hover:bg-indigo-100 hover:text-indigo-600 hover:shadow-sm hover:shadow-indigo-300/30 border border-slate-200'
           }`}
         >
-          <ChevronLeft size={16} className={sidebarCollapsed ? 'rotate-180' : ''} />
+          <ChevronLeft size={16} className={`transition-transform duration-300 ${sidebarCollapsed ? 'rotate-180' : ''}`} />
         </button>
       </div>
       
@@ -167,6 +181,8 @@ const Sidebar: React.FC = () => {
               to="/overview"
               onClick={() => setActiveItem('home')}
               className={getMenuItemClass('home')}
+              onMouseEnter={() => setHoverItem('home')}
+              onMouseLeave={() => setHoverItem(null)}
             >
               {getIconGlow('home')}
               <Home size={18} className={getIconClass('home')} />
@@ -186,6 +202,8 @@ const Sidebar: React.FC = () => {
               to="/problems/unified?dashboard=all"
               onClick={() => setActiveItem('problems')}
               className={getMenuItemClass('problems')}
+              onMouseEnter={() => setHoverItem('problems')}
+              onMouseLeave={() => setHoverItem(null)}
             >
               {getIconGlow('problems', 'red')}
               <AlertTriangle size={18} className={getIconClass('problems')} />
@@ -196,8 +214,8 @@ const Sidebar: React.FC = () => {
               
               {/* Badge pour nombre de problèmes */}
               <div className={`${sidebarCollapsed ? 'absolute -top-1 -right-1' : 'ml-auto'} 
-                              px-1.5 py-0.5 rounded-full text-xs font-medium
-                              ${isDarkTheme ? 'bg-red-900/70 text-red-300' : 'bg-red-100 text-red-700'}`}>
+                              px-1.5 py-0.5 rounded-full text-xs font-semibold
+                              ${isDarkTheme ? 'bg-red-900/70 text-red-300 border border-red-700/30' : 'bg-red-100 text-red-700 border border-red-200/70'}`}>
                 VFG+VFE
               </div>
             </Link>
@@ -205,7 +223,7 @@ const Sidebar: React.FC = () => {
         </div>
         
         {/* Applications critiques */}
-        <div className={`px-4 mt-4 ${sidebarCollapsed ? 'text-center' : ''}`}>
+        <div className={`px-4 mt-5 ${sidebarCollapsed ? 'text-center' : ''}`}>
           <div className={`text-xs font-semibold uppercase tracking-wider mb-3 mt-2 ${
             isDarkTheme ? 'text-slate-500' : 'text-slate-400'
           }`}>
@@ -218,13 +236,15 @@ const Sidebar: React.FC = () => {
               to="/vfg"
               onClick={() => setActiveItem('vfg')}
               className={getVitalItemClass('vfg', 'indigo')}
+              onMouseEnter={() => setHoverItem('vfg')}
+              onMouseLeave={() => setHoverItem(null)}
             >
               {getIconGlow('vfg', 'indigo')}
               <div className={`relative flex-shrink-0 ${getIconClass('vfg')}`}>
                 <Star 
                   size={18} 
                   className={`${isDarkTheme ? 'text-indigo-400' : 'text-indigo-600'} 
-                            ${activeItem === 'vfg' ? 'animate-pulse-slow' : ''}`} 
+                            ${activeItem === 'vfg' ? 'animate-pulse-subtle' : ''}`} 
                 />
               </div>
               
@@ -248,13 +268,15 @@ const Sidebar: React.FC = () => {
               to="/vfe"
               onClick={() => setActiveItem('vfe')}
               className={getVitalItemClass('vfe', 'amber')}
+              onMouseEnter={() => setHoverItem('vfe')}
+              onMouseLeave={() => setHoverItem(null)}
             >
               {getIconGlow('vfe', 'amber')}
               <div className={`relative flex-shrink-0 ${getIconClass('vfe')}`}>
                 <Award 
                   size={18} 
                   className={`${isDarkTheme ? 'text-amber-400' : 'text-amber-600'} 
-                            ${activeItem === 'vfe' ? 'animate-pulse-slow' : ''}`} 
+                            ${activeItem === 'vfe' ? 'animate-pulse-subtle' : ''}`} 
                 />
               </div>
               
@@ -276,7 +298,7 @@ const Sidebar: React.FC = () => {
         </div>
 
         {/* Domain */}
-        <div className={`px-4 mt-4 ${sidebarCollapsed ? 'text-center' : ''}`}>
+        <div className={`px-4 mt-5 ${sidebarCollapsed ? 'text-center' : ''}`}>
           <div className={`text-xs font-semibold uppercase tracking-wider mb-3 mt-2 ${
             isDarkTheme ? 'text-slate-500' : 'text-slate-400'
           }`}>
@@ -289,13 +311,15 @@ const Sidebar: React.FC = () => {
               to="/detection"
               onClick={() => setActiveItem('detection')}
               className={getVitalItemClass('detection', 'blue')}
+              onMouseEnter={() => setHoverItem('detection')}
+              onMouseLeave={() => setHoverItem(null)}
             >
               {getIconGlow('detection', 'blue')}
               <div className={`relative flex-shrink-0 ${getIconClass('detection')}`}>
                 <Shield 
                   size={18} 
                   className={`${isDarkTheme ? 'text-blue-400' : 'text-blue-600'} 
-                            ${activeItem === 'detection' ? 'animate-pulse-slow' : ''}`} 
+                            ${activeItem === 'detection' ? 'animate-pulse-subtle' : ''}`} 
                 />
               </div>
               
@@ -319,13 +343,15 @@ const Sidebar: React.FC = () => {
               to="/security"
               onClick={() => setActiveItem('security')}
               className={getVitalItemClass('security', 'red')}
+              onMouseEnter={() => setHoverItem('security')}
+              onMouseLeave={() => setHoverItem(null)}
             >
               {getIconGlow('security', 'red')}
               <div className={`relative flex-shrink-0 ${getIconClass('security')}`}>
                 <Key 
                   size={18} 
                   className={`${isDarkTheme ? 'text-red-400' : 'text-red-600'} 
-                            ${activeItem === 'security' ? 'animate-pulse-slow' : ''}`} 
+                            ${activeItem === 'security' ? 'animate-pulse-subtle' : ''}`} 
                 />
               </div>
               
@@ -347,7 +373,7 @@ const Sidebar: React.FC = () => {
         </div>
         
         {/* Inventory section */}
-        <div className={`px-4 mt-4 ${sidebarCollapsed ? 'text-center' : ''}`}>
+        <div className={`px-4 mt-5 ${sidebarCollapsed ? 'text-center' : ''}`}>
           <div className={`text-xs font-semibold uppercase tracking-wider mb-3 mt-2 ${
             isDarkTheme ? 'text-slate-500' : 'text-slate-400'
           }`}>
@@ -360,13 +386,15 @@ const Sidebar: React.FC = () => {
               to="/hosts"
               onClick={() => setActiveItem('hosts')}
               className={getVitalItemClass('hosts', 'green')}
+              onMouseEnter={() => setHoverItem('hosts')}
+              onMouseLeave={() => setHoverItem(null)}
             >
               {getIconGlow('hosts', 'green')}
               <div className={`relative flex-shrink-0 ${getIconClass('hosts')}`}>
                 <Layers 
                   size={18} 
                   className={`${isDarkTheme ? 'text-green-400' : 'text-green-600'} 
-                            ${activeItem === 'hosts' ? 'animate-pulse-slow' : ''}`} 
+                            ${activeItem === 'hosts' ? 'animate-pulse-subtle' : ''}`} 
                 />
               </div>
               
@@ -392,17 +420,21 @@ const Sidebar: React.FC = () => {
         
         {/* Footer avec version */}
         <div className={`px-4 py-3 mt-auto ${
-          isDarkTheme ? 'border-t border-slate-700/40' : 'border-t border-slate-200/70'
+          isDarkTheme ? 'border-t border-slate-800/40' : 'border-t border-slate-200/70'
         }`}>
-          <div className={`flex items-center gap-2 px-3 py-2 rounded-xl ${
+          <div className={`flex items-center gap-2 px-3 py-2.5 rounded-xl ${
             isDarkTheme
-              ? 'bg-gradient-to-r from-indigo-900/20 via-blue-900/20 to-indigo-900/10 shadow-inner shadow-black/20'
-              : 'bg-gradient-to-r from-indigo-50 to-blue-50 shadow-inner shadow-blue-100/30'
+              ? 'bg-gradient-to-r from-slate-800/40 via-slate-900/40 to-slate-800/30 shadow-inner shadow-black/10 border border-slate-700/30'
+              : 'bg-gradient-to-r from-indigo-50/50 via-blue-50/50 to-indigo-50/30 shadow-inner shadow-blue-100/30 border border-slate-200/50'
           }`}>
             {/* BNP Paribas Logo */}
             <div className="relative flex-shrink-0">
-              <div className={`absolute inset-0 w-5 h-5 bg-green-500 rounded-full blur-md opacity-60 ${isDarkTheme ? 'animate-pulse-slow' : ''}`}></div>
-              <div className="relative z-10 text-green-600 font-bold text-xs">BNP</div>
+              <div className={`absolute inset-0 w-6 h-6 bg-green-500/20 rounded-full blur-md opacity-60 ${isDarkTheme ? 'animate-pulse-slow' : ''}`}></div>
+              <div className={`relative z-10 px-1 py-0.5 rounded-sm ${
+                isDarkTheme ? 'bg-green-900/60 border border-green-700/30' : 'bg-green-100 border border-green-200'
+              }`}>
+                <span className={`text-xs font-bold ${isDarkTheme ? 'text-green-400' : 'text-green-700'}`}>BNP</span>
+              </div>
             </div>
             {!sidebarCollapsed && (
               <div className="flex flex-col">
@@ -417,7 +449,9 @@ const Sidebar: React.FC = () => {
           {/* Developer credit and feedback link */}
           {!sidebarCollapsed && (
             <div className={`mt-3 px-2 py-2 rounded-lg text-center ${
-              isDarkTheme ? 'bg-slate-800/50' : 'bg-slate-200/50'
+              isDarkTheme 
+                ? 'bg-gradient-to-b from-slate-800/50 to-slate-900/40 border border-slate-700/30' 
+                : 'bg-gradient-to-b from-slate-100/70 to-slate-50/70 border border-slate-200/50'
             }`}>
               <div className="flex flex-col items-center">
                 <span className={`text-xs ${isDarkTheme ? 'text-slate-400' : 'text-slate-600'}`}>
@@ -426,13 +460,15 @@ const Sidebar: React.FC = () => {
                 <a
                   href="mailto:Rayane.Bennasr@externe.bnpparibas.com"
                   className={`text-xs font-medium mt-1 ${
-                    isDarkTheme ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-800'
+                    isDarkTheme ? 'text-blue-400 hover:text-blue-300 hover-glow' : 'text-blue-600 hover:text-blue-800'
                   }`}
                 >
                   Rayane Ben Nasr
                 </a>
-                <div className="flex items-center mt-2 bg-blue-600/20 px-2 py-0.5 rounded">
-                  <span className="text-[10px] font-bold text-blue-500 mr-1">BETA</span>
+                <div className={`flex items-center mt-2 px-2 py-0.5 rounded ${
+                  isDarkTheme ? 'bg-blue-900/30 border border-blue-700/20' : 'bg-blue-100/70 border border-blue-200/50'
+                }`}>
+                  <span className={`text-[10px] font-bold ${isDarkTheme ? 'text-blue-400' : 'text-blue-600'} mr-1`}>BETA</span>
                   <span className="text-[9px] text-slate-500">Vos retours sont précieux</span>
                 </div>
               </div>
@@ -455,6 +491,15 @@ const Sidebar: React.FC = () => {
         
         .animate-pulse-slow {
           animation: pulse-slow 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+
+        @keyframes fade-in {
+          from { opacity: 0; transform: translateY(5px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .animate-fade-in {
+          animation: fade-in 0.5s ease-out forwards;
         }
       `}</style>
     </aside>

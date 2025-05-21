@@ -1,70 +1,70 @@
 /* 
    Thème de couleurs premium pour le dashboard Dynatrace
-   Design élégant, immersif et visuellement impressionnant
+   Design élégant, immersif et visuellement impressionnant digne d'un groupe CAC 40
 */
 
 :root {
-  /* Palette principale - Couleurs riches et vibrantes */
-  --color-primary: 99, 102, 241; /* Indigo vibrant */
-  --color-primary-light: 129, 140, 248; /* Indigo plus clair */
-  --color-primary-dark: 79, 70, 229; /* Indigo plus profond */
+  /* Palette principale - Couleurs raffinées, élégantes, premium */
+  --color-primary: 67, 83, 205;  /* Indigo sophistiqué */
+  --color-primary-light: 99, 118, 229; /* Indigo lumineux */
+  --color-primary-dark: 50, 66, 178; /* Indigo profond */
   
-  --color-secondary: 56, 189, 248; /* Bleu vif */
-  --color-secondary-light: 103, 232, 249; /* Bleu clair lumineux */
-  --color-secondary-dark: 14, 165, 233; /* Bleu foncé riche */
+  --color-secondary: 36, 175, 231; /* Bleu vif moderne */
+  --color-secondary-light: 80, 199, 243; /* Bleu clair brillant */
+  --color-secondary-dark: 21, 148, 203; /* Bleu foncé riche */
   
-  /* Palette d'accentuation - Plus sophistiquée et nuancée */
-  --color-success: 16, 185, 129; /* Emeraude */
-  --color-success-light: 52, 211, 153; /* Emeraude clair */
-  --color-success-glow: 4, 120, 87; /* Lueur d'emeraude pour effets 3D */
+  /* Palette d'accentuation - Sophistiquée et distinctive */
+  --color-success: 11, 171, 126; /* Émeraude sophistiqué */
+  --color-success-light: 45, 196, 145; /* Émeraude clair */
+  --color-success-glow: 2, 109, 82; /* Lueur d'emeraude pour effets 3D */
   
-  --color-warning: 245, 158, 11; /* Ambre */
-  --color-warning-light: 251, 191, 36; /* Ambre clair */
-  --color-warning-glow: 180, 83, 9; /* Lueur d'ambre pour effets 3D */
+  --color-warning: 237, 146, 25; /* Ambre premium */
+  --color-warning-light: 246, 174, 59; /* Ambre clair */
+  --color-warning-glow: 168, 84, 8; /* Lueur d'ambre pour effets 3D */
   
-  --color-error: 239, 68, 68; /* Rouge vif */
-  --color-error-light: 248, 113, 113; /* Rouge clair */
-  --color-error-glow: 153, 27, 27; /* Lueur rouge pour effets 3D */
+  --color-error: 226, 60, 65; /* Rouge vif élégant */
+  --color-error-light: 240, 104, 107; /* Rouge clair */
+  --color-error-glow: 145, 24, 28; /* Lueur rouge pour effets 3D */
   
-  --color-info: 59, 130, 246; /* Bleu royal */
-  --color-info-light: 96, 165, 250; /* Bleu clair */
-  --color-info-glow: 37, 99, 235; /* Lueur bleue pour effets 3D */
+  --color-info: 43, 118, 223; /* Bleu royal sophistiqué */
+  --color-info-light: 82, 150, 234; /* Bleu clair */
+  --color-info-glow: 28, 87, 175; /* Lueur bleue pour effets 3D */
   
-  /* Nuances de gris raffinées pour le fond et les bordures */
-  --color-gray-50: 249, 250, 251;
-  --color-gray-100: 243, 244, 246;
-  --color-gray-200: 229, 231, 235;
-  --color-gray-300: 209, 213, 219;
-  --color-gray-400: 156, 163, 175;
-  --color-gray-500: 107, 114, 128;
-  --color-gray-600: 75, 85, 99;
-  --color-gray-700: 55, 65, 81;
-  --color-gray-800: 31, 41, 55;
-  --color-gray-900: 17, 24, 39;
-  --color-gray-950: 9, 12, 24;
+  /* Nuances de gris raffinées pour arrière-plans et UI premium */
+  --color-gray-50: 250, 251, 252;
+  --color-gray-100: 244, 246, 248;
+  --color-gray-200: 233, 236, 241;
+  --color-gray-300: 215, 220, 228;
+  --color-gray-400: 161, 168, 183;
+  --color-gray-500: 112, 120, 138;
+  --color-gray-600: 78, 87, 107;
+  --color-gray-700: 54, 63, 82;
+  --color-gray-800: 29, 37, 52;
+  --color-gray-900: 14, 20, 32;
+  --color-gray-950: 7, 11, 20;
   
-  /* Variantes élégantes pour le mode sombre - Plus profond et immersif */
-  --color-dark-bg: 10, 15, 30; /* Bleu marine très foncé */
-  --color-dark-card: 15, 23, 42; /* Bleu-gris foncé */
-  --color-dark-card-hover: 30, 41, 59; /* Bleu-gris plus clair au survol */
-  --color-dark-border: 51, 65, 85; /* Bordure subtile */
+  /* Variantes élégantes pour le mode sombre - Sophistiqué et premium */
+  --color-dark-bg: 8, 12, 24; /* Bleu marine très foncé premium */
+  --color-dark-card: 12, 18, 36; /* Bleu-gris foncé */
+  --color-dark-card-hover: 22, 31, 48; /* Bleu-gris plus clair au survol */
+  --color-dark-border: 38, 51, 75; /* Bordure subtile premium */
   
-  /* Couleurs pour les graphiques et visualisations - Plus vibrantes */
-  --color-chart-1: 79, 70, 229; /* Indigo */
-  --color-chart-2: 14, 165, 233; /* Bleu */
-  --color-chart-3: 16, 185, 129; /* Émeraude */
-  --color-chart-4: 245, 158, 11; /* Ambre */
-  --color-chart-5: 239, 68, 68; /* Rouge */
-  --color-chart-6: 168, 85, 247; /* Violet */
-  --color-chart-7: 236, 72, 153; /* Rose */
+  /* Couleurs pour les graphiques et visualisations - Plus vibrantes et distinctives */
+  --color-chart-1: 67, 83, 205; /* Indigo custom */
+  --color-chart-2: 36, 175, 231; /* Bleu custom */
+  --color-chart-3: 11, 171, 126; /* Émeraude custom */
+  --color-chart-4: 237, 146, 25; /* Ambre custom */
+  --color-chart-5: 226, 60, 65; /* Rouge custom */
+  --color-chart-6: 153, 67, 228; /* Violet custom */
+  --color-chart-7: 218, 59, 139; /* Rose custom */
   
   /* Nouvelles couleurs pour dégradés et accents */
-  --color-gradient-blue: 37, 99, 235;
-  --color-gradient-purple: 126, 34, 206;
-  --color-gradient-teal: 13, 148, 136;
-  --color-gradient-rose: 225, 29, 72;
+  --color-gradient-blue: 27, 85, 219;
+  --color-gradient-purple: 115, 30, 188;
+  --color-gradient-teal: 10, 135, 123;
+  --color-gradient-rose: 214, 26, 65;
   
-  /* Dérivés avec différentes opacités */
+  /* Dérivés avec différentes opacités pour effets visuels plus riches */
   --color-primary-100: rgba(var(--color-primary), 0.1);
   --color-primary-200: rgba(var(--color-primary), 0.2);
   --color-primary-300: rgba(var(--color-primary), 0.3);
@@ -75,85 +75,100 @@
   --color-primary-800: rgba(var(--color-primary), 0.8);
   --color-primary-900: rgba(var(--color-primary), 0.9);
   
-  /* Variables pour effets visuels sophistiqués */
-  --card-shadow-regular: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-  --card-shadow-elevated: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-  --glow-primary: 0 0 20px rgba(var(--color-primary), 0.5), 0 0 40px rgba(var(--color-primary), 0.2);
-  --glow-success: 0 0 20px rgba(var(--color-success), 0.5), 0 0 40px rgba(var(--color-success), 0.2);
-  --glow-warning: 0 0 20px rgba(var(--color-warning), 0.5), 0 0 40px rgba(var(--color-warning), 0.2);
-  --glow-error: 0 0 20px rgba(var(--color-error), 0.5), 0 0 40px rgba(var(--color-error), 0.2);
+  /* Variables pour effets visuels sophistiqués et premium */
+  --card-shadow-regular: 0 12px 18px -3px rgba(0, 0, 0, 0.12), 0 4px 8px -2px rgba(0, 0, 0, 0.07);
+  --card-shadow-elevated: 0 24px 30px -5px rgba(0, 0, 0, 0.15), 0 12px 15px -5px rgba(0, 0, 0, 0.08);
+  --glow-primary: 0 0 25px rgba(var(--color-primary), 0.5), 0 0 50px rgba(var(--color-primary), 0.2);
+  --glow-success: 0 0 25px rgba(var(--color-success), 0.5), 0 0 50px rgba(var(--color-success), 0.2);
+  --glow-warning: 0 0 25px rgba(var(--color-warning), 0.5), 0 0 50px rgba(var(--color-warning), 0.2);
+  --glow-error: 0 0 25px rgba(var(--color-error), 0.5), 0 0 50px rgba(var(--color-error), 0.2);
+
+  /* Typographie premium */
+  --font-family-primary: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-family-display: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-family-mono: 'JetBrains Mono', 'SF Mono', Monaco, Menlo, Consolas, 'Liberation Mono', monospace;
 }
 
 /* Classes utilitaires pour les cartes avec effet premium */
 .card {
   @apply bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700/50 rounded-xl shadow-lg transition-all duration-300;
   backface-visibility: hidden;
+  box-shadow: var(--card-shadow-regular);
 }
 
 .card-hover {
-  @apply hover:shadow-xl hover:translate-y-[-2px] hover:border-indigo-500/30;
-  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  @apply hover:shadow-xl hover:translate-y-[-3px] hover:border-indigo-500/30;
+  transition: all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+  box-shadow: var(--card-shadow-elevated);
 }
 
-/* Boutons avec effets améliorés */
+/* Boutons avec effets premium */
 .btn-primary {
-  @apply relative px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white rounded-lg shadow-md font-medium
+  @apply relative px-5 py-3 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white rounded-lg shadow-md font-medium
     hover:from-indigo-500 hover:to-indigo-600 hover:shadow-lg hover:shadow-indigo-500/20
     active:shadow-inner active:translate-y-[1px] 
     disabled:from-slate-600 disabled:to-slate-700 disabled:opacity-50 disabled:cursor-not-allowed; 
-  transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+  transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.12), 0 2px 4px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
 .btn-secondary {
-  @apply relative px-5 py-2.5 bg-gradient-to-r from-sky-600 to-sky-700 text-white rounded-lg shadow-md font-medium
+  @apply relative px-5 py-3 bg-gradient-to-r from-sky-600 to-sky-700 text-white rounded-lg shadow-md font-medium
     hover:from-sky-500 hover:to-sky-600 hover:shadow-lg hover:shadow-sky-500/20
     active:shadow-inner active:translate-y-[1px]
     disabled:from-slate-600 disabled:to-slate-700 disabled:opacity-50 disabled:cursor-not-allowed;
-  transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+  transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.12), 0 2px 4px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
 .btn-outline {
-  @apply relative px-5 py-2.5 bg-transparent border border-slate-600 text-slate-300 rounded-lg 
+  @apply relative px-5 py-3 bg-transparent border border-slate-600 text-slate-300 rounded-lg 
     hover:bg-slate-800 hover:text-white hover:border-slate-500
     active:shadow-inner active:translate-y-[1px]
     disabled:opacity-50 disabled:cursor-not-allowed;
-  transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+  transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
 }
 
 /* Badges premium avec effets visuels subtils */
 .badge-primary {
   @apply px-2.5 py-0.5 bg-indigo-900/70 text-indigo-200 border border-indigo-700/40 rounded-md text-xs font-medium shadow-sm;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
 }
 
 .badge-success {
   @apply px-2.5 py-0.5 bg-emerald-900/70 text-emerald-200 border border-emerald-700/40 rounded-md text-xs font-medium shadow-sm;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
 }
 
 .badge-warning {
   @apply px-2.5 py-0.5 bg-amber-900/70 text-amber-200 border border-amber-700/40 rounded-md text-xs font-medium shadow-sm;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
 }
 
 .badge-error {
   @apply px-2.5 py-0.5 bg-red-900/70 text-red-200 border border-red-700/40 rounded-md text-xs font-medium shadow-sm;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
 }
 
 .badge-info {
   @apply px-2.5 py-0.5 bg-blue-900/70 text-blue-200 border border-blue-700/40 rounded-md text-xs font-medium shadow-sm;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
 }
 
-/* Animations améliorées */
+/* Animations premium raffinées */
 @keyframes pulse-subtle {
   0%, 100% {
     opacity: 1;
     transform: scale(1);
   }
   50% {
-    opacity: 0.8;
+    opacity: 0.85;
     transform: scale(0.98);
   }
 }
@@ -174,7 +189,7 @@
     transform: translateY(0px);
   }
   50% {
-    transform: translateY(-5px);
+    transform: translateY(-6px);
   }
 }
 
@@ -184,6 +199,57 @@
   }
   100% {
     background-position: 200% 0;
+  }
+}
+
+@keyframes fade-in {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes fade-in-up {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in-right {
+  0% {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes scale-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes pulse-slow {
+  0%, 100% {
+    opacity: 0.8;
+  }
+  50% {
+    opacity: 0.4;
   }
 }
 
@@ -205,24 +271,24 @@
   animation: shimmer 2s infinite;
 }
 
-/* Effets 3D améliorés */
+/* Effets 3D premium */
 .card-3d {
   @apply bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700/50 shadow-lg rounded-xl;
   transform-style: preserve-3d;
-  perspective: 1000px;
-  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  perspective: 1200px;
+  transition: all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .card-3d:hover {
-  transform: translateY(-5px) rotateX(2deg) rotateY(2deg);
-  box-shadow: 0 15px 30px rgba(0, 0, 0, 0.3), 0 10px 10px rgba(0, 0, 0, 0.2);
+  transform: translateY(-5px) rotateX(3deg) rotateY(3deg);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4), 0 15px 15px rgba(0, 0, 0, 0.2);
   border-color: rgba(var(--color-primary), 0.3);
 }
 
 .btn-3d {
   @apply relative overflow-hidden;
   transform-style: preserve-3d;
-  transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+  transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .btn-3d:active {
@@ -236,10 +302,10 @@
   left: 0;
   width: 100%;
   height: 100%;
-  background: linear-gradient(to bottom, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 100%);
+  background: linear-gradient(to bottom, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0) 100%);
   transform: translateY(-50%);
   opacity: 0;
-  transition: opacity 0.2s ease;
+  transition: opacity 0.3s ease;
 }
 
 .btn-3d:hover::before {
@@ -247,15 +313,17 @@
   transform: translateY(0);
 }
 
-/* Glassmorphism sophistiqué */
+/* Glassmorphism premium */
 .glass {
   @apply bg-slate-900/70 backdrop-blur-lg border border-white/10 shadow-xl;
-  backdrop-filter: blur(12px) saturate(180%);
+  backdrop-filter: blur(15px) saturate(180%);
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.25), 0 8px 12px rgba(0, 0, 0, 0.15);
 }
 
 .glass-dark {
   @apply bg-slate-900/40 backdrop-blur-lg border border-white/5 shadow-xl;
-  backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(25px) saturate(180%);
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3), 0 8px 12px rgba(0, 0, 0, 0.15);
 }
 
 .glass-card {
@@ -264,63 +332,64 @@
 
 .glass-card:hover {
   @apply border-indigo-500/30 shadow-indigo-900/20;
-  transform: translateY(-2px);
+  transform: translateY(-3px);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3), 0 12px 16px rgba(0, 0, 0, 0.2);
 }
 
 /* Neumorphism élégant */
 .card-neu {
   @apply bg-slate-800 border border-slate-700 rounded-xl;
-  box-shadow: 8px 8px 16px rgba(0, 0, 0, 0.5), 
-             -8px -8px 16px rgba(255, 255, 255, 0.03);
-  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  box-shadow: 10px 10px 20px rgba(0, 0, 0, 0.6), 
+             -10px -10px 20px rgba(255, 255, 255, 0.04);
+  transition: all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .card-neu:hover {
-  box-shadow: 10px 10px 20px rgba(0, 0, 0, 0.6), 
-             -10px -10px 20px rgba(255, 255, 255, 0.04);
+  box-shadow: 12px 12px 24px rgba(0, 0, 0, 0.7), 
+             -12px -12px 24px rgba(255, 255, 255, 0.05);
 }
 
 .btn-neu {
-  @apply bg-slate-800 border border-slate-700 text-white px-5 py-2.5 rounded-xl font-medium;
-  box-shadow: 4px 4px 8px rgba(0, 0, 0, 0.3), 
-             -4px -4px 8px rgba(255, 255, 255, 0.05);
-  transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+  @apply bg-slate-800 border border-slate-700 text-white px-5 py-3 rounded-xl font-medium;
+  box-shadow: 5px 5px 10px rgba(0, 0, 0, 0.4), 
+             -5px -5px 10px rgba(255, 255, 255, 0.05);
+  transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .btn-neu:hover {
   @apply bg-slate-750;
-  box-shadow: 6px 6px 10px rgba(0, 0, 0, 0.4), 
-             -6px -6px 10px rgba(255, 255, 255, 0.06);
+  box-shadow: 7px 7px 12px rgba(0, 0, 0, 0.5), 
+             -7px -7px 12px rgba(255, 255, 255, 0.06);
 }
 
 .btn-neu:active {
-  box-shadow: inset 4px 4px 8px rgba(0, 0, 0, 0.3), 
-              inset -4px -4px 8px rgba(255, 255, 255, 0.05);
+  box-shadow: inset 5px 5px 10px rgba(0, 0, 0, 0.4), 
+              inset -5px -5px 10px rgba(255, 255, 255, 0.05);
   transform: translateY(1px);
 }
 
-/* Effets de survol subtils */
+/* Effets de survol premium */
 .hover-glow {
-  transition: all 0.3s ease-out;
+  transition: all 0.4s ease-out;
 }
 
 .hover-glow:hover {
-  box-shadow: 0 0 15px rgba(var(--color-primary), 0.5);
+  box-shadow: 0 0 20px rgba(var(--color-primary), 0.6);
 }
 
 .hover-glow-success:hover {
-  box-shadow: 0 0 15px rgba(var(--color-success), 0.5);
+  box-shadow: 0 0 20px rgba(var(--color-success), 0.6);
 }
 
 .hover-glow-warning:hover {
-  box-shadow: 0 0 15px rgba(var(--color-warning), 0.5);
+  box-shadow: 0 0 20px rgba(var(--color-warning), 0.6);
 }
 
 .hover-glow-error:hover {
-  box-shadow: 0 0 15px rgba(var(--color-error), 0.5);
+  box-shadow: 0 0 20px rgba(var(--color-error), 0.6);
 }
 
-/* Effets de texte et typographie */
+/* Effets de texte et typographie premium */
 .text-gradient {
   @apply text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-blue-500;
 }
@@ -330,20 +399,20 @@
 }
 
 .text-shadow-sm {
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
 }
 
 .text-shadow-md {
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.35);
 }
 
 .text-shadow-lg {
-  text-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
+  text-shadow: 0 4px 8px rgba(0, 0, 0, 0.45);
 }
 
-/* Backgrounds et bordures spéciales */
+/* Backgrounds et bordures premium */
 .bg-gradient-premium {
-  @apply bg-gradient-to-br from-slate-800 via-slate-900 to-slate-800;
+  @apply bg-gradient-to-br from-slate-800 via-slate-900 to-slate-850;
 }
 
 .bg-gradient-success {
@@ -359,7 +428,22 @@
 }
 
 .border-gradient {
-  border-image: linear-gradient(to right, rgba(var(--color-primary), 0.5), rgba(var(--color-secondary), 0.5)) 1;
+  position: relative;
+}
+
+.border-gradient::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(to right, rgba(var(--color-primary), 0.7), rgba(var(--color-secondary), 0.7));
+  -webkit-mask: 
+    linear-gradient(#fff 0 0) content-box, 
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
 }
 
 /* Curseurs personnalisés */
@@ -373,13 +457,13 @@
 
 /* Grilles et patterns */
 .bg-grid-pattern {
-  background-image: radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-image: radial-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 1px);
   background-size: 20px 20px;
 }
 
 .bg-dots-pattern {
-  background-image: radial-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px);
-  background-size: 15px 15px;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.07) 1.2px, transparent 1.2px);
+  background-size: 18px 18px;
 }
 
 /* Cadran lumineux */
@@ -395,11 +479,11 @@
   right: -2px;
   bottom: -2px;
   border-radius: inherit;
-  background: linear-gradient(45deg, rgba(var(--color-primary), 0.5), rgba(var(--color-secondary), 0.5));
+  background: linear-gradient(45deg, rgba(var(--color-primary), 0.6), rgba(var(--color-secondary), 0.6));
   z-index: -1;
-  filter: blur(10px);
+  filter: blur(12px);
   opacity: 0;
-  transition: opacity 0.3s ease;
+  transition: opacity 0.4s ease;
 }
 
 .glow-ring:hover::before {
@@ -423,9 +507,9 @@
   text-overflow: ellipsis;
 }
 
-/* Effet de transition pour les changements d'état */
-.transition-smooth {
-  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+/* Effet de transition premium pour les changements d'état */
+.transition-premium {
+  transition: all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 /* Animation de chargement élégante */
@@ -482,26 +566,75 @@
 
 .section-title {
   @apply text-xl font-bold text-white;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.25);
 }
 
-/* Effets de profondeur améliorés */
+/* Effets de profondeur premium pour les cartes */
 .depth-1 {
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15), 0 1px 2px rgba(0, 0, 0, 0.12);
 }
 
 .depth-2 {
-  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.16), 0 3px 6px rgba(0, 0, 0, 0.23);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.18), 0 3px 6px rgba(0, 0, 0, 0.15);
 }
 
 .depth-3 {
-  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.19), 0 6px 6px rgba(0, 0, 0, 0.23);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.22), 0 8px 16px rgba(0, 0, 0, 0.15);
 }
 
 .depth-4 {
-  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.25), 0 10px 10px rgba(0, 0, 0, 0.22);
+  box-shadow: 0 18px 35px rgba(0, 0, 0, 0.28), 0 12px 15px rgba(0, 0, 0, 0.22);
 }
 
 .depth-5 {
-  box-shadow: 0 19px 38px rgba(0, 0, 0, 0.30), 0 15px 12px rgba(0, 0, 0, 0.22);
+  box-shadow: 0 24px 45px rgba(0, 0, 0, 0.35), 0 18px 20px rgba(0, 0, 0, 0.25);
+}
+
+/* Nouvelles classes premium pour les séparateurs */
+.divider {
+  @apply h-[1px] w-full bg-gradient-to-r from-transparent via-slate-700 to-transparent my-6;
+}
+
+.divider-vertical {
+  @apply w-[1px] h-full bg-gradient-to-b from-transparent via-slate-700 to-transparent mx-6;
+}
+
+/* Classes pour les cartes premium avec différents niveaux d'élévation */
+.card-premium-low {
+  @apply bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700/50 rounded-xl;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15), 0 3px 6px rgba(0, 0, 0, 0.1);
+  transition: all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.card-premium-medium {
+  @apply bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700/50 rounded-xl;
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.25), 0 5px 12px rgba(0, 0, 0, 0.15);
+  transition: all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.card-premium-high {
+  @apply bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700/50 rounded-xl;
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.3), 0 10px 20px rgba(0, 0, 0, 0.2);
+  transition: all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* Boutons avec icônes et effets premium */
+.btn-icon {
+  @apply relative flex items-center justify-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 
+         text-slate-300 rounded-lg shadow-md transition-premium;
+}
+
+.btn-icon-primary {
+  @apply relative flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500
+         text-white rounded-lg shadow-md transition-premium;
+}
+
+/* Effets de survol premium pour les cartes */
+.hover-lift {
+  transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.hover-lift:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25), 0 10px 15px rgba(0, 0, 0, 0.15);
 }
