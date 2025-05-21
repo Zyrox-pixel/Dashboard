@@ -260,7 +260,7 @@ const ZoneCard: React.FC<ZoneCardProps> = ({
   // Version standard (par défaut)
   return (
     <div 
-      className={`rounded-xl overflow-hidden transition-all duration-300 cursor-pointer shadow-lg border border-slate-700/10 transform hover:translate-y-[-2px] hover:shadow-xl active:translate-y-0 active:shadow-inner ${getDesignClasses()} ${
+      className={`rounded-xl overflow-hidden transition-all duration-300 cursor-pointer shadow-lg border border-slate-700/10 transform hover:translate-y-[-2px] hover:shadow-xl active:translate-y-0 active:shadow-inner h-full flex flex-col ${getDesignClasses()} ${
         highlighted ? 'ring-2 ring-indigo-500/70 ring-offset-2 ring-offset-slate-900' : ''
       }`}
       onClick={() => onZoneClick(zone.id)}
@@ -278,7 +278,7 @@ const ZoneCard: React.FC<ZoneCardProps> = ({
         </div>
       )}
       
-      <div className={`p-4 ${
+      <div className={`p-4 flex-1 flex flex-col ${
         accentColor === 'red' ? 'bg-gradient-to-br from-red-900/20 to-red-950/10' : 
         accentColor === 'green' ? 'bg-gradient-to-br from-emerald-900/20 to-emerald-950/10' :
         'bg-gradient-to-br from-amber-900/20 to-amber-950/10'
@@ -361,7 +361,7 @@ const ZoneCard: React.FC<ZoneCardProps> = ({
         </div>
         
         {/* Bouton de détails qui devient plus visible au survol */}
-        <div className={`mt-3 transition-all duration-300 ${isHovered ? 'opacity-100' : 'opacity-70'}`}>
+        <div className={`mt-auto pt-3 transition-all duration-300 ${isHovered ? 'opacity-100' : 'opacity-70'}`}>
           <div className="flex items-center justify-center w-full py-1.5 bg-slate-700/70 backdrop-blur-sm rounded-md text-sm text-white hover:bg-slate-600/70 hover-glow transition-all duration-300 shadow-md">
             <span>Voir les détails</span>
             <ChevronRight size={14} className="ml-1" />

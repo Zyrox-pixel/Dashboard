@@ -442,13 +442,15 @@ const ModernManagementZoneList: React.FC<ModernManagementZoneListProps> = ({
       ) : (
         <div className="p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {filteredZones.map(zone => (
-            <div key={zone.id} id={`zone-${zone.id}`}>
-              <ZoneCard 
-                zone={zone} 
-                onZoneClick={onZoneClick}
-                variant="standard"
-                design={cardDesign}
-              />
+            <div key={zone.id} id={`zone-${zone.id}`} className="h-full">
+              <div className="h-full" style={{minHeight: '280px'}}>
+                <ZoneCard 
+                  zone={zone} 
+                  onZoneClick={onZoneClick}
+                  variant="standard"
+                  design={cardDesign}
+                />
+              </div>
             </div>
           ))}
         </div>
