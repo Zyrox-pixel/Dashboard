@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { 
-  ChevronLeft, Home, AlertTriangle, Star, Award, Grid, 
-  Layers, Shield, Activity, Command, Settings, Key, Globe, User,
-  Sparkles, Zap, Cpu, Database, Lock, Network, Binary,
-  GitBranch, Shield as ShieldIcon, Workflow, Menu
+  ChevronLeft, Home, AlertTriangle, Star, Award,
+  Layers, Shield, Key, Globe, User,
+  Sparkles, Lock,
+  Shield as ShieldIcon
 } from 'lucide-react';
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
 import { useApp } from '../../contexts/AppContext';
@@ -294,7 +294,7 @@ const Sidebar: React.FC = () => {
             />
           )}
         </Link>
-      </motion.div>
+      </div>
     );
   };
 
@@ -376,7 +376,7 @@ const Sidebar: React.FC = () => {
             >
               <ShieldIcon className={`${isDarkTheme ? 'text-indigo-400' : 'text-indigo-600'} flex-shrink-0`} size={18} />
             </div>
-          </div>
+          </motion.div>
           
           {/* Titre avec animation d'apparition améliorée */}
           <AnimatePresence>
