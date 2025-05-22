@@ -256,7 +256,6 @@ const Sidebar: React.FC = () => {
             {/* Vital for Group */}
             <Link 
               to="/vfg"
-              onClick={() => setActiveItem('vfg')}
               className={getVitalItemClass('vfg', 'indigo')}
               onMouseEnter={() => setHoverItem('vfg')}
               onMouseLeave={() => setHoverItem(null)}
@@ -363,7 +362,6 @@ const Sidebar: React.FC = () => {
             {/* Security & Encryption */}
             <Link 
               to="/security"
-              onClick={() => setActiveItem('security')}
               className={getVitalItemClass('security', 'red')}
               onMouseEnter={() => setHoverItem('security')}
               onMouseLeave={() => setHoverItem(null)}
