@@ -41,6 +41,8 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
   const { isDarkTheme } = useTheme();
   const { refreshData } = useApp();
   const [filteredProblems, setFilteredProblems] = useState<Problem[]>([]);
+  const [prevActiveTab, setPrevActiveTab] = useState(activeTab);
+  const [isTabAnimating, setIsTabAnimating] = useState(false);
   
   // États pour le tri et la recherche
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'ascending' | 'descending' | null }>({
@@ -1062,10 +1064,27 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
     },
   ], [sortConfig]);
 
+  // Gérer l'animation lors du changement d'onglet
+  useEffect(() => {
+    if (activeTab !== prevActiveTab) {
+      setIsTabAnimating(true);
+      setPrevActiveTab(activeTab);
+      
+      // Arrêter l'animation après 400ms
+      const timer = setTimeout(() => {
+        setIsTabAnimating(false);
+      }, 400);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [activeTab, prevActiveTab]);
+
   // Optimiser le gestionnaire d'événements avec useCallback
   const handleTabClick = useCallback((tab: string) => {
-    onTabChange(tab);
-  }, [onTabChange]);
+    if (tab !== activeTab) {
+      onTabChange(tab);
+    }
+  }, [onTabChange, activeTab]);
   
   // Gérer la suppression d'un filtre OS
   const handleRemoveOsFilter = useCallback((categoryId: string, value?: string) => {
@@ -1402,11 +1421,21 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
         </button>
       </div>
       
-      {/* Contenu des onglets - Hôtes */}
-      {activeTab === 'hosts' && (
-        <section className={`rounded-lg overflow-hidden ${
-          isDarkTheme ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
-        } border`}>
+      {/* Conteneur avec animation pour le contenu des onglets */}
+      <div
+        className={`tab-content-transition ${
+          isTabAnimating ? 'animating' : ''
+        }`}
+        style={{
+          transformStyle: 'preserve-3d',
+          perspective: '1000px'
+        }}
+      >
+        {/* Contenu des onglets - Hôtes */}
+        {activeTab === 'hosts' && (
+          <section className={`rounded-lg overflow-hidden ${
+            isDarkTheme ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
+          } border`}>
           <div className="flex flex-col gap-2">
             <div className="flex justify-between items-center p-3 border-b border-slate-700">
               <h2 className="font-semibold flex items-center gap-2">
@@ -1722,6 +1751,7 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
           )}
         </div>
       )}
+      </div>
     </div>
   );
 };
