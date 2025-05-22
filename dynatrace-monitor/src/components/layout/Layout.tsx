@@ -82,15 +82,7 @@ const Layout: React.FC<LayoutProps> = ({ children, title, subtitle }) => {
             </div>
 
             <div className={`flex items-center space-x-4 text-xs ${isDarkTheme ? 'text-slate-400' : 'text-slate-500'}`}>
-              <a href="#" className={`transition-colors duration-300 ${isDarkTheme ? 'hover:text-indigo-400' : 'hover:text-indigo-600'}`}>
-                Documentation
-              </a>
-              <a href="#" className={`transition-colors duration-300 ${isDarkTheme ? 'hover:text-indigo-400' : 'hover:text-indigo-600'}`}>
-                Support
-              </a>
-              <a href="#" className={`transition-colors duration-300 ${isDarkTheme ? 'hover:text-indigo-400' : 'hover:text-indigo-600'}`}>
-                Mentions légales
-              </a>
+              {/* Liens supprimés selon demande utilisateur */}
             </div>
           </div>
         </footer>
