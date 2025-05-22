@@ -6,8 +6,11 @@ import UnifiedFilterBadges, { FilterBadge } from '../components/common/UnifiedFi
 import AdvancedLoadingState from '../components/common/AdvancedLoadingState';
 import { Host } from '../api/types';
 import { exportHostsToCSV, downloadCSV } from '../utils/exportUtils';
+import { useTheme } from '../contexts/ThemeContext';
 
 const HostsPage: React.FC = () => {
+  const { isDarkTheme } = useTheme();
+  
   // État pour la pagination et le filtrage
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
@@ -655,23 +658,46 @@ const HostsPage: React.FC = () => {
         {/* Afficher les badges de filtres actifs */}
         {(osFilters.length > 0 || performanceFilters.length > 0) && (
           <div className="mb-5">
-            {osFilters.length > 0 && (
-              <UnifiedFilterBadges
-                badges={getOsFilterBadges}
-                onRemoveBadge={handleRemoveOsFilter}
-                onClearAllBadges={() => setOsFilters([])}
-                showLabel={performanceFilters.length === 0}
-              />
-            )}
-            
-            {performanceFilters.length > 0 && (
-              <UnifiedFilterBadges
-                badges={getPerformanceFilterBadges}
-                onRemoveBadge={handleRemovePerformanceFilter}
-                onClearAllBadges={() => setPerformanceFilters([])}
-                showLabel={osFilters.length === 0}
-              />
-            )}
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex-1">
+                {osFilters.length > 0 && (
+                  <UnifiedFilterBadges
+                    badges={getOsFilterBadges}
+                    onRemoveBadge={handleRemoveOsFilter}
+                    onClearAllBadges={() => setOsFilters([])}
+                    showLabel={performanceFilters.length === 0}
+                  />
+                )}
+                
+                {performanceFilters.length > 0 && (
+                  <UnifiedFilterBadges
+                    badges={getPerformanceFilterBadges}
+                    onRemoveBadge={handleRemovePerformanceFilter}
+                    onClearAllBadges={() => setPerformanceFilters([])}
+                    showLabel={osFilters.length === 0}
+                  />
+                )}
+              </div>
+              
+              {/* Compteur d'hosts filtrés */}
+              <div className="flex items-center gap-2 px-4">
+                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg ${
+                  isDarkTheme
+                    ? 'bg-slate-700/50 text-slate-300 border border-slate-600/50'
+                    : 'bg-slate-100 text-slate-700 border border-slate-200'
+                }`}>
+                  <Server size={16} />
+                  <span className="text-sm font-medium">
+                    {filteredHosts.length} host{filteredHosts.length !== 1 ? 's' : ''} 
+                    {filteredHosts.length !== hosts.length && (
+                      <span className="text-xs text-slate-500 dark:text-slate-400 ml-1">
+                        (sur {hosts.length})
+                      </span>
+                    )}
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
