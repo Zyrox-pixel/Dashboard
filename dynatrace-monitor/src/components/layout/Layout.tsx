@@ -18,12 +18,12 @@ const Layout: React.FC<LayoutProps> = ({ children, title, subtitle }) => {
   const location = useLocation();
   const [isTransitioning, setIsTransitioning] = useState(false);
 
-  // Effet de transition verticale lors du changement de route
+  // Effet de transition très léger lors du changement de route
   useEffect(() => {
     setIsTransitioning(true);
     const timer = setTimeout(() => {
       setIsTransitioning(false);
-    }, 300);
+    }, 100); // Très rapide
     
     return () => clearTimeout(timer);
   }, [location.pathname]);
@@ -64,13 +64,15 @@ const Layout: React.FC<LayoutProps> = ({ children, title, subtitle }) => {
         <div 
           className="max-w-7xl mx-auto px-4 py-5 sm:px-6 md:px-8 overflow-hidden"
         >
-          {/* Content container avec animation verticale simple */}
+          {/* Content container avec animation très subtile */}
           <div
-            className={`transition-all duration-300 ease-out ${
-              isTransitioning 
-                ? 'opacity-0 transform translate-y-4'
-                : 'opacity-100 transform translate-y-0'
-            }`}
+            style={{
+              transition: 'all 0.1s ease-out',
+              transform: isTransitioning 
+                ? 'translateY(2px)' 
+                : 'translateY(0)',
+              opacity: isTransitioning ? 0.95 : 1,
+            }}
           >
             {children}
           </div>

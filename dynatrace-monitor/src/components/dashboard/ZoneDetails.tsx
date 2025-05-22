@@ -1067,12 +1067,10 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
   const handleTabClick = useCallback((tab: string) => {
     if (tab !== activeTab) {
       setIsTabTransitioning(true);
+      onTabChange(tab);
       setTimeout(() => {
-        onTabChange(tab);
-        setTimeout(() => {
-          setIsTabTransitioning(false);
-        }, 150);
-      }, 150);
+        setIsTabTransitioning(false);
+      }, 100);
     }
   }, [onTabChange, activeTab]);
   
@@ -1411,13 +1409,12 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
         </button>
       </div>
       
-      {/* Contenu des onglets avec animation verticale */}
+      {/* Contenu des onglets avec animation très subtile */}
       <div
-        className={`transition-all duration-300 ease-out ${
-          isTabTransitioning 
-            ? 'opacity-0 transform translate-y-2'
-            : 'opacity-100 transform translate-y-0'
-        }`}
+        style={{
+          transition: 'opacity 0.1s ease-out',
+          opacity: isTabTransitioning ? 0.9 : 1,
+        }}
       >
         {/* Contenu des onglets - Hôtes */}
         {activeTab === 'hosts' && (
