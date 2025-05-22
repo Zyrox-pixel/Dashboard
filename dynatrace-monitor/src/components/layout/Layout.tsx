@@ -16,19 +16,18 @@ const Layout: React.FC<LayoutProps> = ({ children, title, subtitle }) => {
   const { sidebarCollapsed } = useApp();
   const { isDarkTheme } = useTheme();
   const location = useLocation();
-  const [isTransitioning, setIsTransitioning] = useState(true); // Commence en transition
+  const [isTransitioning, setIsTransitioning] = useState(false); // Commence sans transition
 
   // Effet de transition doux lors du changement de route
   useEffect(() => {
-    // Reset l'animation à chaque changement
+    // Déclencher l'animation seulement si ce n'est pas le premier chargement
     setIsTransitioning(true);
     
-    // Attendre un peu avant de commencer l'animation pour s'assurer que le DOM est prêt
-    const startTimer = setTimeout(() => {
+    const timer = setTimeout(() => {
       setIsTransitioning(false);
-    }, 50);
+    }, 600);
     
-    return () => clearTimeout(startTimer);
+    return () => clearTimeout(timer);
   }, [location.pathname]);
 
   // Dynamically apply body styles based on theme
@@ -67,13 +66,9 @@ const Layout: React.FC<LayoutProps> = ({ children, title, subtitle }) => {
         <div 
           className="max-w-7xl mx-auto px-4 py-5 sm:px-6 md:px-8 overflow-hidden"
         >
-          {/* Content container avec animation douce */}
+          {/* Content container avec animation de glissement */}
           <div
-            className={!isTransitioning ? 'page-enter' : ''}
-            style={{
-              opacity: isTransitioning ? 0 : 1,
-              transform: isTransitioning ? 'translateY(12px)' : 'translateY(0)',
-            }}
+            className={isTransitioning ? 'page-slide' : ''}
           >
             {children}
           </div>
@@ -147,23 +142,20 @@ const Layout: React.FC<LayoutProps> = ({ children, title, subtitle }) => {
           animation: fade-in-up 0.5s ease-out forwards;
         }
         
-        @keyframes slide-up {
+        @keyframes slide-up-down {
           0% {
-            opacity: 0;
-            transform: translateY(12px);
+            transform: translateY(0);
           }
           50% {
-            opacity: 0.5;
-            transform: translateY(6px);
+            transform: translateY(15px);
           }
           100% {
-            opacity: 1;
             transform: translateY(0);
           }
         }
         
-        .page-enter {
-          animation: slide-up 0.6s ease-out forwards;
+        .page-slide {
+          animation: slide-up-down 0.6s cubic-bezier(0.4, 0, 0.2, 1);
         }
         
         
