@@ -455,13 +455,15 @@ const Sidebar: React.FC = () => {
         </motion.button>
       </motion.div>
       
-      {/* Navigation principale */}
+      {/* Navigation principale avec scroll */}
       <motion.div 
-        className="relative py-6 flex flex-col h-[calc(100%-5rem)] z-10"
+        className="relative flex flex-col h-[calc(100%-5rem)] z-10 overflow-hidden"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.3 }}
       >
+        {/* Container scrollable */}
+        <div className="overflow-y-auto overflow-x-hidden flex-1 py-6 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent hover:scrollbar-thumb-slate-600">
         <LayoutGroup>
           {/* Tableau de bord */}
           <motion.div 
@@ -698,10 +700,12 @@ const Sidebar: React.FC = () => {
         
           {/* Espace supplémentaire pour l'esthétique */}
           <div className="flex-grow"></div>
-          
-          {/* Footer avec version */}
-          <motion.div 
-            className={`px-3 py-3 mt-auto relative z-10 ${
+        </LayoutGroup>
+        </div>
+        
+        {/* Footer avec version - Reste fixe en bas */}
+        <motion.div 
+          className={`px-3 py-3 relative z-10 ${
               isDarkTheme ? 'border-t border-slate-800/40' : 'border-t border-slate-200/70'
             }`}
             initial={{ opacity: 0, y: 20 }}
@@ -829,7 +833,6 @@ const Sidebar: React.FC = () => {
               )}
             </AnimatePresence>
           </motion.div>
-        </LayoutGroup>
       </motion.div>
       
       {/* Style global pour les motifs d'arrière-plan et animations */}
