@@ -129,15 +129,6 @@ const Header: React.FC<HeaderProps> = ({ title, subtitle }) => {
 
       {/* Partie droite - Actions et statut */}
       <div className="flex items-center gap-3">
-        {/* Affichage de l'heure en cours */}
-        <div className={`hidden md:flex items-center gap-2 px-3.5 py-1.5 rounded-full shadow-sm
-                       ${isDarkTheme 
-                         ? 'bg-gradient-to-r from-slate-800/90 to-slate-800/70 border border-slate-700/50 text-slate-300' 
-                         : 'bg-gradient-to-r from-slate-100 to-white border border-slate-200/70 text-slate-600'}`}>
-          <Clock className={isDarkTheme ? 'text-indigo-400' : 'text-indigo-500'} size={14} />
-          <span className="text-xs font-medium">{formatTime(currentTime)}</span>
-        </div>
-
         {/* Badge BETA avec effet premium */}
         <a
           href="mailto:Rayane.Bennasr@externe.bnpparibas.com"
