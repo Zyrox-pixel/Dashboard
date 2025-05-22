@@ -1702,9 +1702,12 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
         </section>
       )}
       
-      {/* Popup du filtre avancé */}
+      </div>
+      
+      {/* Popup du filtre avancé - En dehors du conteneur animé */}
       {showAdvancedFilter && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-fade-in">
+          <div className="animate-scale-in">
           {filterType === 'os' && (
             <AdvancedFilter
               title="Filtrer par système d'exploitation"
@@ -1737,9 +1740,9 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
               onClose={() => setShowAdvancedFilter(false)}
             />
           )}
+          </div>
         </div>
       )}
-      </div>
     </div>
   );
 };

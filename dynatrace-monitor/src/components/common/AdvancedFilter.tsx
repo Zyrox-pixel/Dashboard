@@ -148,11 +148,11 @@ const AdvancedFilter: React.FC<AdvancedFilterProps> = ({
   };
   
   return (
-    <div className={`p-4 rounded-lg shadow-lg border max-h-[90vh] overflow-y-auto ${
+    <div className={`relative p-6 rounded-xl shadow-2xl border ${
       isDarkTheme 
         ? 'bg-slate-800 border-slate-700' 
         : 'bg-white border-slate-200'
-    } w-full`}>
+    } w-full max-w-3xl max-h-[85vh] overflow-hidden flex flex-col`}>
       <div className="flex justify-between items-center mb-4">
         <div className="flex items-center gap-2">
           <Filter className={isDarkTheme ? 'text-indigo-400' : 'text-indigo-600'} size={18} />
@@ -208,8 +208,8 @@ const AdvancedFilter: React.FC<AdvancedFilterProps> = ({
         </div>
       </div>
       
-      {/* Catégories de filtres */}
-      <div className="space-y-3">
+      {/* Catégories de filtres avec scroll */}
+      <div className="space-y-3 overflow-y-auto flex-1 pr-2">
         {categories.map(category => {
           const selectionState = getCategorySelectionState(category.id);
           const isExpanded = expandedCategory === category.id;
