@@ -554,7 +554,7 @@ def get_problems_72h():
             logger.info("TENTATIVE ALTERNATIVE: Utilisation directe de la fonction test_get_problems qui fonctionne")
             
             # Si c'est un type de dashboard spécifique, récupérer les problèmes pour toutes les zones
-            if dashboard_type in ['vfg', 'vfe', 'vfp', 'vfa', 'detection', 'security']:
+            if dashboard_type in ['vfg', 'vfe', 'vfp', 'vfa', 'detection', 'security', 'fce-security', 'network-filtering', 'identity']:
                 # Si un filtre de zone est fourni, l'utiliser au lieu de toutes les zones
                 if zone_filter:
                     problems = test_get_problems(management_zone_name=zone_filter, time_from=timeframe, status="OPEN,CLOSED")
@@ -582,6 +582,12 @@ def get_problems_72h():
                     mz_list_var = 'DETECTION_CTL_MZ_LIST'
                 elif dashboard_type == 'security':
                     mz_list_var = 'SECURITY_ENCRYPTION_MZ_LIST'
+                elif dashboard_type == 'fce-security':
+                    mz_list_var = 'FCE_SECURITY_MZ_LIST'
+                elif dashboard_type == 'network-filtering':
+                    mz_list_var = 'NETWORK_FILTERING_MZ_LIST'
+                elif dashboard_type == 'identity':
+                    mz_list_var = 'IDENTITY_MZ_LIST'
                 else:
                     mz_list_var = 'VFG_MZ_LIST'  # Fallback au cas où
                     
@@ -697,7 +703,7 @@ def get_problems_72h():
         logger.info("Utilisation de l'implémentation standard")
         
         # Si un type de dashboard est spécifié
-        if dashboard_type in ['vfg', 'vfe', 'detection', 'security']:
+        if dashboard_type in ['vfg', 'vfe', 'detection', 'security', 'fce-security', 'network-filtering', 'identity']:
             # Si un filtre de zone est fourni, l'utiliser au lieu de toutes les zones
             if zone_filter:
                 logger.info(f"Filtrage par zone spécifique: {zone_filter} pour dashboard {dashboard_type}")
@@ -730,6 +736,12 @@ def get_problems_72h():
                 mz_list_var = 'DETECTION_CTL_MZ_LIST'
             elif dashboard_type == 'security':
                 mz_list_var = 'SECURITY_ENCRYPTION_MZ_LIST'
+            elif dashboard_type == 'fce-security':
+                mz_list_var = 'FCE_SECURITY_MZ_LIST'
+            elif dashboard_type == 'network-filtering':
+                mz_list_var = 'NETWORK_FILTERING_MZ_LIST'
+            elif dashboard_type == 'identity':
+                mz_list_var = 'IDENTITY_MZ_LIST'
             else:
                 mz_list_var = 'VFG_MZ_LIST'  # Fallback au cas où
                 
@@ -941,7 +953,7 @@ def get_problems():
         logger.info(f"Variables d'environnement: DT_ENV_URL={DT_ENV_URL}, API_TOKEN={'présent' if API_TOKEN else 'manquant'}")
         
         # Si un type de dashboard est spécifié
-        if dashboard_type in ['vfg', 'vfe', 'vfp', 'vfa', 'detection', 'security']:
+        if dashboard_type in ['vfg', 'vfe', 'vfp', 'vfa', 'detection', 'security', 'fce-security', 'network-filtering', 'identity']:
             # Si un filtre de zone est fourni, l'utiliser à la place de la liste complète
             if zone_filter:
                 logger.info(f"Filtrage par zone spécifique: {zone_filter} pour dashboard {dashboard_type}")
@@ -976,6 +988,12 @@ def get_problems():
                 mz_list_var = 'DETECTION_CTL_MZ_LIST'
             elif dashboard_type == 'security':
                 mz_list_var = 'SECURITY_ENCRYPTION_MZ_LIST'
+            elif dashboard_type == 'fce-security':
+                mz_list_var = 'FCE_SECURITY_MZ_LIST'
+            elif dashboard_type == 'network-filtering':
+                mz_list_var = 'NETWORK_FILTERING_MZ_LIST'
+            elif dashboard_type == 'identity':
+                mz_list_var = 'IDENTITY_MZ_LIST'
             else:
                 mz_list_var = 'VFG_MZ_LIST'  # Fallback au cas où
                 
