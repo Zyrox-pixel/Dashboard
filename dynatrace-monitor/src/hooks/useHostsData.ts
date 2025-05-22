@@ -19,12 +19,15 @@ export function useHostsData() {
   const [hosts, setHosts] = useState<Host[]>([]);
   const [totalHosts, setTotalHosts] = useState<number>(0);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isInitialLoading, setIsInitialLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [lastRefreshTime, setLastRefreshTime] = useState<Date | null>(null);
   // État pour stocker le MZ admin actif
   const [mzAdmin, setMzAdmin] = useState<string>('');
   // État pour suivre si la configuration a été chargée
   const [configLoaded, setConfigLoaded] = useState<boolean>(false);
+  // État pour suivre la phase de chargement actuelle
+  const [loadingPhase, setLoadingPhase] = useState<string>('Initialisation...');
 
   // Référence pour les requêtes en cours
   const pendingRequestRef = useRef<boolean>(false);
@@ -34,6 +37,7 @@ export function useHostsData() {
     try {
       console.log('🔍 [useHostsData] fetchMzAdminConfig démarré');
       setIsLoading(true);
+      setLoadingPhase('Connexion au serveur Dynatrace...');
       
       // 1. D'abord, vérifier si nous avons déjà la valeur en mémoire
       if (mzAdmin) {
@@ -207,6 +211,7 @@ export function useHostsData() {
 
     try {
       console.log(`🚀 [useHostsData] Chargement des données pour la MZ admin: ${mzAdmin}`);
+      setLoadingPhase('Authentification et validation MZ...');
       
       // Définir la MZ actuelle sur la MZ admin
       console.log('🔧 [useHostsData] Définition de la MZ...');
@@ -214,6 +219,7 @@ export function useHostsData() {
       console.log('🔧 [useHostsData] Réponse setManagementZone:', setMzResponse);
       
       // Récupérer les hosts pour cette MZ
+      setLoadingPhase('Scanning des hôtes disponibles...');
       console.log('📡 [useHostsData] Récupération des hosts...');
       const hostsResponse: ApiResponse<Host[]> = await api.getHosts();
       console.log('📡 [useHostsData] Réponse getHosts:', hostsResponse);
@@ -226,6 +232,9 @@ export function useHostsData() {
       const hostsData = hostsResponse.data || [];
       console.log(`✅ [useHostsData] ${hostsData.length} hosts récupérés pour ${mzAdmin}`, hostsData);
       
+      // Simuler une collecte des métriques pour l'UX
+      setLoadingPhase('Collecte des métriques système...');
+      
       // Mettre à jour les états
       setHosts(hostsData);
       setTotalHosts(hostsData.length);
@@ -235,6 +244,7 @@ export function useHostsData() {
       setLastRefreshTime(refreshTime);
       
       // Sauvegarder dans le cache persistant
+      setLoadingPhase('Finalisation et mise en cache...');
       saveToCache(hostsData);
       
       console.log('✅ [useHostsData] Données mises à jour avec succès');
@@ -250,6 +260,7 @@ export function useHostsData() {
       return null;
     } finally {
       setIsLoading(false);
+      setIsInitialLoading(false);
       pendingRequestRef.current = false;
     }
   }, [mzAdmin, saveToCache, hosts.length]);
@@ -348,11 +359,13 @@ export function useHostsData() {
     hosts,
     totalHosts,
     isLoading,
+    isInitialLoading,
     error,
     lastRefreshTime,
     mzAdmin,
     configLoaded,
     refreshData,
-    isFirstLoadDone
+    isFirstLoadDone,
+    loadingPhase
   };
 }

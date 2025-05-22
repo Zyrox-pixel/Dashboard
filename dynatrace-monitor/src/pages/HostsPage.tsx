@@ -4,6 +4,7 @@ import Layout from '../components/layout/Layout';
 import { RefreshCw, Server, Database, HardDrive, Search, AlertCircle, Filter, Monitor, ArrowUp, ArrowDown, Cpu, FileDown } from 'lucide-react';
 import AdvancedFilter, { FilterCategory, FilterValue, FilterItem } from '../components/common/AdvancedFilter';
 import UnifiedFilterBadges, { FilterBadge } from '../components/common/UnifiedFilterBadges';
+import AdvancedLoadingState from '../components/common/AdvancedLoadingState';
 import { Host } from '../api/types';
 import { exportHostsToCSV, downloadCSV } from '../utils/exportUtils';
 
@@ -29,11 +30,13 @@ const HostsPage: React.FC = () => {
   const { 
     hosts, 
     totalHosts, 
-    isLoading, 
+    isLoading,
+    isInitialLoading,
     error, 
     lastRefreshTime,
     mzAdmin,
-    refreshData
+    refreshData,
+    loadingPhase
   } = useHostsData();
 
   // Helper pour obtenir l'icône du système d'exploitation
@@ -515,6 +518,11 @@ const HostsPage: React.FC = () => {
   const handleRefresh = () => {
     refreshData(true);
   };
+
+  // Afficher le composant de chargement avancé pendant le chargement initial
+  if (isInitialLoading && hosts.length === 0) {
+    return <AdvancedLoadingState title="Chargement des hôtes" type="hosts" />;
+  }
 
   return (
     <Layout title="Inventory" subtitle="Hosts">
