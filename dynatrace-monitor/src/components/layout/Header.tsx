@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from '../../contexts/ThemeContext';
-import { Menu, Clock, Shield, ChevronRight, Sparkles, Zap, Activity } from 'lucide-react';
+import { Menu, Shield, ChevronRight, Sparkles, Activity } from 'lucide-react';
 
 interface HeaderProps {
   title: string;
@@ -12,7 +12,6 @@ const Header: React.FC<HeaderProps> = ({ title, subtitle }) => {
   const { isDarkTheme } = useTheme();
   const [scrolled, setScrolled] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [showPulse, setShowPulse] = useState(false);
 
   // Effet pour suivre le scroll et mettre à jour l'état
   useEffect(() => {
@@ -23,27 +22,11 @@ const Header: React.FC<HeaderProps> = ({ title, subtitle }) => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Effet pour mettre à jour l'heure
+  // Effet pour mettre à jour la date seulement
   useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date());
-      // Pulse effect every minute
-      if (new Date().getSeconds() === 0) {
-        setShowPulse(true);
-        setTimeout(() => setShowPulse(false), 1000);
-      }
-    }, 1000);
-    return () => clearInterval(timer);
+    setCurrentTime(new Date());
   }, []);
 
-  // Formatte l'heure dans un format élégant HH:MM:SS
-  const formatTime = (date: Date) => {
-    return date.toLocaleTimeString('fr-FR', {
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
-    });
-  };
 
   // Formatte la date dans un format jour/mois/année
   const formatDate = (date: Date) => {
@@ -182,7 +165,6 @@ const Header: React.FC<HeaderProps> = ({ title, subtitle }) => {
                 </span>
                 <span className="h-1 w-1 rounded-full bg-gradient-to-r from-green-400 to-blue-400 animate-pulse"></span>
                 <span className="flex items-center gap-1">
-                  <Clock size={12} />
                   {formatDate(currentTime)}
                 </span>
               </motion.p>
@@ -213,7 +195,6 @@ const Header: React.FC<HeaderProps> = ({ title, subtitle }) => {
                 </span>
                 <span className="h-1 w-1 rounded-full bg-gradient-to-r from-green-400 to-blue-400 animate-pulse"></span>
                 <span className="flex items-center gap-1">
-                  <Clock size={12} />
                   {formatDate(currentTime)}
                 </span>
               </motion.p>
@@ -224,33 +205,6 @@ const Header: React.FC<HeaderProps> = ({ title, subtitle }) => {
 
       {/* Partie droite - Actions et statut */}
       <div className="flex items-center gap-4 relative z-10">
-        {/* Horloge digitale animée */}
-        <motion.div 
-          className={`hidden sm:flex items-center gap-2 px-4 py-2 rounded-xl backdrop-blur-sm ${
-            isDarkTheme 
-              ? 'bg-slate-800/50 border border-slate-700/50' 
-              : 'bg-white/70 border border-slate-200/50'
-          }`}
-          initial={{ opacity: 0, scale: 0.8 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.5 }}
-        >
-          <Zap size={14} className={`${isDarkTheme ? 'text-yellow-400' : 'text-yellow-600'} ${showPulse ? 'animate-pulse' : ''}`} />
-          <AnimatePresence mode="popLayout">
-            <motion.span 
-              key={formatTime(currentTime)}
-              className={`font-mono text-sm font-semibold ${
-                isDarkTheme ? 'text-indigo-300' : 'text-indigo-600'
-              }`}
-              initial={{ y: -10, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 10, opacity: 0 }}
-              transition={{ duration: 0.2 }}
-            >
-              {formatTime(currentTime)}
-            </motion.span>
-          </AnimatePresence>
-        </motion.div>
         
         {/* Badge BETA avec effet premium amélioré */}
         <motion.a

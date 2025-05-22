@@ -113,13 +113,6 @@ const Layout: React.FC<LayoutProps> = ({ children, title, subtitle }) => {
             <div 
               className={`flex items-center space-x-4 text-xs ${isDarkTheme ? 'text-slate-400' : 'text-slate-500'}`}
             >
-              {/* Performance indicator */}
-              <div className="flex items-center gap-2">
-                <div
-                  className={`w-2 h-2 rounded-full ${isDarkTheme ? 'bg-green-500' : 'bg-green-600'}`}
-                />
-                <span className="text-[10px]">Système opérationnel</span>
-              </div>
             </div>
           </div>
         </footer>
