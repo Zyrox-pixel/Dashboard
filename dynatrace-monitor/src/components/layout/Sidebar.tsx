@@ -24,22 +24,42 @@ const Sidebar: React.FC = () => {
   const [hoverItem, setHoverItem] = useState<string | null>(null);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const sidebarRef = useRef<HTMLDivElement>(null);
+  const mousePositionRef = useRef({ x: 0, y: 0 });
+  const animationFrameRef = useRef<number>();
   
-  // Effet de suivi de la souris pour l'effet parallax
+  // Effet de suivi de la souris pour l'effet parallax (optimisé)
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
-      if (sidebarRef.current) {
+      if (sidebarRef.current && !sidebarCollapsed) {
         const rect = sidebarRef.current.getBoundingClientRect();
-        setMousePosition({
-          x: (e.clientX - rect.left) / rect.width,
-          y: (e.clientY - rect.top) / rect.height
-        });
+        // Vérifier si la souris est dans la sidebar
+        if (e.clientX >= rect.left && e.clientX <= rect.right && 
+            e.clientY >= rect.top && e.clientY <= rect.bottom) {
+          mousePositionRef.current = {
+            x: (e.clientX - rect.left) / rect.width,
+            y: (e.clientY - rect.top) / rect.height
+          };
+          
+          // Utiliser requestAnimationFrame pour optimiser les performances
+          if (animationFrameRef.current) {
+            cancelAnimationFrame(animationFrameRef.current);
+          }
+          
+          animationFrameRef.current = requestAnimationFrame(() => {
+            setMousePosition(mousePositionRef.current);
+          });
+        }
       }
     };
     
     if (!sidebarCollapsed) {
-      window.addEventListener('mousemove', handleMouseMove);
-      return () => window.removeEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mousemove', handleMouseMove, { passive: true });
+      return () => {
+        window.removeEventListener('mousemove', handleMouseMove);
+        if (animationFrameRef.current) {
+          cancelAnimationFrame(animationFrameRef.current);
+        }
+      };
     }
   }, [sidebarCollapsed]);
   
@@ -173,14 +193,7 @@ const Sidebar: React.FC = () => {
     const isHovered = hoverItem === itemKey;
     
     return (
-      <motion.div
-        layout
-        initial={{ opacity: 0, x: -20 }}
-        animate={{ opacity: 1, x: 0 }}
-        exit={{ opacity: 0, x: -20 }}
-        whileHover={{ x: 5 }}
-        whileTap={{ scale: 0.98 }}
-      >
+      <div className="transition-transform duration-200 hover:translate-x-1">
         <Link
           to={to}
           data-menu-item={itemKey}
@@ -194,38 +207,28 @@ const Sidebar: React.FC = () => {
           onMouseEnter={() => setHoverItem(itemKey)}
           onMouseLeave={() => setHoverItem(null)}
         >
-          {/* Effet de lumière animée */}
-          <AnimatePresence>
-            {isActive && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.8 }}
-                className="absolute inset-0 -z-10 rounded-xl overflow-hidden"
-              >
-                <motion.div
-                  animate={{
-                    background: [
-                      `radial-gradient(circle at ${mousePosition.x * 100}% ${mousePosition.y * 100}%, rgba(99, 102, 241, 0.15) 0%, transparent 50%)`,
-                      `radial-gradient(circle at ${mousePosition.x * 100}% ${mousePosition.y * 100}%, rgba(99, 102, 241, 0.25) 0%, transparent 60%)`,
-                      `radial-gradient(circle at ${mousePosition.x * 100}% ${mousePosition.y * 100}%, rgba(99, 102, 241, 0.15) 0%, transparent 50%)`
-                    ]
-                  }}
-                  transition={{ duration: 2, repeat: Infinity }}
-                  className="absolute inset-0"
-                />
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {/* Effet de lumière animée (simplifié pour éviter le clignotement) */}
+          {isActive && (
+            <div className="absolute inset-0 -z-10 rounded-xl overflow-hidden">
+              <div
+                className="absolute inset-0 transition-opacity duration-300"
+                style={{
+                  background: `radial-gradient(circle at 50% 50%, rgba(99, 102, 241, 0.2) 0%, transparent 60%)`,
+                  opacity: isActive ? 1 : 0
+                }}
+              />
+            </div>
+          )}
           
           {/* Glow effect */}
           {getIconGlow(itemKey, color)}
           
-          {/* Icône avec animation */}
-          <motion.div
-            className={`relative flex-shrink-0 ${getIconClass(itemKey)}`}
-            animate={isActive ? { rotate: [0, 5, -5, 0] } : {}}
-            transition={{ duration: 0.5 }}
+          {/* Icône avec animation réduite */}
+          <div
+            className={`relative flex-shrink-0 ${getIconClass(itemKey)} transition-transform duration-300`}
+            style={{
+              transform: isActive ? 'scale(1.1)' : 'scale(1)'
+            }}
           >
             <Icon
               size={18}
@@ -261,43 +264,33 @@ const Sidebar: React.FC = () => {
                 ))}
               </motion.div>
             )}
-          </motion.div>
+          </div>
           
-          {/* Label avec animation */}
+          {/* Label avec transition CSS */}
           {!sidebarCollapsed && (
-            <motion.span
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.1 }}
+            <span
               className={`text-sm font-medium whitespace-nowrap transition-all duration-300
                         ${isActive ? 'tracking-wide' : ''}`}
             >
               {label}
-            </motion.span>
+            </span>
           )}
           
-          {/* Badge amélioré */}
+          {/* Badge simplifié */}
           {badge && (
-            <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ type: "spring", stiffness: 500, damping: 25 }}
+            <div
               className={`${sidebarCollapsed ? 'absolute -top-1 -right-1' : 'ml-auto'} 
-                        px-1.5 py-0.5 rounded-full text-xs font-semibold
+                        px-1.5 py-0.5 rounded-full text-xs font-semibold transition-all duration-200
                         ${isDarkTheme ? `bg-${color}-900/70 text-${color}-300 border border-${color}-700/30` : `bg-${color}-100 text-${color}-700 border border-${color}-200/70`}`}
             >
               {badge}
-            </motion.div>
+            </div>
           )}
           
-          {/* Indicateur actif élégant */}
+          {/* Indicateur actif simplifié */}
           {isActive && !sidebarCollapsed && (
-            <motion.div
-              layoutId="activeIndicator"
-              className={`ml-auto w-1.5 h-5 rounded-full bg-gradient-to-b from-${color}-400 to-${color}-600`}
-              initial={{ opacity: 0, scale: 0 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ type: "spring", stiffness: 400, damping: 30 }}
+            <div
+              className={`ml-auto w-1.5 h-5 rounded-full bg-gradient-to-b from-${color}-400 to-${color}-600 transition-all duration-300`}
             />
           )}
         </Link>
@@ -317,27 +310,18 @@ const Sidebar: React.FC = () => {
           : 'bg-gradient-to-b from-white via-slate-50 to-white border-r border-slate-200/70 shadow-lg shadow-slate-200/30'
       } ${sidebarCollapsed ? 'w-16' : 'w-64'}`}
     >
-      {/* Effet de fond animé */}
-      <div className="absolute inset-0 overflow-hidden">
-        <motion.div
-          className="absolute inset-0"
-          animate={{
+      {/* Effet de fond statique avec transition douce */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div
+          className="absolute inset-0 transition-opacity duration-1000"
+          style={{
             background: isDarkTheme
-              ? [
-                  'radial-gradient(circle at 20% 80%, rgba(99, 102, 241, 0.05) 0%, transparent 50%)',
-                  'radial-gradient(circle at 80% 20%, rgba(99, 102, 241, 0.05) 0%, transparent 50%)',
-                  'radial-gradient(circle at 20% 80%, rgba(99, 102, 241, 0.05) 0%, transparent 50%)'
-                ]
-              : [
-                  'radial-gradient(circle at 20% 80%, rgba(99, 102, 241, 0.02) 0%, transparent 50%)',
-                  'radial-gradient(circle at 80% 20%, rgba(99, 102, 241, 0.02) 0%, transparent 50%)',
-                  'radial-gradient(circle at 20% 80%, rgba(99, 102, 241, 0.02) 0%, transparent 50%)'
-                ]
+              ? 'radial-gradient(circle at 50% 20%, rgba(99, 102, 241, 0.05) 0%, transparent 50%)'
+              : 'radial-gradient(circle at 50% 20%, rgba(99, 102, 241, 0.02) 0%, transparent 50%)'
           }}
-          transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
         />
         
-        {/* Motif de grille futuriste */}
+        {/* Motif de grille futuriste statique */}
         <div 
           className="absolute inset-0 opacity-5" 
           style={{
@@ -375,45 +359,24 @@ const Sidebar: React.FC = () => {
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
           >
-            {/* Effet de halo animé */}
-            <motion.div
+            {/* Effet de halo statique */}
+            <div
               className={`absolute inset-0 w-10 h-10 rounded-full ${
-                isDarkTheme ? 'bg-indigo-500/30' : 'bg-indigo-400/20'
-              }`}
-              animate={{
-                scale: [1, 1.2, 1],
-                opacity: [0.7, 0.3, 0.7]
-              }}
-              transition={{ duration: 3, repeat: Infinity }}
+                isDarkTheme ? 'bg-indigo-500/20' : 'bg-indigo-400/15'
+              } blur-xl`}
             />
             
             {/* Logo principal avec effet 3D */}
-            <motion.div
-              className={`relative z-10 p-2.5 rounded-full backdrop-blur-sm ${
+            <div
+              className={`relative z-10 p-2.5 rounded-full backdrop-blur-sm transition-all duration-300 ${
                 isDarkTheme 
                   ? 'bg-gradient-to-br from-indigo-900/90 via-indigo-800/70 to-indigo-900/50 border border-indigo-600/50 shadow-lg shadow-indigo-900/50' 
                   : 'bg-gradient-to-br from-indigo-100 via-white to-indigo-50 border border-indigo-300/70 shadow-md shadow-indigo-200/50'
               }`}
-              animate={{ rotate: 360 }}
-              transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
             >
               <ShieldIcon className={`${isDarkTheme ? 'text-indigo-400' : 'text-indigo-600'} flex-shrink-0`} size={18} />
-              
-              {/* Effet de brillance */}
-              <motion.div
-                className="absolute inset-0 rounded-full"
-                style={{
-                  background: `linear-gradient(135deg, transparent 30%, rgba(255,255,255,0.3) 50%, transparent 70%)`,
-                  opacity: 0
-                }}
-                animate={{ 
-                  opacity: [0, 1, 0],
-                  transform: ['translateX(-100%) translateY(-100%)', 'translateX(100%) translateY(100%)']
-                }}
-                transition={{ duration: 3, repeat: Infinity, repeatDelay: 2 }}
-              />
-            </motion.div>
-          </motion.div>
+            </div>
+          </div>
           
           {/* Titre avec animation d'apparition améliorée */}
           <AnimatePresence>
