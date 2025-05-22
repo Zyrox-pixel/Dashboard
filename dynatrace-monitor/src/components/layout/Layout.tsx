@@ -16,16 +16,19 @@ const Layout: React.FC<LayoutProps> = ({ children, title, subtitle }) => {
   const { sidebarCollapsed } = useApp();
   const { isDarkTheme } = useTheme();
   const location = useLocation();
-  const [isTransitioning, setIsTransitioning] = useState(false);
+  const [isTransitioning, setIsTransitioning] = useState(true); // Commence en transition
 
   // Effet de transition lent et fluide lors du changement de route
   useEffect(() => {
+    // Reset l'animation à chaque changement
     setIsTransitioning(true);
-    const timer = setTimeout(() => {
-      setIsTransitioning(false);
-    }, 50); // Début rapide pour éviter le délai
     
-    return () => clearTimeout(timer);
+    // Attendre un peu avant de commencer l'animation pour s'assurer que le DOM est prêt
+    const startTimer = setTimeout(() => {
+      setIsTransitioning(false);
+    }, 100);
+    
+    return () => clearTimeout(startTimer);
   }, [location.pathname]);
 
   // Dynamically apply body styles based on theme
@@ -66,12 +69,10 @@ const Layout: React.FC<LayoutProps> = ({ children, title, subtitle }) => {
         >
           {/* Content container avec animation de glissement vertical fluide */}
           <div
+            className={!isTransitioning ? 'page-enter' : ''}
             style={{
-              transition: 'all 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
-              transform: isTransitioning 
-                ? 'translateY(20px)' 
-                : 'translateY(0)',
               opacity: isTransitioning ? 0 : 1,
+              transform: isTransitioning ? 'translateY(30px)' : 'translateY(0)',
             }}
           >
             {children}
@@ -144,6 +145,21 @@ const Layout: React.FC<LayoutProps> = ({ children, title, subtitle }) => {
         
         .animate-fade-in-up {
           animation: fade-in-up 0.5s ease-out forwards;
+        }
+        
+        @keyframes slide-up {
+          0% {
+            opacity: 0;
+            transform: translateY(30px);
+          }
+          100% {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        
+        .page-enter {
+          animation: slide-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
         
         
