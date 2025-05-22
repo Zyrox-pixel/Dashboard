@@ -2,13 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { 
   ChevronLeft, Home, AlertTriangle, Star, Award, Grid, 
-  Layers, Shield, Activity, Command, Settings, Key
+  Layers, Shield, Activity, Command, Settings, Key, Globe, User
 } from 'lucide-react';
 import { useApp } from '../../contexts/AppContext';
 import { useTheme } from '../../contexts/ThemeContext';
 
 // Définir les types pour les fonctions
-type MenuItemKey = 'home' | 'problems' | 'vfg' | 'vfe' | 'detection' | 'security' | 'hosts' | 'activity' | 'settings';
+type MenuItemKey = 'home' | 'problems' | 'vfg' | 'vfe' | 'detection' | 'security' | 'fce_security' | 'network_filtering' | 'identity' | 'hosts' | 'activity' | 'settings';
 type ColorType = 'indigo' | 'amber' | 'red' | 'blue' | 'green' | 'purple' | 'cyan' | 'pink';
 
 const Sidebar: React.FC = () => {
@@ -37,6 +37,12 @@ const Sidebar: React.FC = () => {
       newActiveItem = 'detection';
     } else if (path.startsWith('/security') || path.startsWith('/dashboard/security')) {
       newActiveItem = 'security';
+    } else if (path.startsWith('/fce-security') || path.startsWith('/dashboard/fce-security')) {
+      newActiveItem = 'fce_security';
+    } else if (path.startsWith('/network-filtering') || path.startsWith('/dashboard/network-filtering')) {
+      newActiveItem = 'network_filtering';
+    } else if (path.startsWith('/identity') || path.startsWith('/dashboard/identity')) {
+      newActiveItem = 'identity';
     } else if (path.startsWith('/hosts')) {
       newActiveItem = 'hosts';
     } else if (path.startsWith('/settings')) {
@@ -384,6 +390,99 @@ const Sidebar: React.FC = () => {
               
               {/* Animation subtile d'arrière-plan pour les éléments actifs */}
               {activeItem === 'security' && (
+                <div className="absolute inset-0 -z-10 rounded-xl overflow-hidden">
+                  <div className="absolute inset-0 opacity-20 bg-grid-pattern"></div>
+                </div>
+              )}
+            </Link>
+            
+            {/* FCE Security */}
+            <Link 
+              to="/fce-security"
+              className={getVitalItemClass('fce_security', 'purple')}
+              onMouseEnter={() => setHoverItem('fce_security')}
+              onMouseLeave={() => setHoverItem(null)}
+            >
+              {getIconGlow('fce_security', 'purple')}
+              <div className={`relative flex-shrink-0 ${getIconClass('fce_security')}`}>
+                <Shield 
+                  size={18} 
+                  className={`${isDarkTheme ? 'text-purple-400' : 'text-purple-600'} 
+                            ${activeItem === 'fce_security' ? 'animate-pulse-subtle' : ''}`} 
+                />
+              </div>
+              
+              {!sidebarCollapsed && (
+                <span className={`text-sm font-medium whitespace-nowrap transition-all duration-300
+                                ${activeItem === 'fce_security' ? 'tracking-wide' : ''}`}>
+                  FCE Security
+                </span>
+              )}
+              
+              {/* Animation subtile d'arrière-plan pour les éléments actifs */}
+              {activeItem === 'fce_security' && (
+                <div className="absolute inset-0 -z-10 rounded-xl overflow-hidden">
+                  <div className="absolute inset-0 opacity-20 bg-grid-pattern"></div>
+                </div>
+              )}
+            </Link>
+            
+            {/* Network Filtering */}
+            <Link 
+              to="/network-filtering"
+              className={getVitalItemClass('network_filtering', 'cyan')}
+              onMouseEnter={() => setHoverItem('network_filtering')}
+              onMouseLeave={() => setHoverItem(null)}
+            >
+              {getIconGlow('network_filtering', 'cyan')}
+              <div className={`relative flex-shrink-0 ${getIconClass('network_filtering')}`}>
+                <Globe 
+                  size={18} 
+                  className={`${isDarkTheme ? 'text-cyan-400' : 'text-cyan-600'} 
+                            ${activeItem === 'network_filtering' ? 'animate-pulse-subtle' : ''}`} 
+                />
+              </div>
+              
+              {!sidebarCollapsed && (
+                <span className={`text-sm font-medium whitespace-nowrap transition-all duration-300
+                                ${activeItem === 'network_filtering' ? 'tracking-wide' : ''}`}>
+                  Network Filtering
+                </span>
+              )}
+              
+              {/* Animation subtile d'arrière-plan pour les éléments actifs */}
+              {activeItem === 'network_filtering' && (
+                <div className="absolute inset-0 -z-10 rounded-xl overflow-hidden">
+                  <div className="absolute inset-0 opacity-20 bg-grid-pattern"></div>
+                </div>
+              )}
+            </Link>
+            
+            {/* Identity */}
+            <Link 
+              to="/identity"
+              className={getVitalItemClass('identity', 'pink')}
+              onMouseEnter={() => setHoverItem('identity')}
+              onMouseLeave={() => setHoverItem(null)}
+            >
+              {getIconGlow('identity', 'pink')}
+              <div className={`relative flex-shrink-0 ${getIconClass('identity')}`}>
+                <User 
+                  size={18} 
+                  className={`${isDarkTheme ? 'text-pink-400' : 'text-pink-600'} 
+                            ${activeItem === 'identity' ? 'animate-pulse-subtle' : ''}`} 
+                />
+              </div>
+              
+              {!sidebarCollapsed && (
+                <span className={`text-sm font-medium whitespace-nowrap transition-all duration-300
+                                ${activeItem === 'identity' ? 'tracking-wide' : ''}`}>
+                  Identity
+                </span>
+              )}
+              
+              {/* Animation subtile d'arrière-plan pour les éléments actifs */}
+              {activeItem === 'identity' && (
                 <div className="absolute inset-0 -z-10 rounded-xl overflow-hidden">
                   <div className="absolute inset-0 opacity-20 bg-grid-pattern"></div>
                 </div>

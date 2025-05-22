@@ -11,7 +11,7 @@ interface UnifiedProblemsViewProps {
   /** Titre principal de la vue */
   title: string;
   /** Variante du dashboard (vfg, vfe, detection, security ou all) */
-  variant: 'vfg' | 'vfe' | 'detection' | 'security' | 'vfp' | 'vfa' | 'all';
+  variant: 'vfg' | 'vfe' | 'detection' | 'security' | 'fce-security' | 'network-filtering' | 'identity' | 'vfp' | 'vfa' | 'all';
   /** Filtre de zone optionnel (pour les sous-zones de management) */
   zoneFilter?: string;
   /** Type de problème à afficher (active, recent, all) */
@@ -257,6 +257,15 @@ const UnifiedProblemsView: React.FC<UnifiedProblemsViewProps> = ({ title, varian
       break;
     case 'security':
       accentColor = 'orange';
+      break;
+    case 'fce-security':
+      accentColor = 'purple';
+      break;
+    case 'network-filtering':
+      accentColor = 'cyan';
+      break;
+    case 'identity':
+      accentColor = 'pink';
       break;
     case 'vfp':
       accentColor = 'green';

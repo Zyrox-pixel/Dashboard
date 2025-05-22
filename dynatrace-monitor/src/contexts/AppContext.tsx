@@ -24,6 +24,9 @@ export interface AppStateType {
   vitalForAnalyticsMZs: ManagementZone[];
   detectionCtlMZs: ManagementZone[];
   securityEncryptionMZs: ManagementZone[];
+  fceSecurityMZs: ManagementZone[];
+  networkFilteringMZs: ManagementZone[];
+  identityMZs: ManagementZone[];
   selectedZone: string | null;
   sidebarCollapsed: boolean;
   activeTab: string;
@@ -40,6 +43,9 @@ export interface AppStateType {
     vitalForAnalyticsMZs: boolean;
     detectionCtlMZs: boolean;
     securityEncryptionMZs: boolean;
+    fceSecurityMZs: boolean;
+    networkFilteringMZs: boolean;
+    identityMZs: boolean;
     initialLoadComplete: boolean;
     dashboardData?: boolean;
   };
@@ -61,7 +67,7 @@ export interface AppActionsType {
   setSelectedZone: (zoneId: string | null) => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
   setActiveTab: (tab: string) => void;
-  refreshData: (dashboardType?: 'vfg' | 'vfe' | 'vfp' | 'vfa' | 'detection' | 'security', refreshProblemsOnly?: boolean, timeframe?: string, forceBackendReload?: boolean) => Promise<void>;
+  refreshData: (dashboardType?: 'vfg' | 'vfe' | 'vfp' | 'vfa' | 'detection' | 'security' | 'fce-security' | 'network-filtering' | 'identity', refreshProblemsOnly?: boolean, timeframe?: string, forceBackendReload?: boolean) => Promise<void>;
   loadZoneData?: (zoneId: string) => Promise<void>;
 }
 
@@ -129,6 +135,9 @@ const initialAppState: AppStateType = {
   vitalForAnalyticsMZs: [],
   detectionCtlMZs: [],
   securityEncryptionMZs: [],
+  fceSecurityMZs: [],
+  networkFilteringMZs: [],
+  identityMZs: [],
   selectedZone: null,
   sidebarCollapsed: false,
   activeTab: 'hosts',
@@ -145,6 +154,9 @@ const initialAppState: AppStateType = {
     vitalForAnalyticsMZs: true,
     detectionCtlMZs: true,
     securityEncryptionMZs: true,
+    fceSecurityMZs: true,
+    networkFilteringMZs: true,
+    identityMZs: true,
     initialLoadComplete: false
   },
   error: null,
@@ -484,13 +496,16 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
     state.vitalForAnalyticsMZs,
     state.detectionCtlMZs,
     state.securityEncryptionMZs,
+    state.fceSecurityMZs,
+    state.networkFilteringMZs,
+    state.identityMZs,
     apiClient,
     optimized,
     getProcessIcon
   ]);
 
   // Fonction pour charger toutes les données
-  const loadAllData = useCallback(async (dashboardType?: 'vfg' | 'vfe' | 'vfp' | 'vfa' | 'detection' | 'security', refreshProblemsOnly?: boolean, silentMode: boolean = false, timeframe?: string, forceBackendReload?: boolean) => {
+  const loadAllData = useCallback(async (dashboardType?: 'vfg' | 'vfe' | 'vfp' | 'vfa' | 'detection' | 'security' | 'fce-security' | 'network-filtering' | 'identity', refreshProblemsOnly?: boolean, silentMode: boolean = false, timeframe?: string, forceBackendReload?: boolean) => {
     // Modification de la fonction pour utiliser async/await avec Promise.all
     const startTime = performance.now();
 
@@ -554,6 +569,9 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
       let vfaResponse: ApiResponse<VitalForGroupMZsResponse> | undefined;
       let detectionResponse: ApiResponse<VitalForGroupMZsResponse> | undefined;
       let securityResponse: ApiResponse<VitalForGroupMZsResponse> | undefined;
+      let fceSecurityResponse: ApiResponse<VitalForGroupMZsResponse> | undefined;
+      let networkFilteringResponse: ApiResponse<VitalForGroupMZsResponse> | undefined;
+      let identityResponse: ApiResponse<VitalForGroupMZsResponse> | undefined;
       let problemsResponse: ApiResponse<ProblemResponse[]> | undefined;
       let problemsLast72hResponse: ApiResponse<ProblemResponse[]> | undefined;
       
@@ -576,7 +594,10 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
             apiClient.getVitalForProductionMZs(),
             apiClient.getVitalForAnalyticsMZs(),
             apiClient.getDetectionCtlMZs(),
-            apiClient.getSecurityEncryptionMZs()
+            apiClient.getSecurityEncryptionMZs(),
+            apiClient.getFceSecurityMZs(),
+            apiClient.getNetworkFilteringMZs(),
+            apiClient.getIdentityMZs()
           ]);
           vfgResponse = mzResponses[0] as ApiResponse<VitalForGroupMZsResponse>;
           vfeResponse = mzResponses[1] as ApiResponse<VitalForGroupMZsResponse>;
@@ -584,6 +605,9 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
           vfaResponse = mzResponses[3] as ApiResponse<VitalForGroupMZsResponse>;
           detectionResponse = mzResponses[4] as ApiResponse<VitalForGroupMZsResponse>;
           securityResponse = mzResponses[5] as ApiResponse<VitalForGroupMZsResponse>;
+          fceSecurityResponse = mzResponses[6] as ApiResponse<VitalForGroupMZsResponse>;
+          networkFilteringResponse = mzResponses[7] as ApiResponse<VitalForGroupMZsResponse>;
+          identityResponse = mzResponses[8] as ApiResponse<VitalForGroupMZsResponse>;
         }
       } else {
         // Chargement complet de toutes les données
@@ -595,6 +619,9 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
           apiClient.getVitalForAnalyticsMZs(),
           apiClient.getDetectionCtlMZs(),
           apiClient.getSecurityEncryptionMZs(),
+          apiClient.getFceSecurityMZs(),
+          apiClient.getNetworkFilteringMZs(),
+          apiClient.getIdentityMZs(),
           apiClient.getProblems("OPEN", "-60d", dashboardType, true),  // Force le rafraîchissement pour les problèmes actifs sur 60 jours
           apiClient.getProblems72h(dashboardType, undefined, true, timeframe)   // Utilise le nouvel endpoint dédié pour les problèmes avec la période spécifiée
         ]);
@@ -605,8 +632,11 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
         vfaResponse = responses[4] as ApiResponse<VitalForGroupMZsResponse>;
         detectionResponse = responses[5] as ApiResponse<VitalForGroupMZsResponse>;
         securityResponse = responses[6] as ApiResponse<VitalForGroupMZsResponse>;
-        problemsResponse = responses[7] as ApiResponse<ProblemResponse[]>;
-        problemsLast72hResponse = responses[8] as ApiResponse<ProblemResponse[]>;
+        fceSecurityResponse = responses[7] as ApiResponse<VitalForGroupMZsResponse>;
+        networkFilteringResponse = responses[8] as ApiResponse<VitalForGroupMZsResponse>;
+        identityResponse = responses[9] as ApiResponse<VitalForGroupMZsResponse>;
+        problemsResponse = responses[10] as ApiResponse<ProblemResponse[]>;
+        problemsLast72hResponse = responses[11] as ApiResponse<ProblemResponse[]>;
       }
 
       // Traiter les données du résumé si disponibles et si ce n'est pas un rafraîchissement des problèmes uniquement
@@ -622,6 +652,9 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
       let vfaMZs: ManagementZone[] = [];
       let detectionMZs: ManagementZone[] = [];
       let securityMZs: ManagementZone[] = [];
+      let fceSecurityMZs: ManagementZone[] = [];
+      let networkFilteringMZs: ManagementZone[] = [];
+      let identityMZs: ManagementZone[] = [];
       
       if (!refreshProblemsOnly) {
         if (vfgResponse && !vfgResponse.error && vfgResponse.data?.mzs) {
@@ -957,6 +990,155 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
           
           setState(prev => ({ ...prev, securityEncryptionMZs: securityMZs }));
         }
+
+        // Traitement des données de FCE Security
+        if (fceSecurityResponse && !fceSecurityResponse.error && fceSecurityResponse.data?.mzs) {
+          // Obtenir les comptages pour chaque zone en parallèle
+          const mzPromises = fceSecurityResponse.data.mzs.map(async (mzName) => {
+            try {
+              // Récupérer les comptages depuis l'API
+              const response = await fetch(`${API_BASE_URL}/management-zones/counts?zone=${encodeURIComponent(mzName)}`);
+              
+              if (response.ok) {
+                const data = await response.json();
+                const counts = data.counts || { hosts: 0, services: 0, processes: 0 };
+                
+                return {
+                  id: `env-${mzName.replace(/\s+/g, '-')}`,
+                  name: mzName,
+                  code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
+                  icon: getZoneIcon(mzName),
+                  problemCount: 0,
+                  apps: counts.processes,
+                  services: counts.services,
+                  hosts: counts.hosts,
+                  availability: "99.99%",
+                  status: "healthy" as "healthy" | "warning",
+                  color: getZoneColor(mzName),
+                  dt_url: "#"
+                };
+              } else {
+                throw new Error(`Erreur API ${response.status}`);
+              }
+            } catch (error) {
+              return {
+                id: `env-${mzName.replace(/\s+/g, '-')}`,
+                name: mzName,
+                code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
+                icon: getZoneIcon(mzName),
+                problemCount: 0,
+                apps: 0,
+                services: 0,
+                hosts: 0,
+                availability: "99.99%",
+                status: "healthy" as "healthy" | "warning",
+                color: getZoneColor(mzName),
+                dt_url: "#"
+              };
+            }
+          });
+          
+          fceSecurityMZs = await Promise.all(mzPromises);
+          setState(prev => ({ ...prev, fceSecurityMZs: fceSecurityMZs }));
+        }
+
+        // Traitement des données de Network Filtering
+        if (networkFilteringResponse && !networkFilteringResponse.error && networkFilteringResponse.data?.mzs) {
+          const mzPromises = networkFilteringResponse.data.mzs.map(async (mzName) => {
+            try {
+              const response = await fetch(`${API_BASE_URL}/management-zones/counts?zone=${encodeURIComponent(mzName)}`);
+              
+              if (response.ok) {
+                const data = await response.json();
+                const counts = data.counts || { hosts: 0, services: 0, processes: 0 };
+                
+                return {
+                  id: `env-${mzName.replace(/\s+/g, '-')}`,
+                  name: mzName,
+                  code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
+                  icon: getZoneIcon(mzName),
+                  problemCount: 0,
+                  apps: counts.processes,
+                  services: counts.services,
+                  hosts: counts.hosts,
+                  availability: "99.99%",
+                  status: "healthy" as "healthy" | "warning",
+                  color: getZoneColor(mzName),
+                  dt_url: "#"
+                };
+              } else {
+                throw new Error(`Erreur API ${response.status}`);
+              }
+            } catch (error) {
+              return {
+                id: `env-${mzName.replace(/\s+/g, '-')}`,
+                name: mzName,
+                code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
+                icon: getZoneIcon(mzName),
+                problemCount: 0,
+                apps: 0,
+                services: 0,
+                hosts: 0,
+                availability: "99.99%",
+                status: "healthy" as "healthy" | "warning",
+                color: getZoneColor(mzName),
+                dt_url: "#"
+              };
+            }
+          });
+          
+          networkFilteringMZs = await Promise.all(mzPromises);
+          setState(prev => ({ ...prev, networkFilteringMZs: networkFilteringMZs }));
+        }
+
+        // Traitement des données de Identity
+        if (identityResponse && !identityResponse.error && identityResponse.data?.mzs) {
+          const mzPromises = identityResponse.data.mzs.map(async (mzName) => {
+            try {
+              const response = await fetch(`${API_BASE_URL}/management-zones/counts?zone=${encodeURIComponent(mzName)}`);
+              
+              if (response.ok) {
+                const data = await response.json();
+                const counts = data.counts || { hosts: 0, services: 0, processes: 0 };
+                
+                return {
+                  id: `env-${mzName.replace(/\s+/g, '-')}`,
+                  name: mzName,
+                  code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
+                  icon: getZoneIcon(mzName),
+                  problemCount: 0,
+                  apps: counts.processes,
+                  services: counts.services,
+                  hosts: counts.hosts,
+                  availability: "99.99%",
+                  status: "healthy" as "healthy" | "warning",
+                  color: getZoneColor(mzName),
+                  dt_url: "#"
+                };
+              } else {
+                throw new Error(`Erreur API ${response.status}`);
+              }
+            } catch (error) {
+              return {
+                id: `env-${mzName.replace(/\s+/g, '-')}`,
+                name: mzName,
+                code: mzName.replace(/^.*?([A-Z0-9]+).*$/, '$1') || 'MZ',
+                icon: getZoneIcon(mzName),
+                problemCount: 0,
+                apps: 0,
+                services: 0,
+                hosts: 0,
+                availability: "99.99%",
+                status: "healthy" as "healthy" | "warning",
+                color: getZoneColor(mzName),
+                dt_url: "#"
+              };
+            }
+          });
+          
+          identityMZs = await Promise.all(mzPromises);
+          setState(prev => ({ ...prev, identityMZs: identityMZs }));
+        }
       } else {
         // En cas de rafraîchissement des problèmes uniquement, réutiliser les MZs existantes
         vfgMZs = state.vitalForGroupMZs;
@@ -965,6 +1147,9 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
         vfaMZs = state.vitalForAnalyticsMZs;
         detectionMZs = state.detectionCtlMZs;
         securityMZs = state.securityEncryptionMZs;
+        fceSecurityMZs = state.fceSecurityMZs;
+        networkFilteringMZs = state.networkFilteringMZs;
+        identityMZs = state.identityMZs;
       }
       
       // Traiter les données des problèmes actifs
@@ -1062,6 +1247,33 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
         status: (zoneProblems.length > 0 ? "warning" : "healthy") as "warning" | "healthy"
       };
     });
+
+    const updatedFceSecurityMZs = fceSecurityMZs.map(zone => {
+      const zoneProblems = problems.filter(p => p.zone && p.zone.includes(zone.name));
+      return {
+        ...zone,
+        problemCount: zoneProblems.length,
+        status: (zoneProblems.length > 0 ? "warning" : "healthy") as "warning" | "healthy"
+      };
+    });
+
+    const updatedNetworkFilteringMZs = networkFilteringMZs.map(zone => {
+      const zoneProblems = problems.filter(p => p.zone && p.zone.includes(zone.name));
+      return {
+        ...zone,
+        problemCount: zoneProblems.length,
+        status: (zoneProblems.length > 0 ? "warning" : "healthy") as "warning" | "healthy"
+      };
+    });
+
+    const updatedIdentityMZs = identityMZs.map(zone => {
+      const zoneProblems = problems.filter(p => p.zone && p.zone.includes(zone.name));
+      return {
+        ...zone,
+        problemCount: zoneProblems.length,
+        status: (zoneProblems.length > 0 ? "warning" : "healthy") as "warning" | "healthy"
+      };
+    });
     
     // Mettre à jour les compteurs de problèmes pour les MZs VFP et VFA
     const updatedVfpMZs = vfpMZs.map(zone => {
@@ -1089,7 +1301,10 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
       vitalForProductionMZs: updatedVfpMZs,
       vitalForAnalyticsMZs: updatedVfaMZs,
       detectionCtlMZs: updatedDetectionMZs,
-      securityEncryptionMZs: updatedSecurityMZs
+      securityEncryptionMZs: updatedSecurityMZs,
+      fceSecurityMZs: updatedFceSecurityMZs,
+      networkFilteringMZs: updatedNetworkFilteringMZs,
+      identityMZs: updatedIdentityMZs
     }));
   }
 }
@@ -1193,6 +1408,9 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
             vitalForEntrepriseMZs: !refreshProblemsOnly ? false : prev.isLoading.vitalForEntrepriseMZs,
             detectionCtlMZs: !refreshProblemsOnly ? false : prev.isLoading.detectionCtlMZs,
             securityEncryptionMZs: !refreshProblemsOnly ? false : prev.isLoading.securityEncryptionMZs,
+            fceSecurityMZs: !refreshProblemsOnly ? false : prev.isLoading.fceSecurityMZs,
+            networkFilteringMZs: !refreshProblemsOnly ? false : prev.isLoading.networkFilteringMZs,
+            identityMZs: !refreshProblemsOnly ? false : prev.isLoading.identityMZs,
             initialLoadComplete: !refreshProblemsOnly ? true : prev.isLoading.initialLoadComplete,
             dashboardData: false
           } 
@@ -1206,7 +1424,10 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
     state.vitalForProductionMZs, 
     state.vitalForAnalyticsMZs, 
     state.detectionCtlMZs, 
-    state.securityEncryptionMZs, 
+    state.securityEncryptionMZs,
+    state.fceSecurityMZs,
+    state.networkFilteringMZs,
+    state.identityMZs,
     loadZoneData, 
     apiClient, 
     optimized, 
@@ -1222,7 +1443,7 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
   const refreshTimeoutIdRef = useRef<number | null>(null);
 
   // Fonction pour rafraîchir les données - version non bloquante améliorée avec prise en charge de la période
-  const refreshData = useCallback(async (dashboardType?: 'vfg' | 'vfe' | 'vfp' | 'vfa' | 'detection' | 'security', refreshProblemsOnly?: boolean, timeframe?: string, forceBackendReload?: boolean): Promise<void> => {
+  const refreshData = useCallback(async (dashboardType?: 'vfg' | 'vfe' | 'vfp' | 'vfa' | 'detection' | 'security' | 'fce-security' | 'network-filtering' | 'identity', refreshProblemsOnly?: boolean, timeframe?: string, forceBackendReload?: boolean): Promise<void> => {
     // Éviter les appels multiples simultanés
     if (refreshInProgressRef.current) {
       console.log("Un rafraîchissement est déjà en cours, nouvelle demande ignorée");
@@ -1689,7 +1910,7 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
   // Create a typed version of the refreshData function
   const typedRefreshData = useCallback(
     (
-      dashboardType?: 'vfg' | 'vfe' | 'vfp' | 'vfa' | 'detection' | 'security',
+      dashboardType?: 'vfg' | 'vfe' | 'vfp' | 'vfa' | 'detection' | 'security' | 'fce-security' | 'network-filtering' | 'identity',
       refreshProblemsOnly?: boolean,
       timeframe?: string,
       forceBackendReload?: boolean

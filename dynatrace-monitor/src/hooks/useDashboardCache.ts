@@ -18,6 +18,9 @@ const CACHE_KEYS = {
   vfa: 'dashboard_vfa_cache',
   detection: 'dashboard_detection_cache',
   security: 'dashboard_security_cache',
+  'fce-security': 'dashboard_fce_security_cache',
+  'network-filtering': 'dashboard_network_filtering_cache',
+  identity: 'dashboard_identity_cache',
   unified: 'dashboard_unified_cache'
 };
 
@@ -29,7 +32,7 @@ const CACHE_LIFETIME = 15 * 60 * 1000;
  * Permet de charger les données une seule fois, de les mettre à jour automatiquement
  * et de les récupérer instantanément depuis le cache lors des visites ultérieures
  */
-export function useDashboardCache(dashboardType: 'vfg' | 'vfe' | 'vfp' | 'vfa' | 'detection' | 'security' | 'unified') {
+export function useDashboardCache(dashboardType: 'vfg' | 'vfe' | 'vfp' | 'vfa' | 'detection' | 'security' | 'fce-security' | 'network-filtering' | 'identity' | 'unified') {
   // États pour stocker les données et le statut de chargement
   const [activeProblems, setActiveProblems] = useState<Problem[]>([]);
   const [recentProblems, setRecentProblems] = useState<Problem[]>([]);

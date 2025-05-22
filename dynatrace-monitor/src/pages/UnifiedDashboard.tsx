@@ -28,33 +28,48 @@ const UnifiedDashboard: React.FC = () => {
       case 'vfe':
         return {
           title: isOptimized ? "Vital for Entreprise (Optimisé)" : "Vital for Entreprise",
-          variant: 'vfe' as 'vfg' | 'vfe' | 'vfp' | 'vfa' | 'detection' | 'security',
+          variant: 'vfe' as 'vfg' | 'vfe' | 'vfp' | 'vfa' | 'detection' | 'security' | 'fce-security' | 'network-filtering' | 'identity',
         };
       case 'detection':
         return {
           title: isOptimized ? "Détection & CTL (Optimisé)" : "Détection & CTL",
-          variant: 'detection' as 'vfg' | 'vfe' | 'vfp' | 'vfa' | 'detection' | 'security',
+          variant: 'detection' as 'vfg' | 'vfe' | 'vfp' | 'vfa' | 'detection' | 'security' | 'fce-security' | 'network-filtering' | 'identity',
         };
       case 'security':
         return {
           title: isOptimized ? "Security & Encryption (Optimisé)" : "Security & Encryption",
-          variant: 'security' as 'vfg' | 'vfe' | 'vfp' | 'vfa' | 'detection' | 'security',
+          variant: 'security' as 'vfg' | 'vfe' | 'vfp' | 'vfa' | 'detection' | 'security' | 'fce-security' | 'network-filtering' | 'identity',
+        };
+      case 'fce-security':
+        return {
+          title: isOptimized ? "FCE Security (Optimisé)" : "FCE Security",
+          variant: 'fce-security' as 'vfg' | 'vfe' | 'vfp' | 'vfa' | 'detection' | 'security' | 'fce-security' | 'network-filtering' | 'identity',
+        };
+      case 'network-filtering':
+        return {
+          title: isOptimized ? "Network Filtering (Optimisé)" : "Network Filtering",
+          variant: 'network-filtering' as 'vfg' | 'vfe' | 'vfp' | 'vfa' | 'detection' | 'security' | 'fce-security' | 'network-filtering' | 'identity',
+        };
+      case 'identity':
+        return {
+          title: isOptimized ? "Identity (Optimisé)" : "Identity",
+          variant: 'identity' as 'vfg' | 'vfe' | 'vfp' | 'vfa' | 'detection' | 'security' | 'fce-security' | 'network-filtering' | 'identity',
         };
       case 'vfp':
         return {
           title: isOptimized ? "Vital for Production (Optimisé)" : "Vital for Production",
-          variant: 'vfp' as 'vfg' | 'vfe' | 'vfp' | 'vfa' | 'detection' | 'security',
+          variant: 'vfp' as 'vfg' | 'vfe' | 'vfp' | 'vfa' | 'detection' | 'security' | 'fce-security' | 'network-filtering' | 'identity',
         };
       case 'vfa':
         return {
           title: isOptimized ? "Vital for Analytics (Optimisé)" : "Vital for Analytics",
-          variant: 'vfa' as 'vfg' | 'vfe' | 'vfp' | 'vfa' | 'detection' | 'security',
+          variant: 'vfa' as 'vfg' | 'vfe' | 'vfp' | 'vfa' | 'detection' | 'security' | 'fce-security' | 'network-filtering' | 'identity',
         };
       case 'vfg':
       default:
         return {
           title: isOptimized ? "Vital for Group (Optimisé)" : "Vital for Group",
-          variant: 'vfg' as 'vfg' | 'vfe' | 'vfp' | 'vfa' | 'detection' | 'security',
+          variant: 'vfg' as 'vfg' | 'vfe' | 'vfp' | 'vfa' | 'detection' | 'security' | 'fce-security' | 'network-filtering' | 'identity',
         };
     }
   }, [type, isOptimized]);
@@ -182,7 +197,7 @@ const UnifiedDashboard: React.FC = () => {
         ...appContext.isLoading,
         problems: isLoading
       },
-      refreshData: async (variant?: 'vfg' | 'vfe' | 'vfp' | 'vfa' | 'detection' | 'security', active?: boolean, timeframe?: string) => {
+      refreshData: async (variant?: 'vfg' | 'vfe' | 'vfp' | 'vfa' | 'detection' | 'security' | 'fce-security' | 'network-filtering' | 'identity', active?: boolean, timeframe?: string) => {
         // Utiliser notre système de cache pour le rafraîchissement
         await refreshCachedData(true);
         // Appeler aussi le refreshData original pour maintenir la compatibilité

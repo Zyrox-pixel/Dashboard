@@ -172,6 +172,9 @@ function App() {
                 <Route path="/vfe" element={<Navigate to="/dashboard/vfe" replace />} />
                 <Route path="/detection" element={<Navigate to="/dashboard/detection" replace />} />
                 <Route path="/security" element={<Navigate to="/dashboard/security" replace />} />
+                <Route path="/fce-security" element={<Navigate to="/dashboard/fce-security" replace />} />
+                <Route path="/network-filtering" element={<Navigate to="/dashboard/network-filtering" replace />} />
+                <Route path="/identity" element={<Navigate to="/dashboard/identity" replace />} />
                 
                 {/* Routes pour les versions optimisées */}
                 <Route path="/optimized" element={<Navigate to="/dashboard/vfg/true" replace />} />
@@ -179,6 +182,9 @@ function App() {
                 <Route path="/vfe-optimized" element={<Navigate to="/dashboard/vfe/true" replace />} />
                 <Route path="/detection-optimized" element={<Navigate to="/dashboard/detection/true" replace />} />
                 <Route path="/security-optimized" element={<Navigate to="/dashboard/security/true" replace />} />
+                <Route path="/fce-security-optimized" element={<Navigate to="/dashboard/fce-security/true" replace />} />
+                <Route path="/network-filtering-optimized" element={<Navigate to="/dashboard/network-filtering/true" replace />} />
+                <Route path="/identity-optimized" element={<Navigate to="/dashboard/identity/true" replace />} />
                 
                 {/* Routes supplémentaires pour la compatibilité */}
                 <Route path="/problems" element={<Navigate to="/problems/unified" replace />} />

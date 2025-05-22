@@ -114,6 +114,42 @@ def get_security_encryption_mzs():
     # Diviser la chaîne en liste de MZs
     return [mz.strip() for mz in security_encryption_mz_string.split(',')]
 
+# Fonction pour obtenir la liste des MZs FCE Security
+def get_fce_security_mzs():
+    # Récupérer la liste depuis la variable d'environnement
+    fce_security_mz_string = os.environ.get('FCE_SECURITY_MZ_LIST', '')
+    
+    # Si la variable n'est pas définie, retourner une liste vide
+    if not fce_security_mz_string:
+        return []
+    
+    # Diviser la chaîne en liste de MZs
+    return [mz.strip() for mz in fce_security_mz_string.split(',')]
+
+# Fonction pour obtenir la liste des MZs Network Filtering
+def get_network_filtering_mzs():
+    # Récupérer la liste depuis la variable d'environnement
+    network_filtering_mz_string = os.environ.get('NETWORK_FILTERING_MZ_LIST', '')
+    
+    # Si la variable n'est pas définie, retourner une liste vide
+    if not network_filtering_mz_string:
+        return []
+    
+    # Diviser la chaîne en liste de MZs
+    return [mz.strip() for mz in network_filtering_mz_string.split(',')]
+
+# Fonction pour obtenir la liste des MZs Identity
+def get_identity_mzs():
+    # Récupérer la liste depuis la variable d'environnement
+    identity_mz_string = os.environ.get('IDENTITY_MZ_LIST', '')
+    
+    # Si la variable n'est pas définie, retourner une liste vide
+    if not identity_mz_string:
+        return []
+    
+    # Diviser la chaîne en liste de MZs
+    return [mz.strip() for mz in identity_mz_string.split(',')]
+
 # Endpoint pour obtenir les Management Zones de Vital for Entreprise
 @app.route('/api/vital-for-entreprise-mzs', methods=['GET'])
 def get_vital_for_entreprise_mzs_endpoint():
@@ -300,6 +336,102 @@ def get_vital_for_analytics_mzs_endpoint():
         })
     except Exception as e:
         logger.error(f"Erreur lors de la récupération des MZs Vital for Analytics: {e}")
+        # Retourner une réponse même en cas d'erreur
+        return jsonify({
+            'mzs': [],
+            'source': 'env_file',
+            'error': str(e)
+        }), 500
+
+@app.route('/api/fce-security-mzs', methods=['GET'])
+def get_fce_security_mzs_endpoint():
+    try:
+        # Récupérer directement la liste depuis la variable d'environnement
+        fce_security_mz_string = os.environ.get('FCE_SECURITY_MZ_LIST', '')
+        
+        # Logging pour debug
+        logger.info(f"FCE_SECURITY_MZ_LIST from .env: {fce_security_mz_string}")
+        
+        # Si la variable n'est pas définie, retourner une liste vide
+        if not fce_security_mz_string:
+            logger.warning("FCE_SECURITY_MZ_LIST is empty or not defined in .env file")
+            return jsonify({'mzs': [], 'source': 'env_file'})
+        
+        # Diviser la chaîne en liste de MZs
+        fce_security_mzs = [mz.strip() for mz in fce_security_mz_string.split(',')]
+        logger.info(f"Parsed FCE Security MZs: {fce_security_mzs}")
+        
+        # Format de réponse simple
+        return jsonify({
+            'mzs': fce_security_mzs,
+            'source': 'env_file'  # Indique que les données viennent du fichier .env
+        })
+    except Exception as e:
+        logger.error(f"Erreur lors de la récupération des MZs FCE Security: {e}")
+        # Retourner une réponse même en cas d'erreur
+        return jsonify({
+            'mzs': [],
+            'source': 'env_file',
+            'error': str(e)
+        }), 500
+
+@app.route('/api/network-filtering-mzs', methods=['GET'])
+def get_network_filtering_mzs_endpoint():
+    try:
+        # Récupérer directement la liste depuis la variable d'environnement
+        network_filtering_mz_string = os.environ.get('NETWORK_FILTERING_MZ_LIST', '')
+        
+        # Logging pour debug
+        logger.info(f"NETWORK_FILTERING_MZ_LIST from .env: {network_filtering_mz_string}")
+        
+        # Si la variable n'est pas définie, retourner une liste vide
+        if not network_filtering_mz_string:
+            logger.warning("NETWORK_FILTERING_MZ_LIST is empty or not defined in .env file")
+            return jsonify({'mzs': [], 'source': 'env_file'})
+        
+        # Diviser la chaîne en liste de MZs
+        network_filtering_mzs = [mz.strip() for mz in network_filtering_mz_string.split(',')]
+        logger.info(f"Parsed Network Filtering MZs: {network_filtering_mzs}")
+        
+        # Format de réponse simple
+        return jsonify({
+            'mzs': network_filtering_mzs,
+            'source': 'env_file'  # Indique que les données viennent du fichier .env
+        })
+    except Exception as e:
+        logger.error(f"Erreur lors de la récupération des MZs Network Filtering: {e}")
+        # Retourner une réponse même en cas d'erreur
+        return jsonify({
+            'mzs': [],
+            'source': 'env_file',
+            'error': str(e)
+        }), 500
+
+@app.route('/api/identity-mzs', methods=['GET'])
+def get_identity_mzs_endpoint():
+    try:
+        # Récupérer directement la liste depuis la variable d'environnement
+        identity_mz_string = os.environ.get('IDENTITY_MZ_LIST', '')
+        
+        # Logging pour debug
+        logger.info(f"IDENTITY_MZ_LIST from .env: {identity_mz_string}")
+        
+        # Si la variable n'est pas définie, retourner une liste vide
+        if not identity_mz_string:
+            logger.warning("IDENTITY_MZ_LIST is empty or not defined in .env file")
+            return jsonify({'mzs': [], 'source': 'env_file'})
+        
+        # Diviser la chaîne en liste de MZs
+        identity_mzs = [mz.strip() for mz in identity_mz_string.split(',')]
+        logger.info(f"Parsed Identity MZs: {identity_mzs}")
+        
+        # Format de réponse simple
+        return jsonify({
+            'mzs': identity_mzs,
+            'source': 'env_file'  # Indique que les données viennent du fichier .env
+        })
+    except Exception as e:
+        logger.error(f"Erreur lors de la récupération des MZs Identity: {e}")
         # Retourner une réponse même en cas d'erreur
         return jsonify({
             'mzs': [],
