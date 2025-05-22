@@ -1065,28 +1065,30 @@ const HostsPage: React.FC = () => {
 
       {/* Popup du filtre avancé */}
       {showAdvancedFilter && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          {filterType === 'os' && (
-            <AdvancedFilter
-              title="Filtrer par système d'exploitation"
-              description="Sélectionnez un type d'OS pour voir toutes ses versions, ou cliquez sur une version spécifique."
-              categories={osFilterCategories}
-              selectedFilters={osFilters}
-              onFilterChange={setOsFilters}
-              onClose={() => setShowAdvancedFilter(false)}
-            />
-          )}
-          
-          {filterType === 'performance' && (
-            <AdvancedFilter
-              title="Filtrer par performances"
-              description="Sélectionnez les plages d'utilisation CPU et RAM qui vous intéressent."
-              categories={performanceFilterCategories}
-              selectedFilters={performanceFilters}
-              onFilterChange={setPerformanceFilters}
-              onClose={() => setShowAdvancedFilter(false)}
-            />
-          )}
+        <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-4 overflow-y-auto">
+          <div className="w-full max-w-4xl my-8">
+            {filterType === 'os' && (
+              <AdvancedFilter
+                title="Filtrer par système d'exploitation"
+                description="Sélectionnez un type d'OS pour voir toutes ses versions, ou cliquez sur une version spécifique."
+                categories={osFilterCategories}
+                selectedFilters={osFilters}
+                onFilterChange={setOsFilters}
+                onClose={() => setShowAdvancedFilter(false)}
+              />
+            )}
+            
+            {filterType === 'performance' && (
+              <AdvancedFilter
+                title="Filtrer par performances"
+                description="Sélectionnez les plages d'utilisation CPU et RAM qui vous intéressent."
+                categories={performanceFilterCategories}
+                selectedFilters={performanceFilters}
+                onFilterChange={setPerformanceFilters}
+                onClose={() => setShowAdvancedFilter(false)}
+              />
+            )}
+          </div>
         </div>
       )}
     </Layout>
