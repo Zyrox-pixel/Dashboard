@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from '../../contexts/ThemeContext';
-import { Menu, Clock, Shield, ChevronRight } from 'lucide-react';
+import { Menu, Clock, Shield, ChevronRight, Sparkles, Zap, Activity } from 'lucide-react';
 
 interface HeaderProps {
   title: string;
@@ -11,6 +12,7 @@ const Header: React.FC<HeaderProps> = ({ title, subtitle }) => {
   const { isDarkTheme } = useTheme();
   const [scrolled, setScrolled] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [showPulse, setShowPulse] = useState(false);
 
   // Effet pour suivre le scroll et mettre à jour l'état
   useEffect(() => {
@@ -25,15 +27,21 @@ const Header: React.FC<HeaderProps> = ({ title, subtitle }) => {
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date());
+      // Pulse effect every minute
+      if (new Date().getSeconds() === 0) {
+        setShowPulse(true);
+        setTimeout(() => setShowPulse(false), 1000);
+      }
     }, 1000);
     return () => clearInterval(timer);
   }, []);
 
-  // Formatte l'heure dans un format élégant HH:MM
+  // Formatte l'heure dans un format élégant HH:MM:SS
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString('fr-FR', {
       hour: '2-digit',
       minute: '2-digit',
+      second: '2-digit'
     });
   };
 
@@ -47,9 +55,12 @@ const Header: React.FC<HeaderProps> = ({ title, subtitle }) => {
   };
 
   return (
-    <header 
-      className={`h-16 px-5 sm:px-8 flex items-center justify-between sticky top-0 z-20 transition-all duration-500 
-        ${scrolled ? 'shadow-lg' : 'shadow-md'} 
+    <motion.header 
+      initial={{ y: -100, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      transition={{ type: "spring", stiffness: 300, damping: 30 }}
+      className={`h-20 px-5 sm:px-8 flex items-center justify-between sticky top-0 z-20 transition-all duration-500 
+        ${scrolled ? 'shadow-2xl' : 'shadow-lg'} 
         ${isDarkTheme
           ? `bg-gradient-to-r from-slate-900/95 via-slate-900/97 to-slate-800/95 backdrop-blur-xl border-b 
              ${scrolled ? 'border-indigo-900/40' : 'border-slate-700/30'}`
@@ -57,92 +68,225 @@ const Header: React.FC<HeaderProps> = ({ title, subtitle }) => {
              ${scrolled ? 'border-indigo-200/50' : 'border-slate-200/30'}`
         }`}
     >
-      {/* Élément décoratif - ligne supérieure subtile */}
-      <div className={`absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r 
-        ${isDarkTheme
-          ? 'from-transparent via-indigo-600/30 to-transparent'
-          : 'from-transparent via-indigo-400/40 to-transparent'
-        } z-30`}></div>
+      {/* Élément décoratif - ligne supérieure animée */}
+      <motion.div 
+        className={`absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r 
+          ${isDarkTheme
+            ? 'from-transparent via-indigo-600 to-transparent'
+            : 'from-transparent via-indigo-400 to-transparent'
+          } z-30`}
+        initial={{ scaleX: 0 }}
+        animate={{ scaleX: 1 }}
+        transition={{ duration: 1, delay: 0.5 }}
+      />
+      
+      {/* Effet de particules animées en arrière-plan */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        {[...Array(3)].map((_, i) => (
+          <motion.div
+            key={i}
+            className={`absolute w-32 h-32 rounded-full ${
+              isDarkTheme ? 'bg-indigo-500/5' : 'bg-indigo-400/3'
+            }`}
+            initial={{ 
+              x: Math.random() * 100 - 50, 
+              y: -50,
+              scale: 0 
+            }}
+            animate={{ 
+              x: [
+                Math.random() * 100 - 50,
+                Math.random() * 100 - 50,
+                Math.random() * 100 - 50
+              ],
+              y: [-50, 50, 150],
+              scale: [0, 1, 0]
+            }}
+            transition={{
+              duration: 10 + i * 2,
+              repeat: Infinity,
+              delay: i * 3,
+              ease: "easeInOut"
+            }}
+          />
+        ))}
+      </div>
 
       {/* Partie gauche - Titre avec design moderne et animations */}
-      <div className="flex items-center">
-        {/* Logo subtil pour une expérience haut de gamme */}
-        <div className={`hidden md:flex items-center justify-center rounded-full 
-                         ${isDarkTheme ? 'bg-indigo-900/20' : 'bg-indigo-100/60'}
-                         mr-3 p-1.5 border ${isDarkTheme ? 'border-indigo-700/30' : 'border-indigo-200'}`}>
-          <Shield className={`${isDarkTheme ? 'text-indigo-400' : 'text-indigo-600'}`} size={18} />
-        </div>
+      <div className="flex items-center relative z-10">
+        {/* Logo animé pour une expérience haut de gamme */}
+        <motion.div 
+          className={`hidden md:flex items-center justify-center rounded-full 
+                       ${isDarkTheme ? 'bg-gradient-to-br from-indigo-900/40 to-purple-900/40' : 'bg-gradient-to-br from-indigo-100 to-purple-100'}
+                       mr-4 p-2.5 border ${isDarkTheme ? 'border-indigo-600/50' : 'border-indigo-300/70'} backdrop-blur-sm shadow-lg`}
+          whileHover={{ scale: 1.1, rotate: 180 }}
+          transition={{ type: "spring", stiffness: 300 }}
+        >
+          <Shield className={`${isDarkTheme ? 'text-indigo-400' : 'text-indigo-600'}`} size={20} />
+        </motion.div>
       
         {/* Bouton mobile pour ouvrir le menu */}
-        <button 
-          className={`lg:hidden mr-4 p-2 rounded-full transition-all duration-300 shadow-sm
+        <motion.button 
+          className={`lg:hidden mr-4 p-2.5 rounded-full transition-all duration-300 shadow-lg
                      ${isDarkTheme
                        ? 'text-slate-400 hover:text-indigo-300 hover:bg-indigo-900/50 border border-slate-700/50'
                        : 'text-slate-500 hover:text-indigo-600 hover:bg-indigo-100/70 border border-slate-200/70'
                      }`}
           aria-label="Ouvrir le menu"
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
         >
-          <Menu size={18} />
-        </button>
+          <Menu size={20} />
+        </motion.button>
       
         {/* Titre et sous-titre avec animation au chargement */}
         <div className="flex flex-col">
           {subtitle ? (
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <h1 className={`font-bold text-lg sm:text-xl ${
-                  isDarkTheme 
-                    ? 'text-white text-shadow-sm' 
-                    : 'text-slate-800'
-                } tracking-tight`}>{title}</h1>
-                <div className="flex items-center">
-                  <ChevronRight size={16} className={`mx-1 ${isDarkTheme ? 'text-slate-500' : 'text-slate-400'}`} />
-                  <span className={`font-medium text-sm sm:text-base ${
+                <motion.h1 
+                  className={`font-bold text-xl sm:text-2xl ${
                     isDarkTheme 
-                      ? 'text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-blue-500 text-shadow-sm' 
+                      ? 'text-transparent bg-gradient-to-r from-white via-indigo-200 to-white bg-clip-text' 
+                      : 'text-slate-800'
+                  } tracking-tight`}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.2 }}
+                >
+                  {title}
+                </motion.h1>
+                <motion.div 
+                  className="flex items-center"
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.3 }}
+                >
+                  <ChevronRight size={16} className={`mx-1 ${isDarkTheme ? 'text-indigo-500' : 'text-indigo-400'}`} />
+                  <span className={`font-medium text-base sm:text-lg ${
+                    isDarkTheme 
+                      ? 'text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400' 
                       : 'text-indigo-600'
                   }`}>{subtitle}</span>
-                </div>
+                </motion.div>
               </div>
-              <p className={`text-xs mt-0.5 ${isDarkTheme ? 'text-slate-500' : 'text-slate-500'} flex items-center gap-1.5`}>
-                <span className="font-medium">SEC06</span>
-                <span className="h-1 w-1 rounded-full bg-slate-600/40"></span>
-                <span>{formatDate(currentTime)}</span>
-              </p>
+              <motion.p 
+                className={`text-xs mt-1 ${isDarkTheme ? 'text-slate-400' : 'text-slate-500'} flex items-center gap-2`}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.4 }}
+              >
+                <span className="font-semibold flex items-center gap-1">
+                  <Activity size={12} className={isDarkTheme ? 'text-green-400' : 'text-green-600'} />
+                  SEC06
+                </span>
+                <span className="h-1 w-1 rounded-full bg-gradient-to-r from-green-400 to-blue-400 animate-pulse"></span>
+                <span className="flex items-center gap-1">
+                  <Clock size={12} />
+                  {formatDate(currentTime)}
+                </span>
+              </motion.p>
             </div>
           ) : (
             <div>
-              <h1 className={`font-bold text-lg sm:text-xl ${
-                isDarkTheme 
-                  ? 'text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-300 text-shadow-sm' 
-                  : 'text-slate-800'
-              } tracking-tight`}>{title}</h1>
-              <p className={`text-xs mt-0.5 ${isDarkTheme ? 'text-slate-500' : 'text-slate-500'} flex items-center gap-1.5`}>
-                <span className="font-medium">SEC06</span>
-                <span className="h-1 w-1 rounded-full bg-slate-600/40"></span>
-                <span>{formatDate(currentTime)}</span>
-              </p>
+              <motion.h1 
+                className={`font-bold text-xl sm:text-2xl ${
+                  isDarkTheme 
+                    ? 'text-transparent bg-gradient-to-r from-white via-indigo-200 to-white bg-clip-text' 
+                    : 'text-slate-800'
+                } tracking-tight`}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.2 }}
+              >
+                {title}
+              </motion.h1>
+              <motion.p 
+                className={`text-xs mt-1 ${isDarkTheme ? 'text-slate-400' : 'text-slate-500'} flex items-center gap-2`}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.3 }}
+              >
+                <span className="font-semibold flex items-center gap-1">
+                  <Activity size={12} className={isDarkTheme ? 'text-green-400' : 'text-green-600'} />
+                  SEC06
+                </span>
+                <span className="h-1 w-1 rounded-full bg-gradient-to-r from-green-400 to-blue-400 animate-pulse"></span>
+                <span className="flex items-center gap-1">
+                  <Clock size={12} />
+                  {formatDate(currentTime)}
+                </span>
+              </motion.p>
             </div>
           )}
         </div>
       </div>
 
       {/* Partie droite - Actions et statut */}
-      <div className="flex items-center gap-3">
-        {/* Badge BETA avec effet premium */}
-        <a
-          href="mailto:Rayane.Bennasr@externe.bnpparibas.com"
-          className={`flex items-center text-xs px-3 py-1.5 rounded-full transition-all duration-300 ml-1
-                      ${isDarkTheme
-                        ? 'bg-gradient-to-r from-indigo-900/60 to-blue-900/60 text-blue-300 border border-indigo-700/30 shadow-sm shadow-indigo-900/20 hover:shadow-md hover:shadow-indigo-800/30'
-                        : 'bg-gradient-to-r from-indigo-100 to-blue-100 text-indigo-800 border border-indigo-300/50 shadow-sm hover:shadow-md hover:shadow-indigo-300/20'
-                      } transform-gpu hover:scale-105`}
+      <div className="flex items-center gap-4 relative z-10">
+        {/* Horloge digitale animée */}
+        <motion.div 
+          className={`hidden sm:flex items-center gap-2 px-4 py-2 rounded-xl backdrop-blur-sm ${
+            isDarkTheme 
+              ? 'bg-slate-800/50 border border-slate-700/50' 
+              : 'bg-white/70 border border-slate-200/50'
+          }`}
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.5 }}
         >
-          <span className="font-bold mr-1.5">BETA</span>
-          <span className={isDarkTheme ? 'text-blue-300 font-medium' : 'text-indigo-700 font-medium'}>Feedback</span>
-        </a>
+          <Zap size={14} className={`${isDarkTheme ? 'text-yellow-400' : 'text-yellow-600'} ${showPulse ? 'animate-pulse' : ''}`} />
+          <AnimatePresence mode="popLayout">
+            <motion.span 
+              key={formatTime(currentTime)}
+              className={`font-mono text-sm font-semibold ${
+                isDarkTheme ? 'text-indigo-300' : 'text-indigo-600'
+              }`}
+              initial={{ y: -10, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 10, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              {formatTime(currentTime)}
+            </motion.span>
+          </AnimatePresence>
+        </motion.div>
+        
+        {/* Badge BETA avec effet premium amélioré */}
+        <motion.a
+          href="mailto:Rayane.Bennasr@externe.bnpparibas.com"
+          className={`relative flex items-center text-xs px-4 py-2 rounded-full overflow-hidden ${
+            isDarkTheme
+              ? 'bg-gradient-to-r from-indigo-900/70 via-purple-900/70 to-pink-900/70 text-white border border-indigo-600/50 shadow-lg shadow-indigo-900/30'
+              : 'bg-gradient-to-r from-indigo-100 via-purple-100 to-pink-100 text-indigo-800 border border-indigo-300/50 shadow-lg shadow-indigo-200/30'
+          }`}
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.6 }}
+        >
+          {/* Effet de brillance animé */}
+          <motion.div
+            className="absolute inset-0"
+            style={{
+              background: `linear-gradient(105deg, transparent 40%, ${
+                isDarkTheme ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.5)'
+              } 50%, transparent 60%)`,
+            }}
+            initial={{ x: '-100%' }}
+            animate={{ x: '200%' }}
+            transition={{ duration: 2, repeat: Infinity, repeatDelay: 1, ease: "easeInOut" }}
+          />
+          
+          <Sparkles size={14} className={`mr-1.5 ${isDarkTheme ? 'text-yellow-400' : 'text-yellow-600'}`} />
+          <span className="font-bold mr-1.5 relative z-10">BETA</span>
+          <span className={`${isDarkTheme ? 'text-indigo-200' : 'text-indigo-700'} font-medium relative z-10`}>
+            Feedback
+          </span>
+        </motion.a>
       </div>
-    </header>
+    </motion.header>
   );
 };
 

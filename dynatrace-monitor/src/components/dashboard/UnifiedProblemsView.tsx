@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, Clock, RefreshCw, Filter, CalendarRange, Shield, BarChart, Calendar, FileDown } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import ProblemsList from './ProblemsList';
+import TabNavigation, { TabItem } from '../common/TabNavigation';
 import { Problem } from '../../api/types';
 import { useApp } from '../../contexts/AppContext';
 import { useDashboardCache } from '../../hooks/useDashboardCache';
 import { exportProblemsToCSV, downloadCSV } from '../../utils/exportUtils';
+import { useTheme } from '../../contexts/ThemeContext';
 
 interface UnifiedProblemsViewProps {
   /** Titre principal de la vue */
@@ -24,6 +27,7 @@ interface UnifiedProblemsViewProps {
  */
 const UnifiedProblemsView: React.FC<UnifiedProblemsViewProps> = ({ title, variant, zoneFilter, problemType }) => {
   const navigate = useNavigate();
+  const { isDarkTheme } = useTheme();
   
   // Utiliser le contexte normal pour les informations de base
   const appContext = useApp();
@@ -80,7 +84,8 @@ const UnifiedProblemsView: React.FC<UnifiedProblemsViewProps> = ({ title, varian
   const [selectedTimeframe, setSelectedTimeframe] = useState<string>("-72h"); // 72h par défaut
 
   // Gérer le changement d'onglet
-  const handleTabChange = (tab: 'active' | 'recent') => {
+  const handleTabChange = (tabId: string) => {
+    const tab = tabId as 'active' | 'recent';
     if (tab === activeTab) return; // Ne rien faire si on clique sur l'onglet déjà actif
     
     setActiveTab(tab);
@@ -249,6 +254,24 @@ const UnifiedProblemsView: React.FC<UnifiedProblemsViewProps> = ({ title, varian
     // Télécharger le fichier
     downloadCSV(csv, filename);
   };
+  
+  // Préparer les onglets pour le nouveau composant TabNavigation
+  const tabs: TabItem[] = [
+    {
+      id: 'active',
+      label: 'Problèmes actifs',
+      icon: <AlertTriangle className="text-red-500" />,
+      badge: activeProblems?.length || 0,
+      badgeColor: isDarkTheme ? 'bg-red-900/60 text-red-200' : 'bg-red-100 text-red-700'
+    },
+    {
+      id: 'recent',
+      label: `Récents (${getTimeframeLabel(selectedTimeframe)})`,
+      icon: <Clock className="text-amber-500" />,
+      badge: problemsLast72h?.length || 0,
+      badgeColor: isDarkTheme ? 'bg-amber-900/60 text-amber-200' : 'bg-amber-100 text-amber-700'
+    }
+  ];
 
   // Déterminer les couleurs d'accentuation en fonction de la variante
   let accentColor = 'blue';
@@ -319,111 +342,208 @@ const UnifiedProblemsView: React.FC<UnifiedProblemsViewProps> = ({ title, varian
         </button>
       </div>
 
-      {/* Bannière principale avec statistiques */}
-      <div className={`p-5 ${cssVariant.bgDark} border ${cssVariant.border} rounded-lg mb-6`}>
-        <div className="flex flex-wrap md:flex-nowrap items-start gap-4">
-          {cssVariant.icon}
-          <div>
-            <h2 className="text-xl font-semibold text-white mb-1">
+      {/* Bannière principale avec statistiques et animations */}
+      <motion.div 
+        className={`relative p-6 rounded-xl mb-6 overflow-hidden backdrop-blur-sm ${
+          isDarkTheme 
+            ? 'bg-gradient-to-br from-slate-800/90 via-slate-900/80 to-slate-800/90 border border-slate-700/50' 
+            : 'bg-gradient-to-br from-white/90 via-slate-50/80 to-white/90 border border-slate-200/70'
+        }`}
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+      >
+        {/* Effet de fond animé */}
+        <motion.div
+          className="absolute inset-0 opacity-10"
+          animate={{
+            background: [
+              `radial-gradient(circle at 0% 0%, ${cssVariant.bg} 0%, transparent 50%)`,
+              `radial-gradient(circle at 100% 100%, ${cssVariant.bg} 0%, transparent 50%)`,
+              `radial-gradient(circle at 0% 0%, ${cssVariant.bg} 0%, transparent 50%)`
+            ]
+          }}
+          transition={{ duration: 10, repeat: Infinity }}
+        />
+        
+        <div className="relative flex flex-wrap md:flex-nowrap items-start gap-4">
+          <motion.div
+            animate={{ rotate: [0, 5, -5, 0] }}
+            transition={{ duration: 4, repeat: Infinity }}
+          >
+            {cssVariant.icon}
+          </motion.div>
+          
+          <div className="flex-1">
+            <motion.h2 
+              className="text-xl font-semibold text-white mb-1"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.2 }}
+            >
               Problèmes {activeTab === 'active' ? 'Actifs' : `des ${getTimeframeLabel(selectedTimeframe)}`}
-            </h2>
-            <p className="text-slate-300">
+            </motion.h2>
+            <motion.p 
+              className={`${isDarkTheme ? 'text-slate-300' : 'text-slate-600'}`}
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.3 }}
+            >
               {activeTab === 'active'
                 ? "Suivi en temps réel des incidents et anomalies actuellement actifs"
                 : `Historique consolidé de tous les incidents survenus durant les ${getTimeframeLabel(selectedTimeframe)}`}
-            </p>
+            </motion.p>
 
-            {/* Sélecteur de période - uniquement visible dans l'onglet "récents" */}
-            {activeTab === 'recent' && (
-              <div className="mt-3 flex items-center">
-                <Calendar className="text-amber-500 mr-2" size={16} />
-                <label htmlFor="timeframeSelector" className="text-white mr-2">Période:</label>
-                <select
-                  id="timeframeSelector"
-                  className="bg-slate-800 text-white py-1 px-2 rounded border border-amber-700 focus:outline-none focus:ring-2 focus:ring-amber-500"
-                  value={selectedTimeframe}
-                  onChange={handleTimeframeChange}
+            {/* Sélecteur de période avec animation */}
+            <AnimatePresence>
+              {activeTab === 'recent' && (
+                <motion.div 
+                  className="mt-4 flex items-center gap-3"
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.3 }}
                 >
-                  {timeframeOptions.map(option => (
-                    <option key={option.value} value={option.value}>{option.label}</option>
-                  ))}
-                </select>
-              </div>
-            )}
+                  <Calendar className="text-amber-500" size={16} />
+                  <label htmlFor="timeframeSelector" className={`${isDarkTheme ? 'text-white' : 'text-slate-700'} font-medium`}>
+                    Période:
+                  </label>
+                  <motion.select
+                    id="timeframeSelector"
+                    className={`px-3 py-1.5 rounded-lg font-medium transition-all ${
+                      isDarkTheme 
+                        ? 'bg-gradient-to-r from-amber-900/50 to-amber-800/50 text-amber-200 border border-amber-700/50 hover:from-amber-800/60 hover:to-amber-700/60' 
+                        : 'bg-gradient-to-r from-amber-100 to-amber-50 text-amber-800 border border-amber-300/50 hover:from-amber-200 hover:to-amber-100'
+                    } focus:outline-none focus:ring-2 focus:ring-amber-500/50`}
+                    value={selectedTimeframe}
+                    onChange={handleTimeframeChange}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    {timeframeOptions.map(option => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </motion.select>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
-          <div className="ml-auto flex flex-col items-end">
-              <div className="flex items-center gap-2 text-sm text-slate-400">
+          
+          <motion.div 
+            className="ml-auto flex flex-col items-end gap-3"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.4 }}
+          >
+            <div className={`flex items-center gap-2 text-sm ${isDarkTheme ? 'text-slate-400' : 'text-slate-600'}`}>
               <Clock size={14} />
               <span>Dernière actualisation: {cacheLastRefreshTime.toLocaleTimeString()}</span>
             </div>
-            <div className="flex items-center justify-center h-10 px-4 rounded-lg bg-slate-800 font-bold mt-2 text-white">
-              {problemsToDisplay?.length || 0} problème{(problemsToDisplay?.length || 0) !== 1 ? 's' : ''}
-            </div>
-          </div>
+            <motion.div 
+              className={`flex items-center justify-center min-w-[120px] px-6 py-3 rounded-xl font-bold text-lg backdrop-blur-sm ${
+                isDarkTheme 
+                  ? 'bg-gradient-to-r from-indigo-900/70 to-purple-900/70 text-white border border-indigo-700/50' 
+                  : 'bg-gradient-to-r from-indigo-100 to-purple-100 text-indigo-800 border border-indigo-300/50'
+              }`}
+              animate={{ scale: [1, 1.05, 1] }}
+              transition={{ duration: 2, repeat: Infinity }}
+            >
+              <motion.span
+                key={problemsToDisplay?.length || 0}
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+              >
+                {problemsToDisplay?.length || 0}
+              </motion.span>
+              <span className="ml-1">
+                problème{(problemsToDisplay?.length || 0) !== 1 ? 's' : ''}
+              </span>
+            </motion.div>
+          </motion.div>
         </div>
-      </div>
+      </motion.div>
 
-      {/* Navigation par onglets */}
-      <div className="border-b border-slate-700 mb-4">
-        <div className="flex space-x-1">
-          <button
-            onClick={() => handleTabChange('active')}
-            className={getTabClasses('active')}
-          >
-            <AlertTriangle size={16} className="text-red-500" />
-            <span>Problèmes actifs</span>
-            {activeProblems?.length > 0 && (
-              <span className="ml-2 bg-red-900/60 text-red-200 rounded-full px-2 py-0.5 text-xs">
-                {activeProblems.length}
-              </span>
-            )}
-          </button>
-
-          <button
-            onClick={() => handleTabChange('recent')}
-            className={getTabClasses('recent')}
-          >
-            <Clock size={16} className="text-amber-500" />
-            <span>Récents ({getTimeframeLabel(selectedTimeframe)})</span>
-            {problemsLast72h?.length > 0 && (
-              <span className="ml-2 bg-amber-900/60 text-amber-200 rounded-full px-2 py-0.5 text-xs">
-                {problemsLast72h.length}
-              </span>
-            )}
-          </button>
-
-          {/* Bouton d'export CSV */}
-          <button
+      {/* Navigation par onglets avec le nouveau composant */}
+      <TabNavigation
+        tabs={tabs}
+        activeTab={activeTab}
+        onTabChange={handleTabChange}
+        variant="gradient"
+        size="md"
+        className="mb-6"
+        rightContent={
+          <motion.button
             onClick={handleExportCSV}
-            className={`px-4 py-3 text-sm font-medium rounded-t-lg transition-all duration-200
-              bg-slate-900 text-slate-400 hover:bg-slate-800/50 hover:text-green-300 border-b border-slate-700
-              flex items-center gap-2 ml-auto`}
+            className={`px-4 py-3 text-sm font-medium rounded-lg transition-all duration-200
+              ${isDarkTheme 
+                ? 'bg-gradient-to-r from-green-900/50 to-green-800/50 text-green-300 hover:from-green-800/60 hover:to-green-700/60 border border-green-700/30' 
+                : 'bg-gradient-to-r from-green-100 to-green-50 text-green-700 hover:from-green-200 hover:to-green-100 border border-green-300/50'}
+              flex items-center gap-2 backdrop-blur-sm shadow-sm`}
             title="Télécharger les problèmes au format CSV"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
           >
-            <FileDown size={16} className="text-green-500" />
-            <span>Télécharger CSV</span>
-          </button>
-        </div>
-      </div>
+            <FileDown size={16} />
+            <span>Export CSV</span>
+          </motion.button>
+        }
+      />
 
-      {/* Contenu de l'onglet actif */}
-      <div className="mt-6">
-      {isLoading.problems && !initialLoadComplete ? (
-          <div className="flex items-center justify-center h-64">
-            <div className="w-12 h-12 border-t-4 border-b-4 border-blue-500 rounded-full animate-spin"></div>
-            <span className="ml-3 text-slate-400">Chargement des problèmes...</span>
-          </div>
-        ) : (
-          <ProblemsList
-            problems={problemsToDisplay || []}
-            title={activeTab === 'active'
-              ? "Tous les problèmes actifs"
-              : `Tous les problèmes des ${getTimeframeLabel(selectedTimeframe)}`}
-            showRefreshButton={true}
-            onRefresh={handleRefresh}
-          />
-        )}
-      </div>
+      {/* Contenu de l'onglet actif avec animations */}
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={activeTab}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -20 }}
+          transition={{ duration: 0.3, ease: "easeInOut" }}
+          className="mt-6"
+        >
+          {isLoading.problems && !initialLoadComplete ? (
+            <motion.div 
+              className="flex items-center justify-center h-64"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+            >
+              <motion.div
+                className="relative"
+                animate={{ rotate: 360 }}
+                transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+              >
+                <div className="w-16 h-16 border-4 border-t-indigo-500 border-r-purple-500 border-b-pink-500 border-l-blue-500 rounded-full" />
+                <motion.div
+                  className="absolute inset-0 w-16 h-16 border-4 border-transparent border-t-indigo-300 rounded-full"
+                  animate={{ rotate: -360 }}
+                  transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
+                />
+              </motion.div>
+              <motion.span 
+                className={`ml-4 text-lg ${isDarkTheme ? 'text-slate-300' : 'text-slate-600'}`}
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.2 }}
+              >
+                Chargement des problèmes...
+              </motion.span>
+            </motion.div>
+          ) : (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.1 }}
+            >
+              <ProblemsList
+                problems={problemsToDisplay || []}
+                title={activeTab === 'active'
+                  ? "Tous les problèmes actifs"
+                  : `Tous les problèmes des ${getTimeframeLabel(selectedTimeframe)}`}
+                showRefreshButton={true}
+                onRefresh={handleRefresh}
+              />
+            </motion.div>
+          )}
+        </motion.div>
+      </AnimatePresence>
     </div>
   );
 };

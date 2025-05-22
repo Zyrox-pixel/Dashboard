@@ -2,8 +2,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { 
   ChevronLeft, Home, AlertTriangle, Star, Award, Grid, 
-  Layers, Shield, Activity, Command, Settings, Key, Globe, User
+  Layers, Shield, Activity, Command, Settings, Key, Globe, User,
+  Sparkles, Zap, Cpu, Database, Lock, Network, Binary,
+  GitBranch, Shield as ShieldIcon, Workflow, Menu
 } from 'lucide-react';
+import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
 import { useApp } from '../../contexts/AppContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useFocusManagement } from '../../hooks/useFocusManagement';
@@ -19,7 +22,26 @@ const Sidebar: React.FC = () => {
   const { handleNavigationClick, handleNavigationMouseDown } = useFocusManagement();
   const [activeItem, setActiveItem] = useState<MenuItemKey>('home');
   const [hoverItem, setHoverItem] = useState<string | null>(null);
+  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const sidebarRef = useRef<HTMLDivElement>(null);
+  
+  // Effet de suivi de la souris pour l'effet parallax
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (sidebarRef.current) {
+        const rect = sidebarRef.current.getBoundingClientRect();
+        setMousePosition({
+          x: (e.clientX - rect.left) / rect.width,
+          y: (e.clientY - rect.top) / rect.height
+        });
+      }
+    };
+    
+    if (!sidebarCollapsed) {
+      window.addEventListener('mousemove', handleMouseMove);
+      return () => window.removeEventListener('mousemove', handleMouseMove);
+    }
+  }, [sidebarCollapsed]);
   
   // Effet pour suivre la page active - se déclenche à chaque changement de route
   useEffect(() => {
@@ -136,535 +158,695 @@ const Sidebar: React.FC = () => {
       ></div>
     );
   };
+  
+  // Composant MenuItem amélioré avec Framer Motion
+  const MenuItem = ({ to, itemKey, icon: Icon, label, color = 'indigo', badge, special = false }: {
+    to: string;
+    itemKey: MenuItemKey;
+    icon: any;
+    label: string;
+    color?: ColorType;
+    badge?: string;
+    special?: boolean;
+  }) => {
+    const isActive = activeItem === itemKey;
+    const isHovered = hoverItem === itemKey;
+    
+    return (
+      <motion.div
+        layout
+        initial={{ opacity: 0, x: -20 }}
+        animate={{ opacity: 1, x: 0 }}
+        exit={{ opacity: 0, x: -20 }}
+        whileHover={{ x: 5 }}
+        whileTap={{ scale: 0.98 }}
+      >
+        <Link
+          to={to}
+          data-menu-item={itemKey}
+          onClick={(e) => {
+            setActiveItem(itemKey);
+            handleNavigationClick(e);
+          }}
+          onMouseDown={handleNavigationMouseDown}
+          className={special ? getVitalItemClass(itemKey, color) : getMenuItemClass(itemKey)}
+          tabIndex={isActive ? 0 : -1}
+          onMouseEnter={() => setHoverItem(itemKey)}
+          onMouseLeave={() => setHoverItem(null)}
+        >
+          {/* Effet de lumière animée */}
+          <AnimatePresence>
+            {isActive && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.8 }}
+                className="absolute inset-0 -z-10 rounded-xl overflow-hidden"
+              >
+                <motion.div
+                  animate={{
+                    background: [
+                      `radial-gradient(circle at ${mousePosition.x * 100}% ${mousePosition.y * 100}%, rgba(99, 102, 241, 0.15) 0%, transparent 50%)`,
+                      `radial-gradient(circle at ${mousePosition.x * 100}% ${mousePosition.y * 100}%, rgba(99, 102, 241, 0.25) 0%, transparent 60%)`,
+                      `radial-gradient(circle at ${mousePosition.x * 100}% ${mousePosition.y * 100}%, rgba(99, 102, 241, 0.15) 0%, transparent 50%)`
+                    ]
+                  }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                  className="absolute inset-0"
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
+          
+          {/* Glow effect */}
+          {getIconGlow(itemKey, color)}
+          
+          {/* Icône avec animation */}
+          <motion.div
+            className={`relative flex-shrink-0 ${getIconClass(itemKey)}`}
+            animate={isActive ? { rotate: [0, 5, -5, 0] } : {}}
+            transition={{ duration: 0.5 }}
+          >
+            <Icon
+              size={18}
+              className={`${
+                isDarkTheme ? `text-${color}-400` : `text-${color}-600`
+              } ${isActive ? 'animate-pulse-subtle' : ''}`}
+            />
+            
+            {/* Effet de particules pour les éléments actifs */}
+            {isActive && special && (
+              <motion.div
+                className="absolute inset-0"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+              >
+                {[...Array(3)].map((_, i) => (
+                  <motion.div
+                    key={i}
+                    className={`absolute w-1 h-1 bg-${color}-400 rounded-full`}
+                    initial={{ x: 0, y: 0, opacity: 0 }}
+                    animate={{
+                      x: [0, (i - 1) * 20],
+                      y: [0, -10, 0],
+                      opacity: [0, 1, 0]
+                    }}
+                    transition={{
+                      duration: 2,
+                      delay: i * 0.2,
+                      repeat: Infinity,
+                      repeatDelay: 1
+                    }}
+                  />
+                ))}
+              </motion.div>
+            )}
+          </motion.div>
+          
+          {/* Label avec animation */}
+          {!sidebarCollapsed && (
+            <motion.span
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.1 }}
+              className={`text-sm font-medium whitespace-nowrap transition-all duration-300
+                        ${isActive ? 'tracking-wide' : ''}`}
+            >
+              {label}
+            </motion.span>
+          )}
+          
+          {/* Badge amélioré */}
+          {badge && (
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ type: "spring", stiffness: 500, damping: 25 }}
+              className={`${sidebarCollapsed ? 'absolute -top-1 -right-1' : 'ml-auto'} 
+                        px-1.5 py-0.5 rounded-full text-xs font-semibold
+                        ${isDarkTheme ? `bg-${color}-900/70 text-${color}-300 border border-${color}-700/30` : `bg-${color}-100 text-${color}-700 border border-${color}-200/70`}`}
+            >
+              {badge}
+            </motion.div>
+          )}
+          
+          {/* Indicateur actif élégant */}
+          {isActive && !sidebarCollapsed && (
+            <motion.div
+              layoutId="activeIndicator"
+              className={`ml-auto w-1.5 h-5 rounded-full bg-gradient-to-b from-${color}-400 to-${color}-600`}
+              initial={{ opacity: 0, scale: 0 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ type: "spring", stiffness: 400, damping: 30 }}
+            />
+          )}
+        </Link>
+      </motion.div>
+    );
+  };
 
   return (
-    <aside 
+    <motion.aside
+      ref={sidebarRef}
+      initial={{ x: -100, opacity: 0 }}
+      animate={{ x: 0, opacity: 1 }}
+      transition={{ type: "spring", stiffness: 300, damping: 30 }}
       className={`fixed h-full z-30 transition-all duration-500 ease-out ${
         isDarkTheme 
           ? 'bg-gradient-to-b from-slate-900 via-slate-950 to-slate-900 border-r border-slate-800/40 shadow-xl shadow-black/40' 
           : 'bg-gradient-to-b from-white via-slate-50 to-white border-r border-slate-200/70 shadow-lg shadow-slate-200/30'
       } ${sidebarCollapsed ? 'w-16' : 'w-64'}`}
     >
+      {/* Effet de fond animé */}
+      <div className="absolute inset-0 overflow-hidden">
+        <motion.div
+          className="absolute inset-0"
+          animate={{
+            background: isDarkTheme
+              ? [
+                  'radial-gradient(circle at 20% 80%, rgba(99, 102, 241, 0.05) 0%, transparent 50%)',
+                  'radial-gradient(circle at 80% 20%, rgba(99, 102, 241, 0.05) 0%, transparent 50%)',
+                  'radial-gradient(circle at 20% 80%, rgba(99, 102, 241, 0.05) 0%, transparent 50%)'
+                ]
+              : [
+                  'radial-gradient(circle at 20% 80%, rgba(99, 102, 241, 0.02) 0%, transparent 50%)',
+                  'radial-gradient(circle at 80% 20%, rgba(99, 102, 241, 0.02) 0%, transparent 50%)',
+                  'radial-gradient(circle at 20% 80%, rgba(99, 102, 241, 0.02) 0%, transparent 50%)'
+                ]
+          }}
+          transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
+        />
+        
+        {/* Motif de grille futuriste */}
+        <div 
+          className="absolute inset-0 opacity-5" 
+          style={{
+            backgroundImage: `repeating-linear-gradient(
+              0deg,
+              transparent,
+              transparent 1px,
+              ${isDarkTheme ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)'} 1px,
+              ${isDarkTheme ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)'} 2px
+            ),
+            repeating-linear-gradient(
+              90deg,
+              transparent,
+              transparent 1px,
+              ${isDarkTheme ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)'} 1px,
+              ${isDarkTheme ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)'} 2px
+            )`,
+            backgroundSize: '20px 20px'
+          }}
+        />
+      </div>
       {/* En-tête avec logo et bouton de collapse */}
-      <div className={`h-20 flex items-center px-5 ${
-        isDarkTheme ? 'border-b border-slate-800/50' : 'border-b border-slate-200/70'
-      }`}>
+      <motion.div 
+        className={`relative h-20 flex items-center px-5 z-10 ${
+          isDarkTheme ? 'border-b border-slate-800/50' : 'border-b border-slate-200/70'
+        }`}
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+      >
         <div className="flex items-center gap-3 overflow-hidden">
-          {/* Logo avec effet premium */}
-          <div className="relative">
-            <div className={`absolute inset-0 w-9 h-9 bg-indigo-500/30 rounded-full blur-xl opacity-70 ${
-              isDarkTheme ? 'animate-pulse-slow' : ''
-            }`}></div>
-            <div className={`relative z-10 p-2 rounded-full ${
-              isDarkTheme 
-                ? 'bg-gradient-to-br from-indigo-900/80 to-indigo-800/50 border border-indigo-700/50' 
-                : 'bg-gradient-to-br from-indigo-100 to-white border border-indigo-200'
-            }`}>
-              <Shield className={`${isDarkTheme ? 'text-indigo-400' : 'text-indigo-600'} flex-shrink-0`} size={16} />
-            </div>
-          </div>
+          {/* Logo avec effet premium et animation */}
+          <motion.div
+            className="relative"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            {/* Effet de halo animé */}
+            <motion.div
+              className={`absolute inset-0 w-10 h-10 rounded-full ${
+                isDarkTheme ? 'bg-indigo-500/30' : 'bg-indigo-400/20'
+              }`}
+              animate={{
+                scale: [1, 1.2, 1],
+                opacity: [0.7, 0.3, 0.7]
+              }}
+              transition={{ duration: 3, repeat: Infinity }}
+            />
+            
+            {/* Logo principal avec effet 3D */}
+            <motion.div
+              className={`relative z-10 p-2.5 rounded-full backdrop-blur-sm ${
+                isDarkTheme 
+                  ? 'bg-gradient-to-br from-indigo-900/90 via-indigo-800/70 to-indigo-900/50 border border-indigo-600/50 shadow-lg shadow-indigo-900/50' 
+                  : 'bg-gradient-to-br from-indigo-100 via-white to-indigo-50 border border-indigo-300/70 shadow-md shadow-indigo-200/50'
+              }`}
+              animate={{ rotate: 360 }}
+              transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+            >
+              <ShieldIcon className={`${isDarkTheme ? 'text-indigo-400' : 'text-indigo-600'} flex-shrink-0`} size={18} />
+              
+              {/* Effet de brillance */}
+              <motion.div
+                className="absolute inset-0 rounded-full"
+                style={{
+                  background: `linear-gradient(135deg, transparent 30%, rgba(255,255,255,0.3) 50%, transparent 70%)`,
+                  opacity: 0
+                }}
+                animate={{ 
+                  opacity: [0, 1, 0],
+                  transform: ['translateX(-100%) translateY(-100%)', 'translateX(100%) translateY(100%)']
+                }}
+                transition={{ duration: 3, repeat: Infinity, repeatDelay: 2 }}
+              />
+            </motion.div>
+          </motion.div>
           
-          {/* Titre avec animation d'apparition */}
-          {!sidebarCollapsed && (
-            <div className="overflow-hidden">
-              <div className="flex flex-col">
-                <span className={`font-bold text-base whitespace-nowrap ${
-                  isDarkTheme 
-                    ? 'text-gradient text-shadow-sm' 
-                    : 'text-indigo-700'
-                }`}>
-                  PRODSEC Monitor
-                </span>
-                <span className="text-xs text-slate-500">
-                  SEC06
-                </span>
-              </div>
-            </div>
-          )}
+          {/* Titre avec animation d'apparition améliorée */}
+          <AnimatePresence>
+            {!sidebarCollapsed && (
+              <motion.div
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                className="overflow-hidden"
+              >
+                <div className="flex flex-col">
+                  <motion.span 
+                    className={`font-bold text-base whitespace-nowrap ${
+                      isDarkTheme 
+                        ? 'bg-gradient-to-r from-indigo-400 via-blue-400 to-indigo-400 bg-clip-text text-transparent' 
+                        : 'text-indigo-700'
+                    }`}
+                    animate={isDarkTheme ? {
+                      backgroundPosition: ['0%', '100%', '0%']
+                    } : {}}
+                    transition={{ duration: 5, repeat: Infinity }}
+                    style={{ backgroundSize: '200%' }}
+                  >
+                    PRODSEC Monitor
+                  </motion.span>
+                  <span className={`text-xs ${isDarkTheme ? 'text-slate-400' : 'text-slate-500'} mt-0.5`}>
+                    SEC06 • Enterprise
+                  </span>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
         
         {/* Bouton de collapse avec animation premium */}
-        <button
+        <motion.button
           onClick={toggleSidebar}
-          className={`ml-auto w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300 ${
+          className={`ml-auto w-8 h-8 rounded-full flex items-center justify-center ${
             isDarkTheme
-              ? 'bg-slate-800 text-slate-300 hover:bg-indigo-900 hover:text-indigo-400 hover:shadow-md hover:shadow-indigo-900/30 border border-slate-700/50'
-              : 'bg-slate-100 text-slate-500 hover:bg-indigo-100 hover:text-indigo-600 hover:shadow-sm hover:shadow-indigo-300/30 border border-slate-200'
-          }`}
+              ? 'bg-gradient-to-br from-slate-800 to-slate-900 text-slate-300 hover:from-indigo-900 hover:to-indigo-800 hover:text-indigo-300 border border-slate-700/50'
+              : 'bg-gradient-to-br from-slate-100 to-white text-slate-500 hover:from-indigo-100 hover:to-indigo-50 hover:text-indigo-600 border border-slate-200'
+          } transition-all duration-300 group`}
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
         >
-          <ChevronLeft size={16} className={`transition-transform duration-300 ${sidebarCollapsed ? 'rotate-180' : ''}`} />
-        </button>
-      </div>
+          <motion.div
+            animate={{ rotate: sidebarCollapsed ? 180 : 0 }}
+            transition={{ type: "spring", stiffness: 300, damping: 25 }}
+          >
+            <ChevronLeft size={16} className="group-hover:scale-110 transition-transform" />
+          </motion.div>
+        </motion.button>
+      </motion.div>
       
       {/* Navigation principale */}
-      <div className="py-6 flex flex-col h-[calc(100%-5rem)]">
-        {/* Tableau de bord */}
-        <div className={`px-4 mb-1 ${sidebarCollapsed ? 'text-center' : ''}`}>
-          <div className={`text-xs font-semibold uppercase tracking-wider mb-3 ${
-            isDarkTheme ? 'text-slate-500' : 'text-slate-400'
-          }`}>
-            {!sidebarCollapsed ? 'Tableau de bord' : ''}
-          </div>
-          
-          <nav className="space-y-1">
-            {/* Bouton Accueil */}
-            <Link 
-              to="/overview"
-              data-menu-item="home"
-              onClick={(e) => {
-                setActiveItem('home');
-                handleNavigationClick(e);
-              }}
-              onMouseDown={handleNavigationMouseDown}
-              className={`${getMenuItemClass('home')} focus:outline-none`}
-              tabIndex={activeItem === 'home' ? 0 : -1}
-              onMouseEnter={() => setHoverItem('home')}
-              onMouseLeave={() => setHoverItem(null)}
-            >
-              {getIconGlow('home')}
-              <Home size={18} className={getIconClass('home')} />
-              
+      <motion.div 
+        className="relative py-6 flex flex-col h-[calc(100%-5rem)] z-10"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.3 }}
+      >
+        <LayoutGroup>
+          {/* Tableau de bord */}
+          <motion.div 
+            className={`px-3 mb-4`}
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.4 }}
+          >
+            <AnimatePresence>
               {!sidebarCollapsed && (
-                <span className="text-sm font-medium whitespace-nowrap">Vue d'ensemble</span>
-              )}
-              
-              {/* Indicateur actif */}
-              {activeItem === 'home' && !sidebarCollapsed && (
-                <div className="ml-auto w-1.5 h-5 rounded-full bg-indigo-500"></div>
-              )}
-            </Link>
-            
-            {/* Bouton Problèmes */}
-            <Link 
-              to="/problems/unified?dashboard=all"
-              data-menu-item="problems"
-              onClick={(e) => {
-                setActiveItem('problems');
-                handleNavigationClick(e);
-              }}
-              onMouseDown={handleNavigationMouseDown}
-              className={`${getMenuItemClass('problems')} focus:outline-none`}
-              tabIndex={activeItem === 'problems' ? 0 : -1}
-              onMouseEnter={() => setHoverItem('problems')}
-              onMouseLeave={() => setHoverItem(null)}
-            >
-              {getIconGlow('problems', 'red')}
-              <AlertTriangle size={18} className={getIconClass('problems')} />
-              
-              {!sidebarCollapsed && (
-                <span className="text-sm font-medium whitespace-nowrap">Problèmes</span>
-              )}
-              
-              {/* Badge pour nombre de problèmes */}
-              <div className={`${sidebarCollapsed ? 'absolute -top-1 -right-1' : 'ml-auto'} 
-                              px-1.5 py-0.5 rounded-full text-xs font-semibold
-                              ${isDarkTheme ? 'bg-red-900/70 text-red-300 border border-red-700/30' : 'bg-red-100 text-red-700 border border-red-200/70'}`}>
-                VFG+VFE
-              </div>
-            </Link>
-          </nav>
-        </div>
-        
-        {/* Applications critiques */}
-        <div className={`px-4 mt-5 ${sidebarCollapsed ? 'text-center' : ''}`}>
-          <div className={`text-xs font-semibold uppercase tracking-wider mb-3 mt-2 ${
-            isDarkTheme ? 'text-slate-500' : 'text-slate-400'
-          }`}>
-            {!sidebarCollapsed ? 'Applications' : ''}
-          </div>
-          
-          <nav className="space-y-2">
-            {/* Vital for Group */}
-            <Link 
-              to="/vfg"
-              data-menu-item="vfg"
-              onClick={(e) => {
-                setActiveItem('vfg');
-                handleNavigationClick(e);
-              }}
-              onMouseDown={handleNavigationMouseDown}
-              className={`${getVitalItemClass('vfg', 'indigo')} focus:outline-none`}
-              tabIndex={activeItem === 'vfg' ? 0 : -1}
-              onMouseEnter={() => setHoverItem('vfg')}
-              onMouseLeave={() => setHoverItem(null)}
-            >
-              {getIconGlow('vfg', 'indigo')}
-              <div className={`relative flex-shrink-0 ${getIconClass('vfg')}`}>
-                <Star 
-                  size={18} 
-                  className={`${isDarkTheme ? 'text-indigo-400' : 'text-indigo-600'} 
-                            ${activeItem === 'vfg' ? 'animate-pulse-subtle' : ''}`} 
-                />
-              </div>
-              
-              {!sidebarCollapsed && (
-                <span className={`text-sm font-medium whitespace-nowrap transition-all duration-300
-                                ${activeItem === 'vfg' ? 'tracking-wide' : ''}`}>
-                  Vital for Group
-                </span>
-              )}
-              
-              {/* Animation subtile d'arrière-plan pour les éléments actifs */}
-              {activeItem === 'vfg' && (
-                <div className="absolute inset-0 -z-10 rounded-xl overflow-hidden">
-                  <div className="absolute inset-0 opacity-20 bg-grid-pattern"></div>
-                </div>
-              )}
-            </Link>
-            
-            {/* Vital for Enterprise */}
-            <Link 
-              to="/vfe"
-              data-menu-item="vfe"
-              onClick={(e) => {
-                setActiveItem('vfe');
-                handleNavigationClick(e);
-              }}
-              onMouseDown={handleNavigationMouseDown}
-              className={`${getVitalItemClass('vfe', 'amber')} focus:outline-none`}
-              tabIndex={activeItem === 'vfe' ? 0 : -1}
-              onMouseEnter={() => setHoverItem('vfe')}
-              onMouseLeave={() => setHoverItem(null)}
-            >
-              {getIconGlow('vfe', 'amber')}
-              <div className={`relative flex-shrink-0 ${getIconClass('vfe')}`}>
-                <Award 
-                  size={18} 
-                  className={`${isDarkTheme ? 'text-amber-400' : 'text-amber-600'} 
-                            ${activeItem === 'vfe' ? 'animate-pulse-subtle' : ''}`} 
-                />
-              </div>
-              
-              {!sidebarCollapsed && (
-                <span className={`text-sm font-medium whitespace-nowrap transition-all duration-300
-                                ${activeItem === 'vfe' ? 'tracking-wide' : ''}`}>
-                  Vital for Enterprise
-                </span>
-              )}
-              
-              {/* Animation subtile d'arrière-plan pour les éléments actifs */}
-              {activeItem === 'vfe' && (
-                <div className="absolute inset-0 -z-10 rounded-xl overflow-hidden">
-                  <div className="absolute inset-0 opacity-20 bg-grid-pattern"></div>
-                </div>
-              )}
-            </Link>
-          </nav>
-        </div>
-
-        {/* Domain */}
-        <div className={`px-4 mt-5 ${sidebarCollapsed ? 'text-center' : ''}`}>
-          <div className={`text-xs font-semibold uppercase tracking-wider mb-3 mt-2 ${
-            isDarkTheme ? 'text-slate-500' : 'text-slate-400'
-          }`}>
-            {!sidebarCollapsed ? 'Domain' : ''}
-          </div>
-          
-          <nav className="space-y-2">
-            {/* Detection & CTL */}
-            <Link 
-              to="/detection"
-              data-menu-item="detection"
-              onClick={(e) => {
-                setActiveItem('detection');
-                handleNavigationClick(e);
-              }}
-              onMouseDown={handleNavigationMouseDown}
-              className={`${getVitalItemClass('detection', 'blue')} focus:outline-none`}
-              tabIndex={activeItem === 'detection' ? 0 : -1}
-              onMouseEnter={() => setHoverItem('detection')}
-              onMouseLeave={() => setHoverItem(null)}
-            >
-              {getIconGlow('detection', 'blue')}
-              <div className={`relative flex-shrink-0 ${getIconClass('detection')}`}>
-                <Shield 
-                  size={18} 
-                  className={`${isDarkTheme ? 'text-blue-400' : 'text-blue-600'} 
-                            ${activeItem === 'detection' ? 'animate-pulse-subtle' : ''}`} 
-                />
-              </div>
-              
-              {!sidebarCollapsed && (
-                <span className={`text-sm font-medium whitespace-nowrap transition-all duration-300
-                                ${activeItem === 'detection' ? 'tracking-wide' : ''}`}>
-                  Détection & CTL
-                </span>
-              )}
-              
-              {/* Animation subtile d'arrière-plan pour les éléments actifs */}
-              {activeItem === 'detection' && (
-                <div className="absolute inset-0 -z-10 rounded-xl overflow-hidden">
-                  <div className="absolute inset-0 opacity-20 bg-grid-pattern"></div>
-                </div>
-              )}
-            </Link>
-            
-            {/* Security & Encryption */}
-            <Link 
-              to="/security"
-              data-menu-item="security"
-              onClick={(e) => {
-                setActiveItem('security');
-                handleNavigationClick(e);
-              }}
-              onMouseDown={handleNavigationMouseDown}
-              className={`${getVitalItemClass('security', 'red')} focus:outline-none`}
-              tabIndex={activeItem === 'security' ? 0 : -1}
-              onMouseEnter={() => setHoverItem('security')}
-              onMouseLeave={() => setHoverItem(null)}
-            >
-              {getIconGlow('security', 'red')}
-              <div className={`relative flex-shrink-0 ${getIconClass('security')}`}>
-                <Key 
-                  size={18} 
-                  className={`${isDarkTheme ? 'text-red-400' : 'text-red-600'} 
-                            ${activeItem === 'security' ? 'animate-pulse-subtle' : ''}`} 
-                />
-              </div>
-              
-              {!sidebarCollapsed && (
-                <span className={`text-sm font-medium whitespace-nowrap transition-all duration-300
-                                ${activeItem === 'security' ? 'tracking-wide' : ''}`}>
-                  Security & Encryption
-                </span>
-              )}
-              
-              {/* Animation subtile d'arrière-plan pour les éléments actifs */}
-              {activeItem === 'security' && (
-                <div className="absolute inset-0 -z-10 rounded-xl overflow-hidden">
-                  <div className="absolute inset-0 opacity-20 bg-grid-pattern"></div>
-                </div>
-              )}
-            </Link>
-            
-            {/* FCE Security */}
-            <Link 
-              to="/fce-security"
-              data-menu-item="fce_security"
-              onClick={(e) => {
-                setActiveItem('fce_security');
-                handleNavigationClick(e);
-              }}
-              onMouseDown={handleNavigationMouseDown}
-              className={`${getVitalItemClass('fce_security', 'purple')} focus:outline-none`}
-              tabIndex={activeItem === 'fce_security' ? 0 : -1}
-              onMouseEnter={() => setHoverItem('fce_security')}
-              onMouseLeave={() => setHoverItem(null)}
-            >
-              {getIconGlow('fce_security', 'purple')}
-              <div className={`relative flex-shrink-0 ${getIconClass('fce_security')}`}>
-                <Shield 
-                  size={18} 
-                  className={`${isDarkTheme ? 'text-purple-400' : 'text-purple-600'} 
-                            ${activeItem === 'fce_security' ? 'animate-pulse-subtle' : ''}`} 
-                />
-              </div>
-              
-              {!sidebarCollapsed && (
-                <span className={`text-sm font-medium whitespace-nowrap transition-all duration-300
-                                ${activeItem === 'fce_security' ? 'tracking-wide' : ''}`}>
-                  FCE Security
-                </span>
-              )}
-              
-              {/* Animation subtile d'arrière-plan pour les éléments actifs */}
-              {activeItem === 'fce_security' && (
-                <div className="absolute inset-0 -z-10 rounded-xl overflow-hidden">
-                  <div className="absolute inset-0 opacity-20 bg-grid-pattern"></div>
-                </div>
-              )}
-            </Link>
-            
-            {/* Network Filtering */}
-            <Link 
-              to="/network-filtering"
-              data-menu-item="network_filtering"
-              onClick={(e) => {
-                setActiveItem('network_filtering');
-                handleNavigationClick(e);
-              }}
-              onMouseDown={handleNavigationMouseDown}
-              className={`${getVitalItemClass('network_filtering', 'cyan')} focus:outline-none`}
-              tabIndex={activeItem === 'network_filtering' ? 0 : -1}
-              onMouseEnter={() => setHoverItem('network_filtering')}
-              onMouseLeave={() => setHoverItem(null)}
-            >
-              {getIconGlow('network_filtering', 'cyan')}
-              <div className={`relative flex-shrink-0 ${getIconClass('network_filtering')}`}>
-                <Globe 
-                  size={18} 
-                  className={`${isDarkTheme ? 'text-cyan-400' : 'text-cyan-600'} 
-                            ${activeItem === 'network_filtering' ? 'animate-pulse-subtle' : ''}`} 
-                />
-              </div>
-              
-              {!sidebarCollapsed && (
-                <span className={`text-sm font-medium whitespace-nowrap transition-all duration-300
-                                ${activeItem === 'network_filtering' ? 'tracking-wide' : ''}`}>
-                  Network Filtering
-                </span>
-              )}
-              
-              {/* Animation subtile d'arrière-plan pour les éléments actifs */}
-              {activeItem === 'network_filtering' && (
-                <div className="absolute inset-0 -z-10 rounded-xl overflow-hidden">
-                  <div className="absolute inset-0 opacity-20 bg-grid-pattern"></div>
-                </div>
-              )}
-            </Link>
-            
-            {/* Identity */}
-            <Link 
-              to="/identity"
-              data-menu-item="identity"
-              onClick={(e) => {
-                setActiveItem('identity');
-                handleNavigationClick(e);
-              }}
-              onMouseDown={handleNavigationMouseDown}
-              className={`${getVitalItemClass('identity', 'pink')} focus:outline-none`}
-              tabIndex={activeItem === 'identity' ? 0 : -1}
-              onMouseEnter={() => setHoverItem('identity')}
-              onMouseLeave={() => setHoverItem(null)}
-            >
-              {getIconGlow('identity', 'pink')}
-              <div className={`relative flex-shrink-0 ${getIconClass('identity')}`}>
-                <User 
-                  size={18} 
-                  className={`${isDarkTheme ? 'text-pink-400' : 'text-pink-600'} 
-                            ${activeItem === 'identity' ? 'animate-pulse-subtle' : ''}`} 
-                />
-              </div>
-              
-              {!sidebarCollapsed && (
-                <span className={`text-sm font-medium whitespace-nowrap transition-all duration-300
-                                ${activeItem === 'identity' ? 'tracking-wide' : ''}`}>
-                  Identity
-                </span>
-              )}
-              
-              {/* Animation subtile d'arrière-plan pour les éléments actifs */}
-              {activeItem === 'identity' && (
-                <div className="absolute inset-0 -z-10 rounded-xl overflow-hidden">
-                  <div className="absolute inset-0 opacity-20 bg-grid-pattern"></div>
-                </div>
-              )}
-            </Link>
-          </nav>
-        </div>
-        
-        {/* Inventory section */}
-        <div className={`px-4 mt-5 ${sidebarCollapsed ? 'text-center' : ''}`}>
-          <div className={`text-xs font-semibold uppercase tracking-wider mb-3 mt-2 ${
-            isDarkTheme ? 'text-slate-500' : 'text-slate-400'
-          }`}>
-            {!sidebarCollapsed ? 'Inventory' : ''}
-          </div>
-          
-          <nav className="space-y-2">
-            {/* Hosts */}
-            <Link 
-              to="/hosts"
-              data-menu-item="hosts"
-              onClick={(e) => {
-                setActiveItem('hosts');
-                handleNavigationClick(e);
-              }}
-              onMouseDown={handleNavigationMouseDown}
-              className={`${getVitalItemClass('hosts', 'green')} focus:outline-none`}
-              tabIndex={activeItem === 'hosts' ? 0 : -1}
-              onMouseEnter={() => setHoverItem('hosts')}
-              onMouseLeave={() => setHoverItem(null)}
-            >
-              {getIconGlow('hosts', 'green')}
-              <div className={`relative flex-shrink-0 ${getIconClass('hosts')}`}>
-                <Layers 
-                  size={18} 
-                  className={`${isDarkTheme ? 'text-green-400' : 'text-green-600'} 
-                            ${activeItem === 'hosts' ? 'animate-pulse-subtle' : ''}`} 
-                />
-              </div>
-              
-              {!sidebarCollapsed && (
-                <span className={`text-sm font-medium whitespace-nowrap transition-all duration-300
-                                ${activeItem === 'hosts' ? 'tracking-wide' : ''}`}>
-                  Hosts
-                </span>
-              )}
-              
-              {/* Animation subtile d'arrière-plan pour les éléments actifs */}
-              {activeItem === 'hosts' && (
-                <div className="absolute inset-0 -z-10 rounded-xl overflow-hidden">
-                  <div className="absolute inset-0 opacity-20 bg-grid-pattern"></div>
-                </div>
-              )}
-            </Link>
-          </nav>
-        </div>
-        
-        {/* Espace supplémentaire pour l'esthétique */}
-        <div className="flex-grow"></div>
-        
-        {/* Footer avec version */}
-        <div className={`px-4 py-3 mt-auto ${
-          isDarkTheme ? 'border-t border-slate-800/40' : 'border-t border-slate-200/70'
-        }`}>
-          <div className={`flex items-center gap-2 px-3 py-2.5 rounded-xl ${
-            isDarkTheme
-              ? 'bg-gradient-to-r from-slate-800/40 via-slate-900/40 to-slate-800/30 shadow-inner shadow-black/10 border border-slate-700/30'
-              : 'bg-gradient-to-r from-indigo-50/50 via-blue-50/50 to-indigo-50/30 shadow-inner shadow-blue-100/30 border border-slate-200/50'
-          }`}>
-            {/* BNP Paribas Logo */}
-            <div className="relative flex-shrink-0">
-              <div className={`absolute inset-0 w-6 h-6 bg-green-500/20 rounded-full blur-md opacity-60 ${isDarkTheme ? 'animate-pulse-slow' : ''}`}></div>
-              <div className={`relative z-10 px-1 py-0.5 rounded-sm ${
-                isDarkTheme ? 'bg-green-900/60 border border-green-700/30' : 'bg-green-100 border border-green-200'
-              }`}>
-                <span className={`text-xs font-bold ${isDarkTheme ? 'text-green-400' : 'text-green-700'}`}>BNP</span>
-              </div>
-            </div>
-            {!sidebarCollapsed && (
-              <div className="flex flex-col">
-                <span className={`text-xs font-medium ${isDarkTheme ? 'text-slate-300' : 'text-slate-700'}`}>
-                  BNP Paribas
-                </span>
-                <span className="text-[10px] text-slate-500">v1.0.0</span>
-              </div>
-            )}
-          </div>
-
-          {/* Developer credit and feedback link */}
-          {!sidebarCollapsed && (
-            <div className={`mt-3 px-2 py-2 rounded-lg text-center ${
-              isDarkTheme 
-                ? 'bg-gradient-to-b from-slate-800/50 to-slate-900/40 border border-slate-700/30' 
-                : 'bg-gradient-to-b from-slate-100/70 to-slate-50/70 border border-slate-200/50'
-            }`}>
-              <div className="flex flex-col items-center">
-                <span className={`text-xs ${isDarkTheme ? 'text-slate-400' : 'text-slate-600'}`}>
-                  Développé par
-                </span>
-                <a
-                  href="mailto:Rayane.Bennasr@externe.bnpparibas.com"
-                  className={`text-xs font-medium mt-1 ${
-                    isDarkTheme ? 'text-blue-400 hover:text-blue-300 hover-glow' : 'text-blue-600 hover:text-blue-800'
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className={`text-xs font-semibold uppercase tracking-wider mb-3 px-3 flex items-center gap-2 ${
+                    isDarkTheme ? 'text-slate-500' : 'text-slate-400'
                   }`}
                 >
-                  Rayane Ben Nasr
-                </a>
-                <div className={`flex items-center mt-2 px-2 py-0.5 rounded ${
-                  isDarkTheme ? 'bg-blue-900/30 border border-blue-700/20' : 'bg-blue-100/70 border border-blue-200/50'
-                }`}>
-                  <span className={`text-[10px] font-bold ${isDarkTheme ? 'text-blue-400' : 'text-blue-600'} mr-1`}>BETA</span>
-                  <span className="text-[9px] text-slate-500">Vos retours sont précieux</span>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
+                  <motion.div
+                    className={`w-4 h-0.5 ${isDarkTheme ? 'bg-slate-700' : 'bg-slate-300'}`}
+                    initial={{ width: 0 }}
+                    animate={{ width: 16 }}
+                    transition={{ delay: 0.5 }}
+                  />
+                  Tableau de bord
+                </motion.div>
+              )}
+            </AnimatePresence>
+            
+            <nav className="space-y-1.5">
+              <MenuItem
+                to="/overview"
+                itemKey="home"
+                icon={Home}
+                label="Vue d'ensemble"
+                color="indigo"
+              />
+              
+              <MenuItem
+                to="/problems/unified?dashboard=all"
+                itemKey="problems"
+                icon={AlertTriangle}
+                label="Problèmes"
+                color="red"
+                badge="VFG+VFE"
+              />
+            </nav>
+          </motion.div>
+        
+          {/* Applications critiques */}
+          <motion.div 
+            className={`px-3 mt-6`}
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.5 }}
+          >
+            <AnimatePresence>
+              {!sidebarCollapsed && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className={`text-xs font-semibold uppercase tracking-wider mb-3 px-3 flex items-center gap-2 ${
+                    isDarkTheme ? 'text-slate-500' : 'text-slate-400'
+                  }`}
+                >
+                  <motion.div
+                    className={`w-4 h-0.5 ${isDarkTheme ? 'bg-slate-700' : 'bg-slate-300'}`}
+                    initial={{ width: 0 }}
+                    animate={{ width: 16 }}
+                    transition={{ delay: 0.6 }}
+                  />
+                  Applications
+                  <motion.div
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ delay: 0.7, type: "spring" }}
+                    className={`ml-auto px-1.5 py-0.5 rounded-full text-[10px] ${
+                      isDarkTheme ? 'bg-indigo-900/50 text-indigo-400' : 'bg-indigo-100 text-indigo-600'
+                    }`}
+                  >
+                    CRITICAL
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+            
+            <nav className="space-y-1.5">
+              <MenuItem
+                to="/vfg"
+                itemKey="vfg"
+                icon={Star}
+                label="Vital for Group"
+                color="indigo"
+                special={true}
+              />
+              
+              <MenuItem
+                to="/vfe"
+                itemKey="vfe"
+                icon={Award}
+                label="Vital for Enterprise"
+                color="amber"
+                special={true}
+              />
+            </nav>
+          </motion.div>
+
+          {/* Domain */}
+          <motion.div 
+            className={`px-3 mt-6`}
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.6 }}
+          >
+            <AnimatePresence>
+              {!sidebarCollapsed && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className={`text-xs font-semibold uppercase tracking-wider mb-3 px-3 flex items-center gap-2 ${
+                    isDarkTheme ? 'text-slate-500' : 'text-slate-400'
+                  }`}
+                >
+                  <motion.div
+                    className={`w-4 h-0.5 ${isDarkTheme ? 'bg-slate-700' : 'bg-slate-300'}`}
+                    initial={{ width: 0 }}
+                    animate={{ width: 16 }}
+                    transition={{ delay: 0.7 }}
+                  />
+                  Domain
+                  <motion.div
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ delay: 0.8, type: "spring" }}
+                    className={`ml-auto px-1.5 py-0.5 rounded-full text-[10px] ${
+                      isDarkTheme ? 'bg-purple-900/50 text-purple-400' : 'bg-purple-100 text-purple-600'
+                    }`}
+                  >
+                    SECURITY
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+            
+            <nav className="space-y-1.5">
+              <MenuItem
+                to="/detection"
+                itemKey="detection"
+                icon={Shield}
+                label="Détection & CTL"
+                color="blue"
+                special={true}
+              />
+              
+              <MenuItem
+                to="/security"
+                itemKey="security"
+                icon={Key}
+                label="Security & Encryption"
+                color="red"
+                special={true}
+              />
+              
+              <MenuItem
+                to="/fce-security"
+                itemKey="fce_security"
+                icon={Lock}
+                label="FCE Security"
+                color="purple"
+                special={true}
+              />
+              
+              <MenuItem
+                to="/network-filtering"
+                itemKey="network_filtering"
+                icon={Globe}
+                label="Network Filtering"
+                color="cyan"
+                special={true}
+              />
+              
+              <MenuItem
+                to="/identity"
+                itemKey="identity"
+                icon={User}
+                label="Identity"
+                color="pink"
+                special={true}
+              />
+            </nav>
+          </motion.div>
+        
+          {/* Inventory section */}
+          <motion.div 
+            className={`px-3 mt-6`}
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.7 }}
+          >
+            <AnimatePresence>
+              {!sidebarCollapsed && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className={`text-xs font-semibold uppercase tracking-wider mb-3 px-3 flex items-center gap-2 ${
+                    isDarkTheme ? 'text-slate-500' : 'text-slate-400'
+                  }`}
+                >
+                  <motion.div
+                    className={`w-4 h-0.5 ${isDarkTheme ? 'bg-slate-700' : 'bg-slate-300'}`}
+                    initial={{ width: 0 }}
+                    animate={{ width: 16 }}
+                    transition={{ delay: 0.8 }}
+                  />
+                  Inventory
+                </motion.div>
+              )}
+            </AnimatePresence>
+            
+            <nav className="space-y-1.5">
+              <MenuItem
+                to="/hosts"
+                itemKey="hosts"
+                icon={Layers}
+                label="Hosts"
+                color="green"
+                special={true}
+              />
+            </nav>
+          </motion.div>
+        
+          {/* Espace supplémentaire pour l'esthétique */}
+          <div className="flex-grow"></div>
+          
+          {/* Footer avec version */}
+          <motion.div 
+            className={`px-3 py-3 mt-auto relative z-10 ${
+              isDarkTheme ? 'border-t border-slate-800/40' : 'border-t border-slate-200/70'
+            }`}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.8 }}
+          >
+            {/* Logo BNP Paribas avec effet premium */}
+            <motion.div
+              whileHover={{ scale: 1.02 }}
+              className={`flex items-center gap-2 px-3 py-2.5 rounded-xl backdrop-blur-sm ${
+                isDarkTheme
+                  ? 'bg-gradient-to-r from-slate-800/50 via-slate-900/60 to-slate-800/50 shadow-inner shadow-black/20 border border-slate-700/40'
+                  : 'bg-gradient-to-r from-indigo-50/60 via-blue-50/70 to-indigo-50/60 shadow-inner shadow-blue-100/40 border border-slate-200/60'
+              }`}
+            >
+              {/* Logo animé */}
+              <motion.div 
+                className="relative flex-shrink-0"
+                animate={{ rotate: [0, 10, -10, 0] }}
+                transition={{ duration: 5, repeat: Infinity, repeatDelay: 3 }}
+              >
+                <motion.div
+                  className={`absolute inset-0 w-7 h-7 ${isDarkTheme ? 'bg-green-500/25' : 'bg-green-400/15'} rounded-full`}
+                  animate={{
+                    scale: [1, 1.3, 1],
+                    opacity: [0.6, 0.2, 0.6]
+                  }}
+                  transition={{ duration: 3, repeat: Infinity }}
+                />
+                <motion.div
+                  className={`relative z-10 px-1.5 py-0.5 rounded-md backdrop-blur-md ${
+                    isDarkTheme 
+                      ? 'bg-gradient-to-br from-green-900/80 to-green-800/60 border border-green-600/50 shadow-sm shadow-green-900/50' 
+                      : 'bg-gradient-to-br from-green-100 to-green-50 border border-green-300/70 shadow-sm shadow-green-200/50'
+                  }`}
+                  whileHover={{ scale: 1.1 }}
+                >
+                  <span className={`text-xs font-bold ${isDarkTheme ? 'text-green-400' : 'text-green-700'}`}>BNP</span>
+                </motion.div>
+              </motion.div>
+              
+              <AnimatePresence>
+                {!sidebarCollapsed && (
+                  <motion.div
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -10 }}
+                    className="flex flex-col"
+                  >
+                    <span className={`text-xs font-medium ${isDarkTheme ? 'text-slate-300' : 'text-slate-700'}`}>
+                      BNP Paribas
+                    </span>
+                    <span className={`text-[10px] ${isDarkTheme ? 'text-slate-500' : 'text-slate-400'}`}>
+                      v1.0.0 • Enterprise
+                    </span>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.div>
+
+            {/* Developer credit avec animations */}
+            <AnimatePresence>
+              {!sidebarCollapsed && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ delay: 0.1 }}
+                  className={`mt-3 px-2 py-3 rounded-xl text-center backdrop-blur-sm ${
+                    isDarkTheme 
+                      ? 'bg-gradient-to-b from-slate-800/60 to-slate-900/50 border border-slate-700/40' 
+                      : 'bg-gradient-to-b from-slate-100/80 to-slate-50/80 border border-slate-200/60'
+                  }`}
+                >
+                  <div className="flex flex-col items-center">
+                    <motion.span 
+                      className={`text-xs ${isDarkTheme ? 'text-slate-400' : 'text-slate-600'}`}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 0.9 }}
+                    >
+                      Développé par
+                    </motion.span>
+                    <motion.a
+                      href="mailto:Rayane.Bennasr@externe.bnpparibas.com"
+                      className={`text-xs font-medium mt-1 inline-flex items-center gap-1 ${
+                        isDarkTheme 
+                          ? 'text-transparent bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text hover:from-blue-300 hover:to-purple-300' 
+                          : 'text-blue-600 hover:text-blue-800'
+                      } transition-all duration-300`}
+                      whileHover={{ scale: 1.05 }}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 1 }}
+                    >
+                      <Sparkles size={12} className={isDarkTheme ? 'text-blue-400' : 'text-blue-600'} />
+                      Rayane Ben Nasr
+                    </motion.a>
+                    
+                    {/* Badge BETA animé */}
+                    <motion.div
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ delay: 1.1, type: "spring", stiffness: 500 }}
+                      whileHover={{ scale: 1.1 }}
+                      className={`flex items-center mt-2 px-3 py-1 rounded-full backdrop-blur-sm ${
+                        isDarkTheme 
+                          ? 'bg-gradient-to-r from-blue-900/50 to-purple-900/50 border border-blue-700/30' 
+                          : 'bg-gradient-to-r from-blue-100 to-purple-100 border border-blue-300/50'
+                      }`}
+                    >
+                      <motion.span 
+                        className={`text-[10px] font-bold ${isDarkTheme ? 'text-blue-400' : 'text-blue-600'} mr-1.5`}
+                        animate={{ opacity: [0.5, 1, 0.5] }}
+                        transition={{ duration: 2, repeat: Infinity }}
+                      >
+                        BETA
+                      </motion.span>
+                      <span className={`text-[9px] ${isDarkTheme ? 'text-slate-400' : 'text-slate-600'}`}>
+                        Vos retours sont précieux
+                      </span>
+                    </motion.div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+        </LayoutGroup>
+      </motion.div>
       
-      {/* Style global pour les motifs d'arrière-plan */}
+      {/* Style global pour les motifs d'arrière-plan et animations */}
       <style>{`
         /* Suppression complète du focus pour tous les liens de navigation */
         nav a:focus,
@@ -701,6 +883,15 @@ const Sidebar: React.FC = () => {
         .animate-pulse-slow {
           animation: pulse-slow 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
         }
+        
+        @keyframes pulse-subtle {
+          0%, 100% { transform: scale(1); opacity: 1; }
+          50% { transform: scale(1.05); opacity: 0.9; }
+        }
+        
+        .animate-pulse-subtle {
+          animation: pulse-subtle 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
 
         @keyframes fade-in {
           from { opacity: 0; transform: translateY(5px); }
@@ -710,8 +901,48 @@ const Sidebar: React.FC = () => {
         .animate-fade-in {
           animation: fade-in 0.5s ease-out forwards;
         }
+        
+        /* Effet de lueur pour les liens */
+        .hover-glow {
+          position: relative;
+          transition: all 0.3s ease;
+        }
+        
+        .hover-glow::after {
+          content: '';
+          position: absolute;
+          inset: -2px;
+          border-radius: inherit;
+          opacity: 0;
+          background: radial-gradient(circle, currentColor, transparent);
+          filter: blur(8px);
+          transition: opacity 0.3s ease;
+          z-index: -1;
+        }
+        
+        .hover-glow:hover::after {
+          opacity: 0.3;
+        }
+        
+        /* Scrollbar personnalisée */
+        nav::-webkit-scrollbar {
+          width: 4px;
+        }
+        
+        nav::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        
+        nav::-webkit-scrollbar-thumb {
+          background: ${isDarkTheme ? 'rgba(99, 102, 241, 0.3)' : 'rgba(99, 102, 241, 0.2)'};
+          border-radius: 2px;
+        }
+        
+        nav::-webkit-scrollbar-thumb:hover {
+          background: ${isDarkTheme ? 'rgba(99, 102, 241, 0.5)' : 'rgba(99, 102, 241, 0.3)'};
+        }
       `}</style>
-    </aside>
+    </motion.aside>
   );
 };
 
