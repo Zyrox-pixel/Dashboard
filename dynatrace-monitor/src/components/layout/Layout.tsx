@@ -1,4 +1,4 @@
-import React, { ReactNode, useEffect, useState, useRef } from 'react';
+import React, { ReactNode, useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Header from './Header';
@@ -16,42 +16,16 @@ const Layout: React.FC<LayoutProps> = ({ children, title, subtitle }) => {
   const { sidebarCollapsed } = useApp();
   const { isDarkTheme } = useTheme();
   const location = useLocation();
-  const [isAnimating, setIsAnimating] = useState(false);
-  const [slideDirection, setSlideDirection] = useState<'left' | 'right'>('right');
-  const prevPathRef = useRef(location.pathname);
+  const [isTransitioning, setIsTransitioning] = useState(false);
 
-  // Gérer l'animation de glissement lors du changement de route
+  // Effet de transition verticale lors du changement de route
   useEffect(() => {
-    if (location.pathname !== prevPathRef.current) {
-      // Déterminer la direction du glissement en fonction du chemin
-      const currentPath = location.pathname;
-      const prevPath = prevPathRef.current;
-      
-      // Logique pour déterminer la direction
-      const pathOrder = ['/overview', '/dashboard/vfg', '/dashboard/vfe', '/dashboard/detection', 
-                        '/dashboard/security', '/dashboard/fce-security', '/dashboard/network-filtering', 
-                        '/dashboard/identity', '/hosts', '/problems'];
-      
-      const currentIndex = pathOrder.findIndex(path => currentPath.includes(path));
-      const prevIndex = pathOrder.findIndex(path => prevPath.includes(path));
-      
-      if (currentIndex !== -1 && prevIndex !== -1) {
-        setSlideDirection(currentIndex > prevIndex ? 'right' : 'left');
-      }
-      
-      // Déclencher l'animation
-      setIsAnimating(true);
-      
-      // Mettre à jour la référence du chemin précédent
-      prevPathRef.current = location.pathname;
-      
-      // Arrêter l'animation après 500ms
-      const timer = setTimeout(() => {
-        setIsAnimating(false);
-      }, 500);
-      
-      return () => clearTimeout(timer);
-    }
+    setIsTransitioning(true);
+    const timer = setTimeout(() => {
+      setIsTransitioning(false);
+    }, 300);
+    
+    return () => clearTimeout(timer);
   }, [location.pathname]);
 
   // Dynamically apply body styles based on theme
@@ -90,19 +64,15 @@ const Layout: React.FC<LayoutProps> = ({ children, title, subtitle }) => {
         <div 
           className="max-w-7xl mx-auto px-4 py-5 sm:px-6 md:px-8 overflow-hidden"
         >
-          {/* Content container avec animation de glissement */}
-          <div className={isAnimating ? 'page-transition-container' : ''}>
-            <div
-              className={`transition-all duration-500 ease-out ${
-                isAnimating 
-                  ? slideDirection === 'right'
-                    ? 'animate-slide-in-right-3d'
-                    : 'animate-slide-in-left-3d'
-                  : ''
-              }`}
-            >
-              {children}
-            </div>
+          {/* Content container avec animation verticale simple */}
+          <div
+            className={`transition-all duration-300 ease-out ${
+              isTransitioning 
+                ? 'opacity-0 transform translate-y-4'
+                : 'opacity-100 transform translate-y-0'
+            }`}
+          >
+            {children}
           </div>
         </div>
 
@@ -174,63 +144,6 @@ const Layout: React.FC<LayoutProps> = ({ children, title, subtitle }) => {
           animation: fade-in-up 0.5s ease-out forwards;
         }
         
-        @keyframes slide-in-right {
-          0% {
-            transform: translateX(150px) scale(0.95) rotateY(-5deg);
-            opacity: 0;
-            filter: blur(3px);
-          }
-          30% {
-            transform: translateX(80px) scale(0.97) rotateY(-3deg);
-            opacity: 0.3;
-            filter: blur(2px);
-          }
-          60% {
-            transform: translateX(30px) scale(0.99) rotateY(-1deg);
-            opacity: 0.7;
-            filter: blur(1px);
-          }
-          100% {
-            transform: translateX(0) scale(1) rotateY(0);
-            opacity: 1;
-            filter: blur(0);
-          }
-        }
-        
-        @keyframes slide-in-left {
-          0% {
-            transform: translateX(-150px) scale(0.95) rotateY(5deg);
-            opacity: 0;
-            filter: blur(3px);
-          }
-          30% {
-            transform: translateX(-80px) scale(0.97) rotateY(3deg);
-            opacity: 0.3;
-            filter: blur(2px);
-          }
-          60% {
-            transform: translateX(-30px) scale(0.99) rotateY(1deg);
-            opacity: 0.7;
-            filter: blur(1px);
-          }
-          100% {
-            transform: translateX(0) scale(1) rotateY(0);
-            opacity: 1;
-            filter: blur(0);
-          }
-        }
-        
-        .animate-slide-in-right {
-          animation: slide-in-right 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-          transform-origin: center center;
-          perspective: 1000px;
-        }
-        
-        .animate-slide-in-left {
-          animation: slide-in-left 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-          transform-origin: center center;
-          perspective: 1000px;
-        }
         
         /* Scrollbar personnalisée */
         ::-webkit-scrollbar {

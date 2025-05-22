@@ -41,8 +41,7 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
   const { isDarkTheme } = useTheme();
   const { refreshData } = useApp();
   const [filteredProblems, setFilteredProblems] = useState<Problem[]>([]);
-  const [prevActiveTab, setPrevActiveTab] = useState(activeTab);
-  const [isTabAnimating, setIsTabAnimating] = useState(false);
+  const [isTabTransitioning, setIsTabTransitioning] = useState(false);
   
   // États pour le tri et la recherche
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'ascending' | 'descending' | null }>({
@@ -1064,25 +1063,16 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
     },
   ], [sortConfig]);
 
-  // Gérer l'animation lors du changement d'onglet
-  useEffect(() => {
-    if (activeTab !== prevActiveTab) {
-      setIsTabAnimating(true);
-      setPrevActiveTab(activeTab);
-      
-      // Arrêter l'animation après 400ms
-      const timer = setTimeout(() => {
-        setIsTabAnimating(false);
-      }, 400);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [activeTab, prevActiveTab]);
-
   // Optimiser le gestionnaire d'événements avec useCallback
   const handleTabClick = useCallback((tab: string) => {
     if (tab !== activeTab) {
-      onTabChange(tab);
+      setIsTabTransitioning(true);
+      setTimeout(() => {
+        onTabChange(tab);
+        setTimeout(() => {
+          setIsTabTransitioning(false);
+        }, 150);
+      }, 150);
     }
   }, [onTabChange, activeTab]);
   
@@ -1421,15 +1411,13 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
         </button>
       </div>
       
-      {/* Conteneur avec animation pour le contenu des onglets */}
+      {/* Contenu des onglets avec animation verticale */}
       <div
-        className={`tab-content-transition ${
-          isTabAnimating ? 'animating' : ''
+        className={`transition-all duration-300 ease-out ${
+          isTabTransitioning 
+            ? 'opacity-0 transform translate-y-2'
+            : 'opacity-100 transform translate-y-0'
         }`}
-        style={{
-          transformStyle: 'preserve-3d',
-          perspective: '1000px'
-        }}
       >
         {/* Contenu des onglets - Hôtes */}
         {activeTab === 'hosts' && (
