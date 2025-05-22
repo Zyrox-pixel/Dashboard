@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
-import { Menu, Bell, Search, Clock, Settings, Shield, ChevronRight } from 'lucide-react';
-import { useApp } from '../../contexts/AppContext';
+import { Menu, Clock, Shield, ChevronRight } from 'lucide-react';
 
 interface HeaderProps {
   title: string;
@@ -9,11 +8,9 @@ interface HeaderProps {
 }
 
 const Header: React.FC<HeaderProps> = ({ title, subtitle }) => {
-  const { isDarkTheme, toggleTheme } = useTheme();
-  const { activeProblems } = useApp();
+  const { isDarkTheme } = useTheme();
   const [scrolled, setScrolled] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [showSearchPopover, setShowSearchPopover] = useState(false);
 
   // Effet pour suivre le scroll et mettre à jour l'état
   useEffect(() => {
@@ -132,34 +129,6 @@ const Header: React.FC<HeaderProps> = ({ title, subtitle }) => {
 
       {/* Partie droite - Actions et statut */}
       <div className="flex items-center gap-3">
-        {/* Statut de problèmes avec badge */}
-        <div className={`hidden md:flex items-center gap-2 px-3.5 py-1.5 rounded-full 
-                        ${activeProblems.length > 0
-                          ? 'bg-gradient-to-r from-red-900/30 to-red-900/20 border border-red-700/40 text-red-400'
-                          : 'bg-gradient-to-r from-emerald-900/30 to-emerald-900/20 border border-emerald-700/40 text-emerald-400'
-                        } shadow-sm transition-all duration-300 hover:shadow-md`}
-        >
-          {activeProblems.length > 0 ? (
-            <>
-              <div className="relative">
-                <div className="h-2 w-2 rounded-full bg-red-500 animate-pulse"></div>
-                {/* Effet de halo */}
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-3 w-3 rounded-full bg-red-500 opacity-30 animate-ping"></div>
-              </div>
-              <span className="text-xs font-medium whitespace-nowrap">{activeProblems.length} problème{activeProblems.length > 1 ? 's' : ''} actif{activeProblems.length > 1 ? 's' : ''}</span>
-            </>
-          ) : (
-            <>
-              <div className="relative">
-                <div className="h-2 w-2 rounded-full bg-emerald-500"></div>
-                {/* Effet de halo subtil */}
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-3 w-3 rounded-full bg-emerald-500 opacity-20 animate-pulse"></div>
-              </div>
-              <span className="text-xs font-medium whitespace-nowrap">Tous les systèmes opérationnels</span>
-            </>
-          )}
-        </div>
-
         {/* Affichage de l'heure en cours */}
         <div className={`hidden md:flex items-center gap-2 px-3.5 py-1.5 rounded-full shadow-sm
                        ${isDarkTheme 
@@ -168,43 +137,6 @@ const Header: React.FC<HeaderProps> = ({ title, subtitle }) => {
           <Clock className={isDarkTheme ? 'text-indigo-400' : 'text-indigo-500'} size={14} />
           <span className="text-xs font-medium">{formatTime(currentTime)}</span>
         </div>
-
-        {/* Bouton de recherche */}
-        <button 
-          onClick={() => setShowSearchPopover(!showSearchPopover)}
-          className={`p-2.5 rounded-full transition-all duration-300 flex items-center justify-center ${
-            isDarkTheme
-              ? 'bg-gradient-to-br from-slate-800/90 to-slate-800/70 text-slate-300 hover:text-indigo-300 hover:from-slate-800 hover:to-slate-750 shadow-sm border border-slate-700/50 hover:border-indigo-700/50'
-              : 'bg-gradient-to-br from-slate-100 to-white text-slate-600 hover:text-indigo-600 hover:from-white hover:to-slate-50 shadow-sm border border-slate-200 hover:border-indigo-200'
-          } transform-gpu hover:scale-[1.05]`}
-          aria-label="Rechercher"
-        >
-          <Search size={16} />
-        </button>
-
-        {/* Notifications */}
-        <button 
-          className={`p-2.5 rounded-full transition-all duration-300 flex items-center justify-center ${
-            isDarkTheme
-              ? 'bg-gradient-to-br from-slate-800/90 to-slate-800/70 text-slate-300 hover:text-indigo-300 hover:from-slate-800 hover:to-slate-750 shadow-sm border border-slate-700/50 hover:border-indigo-700/50'
-              : 'bg-gradient-to-br from-slate-100 to-white text-slate-600 hover:text-indigo-600 hover:from-white hover:to-slate-50 shadow-sm border border-slate-200 hover:border-indigo-200'
-          } transform-gpu hover:scale-[1.05]`}
-          aria-label="Notifications"
-        >
-          <Bell size={16} />
-        </button>
-
-        {/* Paramètres */}
-        <button 
-          className={`p-2.5 rounded-full transition-all duration-300 flex items-center justify-center ${
-            isDarkTheme
-              ? 'bg-gradient-to-br from-slate-800/90 to-slate-800/70 text-slate-300 hover:text-indigo-300 hover:from-slate-800 hover:to-slate-750 shadow-sm border border-slate-700/50 hover:border-indigo-700/50'
-              : 'bg-gradient-to-br from-slate-100 to-white text-slate-600 hover:text-indigo-600 hover:from-white hover:to-slate-50 shadow-sm border border-slate-200 hover:border-indigo-200'
-          } transform-gpu hover:scale-[1.05]`}
-          aria-label="Paramètres"
-        >
-          <Settings size={16} />
-        </button>
 
         {/* Badge BETA avec effet premium */}
         <a
