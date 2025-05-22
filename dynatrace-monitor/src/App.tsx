@@ -1,14 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router } from 'react-router-dom';
 import { ThemeProvider } from './contexts/ThemeContext';
-import UnifiedDashboard from './pages/UnifiedDashboard';
-import UnifiedProblemsPage from './pages/UnifiedProblemsPage';
-import OverviewDashboard from './pages/OverviewDashboard';
-import HostsPage from './pages/HostsPage';
 import { AppProvider } from './contexts/AppContext';
 import { ProblemsProvider } from './contexts/ProblemsContext';
 import { useZoneStatusPreloader } from './hooks/useZoneStatusPreloader';
 import { Shield } from 'lucide-react';
+import AppWithLayout from './AppWithLayout';
 
 // Composant de splash screen premium
 const SplashScreen: React.FC = () => {
@@ -129,9 +126,7 @@ const ZoneStatusPreloader: React.FC<{ children: React.ReactNode }> = ({ children
   }
   
   return (
-    <div className="animate-fade-in transition-opacity duration-500">
-      {children}
-    </div>
+    <>{children}</>
   );
 };
 
@@ -151,50 +146,7 @@ function App() {
         <ProblemsProvider>
           <ZoneStatusPreloader>
             <Router>
-              <Routes>
-                {/* Route par défaut - Redirige vers la vue d'ensemble */}
-                <Route path="/" element={<Navigate to="/overview" replace />} />
-
-                {/* Route pour la page d'aperçu global */}
-                <Route path="/overview" element={<OverviewDashboard />} />
-              
-                {/* Routes vers le tableau de bord unifié */}
-                <Route path="/dashboard/:type" element={<UnifiedDashboard />} />
-                <Route path="/dashboard/:type/:optimized" element={<UnifiedDashboard />} />
-                
-                {/* Page des problèmes unifiée */}
-                <Route path="/problems/unified" element={<UnifiedProblemsPage />} />
-                <Route path="/problems/active" element={<UnifiedProblemsPage />} />
-                <Route path="/problems/recent" element={<UnifiedProblemsPage />} />
-                
-                {/* Routes pour les applications */}
-                <Route path="/vfg" element={<Navigate to="/dashboard/vfg" replace />} />
-                <Route path="/vfe" element={<Navigate to="/dashboard/vfe" replace />} />
-                <Route path="/detection" element={<Navigate to="/dashboard/detection" replace />} />
-                <Route path="/security" element={<Navigate to="/dashboard/security" replace />} />
-                <Route path="/fce-security" element={<Navigate to="/dashboard/fce-security" replace />} />
-                <Route path="/network-filtering" element={<Navigate to="/dashboard/network-filtering" replace />} />
-                <Route path="/identity" element={<Navigate to="/dashboard/identity" replace />} />
-                
-                {/* Routes pour les versions optimisées */}
-                <Route path="/optimized" element={<Navigate to="/dashboard/vfg/true" replace />} />
-                <Route path="/vfg-optimized" element={<Navigate to="/dashboard/vfg/true" replace />} />
-                <Route path="/vfe-optimized" element={<Navigate to="/dashboard/vfe/true" replace />} />
-                <Route path="/detection-optimized" element={<Navigate to="/dashboard/detection/true" replace />} />
-                <Route path="/security-optimized" element={<Navigate to="/dashboard/security/true" replace />} />
-                <Route path="/fce-security-optimized" element={<Navigate to="/dashboard/fce-security/true" replace />} />
-                <Route path="/network-filtering-optimized" element={<Navigate to="/dashboard/network-filtering/true" replace />} />
-                <Route path="/identity-optimized" element={<Navigate to="/dashboard/identity/true" replace />} />
-                
-                {/* Routes supplémentaires pour la compatibilité */}
-                <Route path="/problems" element={<Navigate to="/problems/unified" replace />} />
-                <Route path="/hosts" element={<HostsPage />} />
-                <Route path="/services" element={<Navigate to="/dashboard/vfg" replace />} />
-                <Route path="/other" element={<Navigate to="/overview" replace />} />
-                
-                {/* Redirection des routes non trouvées vers la page d'accueil */}
-                <Route path="*" element={<Navigate to="/" replace />} />
-              </Routes>
+              <AppWithLayout />
             </Router>
           </ZoneStatusPreloader>
         </ProblemsProvider>

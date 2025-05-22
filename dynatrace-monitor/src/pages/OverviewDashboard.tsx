@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Shield, AlertTriangle, Clock, Server, Database, BarChart } from 'lucide-react';
-import Layout from '../components/layout/Layout';
 import { useApp } from '../contexts/AppContext';
 import { useProblems } from '../contexts/ProblemsContext';
 import { ManagementZone } from '../api/types';
@@ -232,7 +231,7 @@ const OverviewDashboard: React.FC = () => {
   }, [loading, vfgProblems.length, vfeProblems.length]);
 
   return (
-    <Layout title="Vue d'Ensemble" subtitle="Supervision globale des applications critiques">
+    <>
       {/* Bannière d'introduction */}
       <div className="mb-6 p-5 bg-slate-800/50 border border-slate-700 rounded-lg">
         <div className="flex items-center gap-4">
@@ -569,7 +568,7 @@ const OverviewDashboard: React.FC = () => {
           </div>
         </div>
       </div>
-    </Layout>
+    </>
   );
 };
 

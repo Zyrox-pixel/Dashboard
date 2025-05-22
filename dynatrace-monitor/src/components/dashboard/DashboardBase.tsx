@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Layout from '../layout/Layout';
 import ProblemsList from './ProblemsList';
 import ModernManagementZoneList from './ModernManagementZoneList';
 import ZoneDetails from './ZoneDetails';
@@ -360,19 +359,17 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
   // Afficher un écran de chargement si le chargement initial n'est pas terminé
   if (!isLoading.initialLoadComplete || (isLoading.dashboardData && optimized)) {
     return (
-      <Layout title={title}>
-        <div className="flex flex-col items-center justify-center h-64">
+      <div className="flex flex-col items-center justify-center h-64">
           <div className={`w-16 h-16 border-t-4 border-b-4 ${cssClasses.accent} rounded-full animate-spin mb-4`}></div>
-          <p className="text-xl text-slate-400">Chargement des données...</p>
-        </div>
-      </Layout>
+        <p className="text-xl text-slate-400">Chargement des données...</p>
+      </div>
     );
   }
   
   // Afficher un message d'erreur si le backend n'est pas connecté
   if (!backendConnected) {
     return (
-      <Layout title={title}>
+      <div>
         <div className="flex flex-col items-center justify-center h-64 p-10 mt-20 bg-red-50 border border-red-200 rounded-lg dark:bg-red-900/20 dark:border-red-800">
           <AlertTriangle className="w-16 h-16 text-red-500 mb-4" />
           <p className="text-xl text-red-600 dark:text-red-400 mb-4">Le serveur backend n'est pas accessible</p>
@@ -387,14 +384,14 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
             <span>Réessayer</span>
           </button>
         </div>
-      </Layout>
+      </div>
     );
   }
   
   // Afficher un message d'erreur générale si nécessaire
   if (error) {
     return (
-      <Layout title={title}>
+      <div>
         <div className="flex flex-col items-center justify-center h-64 p-10 mt-20 bg-red-50 border border-red-200 rounded-lg dark:bg-red-900/20 dark:border-red-800">
           <AlertTriangle className="w-16 h-16 text-red-500 mb-4" />
           <p className="text-xl text-red-600 dark:text-red-400 mb-4">Une erreur est survenue</p>
@@ -410,7 +407,7 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
             <span>Réessayer</span>
           </button>
         </div>
-      </Layout>
+      </div>
     );
   }
   
@@ -418,7 +415,7 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
   if (zones.length === 0 && 
      (variant === 'vfg' ? !isLoading.vitalForGroupMZs : !isLoading.vitalForEntrepriseMZs)) {
     return (
-      <Layout title={title}>
+      <div>
         <div className={`flex flex-col items-center justify-center h-64 p-10 mt-20 ${cssClasses.bgLight} border ${cssClasses.borderLight} rounded-lg dark:${cssClasses.bgDark} dark:${cssClasses.borderDark}`}>
           <Shield className={`w-16 h-16 ${cssClasses.accent} mb-4`} />
           <p className={`text-xl ${cssClasses.text} dark:${cssClasses.darkText} mb-4`}>Aucune Management Zone trouvée</p>
@@ -433,14 +430,14 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
             <span>Actualiser</span>
           </button>
         </div>
-      </Layout>
+      </div>
     );
   }
   
   // Afficher l'écran de chargement des détails de zone
   if (isLoading.zoneDetails && selectedZone) {
     return (
-      <Layout title={title} subtitle={currentZone?.name}>
+      <>
         <button 
           onClick={handleBackClick}
           className="mb-5 flex items-center gap-2 px-4 py-1.5 rounded-lg border border-slate-600 text-slate-300 hover:bg-slate-700"
@@ -523,15 +520,12 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
             <br/>Cette opération peut prendre quelques instants...
           </p>
         </div>
-      </Layout>
+      </>
     );
   }
   
   return (
-    <Layout
-      title={title}
-      subtitle={currentZone?.name}
-    >
+    <>
       {/* Section des métriques de performance (version optimisée uniquement) */}
       {optimized && performanceMetrics && (
         <div className={`mb-6 p-4 ${cssClasses.bgLightOpacity} border ${cssClasses.borderLight} rounded-lg dark:${cssClasses.bgDark} dark:${cssClasses.borderDark}`}>
@@ -748,7 +742,7 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
           />
         </>
       )}
-    </Layout>
+    </>
   );
 };
 

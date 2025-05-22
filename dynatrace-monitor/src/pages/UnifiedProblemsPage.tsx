@@ -1,6 +1,5 @@
 import React from 'react';
 import { useLocation } from 'react-router-dom';
-import Layout from '../components/layout/Layout';
 import UnifiedProblemsView from '../components/dashboard/UnifiedProblemsView';
 import AllProblemsView from '../components/common/AllProblemsView';
 
@@ -57,7 +56,7 @@ const UnifiedProblemsPage: React.FC = () => {
     title += " - Tous les Problèmes";
   }
   return (
-    <Layout title={title}>
+    <>
       {dashboardType === 'all' ? (
         <AllProblemsView problemType={problemType} />
       ) : (
@@ -67,7 +66,7 @@ const UnifiedProblemsPage: React.FC = () => {
           problemType={problemType}
         />
       )}
-    </Layout>
+    </>
   );
 };
 

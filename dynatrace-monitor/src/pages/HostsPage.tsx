@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useHostsData } from '../hooks/useHostsData';
-import Layout from '../components/layout/Layout';
 import { RefreshCw, Server, Database, HardDrive, Search, AlertCircle, Filter, Monitor, ArrowUp, ArrowDown, Cpu, FileDown } from 'lucide-react';
 import AdvancedFilter, { FilterCategory, FilterValue, FilterItem } from '../components/common/AdvancedFilter';
 import UnifiedFilterBadges, { FilterBadge } from '../components/common/UnifiedFilterBadges';
@@ -535,8 +534,7 @@ const HostsPage: React.FC = () => {
   }
 
   return (
-    <Layout title="Inventory" subtitle="Hosts">
-      <div className="px-6 py-4 w-full">
+    <div className="px-6 py-4 w-full">
         {/* En-tête avec titre et statistiques */}
         <div className="flex justify-between items-center mb-6">
           <div>
@@ -1061,7 +1059,6 @@ const HostsPage: React.FC = () => {
             )}
           </>
         )}
-      </div>
 
       {/* Popup du filtre avancé */}
       {showAdvancedFilter && (
@@ -1091,7 +1088,7 @@ const HostsPage: React.FC = () => {
           </div>
         </div>
       )}
-    </Layout>
+    </div>
   );
 };
 
