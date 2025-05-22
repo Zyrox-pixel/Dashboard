@@ -26,7 +26,7 @@ const Layout: React.FC<LayoutProps> = ({ children, title, subtitle }) => {
     // Attendre un peu avant de commencer l'animation pour s'assurer que le DOM est prêt
     const startTimer = setTimeout(() => {
       setIsTransitioning(false);
-    }, 200);
+    }, 50);
     
     return () => clearTimeout(startTimer);
   }, [location.pathname]);
@@ -163,7 +163,7 @@ const Layout: React.FC<LayoutProps> = ({ children, title, subtitle }) => {
         }
         
         .page-enter {
-          animation: slide-up 1s ease-out forwards;
+          animation: slide-up 0.6s ease-out forwards;
         }
         
         

@@ -1414,9 +1414,9 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
       {/* Contenu des onglets avec animation douce */}
       <div
         style={{
-          transition: 'all 0.6s ease-out',
+          transition: 'all 0.3s ease-out',
           transform: isTabTransitioning ? 'translateY(8px)' : 'translateY(0)',
-          opacity: isTabTransitioning ? 0.3 : 1,
+          opacity: isTabTransitioning ? 0.5 : 1,
         }}
       >
         {/* Contenu des onglets - Hôtes */}
