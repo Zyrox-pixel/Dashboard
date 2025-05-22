@@ -223,13 +223,16 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
     const startTime = performance.now();
     
     try {
-      // Étape 1: Tentative directe - chercher la zone exacte dans les deux collections
+      // Étape 1: Tentative directe - chercher la zone exacte dans toutes les collections
       let selectedZoneObj = state.vitalForGroupMZs.find(zone => zone.id === zoneId) ||
                            state.vitalForEntrepriseMZs.find(zone => zone.id === zoneId) ||
                            state.vitalForProductionMZs.find(zone => zone.id === zoneId) ||
                            state.vitalForAnalyticsMZs.find(zone => zone.id === zoneId) ||
                            state.detectionCtlMZs.find(zone => zone.id === zoneId) ||
-                           state.securityEncryptionMZs.find(zone => zone.id === zoneId);
+                           state.securityEncryptionMZs.find(zone => zone.id === zoneId) ||
+                           state.fceSecurityMZs.find(zone => zone.id === zoneId) ||
+                           state.networkFilteringMZs.find(zone => zone.id === zoneId) ||
+                           state.identityMZs.find(zone => zone.id === zoneId);
       
       // Étape 2: Si pas trouvé, utiliser des approches plus flexibles
       if (!selectedZoneObj) {
@@ -245,7 +248,10 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, optimized = 
           ...state.vitalForProductionMZs,
           ...state.vitalForAnalyticsMZs,
           ...state.detectionCtlMZs,
-          ...state.securityEncryptionMZs
+          ...state.securityEncryptionMZs,
+          ...state.fceSecurityMZs,
+          ...state.networkFilteringMZs,
+          ...state.identityMZs
         ];
         
         // Approche 2.2: Chercher par nom nettoyé - correspondance partielle
@@ -1765,7 +1771,10 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
           ...state.vitalForProductionMZs,
           ...state.vitalForAnalyticsMZs,
           ...state.detectionCtlMZs,
-          ...state.securityEncryptionMZs
+          ...state.securityEncryptionMZs,
+          ...state.fceSecurityMZs,
+          ...state.networkFilteringMZs,
+          ...state.identityMZs
         ];
         
         // Étape 1: Tentative directe avec ID exact
@@ -1822,6 +1831,9 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
                 const isVFA = state.vitalForAnalyticsMZs.some(z => z.id === zoneId);
                 const isDetection = state.detectionCtlMZs.some(z => z.id === zoneId);
                 const isSecurity = state.securityEncryptionMZs.some(z => z.id === zoneId);
+                const isFceSecurity = state.fceSecurityMZs.some(z => z.id === zoneId);
+                const isNetworkFiltering = state.networkFilteringMZs.some(z => z.id === zoneId);
+                const isIdentity = state.identityMZs.some(z => z.id === zoneId);
                 
                 // Mettre à jour la collection appropriée
                 if (isVFG) {
@@ -1863,6 +1875,27 @@ if (problemsResponse && !problemsResponse.error && problemsResponse.data) {
                   setState(prev => ({
                     ...prev,
                     securityEncryptionMZs: prev.securityEncryptionMZs.map(zone => 
+                      zone.id === zoneId ? {...zone, services: servicesCount} : zone
+                    )
+                  }));
+                } else if (isFceSecurity) {
+                  setState(prev => ({
+                    ...prev,
+                    fceSecurityMZs: prev.fceSecurityMZs.map(zone => 
+                      zone.id === zoneId ? {...zone, services: servicesCount} : zone
+                    )
+                  }));
+                } else if (isNetworkFiltering) {
+                  setState(prev => ({
+                    ...prev,
+                    networkFilteringMZs: prev.networkFilteringMZs.map(zone => 
+                      zone.id === zoneId ? {...zone, services: servicesCount} : zone
+                    )
+                  }));
+                } else if (isIdentity) {
+                  setState(prev => ({
+                    ...prev,
+                    identityMZs: prev.identityMZs.map(zone => 
                       zone.id === zoneId ? {...zone, services: servicesCount} : zone
                     )
                   }));
