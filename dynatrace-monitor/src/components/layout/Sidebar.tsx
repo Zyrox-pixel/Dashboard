@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { 
   ChevronLeft, Home, AlertTriangle, Star, Award, Grid, 
@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../../contexts/AppContext';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useFocusManagement } from '../../hooks/useFocusManagement';
 
 // Définir les types pour les fonctions
 type MenuItemKey = 'home' | 'problems' | 'vfg' | 'vfe' | 'detection' | 'security' | 'fce_security' | 'network_filtering' | 'identity' | 'hosts' | 'activity' | 'settings';
@@ -15,8 +16,10 @@ const Sidebar: React.FC = () => {
   const { sidebarCollapsed, setSidebarCollapsed } = useApp();
   const { isDarkTheme } = useTheme();
   const location = useLocation();
+  const { handleNavigationClick, handleNavigationMouseDown } = useFocusManagement();
   const [activeItem, setActiveItem] = useState<MenuItemKey>('home');
   const [hoverItem, setHoverItem] = useState<string | null>(null);
+  const sidebarRef = useRef<HTMLDivElement>(null);
   
   // Effet pour suivre la page active - se déclenche à chaque changement de route
   useEffect(() => {
@@ -207,8 +210,14 @@ const Sidebar: React.FC = () => {
             {/* Bouton Accueil */}
             <Link 
               to="/overview"
-              onClick={() => setActiveItem('home')}
-              className={getMenuItemClass('home')}
+              data-menu-item="home"
+              onClick={(e) => {
+                setActiveItem('home');
+                handleNavigationClick(e);
+              }}
+              onMouseDown={handleNavigationMouseDown}
+              className={`${getMenuItemClass('home')} focus:outline-none`}
+              tabIndex={activeItem === 'home' ? 0 : -1}
               onMouseEnter={() => setHoverItem('home')}
               onMouseLeave={() => setHoverItem(null)}
             >
@@ -228,8 +237,14 @@ const Sidebar: React.FC = () => {
             {/* Bouton Problèmes */}
             <Link 
               to="/problems/unified?dashboard=all"
-              onClick={() => setActiveItem('problems')}
-              className={getMenuItemClass('problems')}
+              data-menu-item="problems"
+              onClick={(e) => {
+                setActiveItem('problems');
+                handleNavigationClick(e);
+              }}
+              onMouseDown={handleNavigationMouseDown}
+              className={`${getMenuItemClass('problems')} focus:outline-none`}
+              tabIndex={activeItem === 'problems' ? 0 : -1}
               onMouseEnter={() => setHoverItem('problems')}
               onMouseLeave={() => setHoverItem(null)}
             >
@@ -262,7 +277,14 @@ const Sidebar: React.FC = () => {
             {/* Vital for Group */}
             <Link 
               to="/vfg"
-              className={getVitalItemClass('vfg', 'indigo')}
+              data-menu-item="vfg"
+              onClick={(e) => {
+                setActiveItem('vfg');
+                handleNavigationClick(e);
+              }}
+              onMouseDown={handleNavigationMouseDown}
+              className={`${getVitalItemClass('vfg', 'indigo')} focus:outline-none`}
+              tabIndex={activeItem === 'vfg' ? 0 : -1}
               onMouseEnter={() => setHoverItem('vfg')}
               onMouseLeave={() => setHoverItem(null)}
             >
@@ -293,8 +315,14 @@ const Sidebar: React.FC = () => {
             {/* Vital for Enterprise */}
             <Link 
               to="/vfe"
-              onClick={() => setActiveItem('vfe')}
-              className={getVitalItemClass('vfe', 'amber')}
+              data-menu-item="vfe"
+              onClick={(e) => {
+                setActiveItem('vfe');
+                handleNavigationClick(e);
+              }}
+              onMouseDown={handleNavigationMouseDown}
+              className={`${getVitalItemClass('vfe', 'amber')} focus:outline-none`}
+              tabIndex={activeItem === 'vfe' ? 0 : -1}
               onMouseEnter={() => setHoverItem('vfe')}
               onMouseLeave={() => setHoverItem(null)}
             >
@@ -336,8 +364,14 @@ const Sidebar: React.FC = () => {
             {/* Detection & CTL */}
             <Link 
               to="/detection"
-              onClick={() => setActiveItem('detection')}
-              className={getVitalItemClass('detection', 'blue')}
+              data-menu-item="detection"
+              onClick={(e) => {
+                setActiveItem('detection');
+                handleNavigationClick(e);
+              }}
+              onMouseDown={handleNavigationMouseDown}
+              className={`${getVitalItemClass('detection', 'blue')} focus:outline-none`}
+              tabIndex={activeItem === 'detection' ? 0 : -1}
               onMouseEnter={() => setHoverItem('detection')}
               onMouseLeave={() => setHoverItem(null)}
             >
@@ -368,7 +402,14 @@ const Sidebar: React.FC = () => {
             {/* Security & Encryption */}
             <Link 
               to="/security"
-              className={getVitalItemClass('security', 'red')}
+              data-menu-item="security"
+              onClick={(e) => {
+                setActiveItem('security');
+                handleNavigationClick(e);
+              }}
+              onMouseDown={handleNavigationMouseDown}
+              className={`${getVitalItemClass('security', 'red')} focus:outline-none`}
+              tabIndex={activeItem === 'security' ? 0 : -1}
               onMouseEnter={() => setHoverItem('security')}
               onMouseLeave={() => setHoverItem(null)}
             >
@@ -399,7 +440,14 @@ const Sidebar: React.FC = () => {
             {/* FCE Security */}
             <Link 
               to="/fce-security"
-              className={getVitalItemClass('fce_security', 'purple')}
+              data-menu-item="fce_security"
+              onClick={(e) => {
+                setActiveItem('fce_security');
+                handleNavigationClick(e);
+              }}
+              onMouseDown={handleNavigationMouseDown}
+              className={`${getVitalItemClass('fce_security', 'purple')} focus:outline-none`}
+              tabIndex={activeItem === 'fce_security' ? 0 : -1}
               onMouseEnter={() => setHoverItem('fce_security')}
               onMouseLeave={() => setHoverItem(null)}
             >
@@ -430,7 +478,14 @@ const Sidebar: React.FC = () => {
             {/* Network Filtering */}
             <Link 
               to="/network-filtering"
-              className={getVitalItemClass('network_filtering', 'cyan')}
+              data-menu-item="network_filtering"
+              onClick={(e) => {
+                setActiveItem('network_filtering');
+                handleNavigationClick(e);
+              }}
+              onMouseDown={handleNavigationMouseDown}
+              className={`${getVitalItemClass('network_filtering', 'cyan')} focus:outline-none`}
+              tabIndex={activeItem === 'network_filtering' ? 0 : -1}
               onMouseEnter={() => setHoverItem('network_filtering')}
               onMouseLeave={() => setHoverItem(null)}
             >
@@ -461,7 +516,14 @@ const Sidebar: React.FC = () => {
             {/* Identity */}
             <Link 
               to="/identity"
-              className={getVitalItemClass('identity', 'pink')}
+              data-menu-item="identity"
+              onClick={(e) => {
+                setActiveItem('identity');
+                handleNavigationClick(e);
+              }}
+              onMouseDown={handleNavigationMouseDown}
+              className={`${getVitalItemClass('identity', 'pink')} focus:outline-none`}
+              tabIndex={activeItem === 'identity' ? 0 : -1}
               onMouseEnter={() => setHoverItem('identity')}
               onMouseLeave={() => setHoverItem(null)}
             >
@@ -503,8 +565,14 @@ const Sidebar: React.FC = () => {
             {/* Hosts */}
             <Link 
               to="/hosts"
-              onClick={() => setActiveItem('hosts')}
-              className={getVitalItemClass('hosts', 'green')}
+              data-menu-item="hosts"
+              onClick={(e) => {
+                setActiveItem('hosts');
+                handleNavigationClick(e);
+              }}
+              onMouseDown={handleNavigationMouseDown}
+              className={`${getVitalItemClass('hosts', 'green')} focus:outline-none`}
+              tabIndex={activeItem === 'hosts' ? 0 : -1}
               onMouseEnter={() => setHoverItem('hosts')}
               onMouseLeave={() => setHoverItem(null)}
             >
@@ -598,6 +666,28 @@ const Sidebar: React.FC = () => {
       
       {/* Style global pour les motifs d'arrière-plan */}
       <style>{`
+        /* Suppression complète du focus pour tous les liens de navigation */
+        nav a:focus,
+        nav a:focus-visible,
+        nav a:focus-within {
+          outline: none !important;
+          box-shadow: none !important;
+        }
+        
+        /* Empêcher tout ring de focus sur les liens avec data-menu-item */
+        [data-menu-item]:focus,
+        [data-menu-item]:focus-visible {
+          outline: none !important;
+          box-shadow: none !important;
+          --tw-ring-shadow: 0 0 transparent !important;
+        }
+        
+        /* Reset des styles de focus pour éviter les artefacts visuels */
+        [data-menu-item] {
+          -webkit-tap-highlight-color: transparent;
+          user-select: none;
+        }
+        
         .bg-grid-pattern {
           background-image: radial-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px);
           background-size: 8px 8px;

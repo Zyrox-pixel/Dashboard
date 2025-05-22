@@ -151,6 +151,19 @@
     @apply outline-none ring-2 ring-indigo-500/70 ring-offset-1 ring-offset-slate-900;
   }
   
+  /* Supprimer le focus parasite sur les liens de navigation de la sidebar */
+  [data-menu-item]:focus,
+  [data-menu-item]:focus-visible,
+  [data-menu-item]:focus-within {
+    outline: none !important;
+    box-shadow: none !important;
+  }
+  
+  /* Empêcher le focus ring Tailwind sur les liens de navigation */
+  [data-menu-item] {
+    --tw-ring-shadow: 0 0 transparent !important;
+  }
+  
   /* Effet de texte avec espacement */
   .text-spaced {
     letter-spacing: 0.04em;
