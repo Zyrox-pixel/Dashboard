@@ -72,7 +72,7 @@ const TabNavigation: React.FC<TabNavigationProps> = ({
   
   // Styles selon la variante
   const getTabStyles = (isActive: boolean, isHovered: boolean) => {
-    const baseStyles = `${currentSize.padding} ${currentSize.text} font-medium transition-colors duration-200 cursor-pointer select-none`;
+    const baseStyles = `${currentSize.padding} ${currentSize.text} font-medium transition-colors duration-200 cursor-pointer select-none outline-none`;
     
     switch (variant) {
       case 'pills':
@@ -115,8 +115,8 @@ const TabNavigation: React.FC<TabNavigationProps> = ({
               ? 'bg-slate-800 text-white border-t border-l border-r border-slate-700'
               : 'bg-white text-slate-900 border-t border-l border-r border-slate-200 shadow-sm'
             : isDarkTheme
-              ? `bg-slate-900 text-slate-400 ${isHovered ? 'bg-slate-800/50 text-slate-300' : ''} border-b border-slate-700`
-              : `bg-slate-100 text-slate-600 ${isHovered ? 'bg-slate-50 text-slate-900' : ''} border-b border-slate-200`
+              ? `text-slate-400 ${isHovered ? 'bg-slate-800/50 text-slate-300' : ''}`
+              : `text-slate-600 ${isHovered ? 'bg-slate-100 text-slate-900' : ''}`
         }`;
     }
   };
@@ -158,7 +158,7 @@ const TabNavigation: React.FC<TabNavigationProps> = ({
               >
                 <button
                   onClick={() => onTabChange(tab.id)}
-                  className={`${getTabStyles(activeTab === tab.id, hoveredTab === tab.id)} flex items-center gap-2 relative group`}
+                  className={`${getTabStyles(activeTab === tab.id, hoveredTab === tab.id)} flex items-center gap-2 relative group focus:outline-none`}
                   style={{ backfaceVisibility: 'hidden', transform: 'translateZ(0)' }}
                   onMouseEnter={() => handleMouseEnter(tab.id)}
                   onMouseLeave={handleMouseLeave}

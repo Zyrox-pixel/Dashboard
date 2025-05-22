@@ -155,8 +155,8 @@ const Sidebar: React.FC = () => {
     // Animation au survol
     return `${baseClasses} ${
       isDarkTheme 
-        ? 'text-slate-400 hover:bg-gradient-to-r hover:from-slate-800/70 hover:via-slate-800/50 hover:to-transparent hover:text-white hover:border hover:border-slate-700/30' 
-        : 'text-slate-600 hover:bg-gradient-to-r hover:from-slate-100 hover:via-slate-50 hover:to-white hover:text-slate-900 hover:border hover:border-slate-200/70'
+        ? 'text-slate-400 hover:bg-gradient-to-r hover:from-slate-800/70 hover:via-slate-800/50 hover:to-transparent hover:text-white' 
+        : 'text-slate-600 hover:bg-gradient-to-r hover:from-slate-100 hover:via-slate-50 hover:to-white hover:text-slate-900'
     }`;
   };
   
@@ -181,8 +181,8 @@ const Sidebar: React.FC = () => {
     // Élément inactif avec effet de lueur au survol
     return `${baseClasses} ${
       isDarkTheme 
-        ? `text-${color}-400 hover:bg-gradient-to-r hover:from-${color}-900/30 hover:to-transparent hover:text-${color}-300 hover:shadow-sm hover:border hover:border-${color}-700/30 hover:shadow-${color}-900/20` 
-        : `text-${color}-600 hover:bg-gradient-to-r hover:from-${color}-50 hover:to-transparent hover:text-${color}-700 hover:shadow-sm hover:border hover:border-${color}-200/70 hover:shadow-${color}-200/30`
+        ? `text-${color}-400 hover:bg-gradient-to-r hover:from-${color}-900/30 hover:to-transparent hover:text-${color}-300 hover:shadow-sm hover:shadow-${color}-900/20` 
+        : `text-${color}-600 hover:bg-gradient-to-r hover:from-${color}-50 hover:to-transparent hover:text-${color}-700 hover:shadow-sm hover:shadow-${color}-200/30`
     }`;
   };
   
@@ -231,7 +231,7 @@ const Sidebar: React.FC = () => {
             handleNavigationClick(e);
           }}
           onMouseDown={handleNavigationMouseDown}
-          className={special ? getVitalItemClass(itemKey, color) : getMenuItemClass(itemKey)}
+          className={`${special ? getVitalItemClass(itemKey, color) : getMenuItemClass(itemKey)} focus:outline-none`}
           tabIndex={isActive ? 0 : -1}
           onMouseEnter={() => handleHover(itemKey)}
           onMouseLeave={handleHoverLeave}
