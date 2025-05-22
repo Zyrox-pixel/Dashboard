@@ -28,6 +28,9 @@ export const ENDPOINTS = {
   VITAL_FOR_ANALYTICS_MZS: '/vital-for-analytics-mzs',
   DETECTION_CTL_MZS: '/detection-ctl-mzs',
   SECURITY_ENCRYPTION_MZS: '/security-encryption-mzs',
+  FCE_SECURITY_MZS: '/fce-security-mzs',
+  NETWORK_FILTERING_MZS: '/network-filtering-mzs',
+  IDENTITY_MZS: '/identity-mzs',
   MZ_ADMIN: '/mz-admin',
   
   // Endpoint de rafraîchissement du cache

@@ -9,7 +9,7 @@ import { Problem, Host, Service, ProcessGroup } from '../api/types';
  */
 export const exportProblemsToCSV = (
   problems: Problem[],
-  filterType: 'vfg' | 'vfe' | 'vfp' | 'vfa' | 'detection' | 'security' | 'all',
+  filterType: 'vfg' | 'vfe' | 'vfp' | 'vfa' | 'detection' | 'security' | 'fce-security' | 'network-filtering' | 'identity' | 'all',
   mgmtZone?: string
 ): { csv: string; filename: string } => {
   // Créer l'en-tête du CSV selon les nouvelles exigences
@@ -128,6 +128,15 @@ export const exportProblemsToCSV = (
       break;
     case 'security':
       zoneLabel = 'SECURITY';
+      break;
+    case 'fce-security':
+      zoneLabel = 'FCE_SECURITY';
+      break;
+    case 'network-filtering':
+      zoneLabel = 'NETWORK_FILTERING';
+      break;
+    case 'identity':
+      zoneLabel = 'IDENTITY';
       break;
     case 'all':
       zoneLabel = 'ALL';

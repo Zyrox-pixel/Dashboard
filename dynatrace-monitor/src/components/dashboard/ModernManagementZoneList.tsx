@@ -16,7 +16,7 @@ interface ModernManagementZoneListProps {
   onZoneClick: (zoneId: string) => void;
   title?: string;
   subtitle?: string;
-  variant?: 'vfg' | 'vfe' | 'vfp' | 'vfa' | 'detection' | 'security';
+  variant?: 'vfg' | 'vfe' | 'vfp' | 'vfa' | 'detection' | 'security' | 'fce-security' | 'network-filtering' | 'identity';
   loading?: boolean;
   onRefresh?: () => void;
 }
@@ -211,6 +211,12 @@ const ModernManagementZoneList: React.FC<ModernManagementZoneListProps> = ({
         return 'emerald';
       case 'security':
         return 'orange';
+      case 'fce-security':
+        return 'purple';
+      case 'network-filtering':
+        return 'cyan';
+      case 'identity':
+        return 'pink';
       case 'vfp':
         return 'green';
       case 'vfa':
@@ -442,13 +448,15 @@ const ModernManagementZoneList: React.FC<ModernManagementZoneListProps> = ({
       ) : (
         <div className="p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {filteredZones.map(zone => (
-            <div key={zone.id} id={`zone-${zone.id}`}>
-              <ZoneCard 
-                zone={zone} 
-                onZoneClick={onZoneClick}
-                variant="standard"
-                design={cardDesign}
-              />
+            <div key={zone.id} id={`zone-${zone.id}`} className="h-full">
+              <div className="h-full" style={{minHeight: '280px'}}>
+                <ZoneCard 
+                  zone={zone} 
+                  onZoneClick={onZoneClick}
+                  variant="standard"
+                  design={cardDesign}
+                />
+              </div>
             </div>
           ))}
         </div>

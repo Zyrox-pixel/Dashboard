@@ -651,6 +651,27 @@ class ApiClient {
   }
 
   /**
+   * Récupérer les management zones de FCE Security
+   */
+  public getFceSecurityMZs() {
+    return this.get<VitalForGroupMZsResponse>(ENDPOINTS.FCE_SECURITY_MZS);
+  }
+
+  /**
+   * Récupérer les management zones de Network Filtering
+   */
+  public getNetworkFilteringMZs() {
+    return this.get<VitalForGroupMZsResponse>(ENDPOINTS.NETWORK_FILTERING_MZS);
+  }
+
+  /**
+   * Récupérer les management zones de Identity
+   */
+  public getIdentityMZs() {
+    return this.get<VitalForGroupMZsResponse>(ENDPOINTS.IDENTITY_MZS);
+  }
+
+  /**
    * Récupérer la Management Zone Admin configurée dans le fichier .env du backend
    * Force un rafraîchissement à chaque fois pour s'assurer d'avoir la dernière valeur
    */

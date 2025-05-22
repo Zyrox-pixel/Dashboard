@@ -9,7 +9,10 @@ const CACHE_KEYS = {
   vfp: 'zone_status_vfp_cache',
   vfa: 'zone_status_vfa_cache',
   detection: 'zone_status_detection_cache',
-  security: 'zone_status_security_cache'
+  security: 'zone_status_security_cache',
+  'fce-security': 'zone_status_fce_security_cache',
+  'network-filtering': 'zone_status_network_filtering_cache',
+  identity: 'zone_status_identity_cache'
 };
 
 /**
@@ -33,14 +36,20 @@ export function useZoneStatusPreloader() {
     vfp: Record<string, { problemCount: number, status: 'warning' | 'healthy' }>,
     vfa: Record<string, { problemCount: number, status: 'warning' | 'healthy' }>,
     detection: Record<string, { problemCount: number, status: 'warning' | 'healthy' }>,
-    security: Record<string, { problemCount: number, status: 'warning' | 'healthy' }>
+    security: Record<string, { problemCount: number, status: 'warning' | 'healthy' }>,
+    'fce-security': Record<string, { problemCount: number, status: 'warning' | 'healthy' }>,
+    'network-filtering': Record<string, { problemCount: number, status: 'warning' | 'healthy' }>,
+    identity: Record<string, { problemCount: number, status: 'warning' | 'healthy' }>
   }>({
     vfg: {},
     vfe: {},
     vfp: {},
     vfa: {},
     detection: {},
-    security: {}
+    security: {},
+    'fce-security': {},
+    'network-filtering': {},
+    identity: {}
   });
   
   /**
@@ -60,12 +69,18 @@ export function useZoneStatusPreloader() {
         vfgProblemsResponse, 
         vfeProblemsResponse, 
         detectionProblemsResponse, 
-        securityProblemsResponse
+        securityProblemsResponse,
+        fceSecurityProblemsResponse,
+        networkFilteringProblemsResponse,
+        identityProblemsResponse
       ] = await Promise.all([
         api.getProblems("OPEN", "-60d", "vfg", force),
         api.getProblems("OPEN", "-60d", "vfe", force),
         api.getProblems("OPEN", "-60d", "detection", force),
-        api.getProblems("OPEN", "-60d", "security", force)
+        api.getProblems("OPEN", "-60d", "security", force),
+        api.getProblems("OPEN", "-60d", "fce-security", force),
+        api.getProblems("OPEN", "-60d", "network-filtering", force),
+        api.getProblems("OPEN", "-60d", "identity", force)
       ]);
       
       // Extraire les données
@@ -73,12 +88,18 @@ export function useZoneStatusPreloader() {
       const vfeProblemData = vfeProblemsResponse.error ? [] : (vfeProblemsResponse.data || []);
       const detectionProblemData = detectionProblemsResponse.error ? [] : (detectionProblemsResponse.data || []);
       const securityProblemData = securityProblemsResponse.error ? [] : (securityProblemsResponse.data || []);
+      const fceSecurityProblemData = fceSecurityProblemsResponse.error ? [] : (fceSecurityProblemsResponse.data || []);
+      const networkFilteringProblemData = networkFilteringProblemsResponse.error ? [] : (networkFilteringProblemsResponse.data || []);
+      const identityProblemData = identityProblemsResponse.error ? [] : (identityProblemsResponse.data || []);
       
       // Cache in-memory pour un accès rapide
       const vfgZoneStatus: Record<string, { problemCount: number, status: 'warning' | 'healthy' }> = {};
       const vfeZoneStatus: Record<string, { problemCount: number, status: 'warning' | 'healthy' }> = {};
       const detectionZoneStatus: Record<string, { problemCount: number, status: 'warning' | 'healthy' }> = {};
       const securityZoneStatus: Record<string, { problemCount: number, status: 'warning' | 'healthy' }> = {};
+      const fceSecurityZoneStatus: Record<string, { problemCount: number, status: 'warning' | 'healthy' }> = {};
+      const networkFilteringZoneStatus: Record<string, { problemCount: number, status: 'warning' | 'healthy' }> = {};
+      const identityZoneStatus: Record<string, { problemCount: number, status: 'warning' | 'healthy' }> = {};
       
       // Traiter les problèmes VFG et créer un index par zone
       vfgProblemData.forEach(problem => {
@@ -123,6 +144,39 @@ export function useZoneStatusPreloader() {
           securityZoneStatus[problem.zone].status = 'warning';
         }
       });
+
+      // Traiter les problèmes FCE Security
+      fceSecurityProblemData.forEach(problem => {
+        if (problem.zone) {
+          if (!fceSecurityZoneStatus[problem.zone]) {
+            fceSecurityZoneStatus[problem.zone] = { problemCount: 0, status: 'healthy' };
+          }
+          fceSecurityZoneStatus[problem.zone].problemCount++;
+          fceSecurityZoneStatus[problem.zone].status = 'warning';
+        }
+      });
+
+      // Traiter les problèmes Network Filtering
+      networkFilteringProblemData.forEach(problem => {
+        if (problem.zone) {
+          if (!networkFilteringZoneStatus[problem.zone]) {
+            networkFilteringZoneStatus[problem.zone] = { problemCount: 0, status: 'healthy' };
+          }
+          networkFilteringZoneStatus[problem.zone].problemCount++;
+          networkFilteringZoneStatus[problem.zone].status = 'warning';
+        }
+      });
+
+      // Traiter les problèmes Identity
+      identityProblemData.forEach(problem => {
+        if (problem.zone) {
+          if (!identityZoneStatus[problem.zone]) {
+            identityZoneStatus[problem.zone] = { problemCount: 0, status: 'healthy' };
+          }
+          identityZoneStatus[problem.zone].problemCount++;
+          identityZoneStatus[problem.zone].status = 'warning';
+        }
+      });
       
       // Mettre à jour le cache en mémoire
       statusCacheRef.current = {
@@ -131,7 +185,10 @@ export function useZoneStatusPreloader() {
         vfp: {}, // À implémenter plus tard
         vfa: {},  // À implémenter plus tard
         detection: detectionZoneStatus,
-        security: securityZoneStatus
+        security: securityZoneStatus,
+        'fce-security': fceSecurityZoneStatus,
+        'network-filtering': networkFilteringZoneStatus,
+        identity: identityZoneStatus
       };
       
       // Sauvegarder dans localStorage pour persistance
@@ -154,8 +211,23 @@ export function useZoneStatusPreloader() {
         zoneStatuses: securityZoneStatus,
         timestamp: Date.now()
       }));
+
+      localStorage.setItem(CACHE_KEYS['fce-security'], JSON.stringify({
+        zoneStatuses: fceSecurityZoneStatus,
+        timestamp: Date.now()
+      }));
+
+      localStorage.setItem(CACHE_KEYS['network-filtering'], JSON.stringify({
+        zoneStatuses: networkFilteringZoneStatus,
+        timestamp: Date.now()
+      }));
+
+      localStorage.setItem(CACHE_KEYS.identity, JSON.stringify({
+        zoneStatuses: identityZoneStatus,
+        timestamp: Date.now()
+      }));
       
-      console.log(`Statuts préchargés: VFG=${Object.keys(vfgZoneStatus).length} zones, VFE=${Object.keys(vfeZoneStatus).length} zones, Detection=${Object.keys(detectionZoneStatus).length} zones, Security=${Object.keys(securityZoneStatus).length} zones`);
+      console.log(`Statuts préchargés: VFG=${Object.keys(vfgZoneStatus).length} zones, VFE=${Object.keys(vfeZoneStatus).length} zones, Detection=${Object.keys(detectionZoneStatus).length} zones, Security=${Object.keys(securityZoneStatus).length} zones, FCE Security=${Object.keys(fceSecurityZoneStatus).length} zones, Network Filtering=${Object.keys(networkFilteringZoneStatus).length} zones, Identity=${Object.keys(identityZoneStatus).length} zones`);
       
       // Marquer comme préchargé
       setIsPreloaded(true);
@@ -171,18 +243,18 @@ export function useZoneStatusPreloader() {
    * Fonction pour appliquer les statuts préchargés aux Management Zones
    * Cette fonction doit être appelée au moment de la création des zones
    */
-  const applyPreloadedStatuses = (zones: any[], dashboardType: 'vfg' | 'vfe' | 'vfp' | 'vfa' | 'detection' | 'security') => {
+  const applyPreloadedStatuses = (zones: any[], dashboardType: 'vfg' | 'vfe' | 'vfp' | 'vfa' | 'detection' | 'security' | 'fce-security' | 'network-filtering' | 'identity') => {
     // Si pas encore préchargé, renvoyer les zones telles quelles
     if (!isPreloaded) return zones;
     
     console.log(`Applying preloaded statuses for ${dashboardType} - ${zones.length} zones`);
     
     // Pour les nouveaux types (detection, security), nous allons tenter de faire des correspondances plus flexibles
-    let effectiveTypes: ('vfg' | 'vfe' | 'vfp' | 'vfa' | 'detection' | 'security')[] = [dashboardType];
+    let effectiveTypes: ('vfg' | 'vfe' | 'vfp' | 'vfa' | 'detection' | 'security' | 'fce-security' | 'network-filtering' | 'identity')[] = [dashboardType];
     
     // Si c'est un type de dashboard plus récent, essayons de faire correspondre avec les types existants
     // car nous pourrions ne pas avoir de cache pour ce type exact
-    if (dashboardType === 'detection' || dashboardType === 'security') {
+    if (dashboardType === 'detection' || dashboardType === 'security' || dashboardType === 'fce-security' || dashboardType === 'network-filtering' || dashboardType === 'identity') {
       console.log(`Dashboard type ${dashboardType} detected, adding fallback types`);
       // Ajouter des types de repli pour les nouveaux dashboards
       effectiveTypes = [...effectiveTypes, 'vfg', 'vfe'];
@@ -243,11 +315,17 @@ export function useZoneStatusPreloader() {
       const vfeCachedData = localStorage.getItem(CACHE_KEYS.vfe);
       const detectionCachedData = localStorage.getItem(CACHE_KEYS.detection);
       const securityCachedData = localStorage.getItem(CACHE_KEYS.security);
+      const fceSecurityCachedData = localStorage.getItem(CACHE_KEYS['fce-security']);
+      const networkFilteringCachedData = localStorage.getItem(CACHE_KEYS['network-filtering']);
+      const identityCachedData = localStorage.getItem(CACHE_KEYS.identity);
       
       let vfgStatusCache = {};
       let vfeStatusCache = {};
       let detectionStatusCache = {};
       let securityStatusCache = {};
+      let fceSecurityStatusCache = {};
+      let networkFilteringStatusCache = {};
+      let identityStatusCache = {};
       let needsRefresh = true;
       
       if (vfgCachedData) {
@@ -285,6 +363,30 @@ export function useZoneStatusPreloader() {
           needsRefresh = false;
         }
       }
+
+      if (fceSecurityCachedData) {
+        const parsedData = JSON.parse(fceSecurityCachedData);
+        if (parsedData.timestamp && Date.now() - parsedData.timestamp < 30 * 60 * 1000) {
+          fceSecurityStatusCache = parsedData.zoneStatuses || {};
+          needsRefresh = false;
+        }
+      }
+
+      if (networkFilteringCachedData) {
+        const parsedData = JSON.parse(networkFilteringCachedData);
+        if (parsedData.timestamp && Date.now() - parsedData.timestamp < 30 * 60 * 1000) {
+          networkFilteringStatusCache = parsedData.zoneStatuses || {};
+          needsRefresh = false;
+        }
+      }
+
+      if (identityCachedData) {
+        const parsedData = JSON.parse(identityCachedData);
+        if (parsedData.timestamp && Date.now() - parsedData.timestamp < 30 * 60 * 1000) {
+          identityStatusCache = parsedData.zoneStatuses || {};
+          needsRefresh = false;
+        }
+      }
       
       // Mettre à jour le cache en mémoire
       statusCacheRef.current = {
@@ -293,7 +395,10 @@ export function useZoneStatusPreloader() {
         vfp: {}, // À implémenter plus tard
         vfa: {},  // À implémenter plus tard
         detection: detectionStatusCache,
-        security: securityStatusCache
+        security: securityStatusCache,
+        'fce-security': fceSecurityStatusCache,
+        'network-filtering': networkFilteringStatusCache,
+        identity: identityStatusCache
       };
       
       // Si les données sont valides, marquer comme préchargé
@@ -301,7 +406,10 @@ export function useZoneStatusPreloader() {
           Object.keys(vfgStatusCache).length > 0 || 
           Object.keys(vfeStatusCache).length > 0 ||
           Object.keys(detectionStatusCache).length > 0 ||
-          Object.keys(securityStatusCache).length > 0
+          Object.keys(securityStatusCache).length > 0 ||
+          Object.keys(fceSecurityStatusCache).length > 0 ||
+          Object.keys(networkFilteringStatusCache).length > 0 ||
+          Object.keys(identityStatusCache).length > 0
         )) {
         console.log(`Statuts de zones chargés depuis le cache local`);
         setIsPreloaded(true);

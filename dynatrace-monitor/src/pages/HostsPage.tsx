@@ -4,6 +4,7 @@ import Layout from '../components/layout/Layout';
 import { RefreshCw, Server, Database, HardDrive, Search, AlertCircle, Filter, Monitor, ArrowUp, ArrowDown, Cpu, FileDown } from 'lucide-react';
 import AdvancedFilter, { FilterCategory, FilterValue, FilterItem } from '../components/common/AdvancedFilter';
 import UnifiedFilterBadges, { FilterBadge } from '../components/common/UnifiedFilterBadges';
+import AdvancedLoadingState from '../components/common/AdvancedLoadingState';
 import { Host } from '../api/types';
 import { exportHostsToCSV, downloadCSV } from '../utils/exportUtils';
 
@@ -29,11 +30,15 @@ const HostsPage: React.FC = () => {
   const { 
     hosts, 
     totalHosts, 
-    isLoading, 
+    isLoading,
+    isInitialLoading,
     error, 
     lastRefreshTime,
     mzAdmin,
-    refreshData
+    refreshData,
+    loadingPhase,
+    loadingProgress,
+    terminalLogs
   } = useHostsData();
 
   // Helper pour obtenir l'icône du système d'exploitation
@@ -516,6 +521,19 @@ const HostsPage: React.FC = () => {
     refreshData(true);
   };
 
+  // Afficher le composant de chargement avancé pendant le chargement initial
+  if (isInitialLoading && hosts.length === 0) {
+    return (
+      <AdvancedLoadingState 
+        title="Chargement des hôtes" 
+        type="hosts" 
+        currentPhase={loadingPhase}
+        progress={loadingProgress}
+        terminalLogs={terminalLogs}
+      />
+    );
+  }
+
   return (
     <Layout title="Inventory" subtitle="Hosts">
       <div className="px-6 py-4 w-full">
@@ -659,7 +677,7 @@ const HostsPage: React.FC = () => {
           </div>
         )}
 
-        {!mzAdmin || error ? (
+        {error && hosts.length === 0 ? (
           <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-900/30 rounded-lg p-4 mb-6">
             <div className="flex items-center gap-2 text-amber-800 dark:text-amber-400">
               <AlertCircle size={18} />

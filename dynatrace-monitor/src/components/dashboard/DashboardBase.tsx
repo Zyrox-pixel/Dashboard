@@ -10,7 +10,7 @@ import { Shield, Loader, AlertTriangle, RefreshCw, Clock, BarChart, ChevronLeft,
 
 interface DashboardBaseProps {
   title: string;
-  variant: 'vfg' | 'vfe' | 'vfp' | 'vfa' | 'detection' | 'security';
+  variant: 'vfg' | 'vfe' | 'vfp' | 'vfa' | 'detection' | 'security' | 'fce-security' | 'network-filtering' | 'identity';
   optimized?: boolean;
   context: AppContextType;
 }
@@ -69,6 +69,12 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
         return context.detectionCtlMZs;
       case 'security':
         return context.securityEncryptionMZs;
+      case 'fce-security':
+        return context.fceSecurityMZs;
+      case 'network-filtering':
+        return context.networkFilteringMZs;
+      case 'identity':
+        return context.identityMZs;
       case 'vfp':
         return vitalForGroupMZs; // Temporairement, utiliser vfg pour vfp
       case 'vfa':
@@ -225,6 +231,45 @@ const DashboardBase: React.FC<DashboardBaseProps> = ({
           borderLight: 'border-orange-200',
           borderDark: 'border-orange-800',
           hoverBg: 'hover:bg-orange-700',
+        };
+      case 'fce-security':
+        return {
+          accent: 'text-purple-500',
+          accentBg: 'bg-purple-500',
+          text: 'text-purple-600',
+          darkText: 'text-purple-400',
+          bgLight: 'bg-purple-100',
+          bgLightOpacity: 'bg-purple-500/10',
+          bgDark: 'bg-purple-900/20',
+          borderLight: 'border-purple-200',
+          borderDark: 'border-purple-800',
+          hoverBg: 'hover:bg-purple-700',
+        };
+      case 'network-filtering':
+        return {
+          accent: 'text-cyan-500',
+          accentBg: 'bg-cyan-500',
+          text: 'text-cyan-600',
+          darkText: 'text-cyan-400',
+          bgLight: 'bg-cyan-100',
+          bgLightOpacity: 'bg-cyan-500/10',
+          bgDark: 'bg-cyan-900/20',
+          borderLight: 'border-cyan-200',
+          borderDark: 'border-cyan-800',
+          hoverBg: 'hover:bg-cyan-700',
+        };
+      case 'identity':
+        return {
+          accent: 'text-pink-500',
+          accentBg: 'bg-pink-500',
+          text: 'text-pink-600',
+          darkText: 'text-pink-400',
+          bgLight: 'bg-pink-100',
+          bgLightOpacity: 'bg-pink-500/10',
+          bgDark: 'bg-pink-900/20',
+          borderLight: 'border-pink-200',
+          borderDark: 'border-pink-800',
+          hoverBg: 'hover:bg-pink-700',
         };
       case 'vfp':
         return {

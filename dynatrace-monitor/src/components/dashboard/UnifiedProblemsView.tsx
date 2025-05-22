@@ -11,7 +11,7 @@ interface UnifiedProblemsViewProps {
   /** Titre principal de la vue */
   title: string;
   /** Variante du dashboard (vfg, vfe, detection, security ou all) */
-  variant: 'vfg' | 'vfe' | 'detection' | 'security' | 'vfp' | 'vfa' | 'all';
+  variant: 'vfg' | 'vfe' | 'detection' | 'security' | 'fce-security' | 'network-filtering' | 'identity' | 'vfp' | 'vfa' | 'all';
   /** Filtre de zone optionnel (pour les sous-zones de management) */
   zoneFilter?: string;
   /** Type de problème à afficher (active, recent, all) */
@@ -101,8 +101,16 @@ const UnifiedProblemsView: React.FC<UnifiedProblemsViewProps> = ({ title, varian
     const newTimeframe = e.target.value;
     setSelectedTimeframe(newTimeframe);
     
-    // Pour l'onglet "récent", rafraîchir automatiquement les données avec la nouvelle période
-    if (activeTab === 'recent') {
+    // Sauvegarder la nouvelle période sans déclencher de rafraîchissement automatique
+    sessionStorage.setItem('lastTimeframe', newTimeframe);
+    
+    // Ne plus rafraîchir automatiquement - laisser l'utilisateur décider
+    // Les données seront rafraîchies la prochaine fois qu'il clique sur le bouton rafraîchir
+    console.log(`Période changée vers ${newTimeframe}, pas de rafraîchissement automatique`);
+    
+    // Pour l'onglet "récent", ne rafraîchir que si l'utilisateur le demande explicitement
+    // (Optimisation: éviter les requêtes inutiles lors des changements de période)
+    if (false) { // Désactivé pour optimisation
       try {
         setIsRefreshing(true);
         // Rafraîchir les données avec un léger délai pour permettre à l'UI de se mettre à jour
@@ -257,6 +265,15 @@ const UnifiedProblemsView: React.FC<UnifiedProblemsViewProps> = ({ title, varian
       break;
     case 'security':
       accentColor = 'orange';
+      break;
+    case 'fce-security':
+      accentColor = 'purple';
+      break;
+    case 'network-filtering':
+      accentColor = 'cyan';
+      break;
+    case 'identity':
+      accentColor = 'pink';
       break;
     case 'vfp':
       accentColor = 'green';
