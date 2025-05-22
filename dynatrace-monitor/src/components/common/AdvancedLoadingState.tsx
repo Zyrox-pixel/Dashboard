@@ -5,12 +5,19 @@ interface AdvancedLoadingStateProps {
   title?: string;
   type?: 'hosts' | 'services' | 'problems' | 'general';
   duration?: number; // durée estimée en secondes
+  // Nouvelles props pour les vraies données
+  currentPhase?: string;
+  progress?: number;
+  terminalLogs?: string[];
 }
 
 const AdvancedLoadingState: React.FC<AdvancedLoadingStateProps> = ({ 
   title = "Chargement des données", 
   type = "general",
-  duration = 45 
+  duration = 45,
+  currentPhase = "Initialisation...",
+  progress: externalProgress,
+  terminalLogs: externalLogs
 }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [progress, setProgress] = useState(0);
@@ -77,8 +84,17 @@ const AdvancedLoadingState: React.FC<AdvancedLoadingStateProps> = ({
 
   const { steps, terminalMessages } = getStepsAndMessages();
 
-  // Animation du terminal
+  // Utiliser les logs externes si disponibles, sinon utiliser la simulation
   useEffect(() => {
+    if (externalLogs && externalLogs.length > 0) {
+      setTerminalLines(externalLogs.slice(-8));
+    }
+  }, [externalLogs]);
+
+  // Animation du terminal (seulement si pas de logs externes)
+  useEffect(() => {
+    if (externalLogs && externalLogs.length > 0) return;
+    
     const interval = setInterval(() => {
       const messageIndex = Math.floor((progress / 100) * terminalMessages.length);
       if (messageIndex < terminalMessages.length && messageIndex >= 0) {
@@ -95,13 +111,21 @@ const AdvancedLoadingState: React.FC<AdvancedLoadingStateProps> = ({
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [progress, terminalMessages, currentMessage]);
+  }, [progress, terminalMessages, currentMessage, externalLogs]);
 
-  // Simulation du progress basé sur les étapes
+  // Utiliser le progress externe si disponible, sinon utiliser la simulation
   useEffect(() => {
+    if (externalProgress !== undefined) {
+      setProgress(externalProgress);
+      // Calculer l'étape actuelle basée sur le progress externe
+      const stepIndex = Math.floor((externalProgress / 100) * steps.length);
+      setCurrentStep(Math.min(stepIndex, steps.length - 1));
+      return;
+    }
+
+    // Simulation du progress basé sur les étapes (fallback)
     const totalDuration = steps.reduce((acc, step) => acc + step.duration, 0);
     let elapsed = 0;
-    let stepIndex = 0;
 
     const interval = setInterval(() => {
       elapsed += 0.1;
@@ -126,7 +150,7 @@ const AdvancedLoadingState: React.FC<AdvancedLoadingStateProps> = ({
     }, 100);
 
     return () => clearInterval(interval);
-  }, [steps]);
+  }, [steps, externalProgress]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
@@ -144,7 +168,7 @@ const AdvancedLoadingState: React.FC<AdvancedLoadingStateProps> = ({
             </div>
           </div>
           <h2 className="text-2xl font-bold text-white mb-2">{title}</h2>
-          <p className="text-slate-400">Récupération des données depuis Dynatrace...</p>
+          <p className="text-slate-400">{currentPhase}</p>
         </div>
 
         {/* Terminal simulé */}
@@ -164,10 +188,16 @@ const AdvancedLoadingState: React.FC<AdvancedLoadingStateProps> = ({
                 )}
               </div>
             ))}
-            {terminalLines.length === 0 && (
+            {terminalLines.length === 0 && !externalLogs && (
               <div className="text-green-400">
                 {"> Initialisation du système..."}
                 <span className="inline-block w-2 h-4 bg-green-400 ml-1 animate-pulse"></span>
+              </div>
+            )}
+            {/* Curseur clignotant à la fin */}
+            {terminalLines.length > 0 && (
+              <div className="text-green-400 mt-1">
+                <span className="inline-block w-2 h-4 bg-green-400 animate-pulse"></span>
               </div>
             )}
           </div>

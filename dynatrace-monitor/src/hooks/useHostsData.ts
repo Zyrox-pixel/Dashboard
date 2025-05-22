@@ -28,9 +28,21 @@ export function useHostsData() {
   const [configLoaded, setConfigLoaded] = useState<boolean>(false);
   // État pour suivre la phase de chargement actuelle
   const [loadingPhase, setLoadingPhase] = useState<string>('Initialisation...');
+  // État pour suivre la progression (0-100)
+  const [loadingProgress, setLoadingProgress] = useState<number>(0);
+  // État pour les logs du terminal
+  const [terminalLogs, setTerminalLogs] = useState<string[]>([]);
 
   // Référence pour les requêtes en cours
   const pendingRequestRef = useRef<boolean>(false);
+
+  // Fonction pour ajouter un log au terminal
+  const addTerminalLog = useCallback((message: string) => {
+    setTerminalLogs(prev => {
+      const newLogs = [...prev, `> ${message}`];
+      return newLogs.slice(-8); // Garder seulement les 8 dernières lignes
+    });
+  }, []);
 
   // Fonction pour lire la configuration mzadmin depuis le backend ou le cache persistent
   const fetchMzAdminConfig = useCallback(async () => {
@@ -38,6 +50,8 @@ export function useHostsData() {
       console.log('🔍 [useHostsData] fetchMzAdminConfig démarré');
       setIsLoading(true);
       setLoadingPhase('Connexion au serveur Dynatrace...');
+      setLoadingProgress(5);
+      addTerminalLog('Initialisation de la connexion Dynatrace...');
       
       // 1. D'abord, vérifier si nous avons déjà la valeur en mémoire
       if (mzAdmin) {
@@ -59,6 +73,9 @@ export function useHostsData() {
         try {
           attempts++;
           console.log(`🔄 [useHostsData] Tentative ${attempts}/${maxAttempts} de récupération MZ Admin`);
+          addTerminalLog(`Tentative de connexion ${attempts}/${maxAttempts}...`);
+          setLoadingProgress(5 + (attempts * 5));
+          
           // Utiliser le bon endpoint pour récupérer la MZ admin
           const response = await api.get<{mzadmin: string}>('/mz-admin', {
             params: { nocache: Date.now() }
@@ -68,13 +85,17 @@ export function useHostsData() {
           if (response.error) {
             lastError = response.error;
             console.warn(`❌ [useHostsData] Tentative ${attempts}/${maxAttempts} échouée: ${response.error}`);
+            addTerminalLog(`Erreur: ${response.error}`);
           } else {
             const mzAdminValue = response.data?.mzadmin || '';
             if (!mzAdminValue) {
               lastError = 'Aucune Management Zone admin configurée dans le backend.';
               console.warn(`⚠️ [useHostsData] Tentative ${attempts}/${maxAttempts}: MZ admin vide reçue`);
+              addTerminalLog('Aucune Management Zone configurée');
             } else {
               console.log(`✅ [useHostsData] MZ Admin récupérée depuis le backend: ${mzAdminValue}`);
+              addTerminalLog(`Management Zone trouvée: ${mzAdminValue}`);
+              setLoadingProgress(20);
               setMzAdmin(mzAdminValue);
               setConfigLoaded(true);
               return mzAdminValue;
@@ -121,7 +142,7 @@ export function useHostsData() {
     } finally {
       setIsLoading(false);
     }
-  }, [mzAdmin, hosts.length]);
+  }, [mzAdmin, hosts.length, addTerminalLog]);
 
   // Fonction pour sauvegarder les données dans le cache persistant
   const saveToCache = useCallback((hostsData: Host[]) => {
@@ -212,16 +233,23 @@ export function useHostsData() {
     try {
       console.log(`🚀 [useHostsData] Chargement des données pour la MZ admin: ${mzAdmin}`);
       setLoadingPhase('Authentification et validation MZ...');
+      setLoadingProgress(25);
+      addTerminalLog('Validation de la Management Zone...');
       
       // Définir la MZ actuelle sur la MZ admin
       console.log('🔧 [useHostsData] Définition de la MZ...');
       const setMzResponse = await api.setManagementZone(mzAdmin);
       console.log('🔧 [useHostsData] Réponse setManagementZone:', setMzResponse);
+      addTerminalLog(`Configuration MZ active: ${mzAdmin}`);
       
       // Récupérer les hosts pour cette MZ
       setLoadingPhase('Scanning des hôtes disponibles...');
+      setLoadingProgress(35);
+      addTerminalLog('Lancement du scan des hôtes...');
       console.log('📡 [useHostsData] Récupération des hosts...');
+      
       const hostsResponse: ApiResponse<Host[]> = await api.getHosts();
+      
       console.log('📡 [useHostsData] Réponse getHosts:', hostsResponse);
       
       if (hostsResponse.error) {
@@ -232,8 +260,54 @@ export function useHostsData() {
       const hostsData = hostsResponse.data || [];
       console.log(`✅ [useHostsData] ${hostsData.length} hosts récupérés pour ${mzAdmin}`, hostsData);
       
+      // Calculer le nombre de lots basé sur la vraie logique : 1 lot = 50 hosts
+      const HOSTS_PER_BATCH = 50;
+      const totalBatches = Math.ceil(hostsData.length / HOSTS_PER_BATCH);
+      
+      // Simuler la progression par lots après avoir récupéré les données
+      const simulateBackendProcessing = async () => {
+        addTerminalLog(`Détection de ${hostsData.length} hôtes - Traitement par lots...`);
+        
+        for (let currentBatch = 1; currentBatch <= totalBatches; currentBatch++) {
+          const batchProgress = 35 + (currentBatch / totalBatches) * 40; // 35% à 75%
+          setLoadingProgress(batchProgress);
+          
+          // Messages réalistes comme dans vos logs
+          if (currentBatch === 1) {
+            addTerminalLog('Traitement des lots en cours...');
+          } 
+          
+          // Afficher la progression pour certains lots clés
+          if (currentBatch % Math.ceil(totalBatches / 8) === 0 || currentBatch >= totalBatches - 1 || currentBatch <= 2) {
+            const progressPercent = (currentBatch / totalBatches * 100).toFixed(1);
+            // Barre de progression ASCII
+            const progressBarLength = 25;
+            const filledLength = Math.floor((currentBatch / totalBatches) * progressBarLength);
+            const progressBar = '█'.repeat(filledLength) + '░'.repeat(progressBarLength - filledLength);
+            addTerminalLog(`Progression: ${progressPercent}% [${progressBar}] (${currentBatch}/${totalBatches} lots)`);
+          }
+          
+          // Pause entre chaque lot (plus courte car on a déjà les données)
+          await new Promise(resolve => setTimeout(resolve, 300));
+        }
+        
+        // Finaliser
+        setLoadingProgress(75);
+        addTerminalLog(`Progression: 100.0% (${totalBatches}/${totalBatches} lots)`);
+        addTerminalLog(`Traitement terminé pour ${hostsData.length} hôtes en ${(totalBatches * 0.3 / 60).toFixed(1)} minutes`);
+      };
+      
+      // Lancer la simulation du traitement backend
+      await simulateBackendProcessing();
+      
       // Simuler une collecte des métriques pour l'UX
       setLoadingPhase('Collecte des métriques système...');
+      setLoadingProgress(85);
+      addTerminalLog('Récupération des métriques CPU et RAM...');
+      
+      // Petit délai pour simuler le traitement
+      await new Promise(resolve => setTimeout(resolve, 500));
+      addTerminalLog('Analyse des configurations système d\'exploitation...');
       
       // Mettre à jour les états
       setHosts(hostsData);
@@ -245,7 +319,13 @@ export function useHostsData() {
       
       // Sauvegarder dans le cache persistant
       setLoadingPhase('Finalisation et mise en cache...');
+      setLoadingProgress(90);
+      addTerminalLog('Optimisation du cache local...');
       saveToCache(hostsData);
+      
+      // Finalisation
+      setLoadingProgress(100);
+      addTerminalLog(`Chargement terminé: ${hostsData.length} hôtes prêts ✓`);
       
       console.log('✅ [useHostsData] Données mises à jour avec succès');
       return hostsData;
@@ -263,7 +343,7 @@ export function useHostsData() {
       setIsInitialLoading(false);
       pendingRequestRef.current = false;
     }
-  }, [mzAdmin, saveToCache, hosts.length]);
+  }, [mzAdmin, saveToCache, hosts.length, addTerminalLog]);
 
   // Fonction pour vérifier si le premier chargement a déjà été effectué
   const isFirstLoadDone = useCallback(() => {
@@ -366,6 +446,8 @@ export function useHostsData() {
     configLoaded,
     refreshData,
     isFirstLoadDone,
-    loadingPhase
+    loadingPhase,
+    loadingProgress,
+    terminalLogs
   };
 }

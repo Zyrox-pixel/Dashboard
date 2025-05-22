@@ -36,7 +36,9 @@ const HostsPage: React.FC = () => {
     lastRefreshTime,
     mzAdmin,
     refreshData,
-    loadingPhase
+    loadingPhase,
+    loadingProgress,
+    terminalLogs
   } = useHostsData();
 
   // Helper pour obtenir l'icône du système d'exploitation
@@ -521,7 +523,15 @@ const HostsPage: React.FC = () => {
 
   // Afficher le composant de chargement avancé pendant le chargement initial
   if (isInitialLoading && hosts.length === 0) {
-    return <AdvancedLoadingState title="Chargement des hôtes" type="hosts" />;
+    return (
+      <AdvancedLoadingState 
+        title="Chargement des hôtes" 
+        type="hosts" 
+        currentPhase={loadingPhase}
+        progress={loadingProgress}
+        terminalLogs={terminalLogs}
+      />
+    );
   }
 
   return (
