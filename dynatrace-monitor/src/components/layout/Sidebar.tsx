@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { 
   ChevronLeft, Home, AlertTriangle, Star, Award, Grid, 
   Layers, Shield, Activity, Command, Settings, Key
@@ -14,20 +14,42 @@ type ColorType = 'indigo' | 'amber' | 'red' | 'blue' | 'green' | 'purple' | 'cya
 const Sidebar: React.FC = () => {
   const { sidebarCollapsed, setSidebarCollapsed } = useApp();
   const { isDarkTheme } = useTheme();
+  const location = useLocation();
   const [activeItem, setActiveItem] = useState<MenuItemKey>('home');
   const [hoverItem, setHoverItem] = useState<string | null>(null);
   
-  // Effet pour suivre la page active
+  // Effet pour suivre la page active - se déclenche à chaque changement de route
   useEffect(() => {
-    const path = window.location.pathname;
-    if (path === '/' || path.startsWith('/overview')) setActiveItem('home');
-    else if (path.startsWith('/problems')) setActiveItem('problems');
-    else if (path.startsWith('/vfg')) setActiveItem('vfg');
-    else if (path.startsWith('/vfe')) setActiveItem('vfe');
-    else if (path.startsWith('/detection')) setActiveItem('detection');
-    else if (path.startsWith('/security')) setActiveItem('security');
-    else if (path.startsWith('/hosts')) setActiveItem('hosts');
-  }, []);
+    const path = location.pathname;
+    console.log('📍 [Sidebar] Changement de route détecté:', path);
+    
+    let newActiveItem: MenuItemKey;
+    
+    if (path === '/' || path.startsWith('/overview')) {
+      newActiveItem = 'home';
+    } else if (path.startsWith('/problems')) {
+      newActiveItem = 'problems';
+    } else if (path.startsWith('/vfg') || path.startsWith('/dashboard/vfg')) {
+      newActiveItem = 'vfg';
+    } else if (path.startsWith('/vfe') || path.startsWith('/dashboard/vfe')) {
+      newActiveItem = 'vfe';
+    } else if (path.startsWith('/detection') || path.startsWith('/dashboard/detection')) {
+      newActiveItem = 'detection';
+    } else if (path.startsWith('/security') || path.startsWith('/dashboard/security')) {
+      newActiveItem = 'security';
+    } else if (path.startsWith('/hosts')) {
+      newActiveItem = 'hosts';
+    } else if (path.startsWith('/settings')) {
+      newActiveItem = 'settings';
+    } else if (path.startsWith('/activity')) {
+      newActiveItem = 'activity';
+    } else {
+      newActiveItem = 'home'; // Par défaut
+    }
+    
+    setActiveItem(newActiveItem);
+    console.log('📍 [Sidebar] Onglet actif mis à jour:', newActiveItem);
+  }, [location.pathname]); // Dépendance sur le pathname
 
   const toggleSidebar = () => {
     setSidebarCollapsed(!sidebarCollapsed);
