@@ -299,11 +299,8 @@ const Sidebar: React.FC = () => {
   };
 
   return (
-    <motion.aside
+    <aside
       ref={sidebarRef}
-      initial={{ x: -100, opacity: 0 }}
-      animate={{ x: 0, opacity: 1 }}
-      transition={{ type: "spring", stiffness: 300, damping: 30 }}
       className={`fixed h-full z-30 transition-all duration-500 ease-out ${
         isDarkTheme 
           ? 'bg-gradient-to-b from-slate-900 via-slate-950 to-slate-900 border-r border-slate-800/40 shadow-xl shadow-black/40' 
@@ -905,7 +902,7 @@ const Sidebar: React.FC = () => {
           background: ${isDarkTheme ? 'rgba(99, 102, 241, 0.5)' : 'rgba(99, 102, 241, 0.3)'};
         }
       `}</style>
-    </motion.aside>
+    </aside>
   );
 };
 
