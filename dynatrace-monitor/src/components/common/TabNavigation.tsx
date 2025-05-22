@@ -42,7 +42,7 @@ const TabNavigation: React.FC<TabNavigationProps> = ({
   
   // Styles selon la variante
   const getTabStyles = (isActive: boolean) => {
-    const baseStyles = `${currentSize.padding} ${currentSize.text} font-medium transition-all duration-300 cursor-pointer select-none`;
+    const baseStyles = `${currentSize.padding} ${currentSize.text} font-medium transition-colors duration-200 cursor-pointer select-none`;
     
     switch (variant) {
       case 'pills':
@@ -128,19 +128,9 @@ const TabNavigation: React.FC<TabNavigationProps> = ({
               >
                 <button
                   onClick={() => onTabChange(tab.id)}
-                  className={`${getTabStyles(activeTab === tab.id)} flex items-center gap-2 relative overflow-hidden group`}
+                  className={`${getTabStyles(activeTab === tab.id)} flex items-center gap-2 relative group`}
+                  style={{ backfaceVisibility: 'hidden', transform: 'translateZ(0)' }}
                 >
-                  {/* Effet de hover animé */}
-                  <motion.div
-                    className={`absolute inset-0 ${
-                      isDarkTheme 
-                        ? 'bg-gradient-to-r from-transparent via-white/5 to-transparent' 
-                        : 'bg-gradient-to-r from-transparent via-black/5 to-transparent'
-                    }`}
-                    initial={{ x: '-100%' }}
-                    whileHover={{ x: '100%' }}
-                    transition={{ duration: 0.6 }}
-                  />
                   
                   {/* Indicateur actif pour certaines variantes */}
                   {activeTab === tab.id && variant === 'pills' && (
@@ -152,16 +142,13 @@ const TabNavigation: React.FC<TabNavigationProps> = ({
                     />
                   )}
                   
-                  {/* Icône avec animation */}
+                  {/* Icône sans animation */}
                   {tab.icon && (
-                    <motion.div
-                      animate={activeTab === tab.id ? { scale: [1, 1.1, 1] } : {}}
-                      transition={{ duration: 0.3 }}
-                    >
+                    <div>
                       {React.cloneElement(tab.icon as React.ReactElement, { 
                         size: currentSize.icon 
                       })}
-                    </motion.div>
+                    </div>
                   )}
                   
                   {/* Label */}

@@ -193,7 +193,7 @@ const Sidebar: React.FC = () => {
     const isHovered = hoverItem === itemKey;
     
     return (
-      <div className="transition-transform duration-200 hover:translate-x-1">
+      <div>
         <Link
           to={to}
           data-menu-item={itemKey}
@@ -223,12 +223,9 @@ const Sidebar: React.FC = () => {
           {/* Glow effect */}
           {getIconGlow(itemKey, color)}
           
-          {/* Icône avec animation réduite */}
+          {/* Icône stable */}
           <div
-            className={`relative flex-shrink-0 ${getIconClass(itemKey)} transition-transform duration-300`}
-            style={{
-              transform: isActive ? 'scale(1.1)' : 'scale(1)'
-            }}
+            className={`relative flex-shrink-0 ${getIconClass(itemKey)}`}
           >
             <Icon
               size={18}
