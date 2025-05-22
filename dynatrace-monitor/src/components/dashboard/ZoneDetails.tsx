@@ -1411,12 +1411,12 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
         </button>
       </div>
       
-      {/* Contenu des onglets avec animation de glissement vertical fluide */}
+      {/* Contenu des onglets avec animation douce */}
       <div
         style={{
-          transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-          transform: isTabTransitioning ? 'translateY(15px)' : 'translateY(0)',
-          opacity: isTabTransitioning ? 0 : 1,
+          transition: 'all 0.6s ease-out',
+          transform: isTabTransitioning ? 'translateY(8px)' : 'translateY(0)',
+          opacity: isTabTransitioning ? 0.3 : 1,
         }}
       >
         {/* Contenu des onglets - Hôtes */}

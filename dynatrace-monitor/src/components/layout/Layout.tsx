@@ -18,7 +18,7 @@ const Layout: React.FC<LayoutProps> = ({ children, title, subtitle }) => {
   const location = useLocation();
   const [isTransitioning, setIsTransitioning] = useState(true); // Commence en transition
 
-  // Effet de transition lent et fluide lors du changement de route
+  // Effet de transition doux lors du changement de route
   useEffect(() => {
     // Reset l'animation à chaque changement
     setIsTransitioning(true);
@@ -26,7 +26,7 @@ const Layout: React.FC<LayoutProps> = ({ children, title, subtitle }) => {
     // Attendre un peu avant de commencer l'animation pour s'assurer que le DOM est prêt
     const startTimer = setTimeout(() => {
       setIsTransitioning(false);
-    }, 100);
+    }, 200);
     
     return () => clearTimeout(startTimer);
   }, [location.pathname]);
@@ -67,12 +67,12 @@ const Layout: React.FC<LayoutProps> = ({ children, title, subtitle }) => {
         <div 
           className="max-w-7xl mx-auto px-4 py-5 sm:px-6 md:px-8 overflow-hidden"
         >
-          {/* Content container avec animation de glissement vertical fluide */}
+          {/* Content container avec animation douce */}
           <div
             className={!isTransitioning ? 'page-enter' : ''}
             style={{
               opacity: isTransitioning ? 0 : 1,
-              transform: isTransitioning ? 'translateY(30px)' : 'translateY(0)',
+              transform: isTransitioning ? 'translateY(12px)' : 'translateY(0)',
             }}
           >
             {children}
@@ -150,7 +150,11 @@ const Layout: React.FC<LayoutProps> = ({ children, title, subtitle }) => {
         @keyframes slide-up {
           0% {
             opacity: 0;
-            transform: translateY(30px);
+            transform: translateY(12px);
+          }
+          50% {
+            opacity: 0.5;
+            transform: translateY(6px);
           }
           100% {
             opacity: 1;
@@ -159,7 +163,7 @@ const Layout: React.FC<LayoutProps> = ({ children, title, subtitle }) => {
         }
         
         .page-enter {
-          animation: slide-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+          animation: slide-up 1s ease-out forwards;
         }
         
         
