@@ -26,6 +26,35 @@ const Sidebar: React.FC = () => {
   const sidebarRef = useRef<HTMLDivElement>(null);
   const mousePositionRef = useRef({ x: 0, y: 0 });
   const animationFrameRef = useRef<number>();
+  const hoverCooldownRef = useRef<{ [key: string]: boolean }>({});
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Gestion du hover avec anti-spam
+  const handleHover = (itemKey: string) => {
+    // Si l'item est en cooldown, on ne fait rien
+    if (hoverCooldownRef.current[itemKey]) return;
+    
+    // Clear any existing timeout
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+    }
+    
+    // Set hover state immédiatement
+    setHoverItem(itemKey);
+    
+    // Mettre en cooldown cet item pour 300ms
+    hoverCooldownRef.current[itemKey] = true;
+    setTimeout(() => {
+      hoverCooldownRef.current[itemKey] = false;
+    }, 300);
+  };
+  
+  const handleHoverLeave = () => {
+    // Ajouter un petit délai avant de retirer l'effet hover
+    hoverTimeoutRef.current = setTimeout(() => {
+      setHoverItem(null);
+    }, 100);
+  };
   
   // Effet de suivi de la souris pour l'effet parallax (optimisé)
   useEffect(() => {
@@ -204,8 +233,8 @@ const Sidebar: React.FC = () => {
           onMouseDown={handleNavigationMouseDown}
           className={special ? getVitalItemClass(itemKey, color) : getMenuItemClass(itemKey)}
           tabIndex={isActive ? 0 : -1}
-          onMouseEnter={() => setHoverItem(itemKey)}
-          onMouseLeave={() => setHoverItem(null)}
+          onMouseEnter={() => handleHover(itemKey)}
+          onMouseLeave={handleHoverLeave}
         >
           {/* Effet de lumière animée (simplifié pour éviter le clignotement) */}
           {isActive && (

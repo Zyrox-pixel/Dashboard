@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
 import { useTheme } from '../../contexts/ThemeContext';
 
@@ -30,6 +30,9 @@ const TabNavigation: React.FC<TabNavigationProps> = ({
   rightContent
 }) => {
   const { isDarkTheme } = useTheme();
+  const [hoveredTab, setHoveredTab] = useState<string | null>(null);
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const hoverCooldownRef = useRef<{ [key: string]: boolean }>({});
   
   // Configuration des tailles
   const sizeConfig = {
@@ -40,8 +43,35 @@ const TabNavigation: React.FC<TabNavigationProps> = ({
   
   const currentSize = sizeConfig[size];
   
+  // Gestion du hover avec anti-spam
+  const handleMouseEnter = (tabId: string) => {
+    // Si le tab est en cooldown, on ne fait rien
+    if (hoverCooldownRef.current[tabId]) return;
+    
+    // Clear any existing timeout
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+    }
+    
+    // Set hover state immédiatement
+    setHoveredTab(tabId);
+    
+    // Mettre en cooldown ce tab pour 500ms
+    hoverCooldownRef.current[tabId] = true;
+    setTimeout(() => {
+      hoverCooldownRef.current[tabId] = false;
+    }, 500);
+  };
+  
+  const handleMouseLeave = () => {
+    // Ajouter un petit délai avant de retirer l'effet hover
+    hoverTimeoutRef.current = setTimeout(() => {
+      setHoveredTab(null);
+    }, 100);
+  };
+  
   // Styles selon la variante
-  const getTabStyles = (isActive: boolean) => {
+  const getTabStyles = (isActive: boolean, isHovered: boolean) => {
     const baseStyles = `${currentSize.padding} ${currentSize.text} font-medium transition-colors duration-200 cursor-pointer select-none`;
     
     switch (variant) {
@@ -52,8 +82,8 @@ const TabNavigation: React.FC<TabNavigationProps> = ({
               ? 'bg-gradient-to-r from-indigo-600 to-indigo-500 text-white shadow-lg shadow-indigo-900/30'
               : 'bg-gradient-to-r from-indigo-500 to-indigo-400 text-white shadow-lg shadow-indigo-200/50'
             : isDarkTheme
-              ? 'text-slate-400 hover:text-white hover:bg-slate-800/50'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              ? `text-slate-400 ${isHovered ? 'text-white bg-slate-800/50' : ''}`
+              : `text-slate-600 ${isHovered ? 'text-slate-900 bg-slate-100' : ''}`
         }`;
         
       case 'underline':
@@ -63,8 +93,8 @@ const TabNavigation: React.FC<TabNavigationProps> = ({
               ? 'border-indigo-500 text-white'
               : 'border-indigo-600 text-slate-900'
             : isDarkTheme
-              ? 'border-transparent text-slate-400 hover:text-white hover:border-slate-600'
-              : 'border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300'
+              ? `border-transparent text-slate-400 ${isHovered ? 'text-white border-slate-600' : ''}`
+              : `border-transparent text-slate-600 ${isHovered ? 'text-slate-900 border-slate-300' : ''}`
         }`;
         
       case 'gradient':
@@ -74,8 +104,8 @@ const TabNavigation: React.FC<TabNavigationProps> = ({
               ? 'bg-gradient-to-b from-slate-800 to-slate-900 text-white border-t-2 border-x-2 border-indigo-500'
               : 'bg-gradient-to-b from-white to-slate-50 text-slate-900 border-t-2 border-x-2 border-indigo-400 shadow-sm'
             : isDarkTheme
-              ? 'text-slate-400 hover:text-white hover:bg-slate-800/30'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/50'
+              ? `text-slate-400 ${isHovered ? 'text-white bg-slate-800/30' : ''}`
+              : `text-slate-600 ${isHovered ? 'text-slate-900 bg-slate-100/50' : ''}`
         }`;
         
       default:
@@ -85,8 +115,8 @@ const TabNavigation: React.FC<TabNavigationProps> = ({
               ? 'bg-slate-800 text-white border-t border-l border-r border-slate-700'
               : 'bg-white text-slate-900 border-t border-l border-r border-slate-200 shadow-sm'
             : isDarkTheme
-              ? 'bg-slate-900 text-slate-400 hover:bg-slate-800/50 hover:text-slate-300 border-b border-slate-700'
-              : 'bg-slate-100 text-slate-600 hover:bg-slate-50 hover:text-slate-900 border-b border-slate-200'
+              ? `bg-slate-900 text-slate-400 ${isHovered ? 'bg-slate-800/50 text-slate-300' : ''} border-b border-slate-700`
+              : `bg-slate-100 text-slate-600 ${isHovered ? 'bg-slate-50 text-slate-900' : ''} border-b border-slate-200`
         }`;
     }
   };
@@ -128,8 +158,10 @@ const TabNavigation: React.FC<TabNavigationProps> = ({
               >
                 <button
                   onClick={() => onTabChange(tab.id)}
-                  className={`${getTabStyles(activeTab === tab.id)} flex items-center gap-2 relative group`}
+                  className={`${getTabStyles(activeTab === tab.id, hoveredTab === tab.id)} flex items-center gap-2 relative group`}
                   style={{ backfaceVisibility: 'hidden', transform: 'translateZ(0)' }}
+                  onMouseEnter={() => handleMouseEnter(tab.id)}
+                  onMouseLeave={handleMouseLeave}
                 >
                   
                   {/* Indicateur actif pour certaines variantes */}
