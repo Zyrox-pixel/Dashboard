@@ -148,11 +148,11 @@ const AdvancedFilter: React.FC<AdvancedFilterProps> = ({
   };
   
   return (
-    <div className={`p-4 rounded-lg shadow-lg border ${
+    <div className={`p-4 rounded-lg shadow-lg border max-h-[90vh] overflow-y-auto ${
       isDarkTheme 
         ? 'bg-slate-800 border-slate-700' 
         : 'bg-white border-slate-200'
-    } max-w-4xl w-full`}>
+    } w-full`}>
       <div className="flex justify-between items-center mb-4">
         <div className="flex items-center gap-2">
           <Filter className={isDarkTheme ? 'text-indigo-400' : 'text-indigo-600'} size={18} />
