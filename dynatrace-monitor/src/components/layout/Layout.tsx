@@ -18,12 +18,12 @@ const Layout: React.FC<LayoutProps> = ({ children, title, subtitle }) => {
   const location = useLocation();
   const [isTransitioning, setIsTransitioning] = useState(false);
 
-  // Effet de transition très léger lors du changement de route
+  // Effet de transition lent et fluide lors du changement de route
   useEffect(() => {
     setIsTransitioning(true);
     const timer = setTimeout(() => {
       setIsTransitioning(false);
-    }, 100); // Très rapide
+    }, 50); // Début rapide pour éviter le délai
     
     return () => clearTimeout(timer);
   }, [location.pathname]);
@@ -64,14 +64,14 @@ const Layout: React.FC<LayoutProps> = ({ children, title, subtitle }) => {
         <div 
           className="max-w-7xl mx-auto px-4 py-5 sm:px-6 md:px-8 overflow-hidden"
         >
-          {/* Content container avec animation très subtile */}
+          {/* Content container avec animation de glissement vertical fluide */}
           <div
             style={{
-              transition: 'all 0.1s ease-out',
+              transition: 'all 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
               transform: isTransitioning 
-                ? 'translateY(2px)' 
+                ? 'translateY(20px)' 
                 : 'translateY(0)',
-              opacity: isTransitioning ? 0.95 : 1,
+              opacity: isTransitioning ? 0 : 1,
             }}
           >
             {children}
