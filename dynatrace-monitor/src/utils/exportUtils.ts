@@ -375,3 +375,101 @@ export const exportProcessGroupsToCSV = (
 
   return { csv: csvContent, filename };
 };
+
+/**
+ * Convertit un tableau de management zones en format CSV
+ * @param zones Tableau de management zones à exporter
+ * @param variant Type de dashboard (vfg, vfe, etc.)
+ * @returns Un objet contenant le contenu CSV et le nom du fichier
+ */
+export const exportManagementZonesToCSV = (
+  zones: any[],
+  variant: string
+): { csv: string; filename: string } => {
+  // Créer l'en-tête du CSV
+  const headers = [
+    'Nom de la Management Zone',
+    'Nombre d\'applications',
+    'Nombre de services',
+    'Nombre d\'hôtes',
+    'Disponibilité (%)',
+    'Nombre de problèmes actifs',
+    'Statut'
+  ];
+
+  // Mapper les zones au format CSV
+  const rows = zones.map(zone => [
+    zone.name,                                          // Nom de la zone
+    zone.applications?.toString() || '0',               // Nombre d'applications
+    zone.services?.toString() || '0',                   // Nombre de services
+    zone.hosts?.toString() || '0',                      // Nombre d'hôtes
+    zone.availability || 'N/A',                         // Disponibilité
+    zone.problemCount?.toString() || '0',               // Nombre de problèmes
+    zone.status === 'healthy' ? 'Sain' : 'Avec problèmes' // Statut
+  ]);
+
+  // Créer un en-tête informatif avec le type et l'heure d'extraction
+  const now = new Date();
+  const formattedDateTime = now.toLocaleDateString('fr-FR') + ' ' + now.toLocaleTimeString('fr-FR');
+  
+  // Déterminer le titre selon le variant
+  let variantTitle = variant.toUpperCase();
+  switch (variant) {
+    case 'vfg':
+      variantTitle = 'Vital for Group';
+      break;
+    case 'vfe':
+      variantTitle = 'Vital for Enterprise';
+      break;
+    case 'vfp':
+      variantTitle = 'Vital for Production';
+      break;
+    case 'vfa':
+      variantTitle = 'Vital for Analytics';
+      break;
+    case 'detection':
+      variantTitle = 'Détection & CTL';
+      break;
+    case 'security':
+      variantTitle = 'Security & Encryption';
+      break;
+    case 'fce-security':
+      variantTitle = 'FCE Security';
+      break;
+    case 'network-filtering':
+      variantTitle = 'Network Filtering';
+      break;
+    case 'identity':
+      variantTitle = 'Identity';
+      break;
+  }
+  
+  // Créer un en-tête encadré pour le CSV
+  const headerFrame = [
+    '"=========================================="',
+    `"  EXPORT MANAGEMENT ZONES DYNATRACE      "`,
+    '"=========================================="',
+    `"Type: ${variantTitle}"`,
+    `"Date d'extraction: ${formattedDateTime}"`,
+    `"Nombre total de zones: ${zones.length}"`,
+    '"=========================================="',
+    '""',  // Ligne vide pour séparer l'en-tête des données
+  ];
+
+  // Ajouter BOM (Byte Order Mark) pour l'encodage UTF-8 correct
+  const BOM = '\uFEFF';
+  const csvContent = BOM + [
+    ...headerFrame,
+    // Utiliser des guillemets pour chaque cellule et échapper les guillemets doubles
+    headers.map(header => `"${header.replace(/"/g, '""')}"`).join(';'),
+    ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(';'))
+  ].join('\n');
+
+  // Générer le nom du fichier avec la date du jour
+  const today = new Date();
+  const datePrefix = today.toISOString().slice(0, 10).replace(/-/g, '');
+  
+  const filename = `management_zones_${variant}_${datePrefix}.csv`;
+
+  return { csv: csvContent, filename };
+};

@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Layers, Search, CheckCircle2, AlertTriangle, LayoutGrid, List, ArrowDownUp, RefreshCw, Filter } from 'lucide-react';
+import { Layers, Search, CheckCircle2, AlertTriangle, LayoutGrid, List, ArrowDownUp, RefreshCw, Filter, Download } from 'lucide-react';
 import ZoneCard from '../common/ZoneCard';
 import { ManagementZone } from '../../api/types';
 import { useZoneStatusPreloader } from '../../hooks/useZoneStatusPreloader';
+import { exportManagementZonesToCSV, downloadCSV } from '../../utils/exportUtils';
 
 // Type pour les filtres
 interface ZoneFilters {
@@ -282,6 +283,19 @@ const ModernManagementZoneList: React.FC<ModernManagementZoneListProps> = ({
           
           {/* Contrôles */}
           <div className="flex flex-wrap items-center gap-2">
+            {/* Export CSV */}
+            <button 
+              onClick={() => {
+                const { csv, filename } = exportManagementZonesToCSV(zonesWithPreloadedStatus, variant);
+                downloadCSV(csv, filename);
+              }}
+              className="px-3 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 flex items-center gap-2 transition-colors"
+              title="Télécharger les données en CSV"
+            >
+              <Download size={16} />
+              <span className="text-sm">Export CSV</span>
+            </button>
+            
             {/* Rafraîchir */}
             {onRefresh && (
               <button 
