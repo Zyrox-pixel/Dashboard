@@ -557,7 +557,7 @@ const OverviewDashboard: React.FC = () => {
         <div className="p-4 bg-slate-800 border border-slate-700 rounded-lg">
           <div className="flex items-center gap-3 mb-3">
             <Database size={18} className="text-purple-400" />
-            <h3 className="font-medium text-white">Applications</h3>
+            <h3 className="font-medium text-white">Processus</h3>
           </div>
           <div className="text-3xl font-bold text-purple-400">
             {vitalForGroupMZs.reduce((acc, zone) => acc + zone.apps, 0) + 
