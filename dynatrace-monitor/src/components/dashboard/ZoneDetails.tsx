@@ -18,6 +18,7 @@ import TopologyView from '../topology/TopologyView';
 import TopologyViewSimple from '../topology/TopologyViewSimple';
 import TopologyViewBasic from '../topology/TopologyViewBasic';
 import TopologyViewEnhanced from '../topology/TopologyViewEnhanced';
+import TopologyViewDebug from '../topology/TopologyViewDebug';
 
 interface ZoneDetailsProps {
   zone: ManagementZone;
@@ -1753,12 +1754,11 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
               </h2>
             </div>
             
-            {/* Vue topologique - Version améliorée avec relations */}
-            <div className="h-[600px]">
-              <TopologyViewEnhanced
+            {/* Vue topologique - Debug pour voir la structure des données */}
+            <div className="h-[600px] overflow-auto">
+              <TopologyViewDebug
                 entityType="SERVICE"
                 managementZone={zone.name}
-                showMetrics={true}
                 onNodeClick={(node) => {
                   // Ouvrir dans Dynatrace si nécessaire
                   if (node.entityId) {

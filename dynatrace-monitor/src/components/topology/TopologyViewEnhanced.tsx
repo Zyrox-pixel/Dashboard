@@ -48,8 +48,13 @@ const TopologyViewEnhanced: React.FC<TopologyViewEnhancedProps> = ({
         ? `${API_BASE_URL}/topology/${entityType}?mz=${encodeURIComponent(managementZone)}`
         : `${API_BASE_URL}/topology/${entityType}`;
       
+      console.log('Fetching from URL:', url);
+      
       const response = await fetch(url);
       const data = await response.json();
+      
+      console.log('Raw API response:', data);
+      console.log('Number of entities:', data.entities?.length || 0);
       
       // Transformer les entités en nœuds
       const transformedNodes: Node[] = (data.entities || []).map((entity: any) => ({
