@@ -53,11 +53,14 @@ const TopologyView: React.FC<TopologyViewProps> = ({
       const response = await fetch(url);
       const data = await response.json();
       
+      // Log pour debug
+      console.log('Raw topology data:', data);
+      
       // Transformer les données Dynatrace en format D3
       const transformedNodes: Node[] = data.entities?.map((entity: any) => ({
         id: entity.entityId,
-        name: entity.displayName || entity.name,
-        type: entity.type,
+        name: entity.displayName || entity.name || entity.entityId,
+        type: entity.type || 'UNKNOWN',
         status: determineStatus(entity),
         metrics: extractMetrics(entity)
       })) || [];
@@ -77,6 +80,9 @@ const TopologyView: React.FC<TopologyViewProps> = ({
         });
       });
 
+      console.log('Transformed nodes:', transformedNodes);
+      console.log('Transformed links:', transformedLinks);
+      
       setNodes(transformedNodes);
       setLinks(transformedLinks);
     } catch (error) {
@@ -102,7 +108,13 @@ const TopologyView: React.FC<TopologyViewProps> = ({
   };
 
   useEffect(() => {
-    if (!svgRef.current || loading || nodes.length === 0) return;
+    if (!svgRef.current || loading) return;
+    
+    // Si pas de nœuds, afficher un message
+    if (nodes.length === 0) {
+      console.log('No nodes to display');
+      return;
+    }
 
     const width = svgRef.current.clientWidth;
     const height = svgRef.current.clientHeight;
