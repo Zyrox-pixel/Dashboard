@@ -19,6 +19,7 @@ import TopologyViewSimple from '../topology/TopologyViewSimple';
 import TopologyViewBasic from '../topology/TopologyViewBasic';
 import TopologyViewEnhanced from '../topology/TopologyViewEnhanced';
 import TopologyViewDebug from '../topology/TopologyViewDebug';
+import TopologyViewFixed from '../topology/TopologyViewFixed';
 
 interface ZoneDetailsProps {
   zone: ManagementZone;
@@ -1754,9 +1755,9 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
               </h2>
             </div>
             
-            {/* Vue topologique - Version améliorée avec relations */}
+            {/* Vue topologique - Version corrigée */}
             <div className="h-[600px]">
-              <TopologyViewEnhanced
+              <TopologyViewFixed
                 entityType="SERVICE"
                 managementZone={zone.name}
                 showMetrics={true}
