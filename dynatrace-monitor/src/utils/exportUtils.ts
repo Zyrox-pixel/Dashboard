@@ -397,7 +397,7 @@ export const exportManagementZonesToCSV = (
   // Mapper les zones au format CSV
   const rows = zones.map(zone => [
     zone.name,                                          // Nom de la zone
-    zone.applications?.toString() || '0',               // Nombre d'applications
+    zone.apps?.toString() || '0',                       // Nombre d'applications (le champ est 'apps' pas 'applications')
     zone.services?.toString() || '0',                   // Nombre de services
     zone.hosts?.toString() || '0'                       // Nombre d'hôtes
   ]);
@@ -463,7 +463,39 @@ export const exportManagementZonesToCSV = (
   const today = new Date();
   const datePrefix = today.toISOString().slice(0, 10).replace(/-/g, '');
   
-  const filename = `management_zones_${variant}_${datePrefix}.csv`;
+  // Utiliser le titre du variant pour le nom du fichier
+  let filePrefix = variant;
+  switch (variant) {
+    case 'vfg':
+      filePrefix = 'VitalForGroup';
+      break;
+    case 'vfe':
+      filePrefix = 'VitalForEnterprise';
+      break;
+    case 'vfp':
+      filePrefix = 'VitalForProduction';
+      break;
+    case 'vfa':
+      filePrefix = 'VitalForAnalytics';
+      break;
+    case 'detection':
+      filePrefix = 'DetectionCTL';
+      break;
+    case 'security':
+      filePrefix = 'SecurityEncryption';
+      break;
+    case 'fce-security':
+      filePrefix = 'FCESecurity';
+      break;
+    case 'network-filtering':
+      filePrefix = 'NetworkFiltering';
+      break;
+    case 'identity':
+      filePrefix = 'Identity';
+      break;
+  }
+  
+  const filename = `ManagementZones_${filePrefix}_${datePrefix}.csv`;
 
   return { csv: csvContent, filename };
 };
