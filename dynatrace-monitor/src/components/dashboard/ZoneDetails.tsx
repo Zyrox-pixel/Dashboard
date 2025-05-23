@@ -52,6 +52,7 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
   // États pour la recherche
   const [hostSearchTerm, setHostSearchTerm] = useState<string>('');
   const [serviceSearchTerm, setServiceSearchTerm] = useState<string>('');
+  const [processSearchTerm, setProcessSearchTerm] = useState<string>('');
   
   // États pour les filtres avancés
   const [showAdvancedFilter, setShowAdvancedFilter] = useState<boolean>(false);
@@ -710,11 +711,15 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
     });
   }, [sortedServices, serviceFilters]);
   
+  // Obtenir les données triées pour les process groups
+  const sortedProcessGroups = useMemo(() => getSortedData(processGroups, processSearchTerm), 
+    [processGroups, sortConfig, processSearchTerm]);
+
   // Filtrer les process groups en fonction des filtres
   const filteredProcessGroups = useMemo(() => {
-    if (processFilters.length === 0) return processGroups;
+    if (processFilters.length === 0) return sortedProcessGroups;
     
-    return processGroups.filter(process => {
+    return sortedProcessGroups.filter(process => {
       // Vérifier chaque type de filtre
       return processFilters.every(filter => {
         // Si aucune valeur sélectionnée, considérer comme match
@@ -732,7 +737,7 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
         }
       });
     });
-  }, [processGroups, processFilters]);
+  }, [sortedProcessGroups, processFilters]);
   
   // Définition des colonnes pour les tableaux
   const processColumns = useMemo<Column<ProcessGroup>[]>(() => [
@@ -1298,17 +1303,7 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
       </div>
       
       {/* Statistiques générales */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
-        <div className={`p-3 rounded-lg border ${
-          isDarkTheme ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-slate-200'
-        }`}>
-          <div className="text-xs text-slate-400 mb-1">Disponibilité</div>
-          <div className={`text-xl font-bold ${
-            parseFloat(zone.availability) < 99 
-              ? 'text-yellow-500' 
-              : 'text-green-500'
-          }`}>{zone.availability}</div>
-        </div>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
         <div className={`p-3 rounded-lg border ${
           isDarkTheme ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-slate-200'
         }`}>
@@ -1642,6 +1637,30 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
               <span className="text-xs text-slate-400 ml-2">({filteredProcessGroups.length})</span>
             </h2>
             <div className="flex items-center gap-3">
+              {/* Barre de recherche pour les process groups */}
+              <div className="relative">
+                <input
+                  type="text"
+                  value={processSearchTerm}
+                  onChange={(e) => setProcessSearchTerm(e.target.value)}
+                  placeholder="Rechercher un process group..."
+                  className={`w-64 h-8 pl-8 pr-4 rounded-md ${
+                    isDarkTheme
+                      ? 'bg-slate-700 border-slate-600 text-white placeholder-slate-400'
+                      : 'bg-slate-100 border-slate-200 text-slate-900 placeholder-slate-500'
+                  } border focus:outline-none focus:ring-1 focus:ring-indigo-500`}
+                />
+                <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 text-slate-400" size={14} />
+                {processSearchTerm && (
+                  <button
+                    onClick={() => setProcessSearchTerm('')}
+                    className="absolute right-2.5 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-500"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+
               {/* Bouton d'export CSV pour les process groups */}
               <button
                 onClick={() => {
