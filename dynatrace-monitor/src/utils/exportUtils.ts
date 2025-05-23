@@ -391,10 +391,7 @@ export const exportManagementZonesToCSV = (
     'Nom de la Management Zone',
     'Nombre d\'applications',
     'Nombre de services',
-    'Nombre d\'hôtes',
-    'Disponibilité (%)',
-    'Nombre de problèmes actifs',
-    'Statut'
+    'Nombre d\'hôtes'
   ];
 
   // Mapper les zones au format CSV
@@ -402,10 +399,7 @@ export const exportManagementZonesToCSV = (
     zone.name,                                          // Nom de la zone
     zone.applications?.toString() || '0',               // Nombre d'applications
     zone.services?.toString() || '0',                   // Nombre de services
-    zone.hosts?.toString() || '0',                      // Nombre d'hôtes
-    zone.availability || 'N/A',                         // Disponibilité
-    zone.problemCount?.toString() || '0',               // Nombre de problèmes
-    zone.status === 'healthy' ? 'Sain' : 'Avec problèmes' // Statut
+    zone.hosts?.toString() || '0'                       // Nombre d'hôtes
   ]);
 
   // Créer un en-tête informatif avec le type et l'heure d'extraction
