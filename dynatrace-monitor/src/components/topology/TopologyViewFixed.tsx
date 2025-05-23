@@ -88,15 +88,34 @@ const TopologyViewFixed: React.FC<TopologyViewFixedProps> = ({
     // Extract links from relationships
     const links: any[] = [];
     entities.forEach((entity: any) => {
-      if (entity.toRelationships) {
+      // Check if toRelationships exists and is an array
+      if (entity.toRelationships && Array.isArray(entity.toRelationships)) {
         entity.toRelationships.forEach((rel: any) => {
-          if (rel.targets) {
+          if (rel.targets && Array.isArray(rel.targets)) {
             rel.targets.forEach((target: any) => {
               // Check if target exists in our entities
               if (entities.find(e => e.entityId === target.id)) {
                 links.push({
                   source: entity.entityId,
                   target: target.id,
+                  type: rel.type
+                });
+              }
+            });
+          }
+        });
+      }
+      
+      // Also check fromRelationships
+      if (entity.fromRelationships && Array.isArray(entity.fromRelationships)) {
+        entity.fromRelationships.forEach((rel: any) => {
+          if (rel.sources && Array.isArray(rel.sources)) {
+            rel.sources.forEach((source: any) => {
+              // Check if source exists in our entities
+              if (entities.find(e => e.entityId === source.id)) {
+                links.push({
+                  source: source.id,
+                  target: entity.entityId,
                   type: rel.type
                 });
               }
