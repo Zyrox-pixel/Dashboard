@@ -1754,11 +1754,12 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
               </h2>
             </div>
             
-            {/* Vue topologique - Debug pour voir la structure des données */}
-            <div className="h-[600px] overflow-auto">
-              <TopologyViewDebug
+            {/* Vue topologique - Version améliorée avec relations */}
+            <div className="h-[600px]">
+              <TopologyViewEnhanced
                 entityType="SERVICE"
                 managementZone={zone.name}
+                showMetrics={true}
                 onNodeClick={(node) => {
                   // Ouvrir dans Dynatrace si nécessaire
                   if (node.entityId) {
