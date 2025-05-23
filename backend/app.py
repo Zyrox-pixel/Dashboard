@@ -1763,8 +1763,13 @@ def get_service_dependencies():
         
         # D'abord récupérer tous les services
         services_url = f"{DT_ENV_URL}/api/v2/entities"
+        # Construire le sélecteur d'entité
+        entity_selector = 'type(SERVICE)'
+        if mz_name:
+            entity_selector += f',mzName("{mz_name}")'
+            
         params = {
-            'entitySelector': f'type(SERVICE){",mzName(\\"" + mz_name + "\\")" if mz_name else ""}',
+            'entitySelector': entity_selector,
             'fields': '+properties'
         }
         headers = {
