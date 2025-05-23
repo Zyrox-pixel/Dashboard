@@ -15,6 +15,7 @@ import {
   downloadCSV
 } from '../../utils/exportUtils';
 import TopologyView from '../topology/TopologyView';
+import TopologyViewSimple from '../topology/TopologyViewSimple';
 
 interface ZoneDetailsProps {
   zone: ManagementZone;
@@ -1750,16 +1751,16 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
               </h2>
             </div>
             
-            {/* Vue topologique */}
+            {/* Vue topologique - Version simple pour debug */}
             <div className="h-[600px]">
-              <TopologyView
+              <TopologyViewSimple
                 entityType="SERVICE"
                 managementZone={zone.name}
                 showMetrics={true}
                 onNodeClick={(node) => {
                   // Ouvrir dans Dynatrace si nécessaire
-                  if (node.id) {
-                    window.open(`${zone.dt_url}/ui/entity/${node.id}`, '_blank');
+                  if (node.entityId) {
+                    window.open(`${zone.dt_url}/ui/entity/${node.entityId}`, '_blank');
                   }
                 }}
               />
