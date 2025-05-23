@@ -1695,7 +1695,6 @@ def refresh_cache(cache_type):
     return jsonify({'success': True, 'message': f'Cache {cache_type} effacé avec succès'})
 
 @app.route('/api/entity-relationships/<entity_id>')
-@api_client.cache_with_refresh('entity_relationships', duration=300)
 def get_entity_relationships(entity_id):
     """
     Récupère les relations d'une entité depuis l'API Dynatrace
@@ -1719,7 +1718,6 @@ def get_entity_relationships(entity_id):
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/topology/<entity_type>')
-@api_client.cache_with_refresh('topology', duration=300)
 def get_topology(entity_type):
     """
     Récupère la topologie complète pour un type d'entité avec les relations
