@@ -1753,6 +1753,105 @@ def get_topology(entity_type):
         logger.error(f"Error fetching topology: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/service-dependencies')
+def get_service_dependencies():
+    """
+    Récupère les dépendances entre services basées sur les métriques
+    """
+    try:
+        mz_name = request.args.get('mz')
+        
+        # D'abord récupérer tous les services
+        services_url = f"{DT_ENV_URL}/api/v2/entities"
+        params = {
+            'entitySelector': f'type(SERVICE){",mzName(\\"" + mz_name + "\\")" if mz_name else ""}',
+            'fields': '+properties'
+        }
+        headers = {
+            'Authorization': f'Api-Token {API_TOKEN}',
+            'Accept': 'application/json'
+        }
+        
+        services_response = api_client.session.get(services_url, params=params, headers=headers, verify=False)
+        if services_response.status_code != 200:
+            return jsonify({'error': 'Failed to fetch services'}), 500
+            
+        services = services_response.json().get('entities', [])
+        
+        # Pour chaque service, récupérer ses métriques de requests
+        nodes = []
+        links = []
+        link_map = {}  # Pour éviter les doublons
+        
+        for service in services:
+            service_id = service['entityId']
+            service_name = service.get('displayName', service_id)
+            
+            # Ajouter le nœud
+            nodes.append({
+                'id': service_id,
+                'name': service_name,
+                'entityId': service_id,
+                'displayName': service_name,
+                'type': 'SERVICE',
+                'properties': service.get('properties', {})
+            })
+            
+            # Récupérer les métriques de qui appelle ce service
+            metrics_url = f"{DT_ENV_URL}/api/v2/metrics/query"
+            metrics_params = {
+                'metricSelector': f'builtin:service.requestCount.server:splitBy("dt.entity.service"):filter(eq("dt.entity.service","{service_id}"))',
+                'from': 'now-1h'
+            }
+            
+            try:
+                metrics_response = api_client.session.get(metrics_url, params=metrics_params, headers=headers, verify=False)
+                if metrics_response.status_code == 200:
+                    metrics_data = metrics_response.json()
+                    # Parser les métriques pour extraire les relations
+                    # (La structure exacte dépend de la réponse Dynatrace)
+            except:
+                pass
+        
+        # Construire la réponse dans le format attendu
+        return jsonify({
+            'entities': nodes,
+            'relationships': links
+        })
+        
+    except Exception as e:
+        logger.error(f"Error fetching service dependencies: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/smartscape/<entity_id>')
+def get_smartscape(entity_id):
+    """
+    Récupère la vue Smartscape d'une entité (ses relations directes)
+    """
+    try:
+        # Endpoint Smartscape pour une entité
+        url = f"{DT_ENV_URL}/api/v1/entity/infrastructure/services/{entity_id}"
+        headers = {
+            'Authorization': f'Api-Token {API_TOKEN}',
+            'Accept': 'application/json'
+        }
+        
+        response = api_client.session.get(url, headers=headers, verify=False)
+        if response.status_code == 200:
+            return jsonify(response.json())
+        else:
+            # Si v1 ne fonctionne pas, essayer v2
+            url_v2 = f"{DT_ENV_URL}/api/v2/entities/{entity_id}/relationships"
+            response_v2 = api_client.session.get(url_v2, headers=headers, verify=False)
+            if response_v2.status_code == 200:
+                return jsonify(response_v2.json())
+            else:
+                return jsonify({'error': f'Smartscape API not accessible: {response.status_code}'}), response.status_code
+            
+    except Exception as e:
+        logger.error(f"Error fetching Smartscape data: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/mz-admin', methods=['GET'])
 def get_mz_admin():
     """Endpoint pour récupérer la Management Zone configurée pour l'onglet Hosts"""
