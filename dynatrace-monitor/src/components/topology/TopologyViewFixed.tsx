@@ -108,17 +108,24 @@ const TopologyViewFixed: React.FC<TopologyViewFixedProps> = ({
 
     console.log('Found', links.length, 'relationships');
 
-    // Prepare nodes data
+    // Prepare nodes data with D3 types
     const nodes = entities.map(entity => ({
       id: entity.entityId,
       name: entity.displayName || entity.name || entity.entityId,
       type: entity.type,
       color: determineColor(entity),
-      entity: entity // Keep original entity for click handler
+      entity: entity, // Keep original entity for click handler
+      // D3 force simulation properties
+      x: undefined as number | undefined,
+      y: undefined as number | undefined,
+      vx: undefined as number | undefined,
+      vy: undefined as number | undefined,
+      fx: undefined as number | null | undefined,
+      fy: undefined as number | null | undefined
     }));
 
     // Create force simulation
-    const simulation = d3.forceSimulation(nodes)
+    const simulation = d3.forceSimulation(nodes as any)
       .force("link", d3.forceLink(links).id((d: any) => d.id).distance(150))
       .force("charge", d3.forceManyBody().strength(-400))
       .force("center", d3.forceCenter(width / 2, height / 2))
