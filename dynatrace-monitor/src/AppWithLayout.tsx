@@ -5,6 +5,7 @@ import UnifiedDashboard from './pages/UnifiedDashboard';
 import UnifiedProblemsPage from './pages/UnifiedProblemsPage';
 import OverviewDashboard from './pages/OverviewDashboard';
 import HostsPage from './pages/HostsPage';
+import TopologyPage from './pages/TopologyPage';
 
 // Wrapper pour les pages sans Layout (pour éviter le double Layout)
 const PageWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -55,6 +56,9 @@ const AppWithLayout: React.FC = () => {
         <Route path="/hosts" element={<PageWrapper><HostsPage /></PageWrapper>} />
         <Route path="/services" element={<Navigate to="/dashboard/vfg" replace />} />
         <Route path="/other" element={<Navigate to="/overview" replace />} />
+        
+        {/* Route pour la vue topologique */}
+        <Route path="/topology" element={<PageWrapper><TopologyPage /></PageWrapper>} />
         
         {/* Redirection des routes non trouvées vers la page d'accueil */}
         <Route path="*" element={<Navigate to="/" replace />} />

@@ -1694,6 +1694,67 @@ def refresh_cache(cache_type):
     api_client.clear_cache(f"{cache_type}:")
     return jsonify({'success': True, 'message': f'Cache {cache_type} effacé avec succès'})
 
+@app.route('/api/entity-relationships/<entity_id>')
+@api_client.cache_with_refresh('entity_relationships', duration=300)
+def get_entity_relationships(entity_id):
+    """
+    Récupère les relations d'une entité depuis l'API Dynatrace
+    """
+    try:
+        # Récupérer les relations depuis l'API Dynatrace
+        relationships_url = f"{DT_ENV_URL}/api/v2/entities/{entity_id}/relationships"
+        headers = {
+            'Authorization': f'Api-Token {API_TOKEN}',
+            'Accept': 'application/json'
+        }
+        
+        response = api_client.session.get(relationships_url, headers=headers, verify=False)
+        if response.status_code == 200:
+            return jsonify(response.json())
+        else:
+            return jsonify({'error': f'Failed to fetch relationships: {response.status_code}'}), response.status_code
+            
+    except Exception as e:
+        logger.error(f"Error fetching entity relationships: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/topology/<entity_type>')
+@api_client.cache_with_refresh('topology', duration=300)
+def get_topology(entity_type):
+    """
+    Récupère la topologie complète pour un type d'entité avec les relations
+    """
+    try:
+        # Récupérer le paramètre de management zone si fourni
+        mz_name = request.args.get('mz')
+        
+        # Construire le sélecteur d'entité
+        if mz_name:
+            entity_selector = f'type({entity_type}),mzName("{mz_name}")'
+        else:
+            entity_selector = f'type({entity_type})'
+        
+        # Récupérer toutes les entités du type spécifié
+        entities_url = f"{DT_ENV_URL}/api/v2/entities"
+        params = {
+            'entitySelector': entity_selector,
+            'fields': '+properties,+toRelationships,+fromRelationships'
+        }
+        headers = {
+            'Authorization': f'Api-Token {API_TOKEN}',
+            'Accept': 'application/json'
+        }
+        
+        response = api_client.session.get(entities_url, params=params, headers=headers, verify=False)
+        if response.status_code == 200:
+            return jsonify(response.json())
+        else:
+            return jsonify({'error': f'Failed to fetch topology: {response.status_code}'}), response.status_code
+            
+    except Exception as e:
+        logger.error(f"Error fetching topology: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/mz-admin', methods=['GET'])
 def get_mz_admin():
     """Endpoint pour récupérer la Management Zone configurée pour l'onglet Hosts"""

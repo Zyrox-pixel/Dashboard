@@ -1,5 +1,5 @@
 import React, { useMemo, useCallback, useState, useEffect } from 'react';
-import { ChevronLeft, Clock, AlertTriangle, ExternalLink, RefreshCw, Cpu, Activity, Server, Filter, Loader, Database, Search, ArrowUp, ArrowDown, X, Check, Monitor, Sliders, FileDown } from 'lucide-react';
+import { ChevronLeft, Clock, AlertTriangle, ExternalLink, RefreshCw, Cpu, Activity, Server, Filter, Loader, Database, Search, ArrowUp, ArrowDown, X, Check, Monitor, Sliders, FileDown, Network } from 'lucide-react';
 import { useApp } from '../../contexts/AppContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { ManagementZone, Problem, ProcessGroup, Host, Service } from '../../api/types';
@@ -14,6 +14,7 @@ import {
   exportProcessGroupsToCSV,
   downloadCSV
 } from '../../utils/exportUtils';
+import TopologyView from '../topology/TopologyView';
 
 interface ZoneDetailsProps {
   zone: ManagementZone;
@@ -1404,6 +1405,21 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
             <span>Process Groups</span>
           </div>
         </button>
+        <button 
+          onClick={() => handleTabClick('topology')}
+          className={`px-4 py-2 font-medium text-sm whitespace-nowrap border-b-2 -mb-px transition-colors ${
+            activeTab === 'topology' 
+              ? `border-${zone.color}-500 ${zoneColors.text}` 
+              : `border-transparent ${
+                  isDarkTheme ? 'text-slate-400 hover:text-slate-300' : 'text-slate-600 hover:text-slate-900'
+                }`
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            <Network size={14} />
+            <span>Topologie</span>
+          </div>
+        </button>
       </div>
       
       {/* Contenu des onglets avec animation douce */}
@@ -1718,6 +1734,37 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
                 : "Aucun process group trouvé pour cette management zone."
             }
           />
+        </section>
+      )}
+      
+      {/* Contenu de l'onglet Topologie */}
+      {activeTab === 'topology' && (
+        <section className={`rounded-lg overflow-hidden ${
+          isDarkTheme ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
+        } border`}>
+          <div className="p-4">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="font-semibold flex items-center gap-2">
+                <Network className={zoneColors.text} size={16} />
+                <span>Topologie de {zone.name}</span>
+              </h2>
+            </div>
+            
+            {/* Vue topologique */}
+            <div className="h-[600px]">
+              <TopologyView
+                entityType="SERVICE"
+                managementZone={zone.name}
+                showMetrics={true}
+                onNodeClick={(node) => {
+                  // Ouvrir dans Dynatrace si nécessaire
+                  if (node.id) {
+                    window.open(`${zone.dt_url}/ui/entity/${node.id}`, '_blank');
+                  }
+                }}
+              />
+            </div>
+          </div>
         </section>
       )}
       

@@ -12,7 +12,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { useFocusManagement } from '../../hooks/useFocusManagement';
 
 // Définir les types pour les fonctions
-type MenuItemKey = 'home' | 'problems' | 'vfg' | 'vfe' | 'detection' | 'security' | 'fce_security' | 'network_filtering' | 'identity' | 'hosts' | 'activity' | 'settings';
+type MenuItemKey = 'home' | 'problems' | 'vfg' | 'vfe' | 'detection' | 'security' | 'fce_security' | 'network_filtering' | 'identity' | 'hosts' | 'topology' | 'activity' | 'settings';
 type ColorType = 'indigo' | 'amber' | 'red' | 'blue' | 'green' | 'purple' | 'cyan' | 'pink';
 
 const Sidebar: React.FC = () => {
@@ -119,6 +119,8 @@ const Sidebar: React.FC = () => {
       newActiveItem = 'identity';
     } else if (path.startsWith('/hosts')) {
       newActiveItem = 'hosts';
+    } else if (path.startsWith('/topology')) {
+      newActiveItem = 'topology';
     } else if (path.startsWith('/settings')) {
       newActiveItem = 'settings';
     } else if (path.startsWith('/activity')) {
@@ -693,6 +695,14 @@ const Sidebar: React.FC = () => {
                 icon={Layers}
                 label="Hosts"
                 color="green"
+                special={true}
+              />
+              <MenuItem
+                to="/topology"
+                itemKey="topology"
+                icon={Globe}
+                label="Topologie"
+                color="purple"
                 special={true}
               />
             </nav>
