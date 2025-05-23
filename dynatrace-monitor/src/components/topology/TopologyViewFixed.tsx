@@ -136,6 +136,15 @@ const TopologyViewFixed: React.FC<TopologyViewFixedProps> = ({
     });
 
     console.log('Found', links.length, 'relationships');
+    
+    // Log detailed relationship info
+    if (links.length === 0 && entities.length > 0) {
+      console.log('No relationships found. Checking entity structure:');
+      const sampleEntity = entities[0];
+      console.log('Sample entity:', sampleEntity);
+      console.log('Has toRelationships?', !!sampleEntity.toRelationships);
+      console.log('Has fromRelationships?', !!sampleEntity.fromRelationships);
+    }
 
     // Prepare nodes data with D3 types
     const nodes = entities.map(entity => ({

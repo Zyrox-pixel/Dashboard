@@ -48,6 +48,7 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
   const { refreshData } = useApp();
   const [filteredProblems, setFilteredProblems] = useState<Problem[]>([]);
   const [isTabTransitioning, setIsTabTransitioning] = useState(false);
+  const [topologyEntityType, setTopologyEntityType] = useState<string>('SERVICE');
   
   // États pour le tri et la recherche
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'ascending' | 'descending' | null }>({
@@ -1753,12 +1754,56 @@ const ZoneDetails: React.FC<ZoneDetailsProps> = ({
                 <Network className={zoneColors.text} size={16} />
                 <span>Topologie de {zone.name}</span>
               </h2>
+              
+              {/* Sélecteur de type d'entité */}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setTopologyEntityType('SERVICE')}
+                  className={`px-3 py-1 rounded text-xs ${
+                    topologyEntityType === 'SERVICE'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                  }`}
+                >
+                  Services
+                </button>
+                <button
+                  onClick={() => setTopologyEntityType('APPLICATION')}
+                  className={`px-3 py-1 rounded text-xs ${
+                    topologyEntityType === 'APPLICATION'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                  }`}
+                >
+                  Applications
+                </button>
+                <button
+                  onClick={() => setTopologyEntityType('HOST')}
+                  className={`px-3 py-1 rounded text-xs ${
+                    topologyEntityType === 'HOST'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                  }`}
+                >
+                  Hôtes
+                </button>
+                <button
+                  onClick={() => setTopologyEntityType('PROCESS_GROUP')}
+                  className={`px-3 py-1 rounded text-xs ${
+                    topologyEntityType === 'PROCESS_GROUP'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                  }`}
+                >
+                  Process Groups
+                </button>
+              </div>
             </div>
             
             {/* Vue topologique - Version corrigée */}
             <div className="h-[600px]">
               <TopologyViewFixed
-                entityType="SERVICE"
+                entityType={topologyEntityType}
                 managementZone={zone.name}
                 showMetrics={true}
                 onNodeClick={(node) => {
