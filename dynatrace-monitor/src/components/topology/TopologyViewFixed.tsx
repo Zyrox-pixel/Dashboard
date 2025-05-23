@@ -18,6 +18,7 @@ const TopologyViewFixed: React.FC<TopologyViewFixedProps> = ({
   const svgRef = useRef<SVGSVGElement>(null);
   const [loading, setLoading] = useState(true);
   const [entities, setEntities] = useState<any[]>([]);
+  const [debugInfo, setDebugInfo] = useState<any>({});
 
   useEffect(() => {
     fetchTopologyData();
@@ -37,6 +38,15 @@ const TopologyViewFixed: React.FC<TopologyViewFixedProps> = ({
       
       console.log('Response received:', data);
       console.log('Entities found:', data.entities?.length || 0);
+      
+      // Store debug info
+      setDebugInfo({
+        url: url,
+        dataKeys: Object.keys(data || {}),
+        entitiesCount: data.entities?.length || 0,
+        firstEntity: data.entities?.[0] || null,
+        rawData: data
+      });
       
       setEntities(data.entities || []);
     } catch (error) {
@@ -241,14 +251,33 @@ const TopologyViewFixed: React.FC<TopologyViewFixedProps> = ({
 
   if (entities.length === 0) {
     return (
-      <div className="flex items-center justify-center h-full text-slate-400">
-        <div className="text-center">
-          <p className="text-lg">Aucune entité trouvée</p>
-          <p className="text-sm mt-2">Type: {entityType}</p>
-          <p className="text-sm">Zone: {managementZone || 'Toutes'}</p>
+      <div className="h-full overflow-auto p-4 text-slate-400">
+        <div className="space-y-4">
+          <div className="text-center">
+            <p className="text-lg">Aucune entité trouvée</p>
+            <p className="text-sm mt-2">Type: {entityType}</p>
+            <p className="text-sm">Zone: {managementZone || 'Toutes'}</p>
+          </div>
+          
+          <div className="bg-slate-800 p-4 rounded">
+            <h3 className="text-sm font-semibold mb-2">Debug Info:</h3>
+            <p className="text-xs">URL: {debugInfo.url}</p>
+            <p className="text-xs">Data keys: {debugInfo.dataKeys?.join(', ')}</p>
+            <p className="text-xs">Entities count: {debugInfo.entitiesCount}</p>
+            
+            {debugInfo.rawData && (
+              <div className="mt-2">
+                <p className="text-xs mb-1">Raw response:</p>
+                <pre className="text-xs bg-slate-900 p-2 rounded overflow-auto max-h-64">
+                  {JSON.stringify(debugInfo.rawData, null, 2)}
+                </pre>
+              </div>
+            )}
+          </div>
+          
           <button 
             onClick={fetchTopologyData}
-            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
           >
             Rafraîchir
           </button>
